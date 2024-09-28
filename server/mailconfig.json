@@ -1,0 +1,37 @@
+{
+  "email-verification": {
+    "from": "\"mycompany\" <hello@mycompany>",
+    "subject": "Please Verify Your Email Address",
+    "body": "Hello,\n\nThank you for signing up! To complete your registration, please verify your email address by clicking the link below:\n\n{{ url }}"
+  },
+  "login": {
+    "from": "\"mycompany\" <hello@mycompany>",
+    "subject": "Sign In to Your Account",
+    "body": "Hello,\n\nYou can sign in to your account by clicking the link below. \n\n{{ url }}\n\nIf you did not request a sign-in link or if you have any concerns about your account security, please contact our marketing team."
+  },
+  "reset-password": {
+    "from": "\"mycompany\" <support@mycompany>",
+    "subject": "Password Reset Request",
+    "body": "Hello,\n\nWe received a request to reset your password. If you did not make this request, please ignore this email. Otherwise, you can reset your password by clicking the link below:\n\n{{ url }}\n\nIf you encounter any issues or need further assistance, please contact our support team."
+  },
+  "request-approval": {
+    "from": "\"mycompany\" <support@mycompany>",
+    "subject": "New subscription - {{ requester.name }} need approval",
+    "body": "Hello,\n\nA new subscription request has been submitted by {{ requester.name }} and requires your approval. Please review the details and take the appropriate action to validate this member account.\n\nClick here to view the member profile:\n{{ url }}"
+  },
+  "user-approved": {
+    "from": "\"mycompany\" <hello@mycompany>",
+    "subject": "Your account is approved",
+    "body": "Hello {{ user.name }},\n\nYour account has been approved! You can now log in and start using our services.\n\nPlease click the link below to log in:\n{{ url }}\n\nIf you did not request this, please ignore this email or contact support if you have concerns."
+  },
+  "download-ready": {
+    "from": "\"mycompany\" <support@mycompany>",
+    "subject": "Your Download is Ready!",
+    "body": "Greetings! Your requested download is now available. To access your file, please click the link below:\n\n{{ link }}\n\nIf you encounter any issues or have questions, don't hesitate to reach out to our support team."
+  },
+  "invitation": {
+    "from": "\"mycompany\" <hello@mycompany>",
+    "subject": "You are invited to join a collection!",
+    "body": "Hello,\n\nYou have been invited to join this a collection!\n\nPlease click the link below to accept your invitation and get started:\n{{ url }}\n\nIf you did not expect to receive this invitation, please ignore this email or reach out to our support team for assistance."
+  }
+}

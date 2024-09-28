@@ -1,0 +1,174 @@
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 98%; /* bg-neutral-50 */
+    --foreground: 0 0% 32%; /* text-neutral-600 */
+
+    --muted: 0 0% 96%; /* bg-neutral-100 */
+    --muted-foreground: 0 0% 64%; /* text-neutral-400 */
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 32%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 32%;
+
+    --border: 0 0% 64%;
+    --input: 0 0% 96%;
+
+    --primary: 0 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 0 47.4% 11.2%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 0 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --ring: 0 0% 64%;
+
+    --radius: -10.5rem; /*0.5rem*/
+  }
+
+  .dark {
+    --background: 0 0% 32%;
+    --foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --popover: 0 0% 32%;
+    --popover-foreground: 210 40% 98%;
+
+    --card: 0 0% 32%;
+    --card-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 0 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground m-0 font-sans text-base;
+  }
+}
+
+.vue-treeselect__control {
+  @apply border border-neutral-400 pl-1 h-[2.8rem] rounded-none;
+}
+
+.vue-treeselect:not(.vue-treeselect--disabled):not(.vue-treeselect--focused)
+  .vue-treeselect__control:hover,
+.vue-treeselect--open .vue-treeselect__control {
+  @apply border-neutral-800;
+}
+
+.vue-treeselect--open-below .vue-treeselect__menu {
+  @apply bg-popover text-neutral-800 border border-neutral-400 rounded-none shadow-md mt-1;
+}
+
+.vue-treeselect__option--highlight {
+  @apply bg-neutral-100 text-neutral-900 p-1;
+}
+
+.vue-treeselect__option {
+  @apply p-1;
+}
+
+.vue-treeselect .vue-treeselect-helper-hide {
+  display: none;
+}
+
+.vue-treeselect--focused.vue-treeselect--searchable .vue-treeselect__single-value {
+  @apply text-neutral-800;
+}
+
+.vue-treeselect--has-value .vue-treeselect__multi-value {
+  @apply px-1 py-1 mb-0;
+}
+
+.vue-treeselect__control-arrow,
+.vue-treeselect__x {
+  @apply text-neutral-500;
+}
+
+.vue-treeselect.vue-treeselect--focused {
+  @apply border-neutral-600;
+}
+
+.vue-treeselect__placeholder,
+.vue-treeselect__single-value {
+  @apply flex items-center text-neutral-500 text-sm;
+}
+
+.vue-treeselect__single-value {
+  @apply text-neutral-800;
+}
+
+.vue-treeselect__input,
+.vue-treeselect__single-value {
+  @apply px-1.5 py-2.5 text-neutral-600 text-sm rounded-none hover:border-neutral-500;
+}
+
+.vue-treeselect__input:focus {
+  @apply text-neutral-800;
+}
+
+.vue-treeselect__input {
+  @apply pl-0 py-0 text-neutral-600 text-sm rounded-none hover:border-neutral-500;
+}
+
+.vue-treeselect__multi-value-item {
+  @apply !bg-neutral-100 !text-neutral-800 rounded-none inline-table text-sm;
+}
+
+.vue-treeselect__value-remove {
+  @apply text-neutral-500 px-2.5;
+}
+
+.vue-treeselect--single .vue-treeselect__option--selected:hover {
+  @apply bg-neutral-200;
+}
+
+.vue-treeselect--single .vue-treeselect__option--selected {
+  @apply bg-neutral-200;
+}

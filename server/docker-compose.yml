@@ -1,0 +1,31 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:15
+#    command: ["postgres", "-c", "log_statement=all"]
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: dam
+      POSTGRES_PASSWORD: dam
+    volumes:
+      - postgres:/var/lib/postgresql/data
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - 1025:1025
+      - 8025:8025
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":8090"
+    environment:
+      MINIO_ROOT_USER: dam
+      MINIO_ROOT_PASSWORD: damdamdamdam
+    ports:
+      - 8090:8090
+      - 9000:9000
+    volumes:
+      - minio:/data
+volumes:
+  postgres: {}
+  minio: {}

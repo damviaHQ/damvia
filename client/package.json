@@ -1,0 +1,62 @@
+{
+  "name": "damvia-client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@heroicons/vue": "^2.0.18",
+    "@tanstack/vue-query": "^5.4.3",
+    "@tanstack/vue-table": "^8.19.2",
+    "@trpc/client": "^10.43.0",
+    "@trpc/server": "^10.43.0",
+    "@vee-validate/zod": "^4.13.2",
+    "@vueup/vue-quill": "^1.2.0",
+    "@vueuse/components": "^10.9.0",
+    "@vueuse/core": "^11.0.1",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "dayjs": "^1.11.10",
+    "js-cookie": "^3.0.5",
+    "lodash": "^4.17.21",
+    "lucide-vue-next": "^0.427.0",
+    "papaparse": "^5.4.1",
+    "pinia": "^2.1.7",
+    "radix-vue": "^1.9.3",
+    "sass": "^1.69.6",
+    "server": "file:../server",
+    "tailwind-merge": "^2.4.0",
+    "tailwindcss-animate": "^1.0.7",
+    "vee-validate": "^4.13.2",
+    "vite-svg-loader": "^5.1.0",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.5",
+    "vue-sonner": "^1.1.4",
+    "vue3-lazyload": "^0.3.8",
+    "vue3-toastify": "^0.1.14",
+    "vue3-treeselect-ts": "^0.0.4",
+    "vuedraggable": "^4.1.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/js-cookie": "^3.0.5",
+    "@types/lodash": "^4.14.202",
+    "@types/node": "^22.1.0",
+    "@types/papaparse": "^5.3.14",
+    "@types/quill": "^2.0.14",
+    "@vitejs/plugin-vue": "^5.0.5",
+    "@vitejs/plugin-vue-jsx": "^4.0.0",
+    "autoprefixer": "^10.4.20",
+    "tailwindcss": "^3.4.9",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3",
+    "vue-tsc": "^2.0.24"
+  },
+  "overrides": {
+    "quill": "^2.0.2"
+  }
+}
