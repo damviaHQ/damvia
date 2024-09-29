@@ -402,8 +402,7 @@ onUnmounted(() => {
           <button class="search-bar__modal-select-control" @click="isAssetTypeSelectOpen = !isAssetTypeSelectOpen">
             <div
               class="font-medium text-base min-w-[200px] p-[0.1em_0.1em_0.1em_0.3em] max-w-[260px] truncate overflow-clip cursor-pointer">
-              {{ selectedAssetTypes.length ? selectedAssetTypes.map((assetType) => assetType!.name).join(', ') : 'any
-              asset type' }}
+              {{ selectedAssetTypes.length ? selectedAssetTypes.map((assetType) => assetType!.name).join(', ') : 'any asset type' }}
             </div>
             <ChevronDown />
           </button>
