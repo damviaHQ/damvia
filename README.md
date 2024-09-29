@@ -1,7 +1,4 @@
-# Damvia
-
-![Damvia Logo](https://github.com/user-attachments/assets/ede7ae55-3f90-4ab0-86cc-36a7970c329e)
-
+<img src="https://github.com/user-attachments/assets/edddec3c-dd0d-4e49-8a61-973f6bddc959" alt="Damvia Logo" width="300"/><br><br>
 Damvia is an open-source Digital Asset Management (DAM) solution that works natively with your existing Cloud Storage.
 
 ## Features
@@ -14,7 +11,6 @@ Damvia is an open-source Digital Asset Management (DAM) solution that works nati
 ## Installation Requirements
 
 - Dedicated Server
-- You can use [Coolify](https://coolify.io/) for deploying server and client
 - SMTP provider (e.g., Postmark)
 - Database backup solution
 - Note: You don't need to backup data outside the DB as cloud storage retains all assets
