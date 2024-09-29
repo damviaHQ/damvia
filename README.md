@@ -60,14 +60,6 @@ Damvia is an open-source Digital Asset Management (DAM) solution that works nati
    npm run dev
    ```
 
-For detailed instructions and advanced configuration, please refer to our [full documentation](link-to-docs).
-
-## Support
-
-For support, feature requests, or to report issues:
-
-- Contact us at [support@damvia.com](mailto:support@damvia.com)
-
 ## License
 
 Damvia is released under the [GNU Affero General Public License v3.0](https://github.com/damviaHQ/damvia/blob/v1.0.0/LICENSE).
