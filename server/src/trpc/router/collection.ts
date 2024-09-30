@@ -259,7 +259,7 @@ export default router({
 				))
 			}
 
-			if (input.productViews?.length || attributesKeys.length) {
+			if (input.productViews?.length) {
 				query.andWhere('asset_type.is_related_to_products IS TRUE')
 			}
 

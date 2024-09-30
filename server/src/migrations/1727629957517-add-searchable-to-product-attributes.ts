@@ -12,19 +12,19 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from "typeorm"
 
 export class AddSearchableToProductAttributes1727629957517 implements MigrationInterface {
     name = 'AddSearchableToProductAttributes1727629957517'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "product_attributes" ADD "searchable" boolean NOT NULL DEFAULT false`);
-        await queryRunner.query(`CREATE INDEX "IDX_0adcbd4fe7ab4d3be7bffdc3b0" ON "product_attributes" ("searchable") `);
+        await queryRunner.query(`ALTER TABLE "product_attributes" ADD "searchable" boolean NOT NULL DEFAULT false`)
+        await queryRunner.query(`CREATE INDEX "IDX_0adcbd4fe7ab4d3be7bffdc3b0" ON "product_attributes" ("searchable") `)
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP INDEX "public"."IDX_0adcbd4fe7ab4d3be7bffdc3b0"`);
-        await queryRunner.query(`ALTER TABLE "product_attributes" DROP COLUMN "searchable"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_0adcbd4fe7ab4d3be7bffdc3b0"`)
+        await queryRunner.query(`ALTER TABLE "product_attributes" DROP COLUMN "searchable"`)
     }
 
 }
