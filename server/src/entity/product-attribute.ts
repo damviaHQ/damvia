@@ -12,7 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { Column, CreateDateColumn, Entity, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
+import {Column, CreateDateColumn, Entity, Index, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn} from "typeorm"
 
 @Entity('product_attributes')
 export class ProductAttribute {
@@ -28,6 +28,10 @@ export class ProductAttribute {
 
     @Column({ default: false })
     facetable: boolean
+
+    @Column({ default: false })
+    @Index()
+    searchable: boolean
 
     @Column({ default: false })
     viewable: boolean

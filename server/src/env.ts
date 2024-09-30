@@ -35,7 +35,7 @@ export const logger = createLogger({
 
 export const dataSource = new DataSource({
   type: "postgres",
-  url: process.env.DATABASE_URL ?? 'postgresql://damvia:damvia@localhost/damvia',
+  url: process.env.DATABASE_URL ?? 'postgresql://dam:dam@localhost/dam',
   synchronize: false,
   logging: false,
   migrationsRun: true,

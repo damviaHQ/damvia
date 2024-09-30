@@ -202,15 +202,27 @@ export default router({
 			attributes: z.record(z.string().array().nullable()).nullable().optional(),
 		}))
 		.query(async ({ input, ctx }) => {
+			const searchableAttributes = await dataSource.getRepository(ProductAttribute).findBy({
+				searchable: true
+			})
+
 			let query = userCollectionFilesQuery(ctx.user)
 			if (input.query && input.exactMatch) {
-				query.andWhere('asset_file.name ILIKE :query', { query: `%${input.query}%` })
+				const queryParts = [
+					'asset_file.name ILIKE :query',
+					...searchableAttributes.map((attribute) => `product.meta_data['${attribute.name}'] ILIKE :query`),
+				]
+				query.andWhere(`(${queryParts.join(' OR ')})`, { query: `%${input.query}%` })
 			} else if (input.query) {
 				query.andWhere(new Brackets((baseQuery) =>
 					input.query.replaceAll(/\s+/gm, ' ').split(' ').reduce((q, value, index) => {
 						const queryKey = `query${index}`
 						const where = index === 0 ? q.where : q.orWhere
-						return where.call(q, `asset_file.name ILIKE :${queryKey}`, { [queryKey]: `%${value}%` })
+						const queryParts = [
+							`asset_file.name ILIKE :${queryKey}`,
+							...searchableAttributes.map((attribute) => `product.meta_data['${attribute.name}'] ILIKE :${queryKey}`),
+						]
+						return where.call(q, `(${queryParts.join(' OR ')})`, { [queryKey]: `%${value}%` })
 					}, baseQuery),
 				))
 			}
