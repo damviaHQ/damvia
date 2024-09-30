@@ -26,6 +26,7 @@ export function formatProductAttribute(attribute: ProductAttribute) {
 		displayName: attribute.displayName,
 		facetable: attribute.facetable,
 		viewable: attribute.viewable,
+		searchable: attribute.searchable,
 	}
 }
 
@@ -70,6 +71,7 @@ export default router({
 			displayName: z.string().nullable(),
 			facetable: z.boolean(),
 			viewable: z.boolean(),
+			searchable: z.boolean(),
 		}))
 		.mutation(async ({ input }) => {
 			const attribute = new ProductAttribute()
@@ -77,6 +79,7 @@ export default router({
 			attribute.displayName = input.displayName
 			attribute.facetable = input.facetable
 			attribute.viewable = input.facetable || input.viewable
+			attribute.searchable = input.searchable
 			await dataSource.getRepository(ProductAttribute).save(attribute)
 			return formatProductAttribute(attribute)
 		}),
@@ -87,6 +90,7 @@ export default router({
 			displayName: z.string().nullable(),
 			facetable: z.boolean(),
 			viewable: z.boolean(),
+			searchable: z.boolean(),
 		}))
 		.mutation(async ({ input }) => {
 			const attribute = await dataSource.getRepository(ProductAttribute).findOneBy({ id: input.id })
@@ -97,6 +101,7 @@ export default router({
 			attribute.displayName = input.displayName
 			attribute.facetable = input.facetable
 			attribute.viewable = input.facetable || input.viewable
+			attribute.searchable = input.searchable
 			await dataSource.getRepository(ProductAttribute).save(attribute)
 			return formatProductAttribute(attribute)
 		}),

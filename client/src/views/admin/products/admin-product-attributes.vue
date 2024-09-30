@@ -72,11 +72,13 @@ const form = ref<{
   displayName: string | null
   facetable: boolean
   viewable: boolean
+  searchable: boolean
 }>({
   name: null,
   displayName: null,
   facetable: false,
   viewable: false,
+  searchable: false,
 })
 const modalState = ref<"creating" | "editing" | "closed">("closed")
 
@@ -86,6 +88,7 @@ function openCreateModal() {
     displayName: "",
     facetable: false,
     viewable: false,
+    searchable: false,
   }
   modalState.value = "creating"
 }
@@ -97,6 +100,7 @@ function openEditModal(productAttribute: ProductAttribute) {
     displayName: productAttribute.displayName,
     facetable: productAttribute.facetable,
     viewable: productAttribute.viewable,
+    searchable: productAttribute.searchable,
   }
   modalState.value = "editing"
 }
@@ -171,6 +175,7 @@ function onModalSubmit(event: Event) {
           <TableHead>Display Name</TableHead>
           <TableHead>Filter in Search</TableHead>
           <TableHead>Visible in Product List</TableHead>
+          <TableHead>Searchable</TableHead>
           <TableHead></TableHead>
         </TableRow>
       </TableHeader>
@@ -180,6 +185,7 @@ function onModalSubmit(event: Event) {
           <TableCell>{{ attribute.displayName }}</TableCell>
           <TableCell>{{ attribute.facetable ? "Yes" : "No" }}</TableCell>
           <TableCell>{{ attribute.viewable ? "Yes" : "No" }}</TableCell>
+          <TableCell>{{ attribute.searchable ? "Yes" : "No" }}</TableCell>
           <TableCell>
             <div class="flex space-x-2">
               <Button variant="ghost" size="sm" @click="openEditModal(attribute)">
@@ -212,7 +218,7 @@ function onModalSubmit(event: Event) {
           <div class="flex flex-col gap-6 py-4">
             <div class="flex flex-col gap-2">
               <Label for="name">Select an Attribute *</Label>
-              <Select v-model="form.name" :disabled="modalState === 'editing'" class="w-full">
+              <Select v-model="form.name!" :disabled="modalState === 'editing'" class="w-full">
                 <SelectTrigger class="w-full">
                   <SelectValue placeholder="Available Attributes..." />
                 </SelectTrigger>
@@ -226,7 +232,7 @@ function onModalSubmit(event: Event) {
             </div>
             <div class="flex flex-col gap-2">
               <Label for="displayName">Change Display Name</Label>
-              <Input id="displayName" v-model="form.displayName" placeholder="Keep empty for default value"
+              <Input id="displayName" v-model="form.displayName!" placeholder="Keep empty for default value"
                 class="w-full" />
             </div>
             <div class="flex items-center space-x-2">
@@ -236,6 +242,10 @@ function onModalSubmit(event: Event) {
             <div class="flex items-center space-x-2">
               <Checkbox id="viewable" v-model:checked="form.viewable" :disabled="form.facetable" />
               <Label for="viewable">Visible in Product List</Label>
+            </div>
+            <div class="flex items-center space-x-2">
+              <Checkbox id="searchable" v-model:checked="form.searchable" />
+              <Label for="searchable">Searchable</Label>
             </div>
           </div>
           <DialogFooter class="sm:justify-between items-center">
