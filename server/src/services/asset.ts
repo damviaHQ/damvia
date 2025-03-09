@@ -130,10 +130,50 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 		logger.info(`Generating image thumbnail for ${file.name} (MIME: ${file.mimeType})`);
 		try {
 			const thumbnailPath = await tmpFile();
-			await sharp(contentPath)
-				.resize({ height: 1280 })
-				.toFormat('webp')
-				.toFile(thumbnailPath);
+			const isTiff = file.mimeType === 'image/tiff' || 
+						  extension === 'tiff' || 
+						  extension === 'tif';
+			
+			// For TIFF files, use a higher pixel limit and downscale first if needed
+			if (isTiff) {
+				try {
+					// Use Sharp with increased limits for large TIFF files
+					await sharp(contentPath, { 
+						limitInputPixels: 1000000000, // Increase pixel limit (default is 268402689)
+						pages: 1 // Only process the first page for multi-page TIFFs
+					})
+					.resize({ height: 1280 })
+					.toFormat('webp')
+					.toFile(thumbnailPath);
+				} catch (tiffError) {
+					logger.warn(`Error processing large TIFF with increased limits: ${file.name}`, { 
+						error: tiffError.message 
+					});
+					
+					// If that still fails, try a more aggressive approach with even higher limits
+					try {
+						logger.info(`Attempting alternative method for large TIFF: ${file.name}`);
+						await sharp(contentPath, { 
+							limitInputPixels: 2000000000, // Even higher limit
+							pages: 1
+						})
+						.resize({ height: 640 }) // Lower resolution to reduce memory usage
+						.toFormat('webp')
+						.toFile(thumbnailPath);
+					} catch (fallbackError) {
+						logger.error(`All TIFF processing methods failed for ${file.name}`, { 
+							error: fallbackError.message 
+						});
+						throw fallbackError;
+					}
+				}
+			} else {
+				// For regular images, use the standard approach
+				await sharp(contentPath)
+					.resize({ height: 1280 })
+					.toFormat('webp')
+					.toFile(thumbnailPath);
+			}
 			
 			return thumbnailPath;
 		} catch (error) {
@@ -146,10 +186,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 	} else if (isVector) {
 		logger.info(`Generating vector thumbnail for ${file.name} (MIME: ${file.mimeType})`);
 		try {
-			// For vector files (EPS, AI, PDF), we'll use a two-step process:
-			// 1. Convert to PNG using Ghostscript (for EPS/AI) or Sharp (for PDF)
-			// 2. Convert PNG to WebP for the final thumbnail
-			
 			const tempPngPath = await tmpFile();
 			const thumbnailPath = await tmpFile();
 			
