@@ -79,6 +79,8 @@ const hasLicenses = computed(() => {
 watch([() => globalStore.selection, () => props.modelValue], () => {
   if (!props.modelValue) {
     res.value = null
+
+    form.value.isAcceptingTerms = false
     return
   }
 
@@ -87,6 +89,8 @@ watch([() => globalStore.selection, () => props.modelValue], () => {
     .then((data) => {
       res.value = data
       form.value.downloadType = data.allowDirectDownload ? "direct" : "email"
+      // Reset the checkbox state when new files are loaded
+      form.value.isAcceptingTerms = false
     })
     .catch((error) => toast.error((error as Error).message))
 })
@@ -108,11 +112,6 @@ watchEffect(() => {
 })
 
 watchEffect(() => {
-  // If there are no licenses, automatically set isAcceptingTerms to true
-  if (!hasLicenses.value) {
-    form.value.isAcceptingTerms = true;
-  }
-  
   // Reset error state when checkbox is changed
   if (hasLicenses.value) {
     hasTermsError.value = false;
@@ -129,13 +128,20 @@ function download() {
 
   isLoading.value = true
   hasTermsError.value = false
+  
+  const formData = {
+    ...form.value,
+    isAcceptingTerms: hasLicenses.value ? form.value.isAcceptingTerms : true,
+    collectionFileIds: res.value?.files.map((file) => file.id),
+  };
+  
   trpc.download.create
-    .mutate({
-      ...form.value,
-      collectionFileIds: res.value?.files.map((file) => file.id),
-    } as any)
+    .mutate(formData as any)
     .then((res) => {
       queryClient.invalidateQueries({ queryKey: ["downloads"] })
+      
+      form.value.isAcceptingTerms = false
+      
       emit("update:modelValue", false)
       if (res.url) {
         window.open(res.url, "_blank")

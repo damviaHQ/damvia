@@ -196,11 +196,6 @@ watch(
 )
 
 watchEffect(() => {
-  // If there's no license, automatically set isAcceptingTerms to true
-  if (!hasLicense.value) {
-    form.value.isAcceptingTerms = true;
-  }
-  
   // Reset error state when checkbox is changed
   if (hasLicense.value) {
     hasTermsError.value = false;
@@ -269,11 +264,19 @@ async function download() {
   isLoading.value = true
   hasTermsError.value = false
   try {
-    const downloadRes = await trpc.download.create.mutate({
+    // If there's no license, set isAcceptingTerms to true for the API call
+    const formData = {
       ...form.value,
+      isAcceptingTerms: hasLicense.value ? form.value.isAcceptingTerms : true,
       collectionFileIds: [currentFile.value.id],
-    } as any)
+    };
+    
+    const downloadRes = await trpc.download.create.mutate(formData as any)
     await queryClient.invalidateQueries({ queryKey: ["downloads"] })
+    
+    // Reset the checkbox state
+    form.value.isAcceptingTerms = false
+    
     if (downloadRes.url) {
       window.open(downloadRes.url, "_blank")
       emit("update:modelValue", null)
@@ -333,6 +336,11 @@ watch(() => props.modelValue, (newValue) => {
     nextTick(() => {
       modalRef.value?.focus()
     })
+  }
+  
+  // Reset the checkbox state when the modal is closed
+  if (!newValue) {
+    form.value.isAcceptingTerms = false
   }
 })
 
