@@ -179,6 +179,10 @@ const hasCollectionPath = computed(() => {
   return (props.collection || fileCollection.value) && path.length > 0
 })
 
+const hasLicense = computed(() => {
+  return !!currentFile.value?.license;
+})
+
 watch(
   [allowDirectDownload],
   () => {
@@ -192,8 +196,15 @@ watch(
 )
 
 watchEffect(() => {
-  form.value.isAcceptingTerms
-  hasTermsError.value = false
+  // If there's no license, automatically set isAcceptingTerms to true
+  if (!hasLicense.value) {
+    form.value.isAcceptingTerms = true;
+  }
+  
+  // Reset error state when checkbox is changed
+  if (hasLicense.value) {
+    hasTermsError.value = false;
+  }
 })
 
 function isFavorite(file: File) {
@@ -248,7 +259,7 @@ async function remove(file: File) {
 }
 
 async function download() {
-  if (!form.value.isAcceptingTerms) {
+  if (hasLicense.value && !form.value.isAcceptingTerms) {
     toast.error("Please accept the terms and conditions to proceed with the download.")
     isLoading.value = false
     hasTermsError.value = true
@@ -529,7 +540,7 @@ watch(() => props.modelValue, (newValue) => {
             </div>
           </RadioGroup>
         </div>
-        <div>
+        <div v-if="hasLicense">
           <div class="font-medium mb-4 text-lg">Usage Licensing Agreement</div>
           <div class="flex-col gap-1">
             <div v-if="currentFile.license" class="flex items-center text-neutral-300">
@@ -566,11 +577,11 @@ watch(() => props.modelValue, (newValue) => {
           <Button @click="download"
             class="w-full text-neutral-800 ring-amber-400 hover:text-neutral-900 hover:bg-amber-500 hover:ring-amber-400 bg-amber-400"
             :class="{
-              'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-amber-400 hover:text-amber-400 hover:bg-neutral-800': !form.isAcceptingTerms,
+              'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-amber-400 hover:text-amber-400 hover:bg-neutral-800': hasLicense && !form.isAcceptingTerms,
             }" :disabled="isLoading">
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>
-          <div :class="{ '!text-neutral-200': !form.isAcceptingTerms }" class="text-sm text-amber-400 mt-2">
+          <div :class="{ '!text-neutral-200': hasLicense && !form.isAcceptingTerms }" class="text-sm text-amber-400 mt-2">
             Total Size: {{ formatFileSize(currentFile.size) }}
           </div>
         </div>
