@@ -24,6 +24,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  Breadcrumb,
+  BreadcrumbEllipsis,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
@@ -43,9 +58,12 @@ import {
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from "vue"
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
+type Collection = RouterOutput["collection"]["findById"]
+type CollectionWithPath = Collection & { isEllipsis?: boolean }
+
 type Props = {
   files?: File[]
-  collection?: RouterOutput["collection"]["findById"]
+  collection?: Collection
   modelValue: string | null
 }
 
@@ -84,6 +102,27 @@ const files = computed(() => props.files ?? props.collection?.files)
 const currentFile = computed<File>(() => files.value?.find((file: File) => file.id === props.modelValue))
 const allowDirectDownload = computed(() => { return !currentFile.value || parseInt(currentFile.value.size, 10) <= 5_000_000_000 })
 
+// Add a query to fetch the collection data for the file when it's opened from search results
+const { data: fileCollection } = useQuery({
+  queryKey: computed(() => ["file-collection", props.modelValue]),
+  queryFn: () => currentFile.value?.collectionId ? trpc.collection.findById.query(currentFile.value.collectionId) : null,
+  enabled: computed(() => !!currentFile.value && !props.collection && !!currentFile.value.collectionId)
+})
+
+// Update the collectionPath computed property to use the fileCollection data if available
+const collectionPath = computed<Collection[]>(() => {
+  // Use the fileCollection data if available, otherwise use the props.collection
+  const collection = fileCollection.value || props.collection
+  if (!collection) {
+    return []
+  }
+  const path = [collection]
+  for (let current = collection.parent; current; current = current.parent) {
+    path.push(current)
+  }
+  return path.reverse()
+})
+
 const hasThumbnail = computed(() => {
   if (!currentFile.value) return false
   return !!currentFile.value.thumbnailURL && currentFile.value.thumbnailURL !== ''
@@ -117,11 +156,28 @@ const isPowerPoint = computed(() => {
          currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.slideshow'
 })
 
-const isPdfLoading = ref(true)
+const itemsToDisplay = 5
 
-function handlePdfLoad() {
-  isPdfLoading.value = false
-}
+const dropdownItems = computed<Collection[]>(() => {
+  const path = collectionPath.value
+  if (path.length <= itemsToDisplay) return []
+  return path.slice(1, -2)
+})
+
+const visibleItems = computed<CollectionWithPath[]>(() => {
+  const path = collectionPath.value
+  if (path.length <= itemsToDisplay) return path
+  return [
+    path[0],
+    { id: "ellipsis", name: "...", isEllipsis: true } as CollectionWithPath,
+    ...path.slice(-2),
+  ]
+})
+
+const hasCollectionPath = computed(() => {
+  const path = collectionPath.value
+  return (props.collection || fileCollection.value) && path.length > 0
+})
 
 watch(
   [allowDirectDownload],
@@ -276,11 +332,11 @@ watch(() => props.modelValue, (newValue) => {
   <div v-if="currentFile" ref="modalRef" tabindex="-1"
     class="bg-neutral-800 fixed top-0 left-0 w-full h-full z-20 py-5 px-8 text-neutral-200 outline-none">
     <div class="gallery-modal__header">
-      <div class="flex items-center gap-4">
+      <div class="flex items-center">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
-              <div class="text-xl font-medium">
+              <div class="text-xl font-medium truncate max-w-[300px] md:max-w-[400px]">
                 {{ truncateFileName(currentFile.name) }}
               </div>
             </TooltipTrigger>
@@ -289,10 +345,11 @@ watch(() => props.modelValue, (newValue) => {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <div class="flex items-center gap-6">
+        
+        <div class="flex items-center gap-6 ml-4">
           <template v-if="haveAccessToFavorites">
             <button v-if="isFavorite(currentFile)" @click="removeFromFavorite(currentFile)" type="button"
-              class="relative ml-4">
+              class="relative">
               <Star class="w-5 h-5 text-neutral-200 fill-neutral-200" />
               <StarOff
                 class="w-5 h-5 text-neutral-200 absolute inset-0 opacity-0 hover:opacity-100 transition-opacity fill-neutral-800 bg-neutral-800" />
@@ -306,11 +363,52 @@ watch(() => props.modelValue, (newValue) => {
           </button>
         </div>
       </div>
-      <Button variant="ghost" size="icon" type="button"
-        class="text-neutral-200 hover:text-neutral-300 bg-transparent hover:bg-neutral-700"
-        @click="$emit('update:modelValue', null)">
-        <X strokeWidth="3" />
-      </Button>
+      
+      <div class="flex items-center gap-2">
+        <div v-if="hasCollectionPath" class="gallery-modal__breadcrumb">
+          <Breadcrumb>
+            <BreadcrumbList class="text-neutral-400">
+              <template v-for="(item, index) in visibleItems" :key="item.id">
+                <BreadcrumbItem class="text-neutral-400 hover:text-neutral-200">
+                  <template v-if="item.isEllipsis">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger class="flex items-center gap-1 hover:bg-transparent"
+                        aria-label="Toggle menu">
+                        <BreadcrumbEllipsis class="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" class="bg-neutral-700 text-neutral-200 border-neutral-600">
+                        <DropdownMenuItem v-for="dropItem in dropdownItems" :key="dropItem.id" class="hover:bg-neutral-600">
+                          <router-link :to="{ name: 'collection', params: { id: dropItem.id } }" class="text-neutral-200">
+                            {{ dropItem.name }}
+                          </router-link>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </template>
+                  <template v-else>
+                    <BreadcrumbLink v-if="index < visibleItems.length - 1" as-child>
+                      <router-link :to="{ name: 'collection', params: { id: item.id } }"
+                        class="max-w-20 truncate md:max-w-none text-neutral-400 hover:text-neutral-200">
+                        {{ item.name }}
+                      </router-link>
+                    </BreadcrumbLink>
+                    <BreadcrumbPage v-else class="max-w-20 truncate md:max-w-none font-medium text-neutral-200">
+                      {{ item.name }}
+                    </BreadcrumbPage>
+                  </template>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator v-if="index < visibleItems.length - 1" class="text-neutral-500" />
+              </template>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        
+        <Button variant="ghost" size="icon" type="button"
+          class="text-neutral-200 hover:text-neutral-300 bg-transparent hover:bg-neutral-700 ml-2"
+          @click="$emit('update:modelValue', null)">
+          <X strokeWidth="3" />
+        </Button>
+      </div>
     </div>
     <div class="flex">
       <div class="gallery-modal__preview">
@@ -492,6 +590,20 @@ watch(() => props.modelValue, (newValue) => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+@media (max-width: 767px) {
+  .gallery-modal__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .gallery-modal__header > div:last-child {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 .gallery-modal__header-close {
@@ -783,5 +895,29 @@ watch(() => props.modelValue, (newValue) => {
   color: var(--accent-color);
   text-decoration: underline;
   font-size: 14px;
+}
+
+.gallery-modal__breadcrumb {
+  font-size: 0.875rem;
+  max-width: calc(100% - 50px);
+  display: flex;
+  align-items: center;
+}
+
+.gallery-modal__breadcrumb :deep(.breadcrumb-list) {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.gallery-modal__breadcrumb :deep(.breadcrumb-item) {
+  display: flex;
+  align-items: center;
+  height: 1.5rem;
+}
+
+.gallery-modal__breadcrumb:before {
+  margin-right: 0.5rem;
+  color: #9ca3af;
+  white-space: nowrap;
 }
 </style>
