@@ -160,11 +160,18 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					.toFormat('png')
 					.toFile(tempPngPath);
 			} else if (extension === 'pdf' || file.mimeType === 'application/pdf') {
-				// For PDF files, use Sharp directly
-				await sharp(contentPath, { page: 0 })
-					.resize({ height: 1280 })
-					.toFormat('png')
-					.toFile(tempPngPath);
+					await new Promise<void>((resolve, reject) => {
+						// Use Ghostscript to convert PDF to PNG
+						const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile=${tempPngPath} ${contentPath}`;
+						exec(cmd, (error) => {
+							if (error) {
+								logger.error(`Ghostscript error for ${file.name}`, { error: error.message });
+								reject(error);
+							} else {
+								resolve();
+							}
+						});
+					});
 			} else {
 				// For EPS and AI files, use Ghostscript via child_process
 				await new Promise<void>((resolve, reject) => {
