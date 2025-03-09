@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { fromFile as fileTypeFromFile } from "file-type"
 import ffmpeg from "fluent-ffmpeg"
+import { exec } from "node:child_process"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -70,25 +71,139 @@ export async function updateFileContent(file: AssetFile): Promise<void> {
 }
 
 export async function generateFileThumbnail(file: AssetFile, contentPath: string): Promise<string | null> {
-	if (file.mimeType.startsWith('video/')) {
-		const thumbnailFolder = await tmpDir()
-		const thumbnailFiles = await new Promise<string[]>((resolve, reject) => {
-			let _filenames = []
-			ffmpeg(contentPath).thumbnail({
-				count: 1,
-				folder: thumbnailFolder,
-			})
-				.on('filenames', (filenames) => _filenames = filenames)
-				.on('error', reject)
-				.on('end', () => resolve(_filenames))
-		})
-		return join(thumbnailFolder, thumbnailFiles[0])
-	} else if (file.mimeType.startsWith('image/')) {
-		const thumbnailPath = await tmpFile()
-		await sharp(contentPath).resize({ height: 1280 }).toFormat('webp').toFile(thumbnailPath)
-		return thumbnailPath
+	// Get lowercase file extension
+	const extension = file.name.split('.').pop()?.toLowerCase();
+	
+	// Check if this is a video file either by MIME type or extension
+	const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'm4v'];
+	const isVideo = file.mimeType.startsWith('video/') || 
+				   (extension && videoExtensions.includes(extension));
+	
+	// Check if this is an image file either by MIME type or extension
+	const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'];
+	const isImage = file.mimeType.startsWith('image/') || 
+				   (extension && imageExtensions.includes(extension));
+				
+	// Check if this is a vector file (EPS, AI, PDF)
+	const vectorExtensions = ['eps', 'ai', 'pdf', 'svg'];
+	const isVector = file.mimeType === 'application/postscript' || 
+					file.mimeType === 'application/pdf' ||
+					file.mimeType === 'application/illustrator' ||
+					file.mimeType === 'image/svg+xml' ||
+					(extension && vectorExtensions.includes(extension));
+	
+	if (isVideo) {
+		logger.info(`Generating video thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const thumbnailFolder = await tmpDir();
+			const thumbnailFiles = await new Promise<string[]>((resolve, reject) => {
+				let _filenames = [];
+				ffmpeg(contentPath).thumbnail({
+					count: 1,
+					folder: thumbnailFolder,
+					size: '1280x?',
+					timestamps: ['10%'], // Take thumbnail from 10% into the video
+					filename: 'thumbnail-%b.png'
+				})
+					.on('filenames', (filenames) => _filenames = filenames)
+					.on('error', (err) => {
+						logger.error(`FFmpeg error for ${file.name}`, { error: err.message });
+						reject(err);
+					})
+					.on('end', () => resolve(_filenames));
+			});
+			
+			if (thumbnailFiles.length === 0) {
+				logger.warn(`No thumbnail generated for video ${file.name}`);
+				return null;
+			}
+			
+			return join(thumbnailFolder, thumbnailFiles[0]);
+		} catch (error) {
+			logger.error(`Error generating video thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
+	} else if (isImage) {
+		logger.info(`Generating image thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const thumbnailPath = await tmpFile();
+			await sharp(contentPath)
+				.resize({ height: 1280 })
+				.toFormat('webp')
+				.toFile(thumbnailPath);
+			
+			return thumbnailPath;
+		} catch (error) {
+			logger.error(`Error generating image thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
+	} else if (isVector) {
+		logger.info(`Generating vector thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			// For vector files (EPS, AI, PDF), we'll use a two-step process:
+			// 1. Convert to PNG using Ghostscript (for EPS/AI) or Sharp (for PDF)
+			// 2. Convert PNG to WebP for the final thumbnail
+			
+			const tempPngPath = await tmpFile();
+			const thumbnailPath = await tmpFile();
+			
+			if (extension === 'svg' || file.mimeType === 'image/svg+xml') {
+				// For SVG files, use Sharp directly
+				await sharp(contentPath)
+					.resize({ height: 1280 })
+					.toFormat('png')
+					.toFile(tempPngPath);
+			} else if (extension === 'pdf' || file.mimeType === 'application/pdf') {
+				// For PDF files, use Sharp directly
+				await sharp(contentPath, { page: 0 })
+					.resize({ height: 1280 })
+					.toFormat('png')
+					.toFile(tempPngPath);
+			} else {
+				// For EPS and AI files, use Ghostscript via child_process
+				await new Promise<void>((resolve, reject) => {
+					// Use Ghostscript to convert EPS/AI to PNG
+					const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dEPSCrop -r300 -sOutputFile=${tempPngPath} ${contentPath}`;
+					exec(cmd, (error) => {
+						if (error) {
+							logger.error(`Ghostscript error for ${file.name}`, { error: error.message });
+							reject(error);
+						} else {
+							resolve();
+						}
+					});
+				});
+			}
+			
+			// Convert the PNG to WebP for the final thumbnail
+			await sharp(tempPngPath)
+				.resize({ height: 1280 })
+				.toFormat('webp')
+				.toFile(thumbnailPath);
+			
+			// Clean up the temporary PNG file
+			rm(tempPngPath).catch((error) => 
+				logger.error("Failed to delete temporary PNG", { error: error.message })
+			);
+			
+			return thumbnailPath;
+		} catch (error) {
+			logger.error(`Error generating vector thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
 	}
-	return null
+	
+	logger.info(`No thumbnail generation for ${file.name} (MIME: ${file.mimeType})`);
+	return null;
 }
 
 export async function extractDimensions(file: AssetFile, contentPath: string): Promise<{ width: number, height: number } | null> {

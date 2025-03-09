@@ -84,6 +84,31 @@ const files = computed(() => props.files ?? props.collection?.files)
 const currentFile = computed<File>(() => files.value?.find((file: File) => file.id === props.modelValue))
 const allowDirectDownload = computed(() => { return !currentFile.value || parseInt(currentFile.value.size, 10) <= 5_000_000_000 })
 
+const hasThumbnail = computed(() => {
+  if (!currentFile.value) return false
+  return !!currentFile.value.thumbnailURL && currentFile.value.thumbnailURL !== ''
+})
+
+const isPdf = computed(() => {
+  if (!currentFile.value) return false
+  return currentFile.value.mimeType === 'application/pdf' || 
+         currentFile.value.name.toLowerCase().endsWith('.pdf')
+})
+
+const isVectorFile = computed(() => {
+  if (!currentFile.value) return false
+  return currentFile.value.name.toLowerCase().endsWith('.ai') || 
+         currentFile.value.name.toLowerCase().endsWith('.eps') ||
+         currentFile.value.mimeType === 'application/postscript' ||
+         currentFile.value.mimeType === 'application/illustrator'
+})
+
+const isPdfLoading = ref(true)
+
+function handlePdfLoad() {
+  isPdfLoading.value = false
+}
+
 watch(
   [allowDirectDownload],
   () => {
@@ -229,6 +254,8 @@ watch(() => props.modelValue, (newValue) => {
     })
   }
 })
+
+
 </script>
 
 <template>
@@ -289,9 +316,22 @@ watch(() => props.modelValue, (newValue) => {
         <div class="gallery-modal__preview-thumbnail-container">
           <video v-if="currentFile.mimeType.startsWith('video/')" :src="currentFile.fileURL" controls
             class="gallery-modal__preview-thumbnail" />
-          <img v-else-if="currentFile.mimeType.startsWith('image/')" :src="currentFile.thumbnailURL"
-            :alt="currentFile.name" class="gallery-modal__preview-thumbnail" />
-          <thumbnail-placeholder v-else :alt="currentFile.name" class="gallery-modal__preview-thumbnail" />
+          <iframe v-else-if="isPdf" :src="`${currentFile.fileURL}#toolbar=0&navpanes=0&scrollbar=1`"
+            class="gallery-modal__preview-thumbnail gallery-modal__pdf-preview" 
+            width="90%" height="90%" frameborder="0">
+            <div class="pdf-fallback">
+              <p>It appears your browser doesn't support embedded PDFs.</p>
+              <a :href="currentFile.fileURL" target="_blank" class="pdf-fallback-link">Click here to view the PDF</a>
+            </div>
+          </iframe>
+          <img v-else-if="(currentFile.mimeType.startsWith('image/') || isVectorFile) && hasThumbnail" 
+               :src="currentFile.thumbnailURL"
+               :alt="currentFile.name" 
+               class="gallery-modal__preview-thumbnail" />
+          <div v-else class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename"> No preview available</div>
+          </div>
         </div>
       </div>
       <div class="gallery-modal__download-container">
@@ -465,6 +505,7 @@ watch(() => props.modelValue, (newValue) => {
   align-items: center;
   pointer-events: none;
   user-select: none;
+  z-index: 2;
 
   &:hover .gallery-modal__key-info {
     opacity: 1;
@@ -629,5 +670,93 @@ watch(() => props.modelValue, (newValue) => {
 
 .gallery-modal__terms-container.error {
   color: var(--danger-color);
+}
+
+.gallery-modal__pdf-preview {
+  width: 90%;
+  height: 90%;
+  background-color: #f5f5f5;
+  border: 1px solid #454545;
+  border-radius: 4px;
+}
+
+.pdf-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+}
+
+.pdf-fallback-link {
+  margin-top: 1rem;
+  color: var(--accent-color);
+  text-decoration: underline;
+}
+
+.pdf-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+}
+
+.pdf-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.gallery-modal__placeholder-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.gallery-modal__placeholder {
+  width: 120px;
+  height: 120px;
+  color: #e0e0e0;
+  opacity: 0.8;
+}
+
+.gallery-modal__placeholder :deep(svg) {
+  width: 100%;
+  height: 100%;
+}
+
+.gallery-modal__placeholder :deep(path) {
+  fill: currentColor;
+}
+
+.gallery-modal__placeholder-filename {
+  @apply text-neutral-400;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  max-width: 80%;
+  word-break: break-word;
 }
 </style>
