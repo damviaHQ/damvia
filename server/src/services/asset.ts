@@ -92,6 +92,13 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					file.mimeType === 'image/svg+xml' ||
 					(extension && vectorExtensions.includes(extension));
 	
+	// Check if this is a PowerPoint file
+	const pptExtensions = ['ppt', 'pptx', 'ppsx', 'pps', 'potx', 'pot'];
+	const isPowerPoint = file.mimeType === 'application/vnd.ms-powerpoint' || 
+					    file.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+					    file.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.slideshow' ||
+					    (extension && pptExtensions.includes(extension));
+	
 	if (isVideo) {
 		logger.info(`Generating video thumbnail for ${file.name} (MIME: ${file.mimeType})`);
 		try {
@@ -198,7 +205,8 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 			} else if (extension === 'pdf' || file.mimeType === 'application/pdf') {
 					await new Promise<void>((resolve, reject) => {
 						// Use Ghostscript to convert PDF to PNG
-						const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile=${tempPngPath} ${contentPath}`;
+						// Quote paths to handle spaces and special characters
+						const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${tempPngPath}" "${contentPath}"`;
 						exec(cmd, (error) => {
 							if (error) {
 								logger.error(`Ghostscript error for ${file.name}`, { error: error.message });
@@ -212,7 +220,8 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				// For EPS and AI files, use Ghostscript via child_process
 				await new Promise<void>((resolve, reject) => {
 					// Use Ghostscript to convert EPS/AI to PNG
-					const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dEPSCrop -r300 -sOutputFile=${tempPngPath} ${contentPath}`;
+					// Quote paths to handle spaces and special characters
+					const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dEPSCrop -r300 -sOutputFile="${tempPngPath}" "${contentPath}"`;
 					exec(cmd, (error) => {
 						if (error) {
 							logger.error(`Ghostscript error for ${file.name}`, { error: error.message });
@@ -238,6 +247,120 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 			return thumbnailPath;
 		} catch (error) {
 			logger.error(`Error generating vector thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
+	} else if (isPowerPoint) {
+		logger.info(`Generating PowerPoint thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const tempPngPath = await tmpFile();
+			const thumbnailPath = await tmpFile();
+			
+			// Create a temporary directory specifically for this PowerPoint conversion
+			const powerPointTempDir = join(await tmpDir(), `ppt_${uuid()}`);
+			
+			// Ensure the directory exists
+			await new Promise<void>((resolve, reject) => {
+				const mkdirCmd = process.platform === 'win32' 
+					? `mkdir "${powerPointTempDir}"` 
+					: `mkdir -p "${powerPointTempDir}"`;
+				
+				exec(mkdirCmd, (mkdirError) => {
+					if (mkdirError) {
+						logger.error(`Error creating temporary directory for ${file.name}`, { error: mkdirError.message });
+						reject(mkdirError);
+					} else {
+						resolve();
+					}
+				});
+			});
+			
+			// Create a safe filename without spaces or special characters
+			const safeFilename = `powerpoint_${uuid()}.${extension}`;
+			const safeTempPath = join(powerPointTempDir, safeFilename);
+			
+			// Copy the original file to the temp path with a safe filename
+			await new Promise<void>((resolve, reject) => {
+				const copyCmd = process.platform === 'win32' 
+					? `copy "${contentPath}" "${safeTempPath}"` 
+					: `cp "${contentPath}" "${safeTempPath}"`;
+				
+				exec(copyCmd, (copyError) => {
+					if (copyError) {
+						logger.error(`Error copying PowerPoint file: ${file.name}`, { error: copyError.message });
+						reject(copyError);
+					} else {
+						resolve();
+					}
+				});
+			});
+			
+			// Use LibreOffice to convert PowerPoint to PDF with the safe filename
+			await new Promise<void>((resolve, reject) => {
+				// Quote paths to handle spaces
+				const cmd = `soffice --headless --convert-to pdf --outdir "${powerPointTempDir}" "${safeTempPath}"`;
+				exec(cmd, async (error) => {
+					if (error) {
+						logger.error(`LibreOffice error for ${file.name}`, { error: error.message });
+						reject(error);
+						return;
+					}
+					
+					try {
+						// Get the PDF filename (same as safe filename but with .pdf extension)
+						const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
+						const pdfPath = join(powerPointTempDir, pdfFilename);
+						
+						// Use Ghostscript to convert PDF to PNG
+						await new Promise<void>((resolveGs, rejectGs) => {
+							// Quote paths to handle spaces
+							const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${tempPngPath}" "${pdfPath}"`;
+							exec(gsCmd, (gsError) => {
+								if (gsError) {
+									logger.error(`Ghostscript error for PowerPoint PDF: ${pdfFilename}`, { error: gsError.message });
+									rejectGs(gsError);
+								} else {
+									resolveGs();
+								}
+							});
+						});
+						
+						// Clean up the temporary files
+						rm(pdfPath, { force: true }).catch(e => 
+							logger.error("Failed to delete temporary PDF", { error: e.message })
+						);
+						rm(safeTempPath, { force: true }).catch(e => 
+							logger.error("Failed to delete temporary PowerPoint file", { error: e.message })
+						);
+						
+						resolve();
+					} catch (cleanupError) {
+						reject(cleanupError);
+					}
+				});
+			});
+			
+			// Clean up the temporary directory
+			rm(powerPointTempDir, { recursive: true, force: true }).catch(e => 
+				logger.error("Failed to delete temporary directory", { error: e.message })
+			);
+			
+			// Convert the PNG to WebP for the final thumbnail
+			await sharp(tempPngPath)
+				.resize({ height: 1280 })
+				.toFormat('webp')
+				.toFile(thumbnailPath);
+			
+			// Clean up the temporary PNG file
+			rm(tempPngPath).catch((error) => 
+				logger.error("Failed to delete temporary PNG", { error: error.message })
+			);
+			
+			return thumbnailPath;
+		} catch (error) {
+			logger.error(`Error generating PowerPoint thumbnail for ${file.name}`, { 
 				error: error.message, 
 				stack: error.stack 
 			});

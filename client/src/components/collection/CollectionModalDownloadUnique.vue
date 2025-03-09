@@ -103,6 +103,20 @@ const isVectorFile = computed(() => {
          currentFile.value.mimeType === 'application/illustrator'
 })
 
+const isPowerPoint = computed(() => {
+  if (!currentFile.value) return false
+  const filename = currentFile.value.name.toLowerCase()
+  return filename.endsWith('.ppt') || 
+         filename.endsWith('.pptx') || 
+         filename.endsWith('.ppsx') ||
+         filename.endsWith('.pps') ||
+         filename.endsWith('.potx') ||
+         filename.endsWith('.pot') ||
+         currentFile.value.mimeType === 'application/vnd.ms-powerpoint' ||
+         currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+         currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.slideshow'
+})
+
 const isPdfLoading = ref(true)
 
 function handlePdfLoad() {
@@ -324,10 +338,14 @@ watch(() => props.modelValue, (newValue) => {
               <a :href="currentFile.fileURL" target="_blank" class="pdf-fallback-link">Click here to view the PDF</a>
             </div>
           </iframe>
-          <img v-else-if="(currentFile.mimeType.startsWith('image/') || isVectorFile) && hasThumbnail" 
+          <img v-else-if="(currentFile.mimeType.startsWith('image/') || isVectorFile || (isPowerPoint && hasThumbnail))" 
                :src="currentFile.thumbnailURL"
                :alt="currentFile.name" 
                class="gallery-modal__preview-thumbnail" />
+          <div v-else-if="isPowerPoint && !hasThumbnail" class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename">PowerPoint Preview Not Available</div>
+          </div>
           <div v-else class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
             <div class="gallery-modal__placeholder-filename"> No preview available</div>
@@ -758,5 +776,12 @@ watch(() => props.modelValue, (newValue) => {
   text-align: center;
   max-width: 80%;
   word-break: break-word;
+}
+
+.gallery-modal__download-link {
+  margin-top: 1rem;
+  color: var(--accent-color);
+  text-decoration: underline;
+  font-size: 14px;
 }
 </style>
