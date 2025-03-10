@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { fromFile as fileTypeFromFile } from "file-type"
 import ffmpeg from "fluent-ffmpeg"
 import { exec } from "node:child_process"
+import { existsSync } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -93,6 +94,19 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					    file.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
 					    file.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.slideshow' ||
 					    (extension && pptExtensions.includes(extension));
+	
+	const wordExtensions = ['doc', 'docx', 'rtf', 'odt'];
+	const isWord = file.mimeType === 'application/msword' || 
+				  file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+				  file.mimeType === 'application/rtf' ||
+				  file.mimeType === 'application/vnd.oasis.opendocument.text' ||
+				  (extension && wordExtensions.includes(extension));
+	
+	const excelExtensions = ['xls', 'xlsx', 'csv', 'ods'];
+	const isExcel = file.mimeType === 'application/vnd.ms-excel' || 
+				   file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+				   file.mimeType === 'application/vnd.oasis.opendocument.spreadsheet' ||
+				   (extension && excelExtensions.includes(extension));
 	
 	if (isVideo) {
 		logger.info(`Generating video thumbnail for ${file.name} (MIME: ${file.mimeType})`);
@@ -237,10 +251,424 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 			});
 			throw error;
 		}
+	} else if (isWord) {
+		logger.info(`Generating Word document thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const thumbnailPath = await tmpFile();
+			
+			const wordTempDir = join(await tmpDir(), `word_${uuid()}`);
+			
+			await new Promise<void>((resolve, reject) => {
+				const mkdirCmd = process.platform === 'win32' 
+					? `mkdir "${wordTempDir}"` 
+					: `mkdir -p "${wordTempDir}"`;
+				
+				exec(mkdirCmd, (mkdirError) => {
+					if (mkdirError) {
+						logger.error(`Error creating temporary directory for ${file.name}`, { error: mkdirError.message });
+						reject(mkdirError);
+					} else {
+						resolve();
+					}
+				});
+			});
+			
+			const safeFilename = `word_${uuid()}.${extension}`;
+			const safeTempPath = join(wordTempDir, safeFilename);
+			
+			await new Promise<void>((resolve, reject) => {
+				const copyCmd = process.platform === 'win32' 
+					? `copy "${contentPath}" "${safeTempPath}"` 
+					: `cp "${contentPath}" "${safeTempPath}"`;
+				
+				exec(copyCmd, (copyError) => {
+					if (copyError) {
+						logger.error(`Error copying Word file: ${file.name}`, { error: copyError.message });
+						reject(copyError);
+					} else {
+						resolve();
+					}
+				});
+			});
+			
+			// Method 1: Try direct export to PNG using LibreOffice
+			try {
+				const tempPngPath = join(wordTempDir, `${safeFilename.substring(0, safeFilename.lastIndexOf('.'))}.png`);
+				
+				await new Promise<void>((resolve, reject) => {
+					// Use LibreOffice to directly export to PNG
+					const cmd = `soffice --headless --convert-to png --outdir "${wordTempDir}" "${safeTempPath}"`;
+					exec(cmd, (error) => {
+						if (error) {
+							logger.warn(`LibreOffice direct PNG export failed for ${file.name}, will try alternative method`, { error: error.message });
+							reject(error);
+						} else {
+							resolve();
+						}
+					});
+				});
+				
+				// If we get here, the PNG was created successfully
+				await sharp(tempPngPath)
+					.resize({ height: 1280 })
+					.flatten({ background: { r: 255, g: 255, b: 255 } })
+					.toFormat('webp')
+					.toFile(thumbnailPath);
+				
+				rm(tempPngPath).catch((error) => 
+					logger.error("Failed to delete temporary PNG", { error: error.message })
+				);
+				
+				rm(safeTempPath, { force: true }).catch(e => 
+					logger.error("Failed to delete temporary Word file", { error: e.message })
+				);
+				
+				rm(wordTempDir, { recursive: true, force: true }).catch(e => 
+					logger.error("Failed to delete temporary directory", { error: e.message })
+				);
+				
+				return thumbnailPath;
+			} catch (directExportError) {
+				// Method 1 failed, try Method 2
+				logger.info(`Direct PNG export failed for ${file.name}, trying PDF export with alternative rendering`, {
+					error: directExportError.message
+				});
+				
+				try {
+					// Method 2: Export to PDF, then use alternative PDF to image conversion
+					await new Promise<void>((resolve, reject) => {
+						const cmd = `soffice --headless --convert-to pdf --outdir "${wordTempDir}" "${safeTempPath}"`;
+						exec(cmd, (error) => {
+							if (error) {
+								logger.error(`LibreOffice PDF export failed for ${file.name}`, { error: error.message });
+								reject(error);
+								return;
+							}
+							resolve();
+						});
+					});
+					
+					const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
+					const pdfPath = join(wordTempDir, pdfFilename);
+					
+					// Use pdftoppm instead of Ghostscript for more reliable PDF to image conversion
+					const tempImagePath = join(wordTempDir, 'word_preview');
+					
+					await new Promise<void>((resolve, reject) => {
+						// Check if pdftoppm is available
+						exec('which pdftoppm', async (whichError) => {
+							if (whichError) {
+								// Fallback to Ghostscript with more permissive options
+								const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${join(wordTempDir, 'word_preview.png')}" "${pdfPath}"`;
+								exec(gsCmd, (gsError) => {
+									if (gsError) {
+										logger.error(`Ghostscript error for Word PDF: ${pdfFilename}`, { error: gsError.message });
+										reject(gsError);
+									} else {
+										resolve();
+									}
+								});
+							} else {
+								// Use pdftoppm which is more reliable for PDF to image conversion
+								const pdftoppmCmd = `pdftoppm -png -singlefile -f 1 -l 1 "${pdfPath}" "${tempImagePath}"`;
+								exec(pdftoppmCmd, (pdftoppmError) => {
+									if (pdftoppmError) {
+										logger.error(`pdftoppm error for Word PDF: ${pdfFilename}`, { error: pdftoppmError.message });
+										reject(pdftoppmError);
+									} else {
+										resolve();
+									}
+								});
+							}
+						});
+					});
+					
+					// Find the generated image file
+					let imageFile = join(wordTempDir, 'word_preview.png');
+					if (!existsSync(imageFile)) {
+						// Try alternative name from pdftoppm
+						imageFile = join(wordTempDir, 'word_preview-1.png');
+						if (!existsSync(imageFile)) {
+							throw new Error('Generated image file not found');
+						}
+					}
+					
+					await sharp(imageFile)
+						.resize({ height: 1280 })
+						.flatten({ background: { r: 255, g: 255, b: 255 } })
+						.toFormat('webp')
+						.toFile(thumbnailPath);
+					
+					rm(pdfPath, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary PDF", { error: e.message })
+					);
+					rm(imageFile, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary image", { error: e.message })
+					);
+					rm(safeTempPath, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary Word file", { error: e.message })
+					);
+					
+					rm(wordTempDir, { recursive: true, force: true }).catch(e => 
+						logger.error("Failed to delete temporary directory", { error: e.message })
+					);
+					
+					return thumbnailPath;
+				} catch (pdfExportError) {
+					// Both methods failed, try one last approach
+					logger.error(`PDF export and conversion failed for ${file.name}`, { 
+						error: pdfExportError.message 
+					});
+					
+					// Method 3: Try to create a simple placeholder image with the Word icon
+					try {
+						// Create a simple colored background with text
+						const svgImage = `
+						<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+							<rect width="100%" height="100%" fill="#ffffff"/>
+							<text x="50%" y="50%" font-family="Arial" font-size="24" fill="#333" text-anchor="middle">
+								Word Document: ${file.name.replace(/[<>&"']/g, (c) => {
+									return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c];
+								})}
+							</text>
+						</svg>`;
+						
+						const svgBuffer = Buffer.from(svgImage);
+						await sharp(svgBuffer)
+							.resize({ height: 1280 })
+							.flatten({ background: { r: 255, g: 255, b: 255 } })
+							.toFormat('webp')
+							.toFile(thumbnailPath);
+						
+						rm(wordTempDir, { recursive: true, force: true }).catch(e => 
+							logger.error("Failed to delete temporary directory", { error: e.message })
+						);
+						
+						return thumbnailPath;
+					} catch (fallbackError) {
+						logger.error(`All Word thumbnail generation methods failed for ${file.name}`, { 
+							error: fallbackError.message 
+						});
+						throw fallbackError;
+					}
+				}
+			}
+		} catch (error) {
+			logger.error(`Error generating Word thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
+	} else if (isExcel) {
+		logger.info(`Generating Excel spreadsheet thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const thumbnailPath = await tmpFile();
+			
+			const excelTempDir = join(await tmpDir(), `excel_${uuid()}`);
+			
+			await new Promise<void>((resolve, reject) => {
+				const mkdirCmd = process.platform === 'win32' 
+					? `mkdir "${excelTempDir}"` 
+					: `mkdir -p "${excelTempDir}"`;
+				
+				exec(mkdirCmd, (mkdirError) => {
+					if (mkdirError) {
+						logger.error(`Error creating temporary directory for ${file.name}`, { error: mkdirError.message });
+						reject(mkdirError);
+					} else {
+						resolve();
+					}
+				});
+			});
+			
+			const safeFilename = `excel_${uuid()}.${extension}`;
+			const safeTempPath = join(excelTempDir, safeFilename);
+			
+			await new Promise<void>((resolve, reject) => {
+				const copyCmd = process.platform === 'win32' 
+					? `copy "${contentPath}" "${safeTempPath}"` 
+					: `cp "${contentPath}" "${safeTempPath}"`;
+				
+				exec(copyCmd, (copyError) => {
+					if (copyError) {
+						logger.error(`Error copying Excel file: ${file.name}`, { error: copyError.message });
+						reject(copyError);
+					} else {
+						resolve();
+					}
+				});
+			});
+			
+			// Method 1: Try direct export to PNG using LibreOffice
+			try {
+				const tempPngPath = join(excelTempDir, `${safeFilename.substring(0, safeFilename.lastIndexOf('.'))}.png`);
+				
+				await new Promise<void>((resolve, reject) => {
+					// Use LibreOffice to directly export to PNG
+					const cmd = `soffice --headless --convert-to png --outdir "${excelTempDir}" "${safeTempPath}"`;
+					exec(cmd, (error) => {
+						if (error) {
+							logger.warn(`LibreOffice direct PNG export failed for ${file.name}, will try alternative method`, { error: error.message });
+							reject(error);
+						} else {
+							resolve();
+						}
+					});
+				});
+				
+				// If we get here, the PNG was created successfully
+				await sharp(tempPngPath)
+					.resize({ height: 1280 })
+					.toFormat('webp')
+					.toFile(thumbnailPath);
+				
+				rm(tempPngPath).catch((error) => 
+					logger.error("Failed to delete temporary PNG", { error: error.message })
+				);
+				
+				rm(safeTempPath, { force: true }).catch(e => 
+					logger.error("Failed to delete temporary Excel file", { error: e.message })
+				);
+				
+				rm(excelTempDir, { recursive: true, force: true }).catch(e => 
+					logger.error("Failed to delete temporary directory", { error: e.message })
+				);
+				
+				return thumbnailPath;
+			} catch (directExportError) {
+				// Method 1 failed, try Method 2
+				logger.info(`Direct PNG export failed for ${file.name}, trying PDF export with alternative rendering`, {
+					error: directExportError.message
+				});
+				
+				try {
+					// Method 2: Export to PDF, then use alternative PDF to image conversion
+					await new Promise<void>((resolve, reject) => {
+						const cmd = `soffice --headless --convert-to pdf --outdir "${excelTempDir}" "${safeTempPath}"`;
+						exec(cmd, (error) => {
+							if (error) {
+								logger.error(`LibreOffice PDF export failed for ${file.name}`, { error: error.message });
+								reject(error);
+								return;
+							}
+							resolve();
+						});
+					});
+					
+					const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
+					const pdfPath = join(excelTempDir, pdfFilename);
+					
+					// Use pdftoppm instead of Ghostscript for more reliable PDF to image conversion
+					const tempImagePath = join(excelTempDir, 'excel_preview');
+					
+					await new Promise<void>((resolve, reject) => {
+						// Check if pdftoppm is available
+						exec('which pdftoppm', async (whichError) => {
+							if (whichError) {
+								// Fallback to Ghostscript with more permissive options
+								const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${join(excelTempDir, 'excel_preview.png')}" "${pdfPath}"`;
+								exec(gsCmd, (gsError) => {
+									if (gsError) {
+										logger.error(`Ghostscript error for Excel PDF: ${pdfFilename}`, { error: gsError.message });
+										reject(gsError);
+									} else {
+										resolve();
+									}
+								});
+							} else {
+								// Use pdftoppm which is more reliable for PDF to image conversion
+								const pdftoppmCmd = `pdftoppm -png -singlefile -f 1 -l 1 "${pdfPath}" "${tempImagePath}"`;
+								exec(pdftoppmCmd, (pdftoppmError) => {
+									if (pdftoppmError) {
+										logger.error(`pdftoppm error for Excel PDF: ${pdfFilename}`, { error: pdftoppmError.message });
+										reject(pdftoppmError);
+									} else {
+										resolve();
+									}
+								});
+							}
+						});
+					});
+					
+					// Find the generated image file
+					let imageFile = join(excelTempDir, 'excel_preview.png');
+					if (!existsSync(imageFile)) {
+						// Try alternative name from pdftoppm
+						imageFile = join(excelTempDir, 'excel_preview-1.png');
+						if (!existsSync(imageFile)) {
+							throw new Error('Generated image file not found');
+						}
+					}
+					
+					await sharp(imageFile)
+						.resize({ height: 1280 })
+						.toFormat('webp')
+						.toFile(thumbnailPath);
+					
+					rm(pdfPath, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary PDF", { error: e.message })
+					);
+					rm(imageFile, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary image", { error: e.message })
+					);
+					rm(safeTempPath, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary Excel file", { error: e.message })
+					);
+					
+					rm(excelTempDir, { recursive: true, force: true }).catch(e => 
+						logger.error("Failed to delete temporary directory", { error: e.message })
+					);
+					
+					return thumbnailPath;
+				} catch (pdfExportError) {
+					// Both methods failed, try one last approach
+					logger.error(`PDF export and conversion failed for ${file.name}`, { 
+						error: pdfExportError.message 
+					});
+					
+					// Method 3: Try to create a simple placeholder image with the Excel icon
+					try {
+						// Create a simple colored background with text
+						const svgImage = `
+						<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+							<rect width="100%" height="100%" fill="#f3f3f3"/>
+							<text x="50%" y="50%" font-family="Arial" font-size="24" fill="#333" text-anchor="middle">
+								Excel Spreadsheet: ${file.name.replace(/[<>&"']/g, (c) => {
+									return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c];
+								})}
+							</text>
+						</svg>`;
+						
+						const svgBuffer = Buffer.from(svgImage);
+						await sharp(svgBuffer)
+							.resize({ height: 1280 })
+							.toFormat('webp')
+							.toFile(thumbnailPath);
+						
+						rm(excelTempDir, { recursive: true, force: true }).catch(e => 
+							logger.error("Failed to delete temporary directory", { error: e.message })
+						);
+						
+						return thumbnailPath;
+					} catch (fallbackError) {
+						logger.error(`All Excel thumbnail generation methods failed for ${file.name}`, { 
+							error: fallbackError.message 
+						});
+						throw fallbackError;
+					}
+				}
+			}
+		} catch (error) {
+			logger.error(`Error generating Excel thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
 	} else if (isPowerPoint) {
 		logger.info(`Generating PowerPoint thumbnail for ${file.name} (MIME: ${file.mimeType})`);
 		try {
-			const tempPngPath = await tmpFile();
 			const thumbnailPath = await tmpFile();
 			
 			const powerPointTempDir = join(await tmpDir(), `ppt_${uuid()}`);
@@ -278,59 +706,165 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				});
 			});
 			
-			await new Promise<void>((resolve, reject) => {
-				const cmd = `soffice --headless --convert-to pdf --outdir "${powerPointTempDir}" "${safeTempPath}"`;
-				exec(cmd, async (error) => {
-					if (error) {
-						logger.error(`LibreOffice error for ${file.name}`, { error: error.message });
-						reject(error);
-						return;
+			// Method 1: Try direct export to PNG using LibreOffice
+			try {
+				const tempPngPath = join(powerPointTempDir, `${safeFilename.substring(0, safeFilename.lastIndexOf('.'))}.png`);
+				
+				await new Promise<void>((resolve, reject) => {
+					// Use LibreOffice to directly export to PNG
+					const cmd = `soffice --headless --convert-to png --outdir "${powerPointTempDir}" "${safeTempPath}"`;
+					exec(cmd, (error) => {
+						if (error) {
+							logger.warn(`LibreOffice direct PNG export failed for ${file.name}, will try alternative method`, { error: error.message });
+							reject(error);
+						} else {
+							resolve();
+						}
+					});
+				});
+				
+				// If we get here, the PNG was created successfully
+				await sharp(tempPngPath)
+					.resize({ height: 1280 })
+					.toFormat('webp')
+					.toFile(thumbnailPath);
+				
+				rm(tempPngPath).catch((error) => 
+					logger.error("Failed to delete temporary PNG", { error: error.message })
+				);
+				
+				rm(safeTempPath, { force: true }).catch(e => 
+					logger.error("Failed to delete temporary PowerPoint file", { error: e.message })
+				);
+				
+				rm(powerPointTempDir, { recursive: true, force: true }).catch(e => 
+					logger.error("Failed to delete temporary directory", { error: e.message })
+				);
+				
+				return thumbnailPath;
+			} catch (directExportError) {
+				// Method 1 failed, try Method 2
+				logger.info(`Direct PNG export failed for ${file.name}, trying PDF export with alternative rendering`, {
+					error: directExportError.message
+				});
+				
+				try {
+					// Method 2: Export to PDF, then use alternative PDF to image conversion
+					await new Promise<void>((resolve, reject) => {
+						const cmd = `soffice --headless --convert-to pdf --outdir "${powerPointTempDir}" "${safeTempPath}"`;
+						exec(cmd, (error) => {
+							if (error) {
+								logger.error(`LibreOffice PDF export failed for ${file.name}`, { error: error.message });
+								reject(error);
+								return;
+							}
+							resolve();
+						});
+					});
+					
+					const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
+					const pdfPath = join(powerPointTempDir, pdfFilename);
+					
+					// Use pdftoppm instead of Ghostscript for more reliable PDF to image conversion
+					const tempImagePath = join(powerPointTempDir, 'ppt_preview');
+					
+					await new Promise<void>((resolve, reject) => {
+						// Check if pdftoppm is available
+						exec('which pdftoppm', async (whichError) => {
+							if (whichError) {
+								// Fallback to Ghostscript with more permissive options
+								const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${join(powerPointTempDir, 'ppt_preview.png')}" "${pdfPath}"`;
+								exec(gsCmd, (gsError) => {
+									if (gsError) {
+										logger.error(`Ghostscript error for PowerPoint PDF: ${pdfFilename}`, { error: gsError.message });
+										reject(gsError);
+									} else {
+										resolve();
+									}
+								});
+							} else {
+								// Use pdftoppm which is more reliable for PDF to image conversion
+								const pdftoppmCmd = `pdftoppm -png -singlefile -f 1 -l 1 "${pdfPath}" "${tempImagePath}"`;
+								exec(pdftoppmCmd, (pdftoppmError) => {
+									if (pdftoppmError) {
+										logger.error(`pdftoppm error for PowerPoint PDF: ${pdfFilename}`, { error: pdftoppmError.message });
+										reject(pdftoppmError);
+									} else {
+										resolve();
+									}
+								});
+							}
+						});
+					});
+					
+					// Find the generated image file
+					let imageFile = join(powerPointTempDir, 'ppt_preview.png');
+					if (!existsSync(imageFile)) {
+						// Try alternative name from pdftoppm
+						imageFile = join(powerPointTempDir, 'ppt_preview-1.png');
+						if (!existsSync(imageFile)) {
+							throw new Error('Generated image file not found');
+						}
 					}
 					
+					await sharp(imageFile)
+						.resize({ height: 1280 })
+						.toFormat('webp')
+						.toFile(thumbnailPath);
+					
+					rm(pdfPath, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary PDF", { error: e.message })
+					);
+					rm(imageFile, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary image", { error: e.message })
+					);
+					rm(safeTempPath, { force: true }).catch(e => 
+						logger.error("Failed to delete temporary PowerPoint file", { error: e.message })
+					);
+					
+					rm(powerPointTempDir, { recursive: true, force: true }).catch(e => 
+						logger.error("Failed to delete temporary directory", { error: e.message })
+					);
+					
+					return thumbnailPath;
+				} catch (pdfExportError) {
+					// Both methods failed, try one last approach
+					logger.error(`PDF export and conversion failed for ${file.name}`, { 
+						error: pdfExportError.message 
+					});
+					
+					// Method 3: Try to create a simple placeholder image with the PowerPoint icon
 					try {
-						const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
-						const pdfPath = join(powerPointTempDir, pdfFilename);
+						// Create a simple colored background with text
+						const svgImage = `
+						<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+							<rect width="100%" height="100%" fill="#f3f3f3"/>
+							<text x="50%" y="50%" font-family="Arial" font-size="24" fill="#333" text-anchor="middle">
+								PowerPoint Presentation: ${file.name.replace(/[<>&"']/g, (c) => {
+									return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c];
+								})}
+							</text>
+						</svg>`;
 						
-						await new Promise<void>((resolveGs, rejectGs) => {
-							const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${tempPngPath}" "${pdfPath}"`;
-							exec(gsCmd, (gsError) => {
-								if (gsError) {
-									logger.error(`Ghostscript error for PowerPoint PDF: ${pdfFilename}`, { error: gsError.message });
-									rejectGs(gsError);
-								} else {
-									resolveGs();
-								}
-							});
+						const svgBuffer = Buffer.from(svgImage);
+						await sharp(svgBuffer)
+							.resize({ height: 1280 })
+							.toFormat('webp')
+							.toFile(thumbnailPath);
+						
+						rm(powerPointTempDir, { recursive: true, force: true }).catch(e => 
+							logger.error("Failed to delete temporary directory", { error: e.message })
+						);
+						
+						return thumbnailPath;
+					} catch (fallbackError) {
+						logger.error(`All PowerPoint thumbnail generation methods failed for ${file.name}`, { 
+							error: fallbackError.message 
 						});
-						
-						rm(pdfPath, { force: true }).catch(e => 
-							logger.error("Failed to delete temporary PDF", { error: e.message })
-						);
-						rm(safeTempPath, { force: true }).catch(e => 
-							logger.error("Failed to delete temporary PowerPoint file", { error: e.message })
-						);
-						
-						resolve();
-					} catch (cleanupError) {
-						reject(cleanupError);
+						throw fallbackError;
 					}
-				});
-			});
-			
-			rm(powerPointTempDir, { recursive: true, force: true }).catch(e => 
-				logger.error("Failed to delete temporary directory", { error: e.message })
-			);
-			
-			await sharp(tempPngPath)
-				.resize({ height: 1280 })
-				.toFormat('webp')
-				.toFile(thumbnailPath);
-			
-			rm(tempPngPath).catch((error) => 
-				logger.error("Failed to delete temporary PNG", { error: error.message })
-			);
-			
-			return thumbnailPath;
+				}
+			}
 		} catch (error) {
 			logger.error(`Error generating PowerPoint thumbnail for ${file.name}`, { 
 				error: error.message, 

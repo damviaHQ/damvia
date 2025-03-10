@@ -153,6 +153,31 @@ const isPowerPoint = computed(() => {
          currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.slideshow'
 })
 
+const isWord = computed(() => {
+  if (!currentFile.value) return false
+  const filename = currentFile.value.name.toLowerCase()
+  return filename.endsWith('.doc') || 
+         filename.endsWith('.docx') || 
+         filename.endsWith('.rtf') ||
+         filename.endsWith('.odt') ||
+         currentFile.value.mimeType === 'application/msword' ||
+         currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+         currentFile.value.mimeType === 'application/rtf' ||
+         currentFile.value.mimeType === 'application/vnd.oasis.opendocument.text'
+})
+
+const isExcel = computed(() => {
+  if (!currentFile.value) return false
+  const filename = currentFile.value.name.toLowerCase()
+  return filename.endsWith('.xls') || 
+         filename.endsWith('.xlsx') || 
+         filename.endsWith('.csv') ||
+         filename.endsWith('.ods') ||
+         currentFile.value.mimeType === 'application/vnd.ms-excel' ||
+         currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+         currentFile.value.mimeType === 'application/vnd.oasis.opendocument.spreadsheet'
+})
+
 const itemsToDisplay = 5
 
 const dropdownItems = computed<Collection[]>(() => {
@@ -446,13 +471,24 @@ watch(() => props.modelValue, (newValue) => {
               <a :href="currentFile.fileURL" target="_blank" class="pdf-fallback-link">Click here to view the PDF</a>
             </div>
           </iframe>
-          <img v-else-if="(currentFile.mimeType.startsWith('image/') || isVectorFile || (isPowerPoint && hasThumbnail))" 
+          <img v-else-if="(currentFile.mimeType.startsWith('image/') || isVectorFile || 
+                          (isPowerPoint && hasThumbnail) || 
+                          (isWord && hasThumbnail) || 
+                          (isExcel && hasThumbnail))" 
                :src="currentFile.thumbnailURL"
                :alt="currentFile.name" 
                class="gallery-modal__preview-thumbnail" />
           <div v-else-if="isPowerPoint && !hasThumbnail" class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
             <div class="gallery-modal__placeholder-filename">PowerPoint Preview Not Available</div>
+          </div>
+          <div v-else-if="isWord && !hasThumbnail" class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename">Word Document Preview Not Available</div>
+          </div>
+          <div v-else-if="isExcel && !hasThumbnail" class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename">Excel Spreadsheet Preview Not Available</div>
           </div>
           <div v-else class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
