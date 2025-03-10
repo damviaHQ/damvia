@@ -150,7 +150,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 						  extension === 'tiff' || 
 						  extension === 'tif';
 			
-			// For TIFF files, use a higher pixel limit and downscale first if needed
 			if (isTiff) {
 				try {
 					await sharp(contentPath, { 
@@ -165,14 +164,13 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 						error: tiffError.message 
 					});
 					
-					// If that still fails, try a more aggressive approach with even higher limits
 					try {
 						logger.info(`Attempting alternative method for large TIFF: ${file.name}`);
 						await sharp(contentPath, { 
-							limitInputPixels: 2000000000, // Even higher limit
+							limitInputPixels: 2000000000,
 							pages: 1
 						})
-						.resize({ height: 640 }) // Lower resolution to reduce memory usage
+						.resize({ height: 640 })
 						.toFormat('webp')
 						.toFile(thumbnailPath);
 					} catch (fallbackError) {
@@ -291,12 +289,10 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				});
 			});
 			
-			// Method 1: Try direct export to PNG using LibreOffice
 			try {
 				const tempPngPath = join(wordTempDir, `${safeFilename.substring(0, safeFilename.lastIndexOf('.'))}.png`);
 				
 				await new Promise<void>((resolve, reject) => {
-					// Use LibreOffice to directly export to PNG
 					const cmd = `soffice --headless --convert-to png --outdir "${wordTempDir}" "${safeTempPath}"`;
 					exec(cmd, (error) => {
 						if (error) {
@@ -308,7 +304,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					});
 				});
 				
-				// If we get here, the PNG was created successfully
 				await sharp(tempPngPath)
 					.resize({ height: 1280 })
 					.flatten({ background: { r: 255, g: 255, b: 255 } })
@@ -329,13 +324,11 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				
 				return thumbnailPath;
 			} catch (directExportError) {
-				// Method 1 failed, try Method 2
 				logger.info(`Direct PNG export failed for ${file.name}, trying PDF export with alternative rendering`, {
 					error: directExportError.message
 				});
 				
 				try {
-					// Method 2: Export to PDF, then use alternative PDF to image conversion
 					await new Promise<void>((resolve, reject) => {
 						const cmd = `soffice --headless --convert-to pdf --outdir "${wordTempDir}" "${safeTempPath}"`;
 						exec(cmd, (error) => {
@@ -351,14 +344,11 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
 					const pdfPath = join(wordTempDir, pdfFilename);
 					
-					// Use pdftoppm instead of Ghostscript for more reliable PDF to image conversion
 					const tempImagePath = join(wordTempDir, 'word_preview');
 					
 					await new Promise<void>((resolve, reject) => {
-						// Check if pdftoppm is available
 						exec('which pdftoppm', async (whichError) => {
 							if (whichError) {
-								// Fallback to Ghostscript with more permissive options
 								const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${join(wordTempDir, 'word_preview.png')}" "${pdfPath}"`;
 								exec(gsCmd, (gsError) => {
 									if (gsError) {
@@ -369,7 +359,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 									}
 								});
 							} else {
-								// Use pdftoppm which is more reliable for PDF to image conversion
 								const pdftoppmCmd = `pdftoppm -png -singlefile -f 1 -l 1 "${pdfPath}" "${tempImagePath}"`;
 								exec(pdftoppmCmd, (pdftoppmError) => {
 									if (pdftoppmError) {
@@ -383,10 +372,8 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 						});
 					});
 					
-					// Find the generated image file
 					let imageFile = join(wordTempDir, 'word_preview.png');
 					if (!existsSync(imageFile)) {
-						// Try alternative name from pdftoppm
 						imageFile = join(wordTempDir, 'word_preview-1.png');
 						if (!existsSync(imageFile)) {
 							throw new Error('Generated image file not found');
@@ -415,14 +402,11 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					
 					return thumbnailPath;
 				} catch (pdfExportError) {
-					// Both methods failed, try one last approach
 					logger.error(`PDF export and conversion failed for ${file.name}`, { 
 						error: pdfExportError.message 
 					});
 					
-					// Method 3: Try to create a simple placeholder image with the Word icon
 					try {
-						// Create a simple colored background with text
 						const svgImage = `
 						<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
 							<rect width="100%" height="100%" fill="#ffffff"/>
@@ -543,7 +527,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				});
 				
 				try {
-					// Method 2: Export to PDF, then use alternative PDF to image conversion
 					await new Promise<void>((resolve, reject) => {
 						const cmd = `soffice --headless --convert-to pdf --outdir "${excelTempDir}" "${safeTempPath}"`;
 						exec(cmd, (error) => {
@@ -559,14 +542,11 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
 					const pdfPath = join(excelTempDir, pdfFilename);
 					
-					// Use pdftoppm instead of Ghostscript for more reliable PDF to image conversion
 					const tempImagePath = join(excelTempDir, 'excel_preview');
 					
 					await new Promise<void>((resolve, reject) => {
-						// Check if pdftoppm is available
 						exec('which pdftoppm', async (whichError) => {
 							if (whichError) {
-								// Fallback to Ghostscript with more permissive options
 								const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${join(excelTempDir, 'excel_preview.png')}" "${pdfPath}"`;
 								exec(gsCmd, (gsError) => {
 									if (gsError) {
@@ -577,7 +557,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 									}
 								});
 							} else {
-								// Use pdftoppm which is more reliable for PDF to image conversion
 								const pdftoppmCmd = `pdftoppm -png -singlefile -f 1 -l 1 "${pdfPath}" "${tempImagePath}"`;
 								exec(pdftoppmCmd, (pdftoppmError) => {
 									if (pdftoppmError) {
@@ -591,10 +570,8 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 						});
 					});
 					
-					// Find the generated image file
 					let imageFile = join(excelTempDir, 'excel_preview.png');
 					if (!existsSync(imageFile)) {
-						// Try alternative name from pdftoppm
 						imageFile = join(excelTempDir, 'excel_preview-1.png');
 						if (!existsSync(imageFile)) {
 							throw new Error('Generated image file not found');
@@ -706,12 +683,10 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				});
 			});
 			
-			// Method 1: Try direct export to PNG using LibreOffice
 			try {
 				const tempPngPath = join(powerPointTempDir, `${safeFilename.substring(0, safeFilename.lastIndexOf('.'))}.png`);
 				
 				await new Promise<void>((resolve, reject) => {
-					// Use LibreOffice to directly export to PNG
 					const cmd = `soffice --headless --convert-to png --outdir "${powerPointTempDir}" "${safeTempPath}"`;
 					exec(cmd, (error) => {
 						if (error) {
@@ -723,7 +698,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					});
 				});
 				
-				// If we get here, the PNG was created successfully
 				await sharp(tempPngPath)
 					.resize({ height: 1280 })
 					.toFormat('webp')
@@ -743,13 +717,11 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				
 				return thumbnailPath;
 			} catch (directExportError) {
-				// Method 1 failed, try Method 2
 				logger.info(`Direct PNG export failed for ${file.name}, trying PDF export with alternative rendering`, {
 					error: directExportError.message
 				});
 				
 				try {
-					// Method 2: Export to PDF, then use alternative PDF to image conversion
 					await new Promise<void>((resolve, reject) => {
 						const cmd = `soffice --headless --convert-to pdf --outdir "${powerPointTempDir}" "${safeTempPath}"`;
 						exec(cmd, (error) => {
@@ -765,14 +737,11 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
 					const pdfPath = join(powerPointTempDir, pdfFilename);
 					
-					// Use pdftoppm instead of Ghostscript for more reliable PDF to image conversion
 					const tempImagePath = join(powerPointTempDir, 'ppt_preview');
 					
 					await new Promise<void>((resolve, reject) => {
-						// Check if pdftoppm is available
 						exec('which pdftoppm', async (whichError) => {
 							if (whichError) {
-								// Fallback to Ghostscript with more permissive options
 								const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${join(powerPointTempDir, 'ppt_preview.png')}" "${pdfPath}"`;
 								exec(gsCmd, (gsError) => {
 									if (gsError) {
@@ -783,7 +752,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 									}
 								});
 							} else {
-								// Use pdftoppm which is more reliable for PDF to image conversion
 								const pdftoppmCmd = `pdftoppm -png -singlefile -f 1 -l 1 "${pdfPath}" "${tempImagePath}"`;
 								exec(pdftoppmCmd, (pdftoppmError) => {
 									if (pdftoppmError) {
@@ -797,10 +765,8 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 						});
 					});
 					
-					// Find the generated image file
 					let imageFile = join(powerPointTempDir, 'ppt_preview.png');
 					if (!existsSync(imageFile)) {
-						// Try alternative name from pdftoppm
 						imageFile = join(powerPointTempDir, 'ppt_preview-1.png');
 						if (!existsSync(imageFile)) {
 							throw new Error('Generated image file not found');
@@ -828,14 +794,11 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					
 					return thumbnailPath;
 				} catch (pdfExportError) {
-					// Both methods failed, try one last approach
 					logger.error(`PDF export and conversion failed for ${file.name}`, { 
 						error: pdfExportError.message 
 					});
 					
-					// Method 3: Try to create a simple placeholder image with the PowerPoint icon
 					try {
-						// Create a simple colored background with text
 						const svgImage = `
 						<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
 							<rect width="100%" height="100%" fill="#f3f3f3"/>

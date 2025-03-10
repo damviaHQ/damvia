@@ -64,7 +64,7 @@ async function addToCollection() {
       id: selectedCollection.value.id,
       items: globalStore.selection,
     })
-    console.log("invalidating")
+
     queryClient.invalidateQueries({ queryKey: ["collection", "tree"] })
     queryClient.invalidateQueries({ queryKey: ["collection", "ListPrivateCollections"] })
     emit("update:modelValue", false)
