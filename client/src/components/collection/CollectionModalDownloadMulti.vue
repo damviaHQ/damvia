@@ -72,9 +72,15 @@ const totalSize = computed(() => {
   return formatFileSize(sizeInBytes)
 })
 
+const hasLicenses = computed(() => {
+  return res.value?.licenses && res.value.licenses.length > 0;
+})
+
 watch([() => globalStore.selection, () => props.modelValue], () => {
   if (!props.modelValue) {
     res.value = null
+
+    form.value.isAcceptingTerms = false
     return
   }
 
@@ -83,12 +89,12 @@ watch([() => globalStore.selection, () => props.modelValue], () => {
     .then((data) => {
       res.value = data
       form.value.downloadType = data.allowDirectDownload ? "direct" : "email"
+      form.value.isAcceptingTerms = false
     })
     .catch((error) => toast.error((error as Error).message))
 })
 
 watchEffect(() => {
-  // Force original format if image compression is disabled
   if (!allowImageCompression.value && form.value.imageFormat !== "original") {
     form.value.imageFormat = "original"
   }
@@ -104,12 +110,13 @@ watchEffect(() => {
 })
 
 watchEffect(() => {
-  form.value.isAcceptingTerms
-  hasTermsError.value = false
+  if (hasLicenses.value) {
+    hasTermsError.value = false;
+  }
 })
 
 function download() {
-  if (!form.value.isAcceptingTerms) {
+  if (hasLicenses.value && !form.value.isAcceptingTerms) {
     toast.error("Please accept the terms and conditions to proceed with the download.")
     isLoading.value = false
     hasTermsError.value = true
@@ -118,13 +125,20 @@ function download() {
 
   isLoading.value = true
   hasTermsError.value = false
+  
+  const formData = {
+    ...form.value,
+    isAcceptingTerms: hasLicenses.value ? form.value.isAcceptingTerms : true,
+    collectionFileIds: res.value?.files.map((file) => file.id),
+  };
+  
   trpc.download.create
-    .mutate({
-      ...form.value,
-      collectionFileIds: res.value?.files.map((file) => file.id),
-    } as any)
+    .mutate(formData as any)
     .then((res) => {
       queryClient.invalidateQueries({ queryKey: ["downloads"] })
+      
+      form.value.isAcceptingTerms = false
+      
       emit("update:modelValue", false)
       if (res.url) {
         window.open(res.url, "_blank")
@@ -225,17 +239,19 @@ function removeFromSelection(file: { id: string }) {
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
                 { name: 'Original (HD)', value: 'original' },
-                { name: 'PNG', value: 'png', disabled: true },
-                { name: 'JPG', value: 'jpg', disabled: true },
-                { name: 'WEBP', value: 'webp', disabled: true },
-              ]" :key="option.value" class="flex items-center space-x-2">
+                { name: 'PNG', value: 'png', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
+                { name: 'JPG', value: 'jpg', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
+                { name: 'WEBP', value: 'webp', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
+              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option': option.disabled }">
                 <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`" :disabled="option.disabled"
                   class="border border-amber-400 text-amber-400 min-w-max" />
-                <Label :for="`image-format-${option.value}`">{{ option.name }}</Label>
+                <Label :for="`image-format-${option.value}`" :class="{ 'text-neutral-500': option.disabled }">
+                  {{ option.name }}
+                </Label>
+                <div v-if="option.disabled && option.tooltip" class="tooltip">{{ option.tooltip }}</div>
               </div>
             </div>
           </RadioGroup>
-          <p class="warning">Compression is disabled if you download over 300 images.</p>
         </div>
         <div v-if="imageCount && form.imageFormat !== 'original'">
           <div class="font-medium mb-4 text-lg">Image quality</div>
@@ -278,6 +294,7 @@ function removeFromSelection(file: { id: string }) {
                   value: 'direct',
                   description: 'Download starts right after the zip is ready.',
                   disabled: !res.allowDirectDownload || disallowDirectDownload,
+                  tooltip: disallowDirectDownload ? 'Direct download is disabled for files larger than 5GB or if the file count exceeds 300.' : null
                 },
                 {
                   name: 'Create a link',
@@ -285,22 +302,23 @@ function removeFromSelection(file: { id: string }) {
                   description:
                     'A zip is saved for 7 days in My Downloads. You will receive an email with the link when ready.',
                 },
-              ]" :key="option.value" class="flex items-center space-x-2">
+              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option': option.disabled }">
                 <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"
                   class="border border-amber-400 text-amber-400 min-w-max" />
                 <div>
-                  <Label :for="`download-type-${option.value}`">{{ option.name }}</Label>
-                  <p class="text-sm text-neutral-400">{{ option.description }}</p>
+                  <Label :for="`download-type-${option.value}`" :class="{ 'text-neutral-500': option.disabled }">
+                    {{ option.name }}
+                  </Label>
+                  <p class="text-sm" :class="option.disabled ? 'text-neutral-500' : 'text-neutral-400'">
+                    {{ option.description }}
+                  </p>
                 </div>
+                <div v-if="option.disabled && option.tooltip" class="tooltip">{{ option.tooltip }}</div>
               </div>
             </div>
           </RadioGroup>
-          <p v-if="disallowDirectDownload" class="warning">
-            Direct download is disabled for files larger than 5GB or if the file count
-            exceeds 300.
-          </p>
         </div>
-        <div>
+        <div v-if="hasLicenses">
           <div>
             <div class="font-medium mb-4 text-lg">Usage Licensing Agreement</div>
             <div class="flex-col gap-1">
@@ -336,11 +354,11 @@ function removeFromSelection(file: { id: string }) {
           <Button @click="download" :disabled="isLoading"
             class="w-full text-neutral-800 ring-amber-400 hover:text-neutral-900 hover:bg-amber-500 hover:ring-amber-400 bg-amber-400"
             :class="{
-              'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-amber-400 hover:text-amber-400 hover:bg-neutral-800': !form.isAcceptingTerms,
+              'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-amber-400 hover:text-amber-400 hover:bg-neutral-800': hasLicenses && !form.isAcceptingTerms,
             }">
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>
-          <div :class="{ '!text-neutral-200': !form.isAcceptingTerms }" class="text-sm text-amber-400 mt-2">
+          <div :class="{ '!text-neutral-200': hasLicenses && !form.isAcceptingTerms }" class="text-sm text-amber-400 mt-2">
             Total Size: {{ totalSize }}
           </div>
         </div>
@@ -398,6 +416,49 @@ function removeFromSelection(file: { id: string }) {
   color: #ff5e5e;
   font-size: 14px;
   margin-top: 0.5rem;
+}
+
+.info-message {
+  color: #9ca3af;
+  font-size: 14px;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+.tooltip {
+  position: absolute;
+  background-color: #4b5563;
+  color: #e5e7eb;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  max-width: 250px;
+  z-index: 50;
+  margin-top: -2.5rem;
+  margin-left: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.disabled-option {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.disabled-option > * {
+  cursor: not-allowed;
+}
+
+.disabled-option .tooltip {
+  display: block;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+  transition-delay: 0.5s;
+}
+
+.disabled-option:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
 }
 
 .download-assets-modal__unselect-item {

@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { fromFile as fileTypeFromFile } from "file-type"
 import ffmpeg from "fluent-ffmpeg"
+import { exec } from "node:child_process"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -70,25 +71,277 @@ export async function updateFileContent(file: AssetFile): Promise<void> {
 }
 
 export async function generateFileThumbnail(file: AssetFile, contentPath: string): Promise<string | null> {
-	if (file.mimeType.startsWith('video/')) {
-		const thumbnailFolder = await tmpDir()
-		const thumbnailFiles = await new Promise<string[]>((resolve, reject) => {
-			let _filenames = []
-			ffmpeg(contentPath).thumbnail({
-				count: 1,
-				folder: thumbnailFolder,
-			})
-				.on('filenames', (filenames) => _filenames = filenames)
-				.on('error', reject)
-				.on('end', () => resolve(_filenames))
-		})
-		return join(thumbnailFolder, thumbnailFiles[0])
-	} else if (file.mimeType.startsWith('image/')) {
-		const thumbnailPath = await tmpFile()
-		await sharp(contentPath).resize({ height: 1280 }).toFormat('webp').toFile(thumbnailPath)
-		return thumbnailPath
+	const extension = file.name.split('.').pop()?.toLowerCase();
+	
+	const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'm4v'];
+	const isVideo = file.mimeType.startsWith('video/') || 
+				   (extension && videoExtensions.includes(extension));
+	
+	const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'];
+	const isImage = file.mimeType.startsWith('image/') || 
+				   (extension && imageExtensions.includes(extension));
+				
+	const vectorExtensions = ['eps', 'ai', 'pdf', 'svg'];
+	const isVector = file.mimeType === 'application/postscript' || 
+					file.mimeType === 'application/pdf' ||
+					file.mimeType === 'application/illustrator' ||
+					file.mimeType === 'image/svg+xml' ||
+					(extension && vectorExtensions.includes(extension));
+	
+	const pptExtensions = ['ppt', 'pptx', 'ppsx', 'pps', 'potx', 'pot'];
+	const isPowerPoint = file.mimeType === 'application/vnd.ms-powerpoint' || 
+					    file.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+					    file.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.slideshow' ||
+					    (extension && pptExtensions.includes(extension));
+	
+	if (isVideo) {
+		logger.info(`Generating video thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const thumbnailFolder = await tmpDir();
+			const thumbnailFiles = await new Promise<string[]>((resolve, reject) => {
+				let _filenames = [];
+				ffmpeg(contentPath).thumbnail({
+					count: 1,
+					folder: thumbnailFolder,
+					size: '1280x?',
+					timestamps: ['10%'],
+					filename: 'thumbnail-%b.png'
+				})
+					.on('filenames', (filenames) => _filenames = filenames)
+					.on('error', (err) => {
+						logger.error(`FFmpeg error for ${file.name}`, { error: err.message });
+						reject(err);
+					})
+					.on('end', () => resolve(_filenames));
+			});
+			
+			if (thumbnailFiles.length === 0) {
+				logger.warn(`No thumbnail generated for video ${file.name}`);
+				return null;
+			}
+			
+			return join(thumbnailFolder, thumbnailFiles[0]);
+		} catch (error) {
+			logger.error(`Error generating video thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
+	} else if (isImage) {
+		logger.info(`Generating image thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const thumbnailPath = await tmpFile();
+			const isTiff = file.mimeType === 'image/tiff' || 
+						  extension === 'tiff' || 
+						  extension === 'tif';
+			
+			// For TIFF files, use a higher pixel limit and downscale first if needed
+			if (isTiff) {
+				try {
+					await sharp(contentPath, { 
+						limitInputPixels: 1000000000, // Increase pixel limit (default is 268402689)
+						pages: 1
+					})
+					.resize({ height: 1280 })
+					.toFormat('webp')
+					.toFile(thumbnailPath);
+				} catch (tiffError) {
+					logger.warn(`Error processing large TIFF with increased limits: ${file.name}`, { 
+						error: tiffError.message 
+					});
+					
+					// If that still fails, try a more aggressive approach with even higher limits
+					try {
+						logger.info(`Attempting alternative method for large TIFF: ${file.name}`);
+						await sharp(contentPath, { 
+							limitInputPixels: 2000000000, // Even higher limit
+							pages: 1
+						})
+						.resize({ height: 640 }) // Lower resolution to reduce memory usage
+						.toFormat('webp')
+						.toFile(thumbnailPath);
+					} catch (fallbackError) {
+						logger.error(`All TIFF processing methods failed for ${file.name}`, { 
+							error: fallbackError.message 
+						});
+						throw fallbackError;
+					}
+				}
+			} else {
+				await sharp(contentPath)
+					.resize({ height: 1280 })
+					.toFormat('webp')
+					.toFile(thumbnailPath);
+			}
+			
+			return thumbnailPath;
+		} catch (error) {
+			logger.error(`Error generating image thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
+	} else if (isVector) {
+		logger.info(`Generating vector thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const tempPngPath = await tmpFile();
+			const thumbnailPath = await tmpFile();
+			
+			if (extension === 'svg' || file.mimeType === 'image/svg+xml') {
+				await sharp(contentPath)
+					.resize({ height: 1280 })
+					.toFormat('png')
+					.toFile(tempPngPath);
+			} else if (extension === 'pdf' || file.mimeType === 'application/pdf') {
+					await new Promise<void>((resolve, reject) => {
+						const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${tempPngPath}" "${contentPath}"`;
+						exec(cmd, (error) => {
+							if (error) {
+								logger.error(`Ghostscript error for ${file.name}`, { error: error.message });
+								reject(error);
+							} else {
+								resolve();
+							}
+						});
+					});
+			} else {
+				await new Promise<void>((resolve, reject) => {
+					const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dEPSCrop -r300 -sOutputFile="${tempPngPath}" "${contentPath}"`;
+					exec(cmd, (error) => {
+						if (error) {
+							logger.error(`Ghostscript error for ${file.name}`, { error: error.message });
+							reject(error);
+						} else {
+							resolve();
+						}
+					});
+				});
+			}
+			
+			await sharp(tempPngPath)
+				.resize({ height: 1280 })
+				.toFormat('webp')
+				.toFile(thumbnailPath);
+			
+			rm(tempPngPath).catch((error) => 
+				logger.error("Failed to delete temporary PNG", { error: error.message })
+			);
+			
+			return thumbnailPath;
+		} catch (error) {
+			logger.error(`Error generating vector thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
+	} else if (isPowerPoint) {
+		logger.info(`Generating PowerPoint thumbnail for ${file.name} (MIME: ${file.mimeType})`);
+		try {
+			const tempPngPath = await tmpFile();
+			const thumbnailPath = await tmpFile();
+			
+			const powerPointTempDir = join(await tmpDir(), `ppt_${uuid()}`);
+			
+			await new Promise<void>((resolve, reject) => {
+				const mkdirCmd = process.platform === 'win32' 
+					? `mkdir "${powerPointTempDir}"` 
+					: `mkdir -p "${powerPointTempDir}"`;
+				
+				exec(mkdirCmd, (mkdirError) => {
+					if (mkdirError) {
+						logger.error(`Error creating temporary directory for ${file.name}`, { error: mkdirError.message });
+						reject(mkdirError);
+					} else {
+						resolve();
+					}
+				});
+			});
+			
+			const safeFilename = `powerpoint_${uuid()}.${extension}`;
+			const safeTempPath = join(powerPointTempDir, safeFilename);
+			
+			await new Promise<void>((resolve, reject) => {
+				const copyCmd = process.platform === 'win32' 
+					? `copy "${contentPath}" "${safeTempPath}"` 
+					: `cp "${contentPath}" "${safeTempPath}"`;
+				
+				exec(copyCmd, (copyError) => {
+					if (copyError) {
+						logger.error(`Error copying PowerPoint file: ${file.name}`, { error: copyError.message });
+						reject(copyError);
+					} else {
+						resolve();
+					}
+				});
+			});
+			
+			await new Promise<void>((resolve, reject) => {
+				const cmd = `soffice --headless --convert-to pdf --outdir "${powerPointTempDir}" "${safeTempPath}"`;
+				exec(cmd, async (error) => {
+					if (error) {
+						logger.error(`LibreOffice error for ${file.name}`, { error: error.message });
+						reject(error);
+						return;
+					}
+					
+					try {
+						const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
+						const pdfPath = join(powerPointTempDir, pdfFilename);
+						
+						await new Promise<void>((resolveGs, rejectGs) => {
+							const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${tempPngPath}" "${pdfPath}"`;
+							exec(gsCmd, (gsError) => {
+								if (gsError) {
+									logger.error(`Ghostscript error for PowerPoint PDF: ${pdfFilename}`, { error: gsError.message });
+									rejectGs(gsError);
+								} else {
+									resolveGs();
+								}
+							});
+						});
+						
+						rm(pdfPath, { force: true }).catch(e => 
+							logger.error("Failed to delete temporary PDF", { error: e.message })
+						);
+						rm(safeTempPath, { force: true }).catch(e => 
+							logger.error("Failed to delete temporary PowerPoint file", { error: e.message })
+						);
+						
+						resolve();
+					} catch (cleanupError) {
+						reject(cleanupError);
+					}
+				});
+			});
+			
+			rm(powerPointTempDir, { recursive: true, force: true }).catch(e => 
+				logger.error("Failed to delete temporary directory", { error: e.message })
+			);
+			
+			await sharp(tempPngPath)
+				.resize({ height: 1280 })
+				.toFormat('webp')
+				.toFile(thumbnailPath);
+			
+			rm(tempPngPath).catch((error) => 
+				logger.error("Failed to delete temporary PNG", { error: error.message })
+			);
+			
+			return thumbnailPath;
+		} catch (error) {
+			logger.error(`Error generating PowerPoint thumbnail for ${file.name}`, { 
+				error: error.message, 
+				stack: error.stack 
+			});
+			throw error;
+		}
 	}
-	return null
+	
+	logger.info(`No thumbnail generation for ${file.name} (MIME: ${file.mimeType})`);
+	return null;
 }
 
 export async function extractDimensions(file: AssetFile, contentPath: string): Promise<{ width: number, height: number } | null> {
@@ -233,13 +486,11 @@ export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
 	}
 	await dataSource.getRepository(AssetFile).save(file)
 
-	// requesting file content update if checksum is changed or file is creating
 	if (file.externalChecksum !== opts.externalChecksum || file.status === AssetFileStatus.CREATING) {
 		await assetUpdateContentQueue.push({ assetFileId: file.id })
 	}
 
 	const folderChanged = previousFolder?.id !== file.folder?.id
-	// synchronize collections
 	if (folderChanged || file.status === AssetFileStatus.CREATING) {
 		if (folderChanged) {
 			await dataSource.query(`DELETE FROM collection_files WHERE asset_file_id = $1`, [file.id])
