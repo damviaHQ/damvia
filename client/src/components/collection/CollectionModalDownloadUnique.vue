@@ -414,7 +414,8 @@ watch(() => props.modelValue, (newValue) => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" class="bg-neutral-700 text-neutral-200 border-neutral-600">
                         <DropdownMenuItem v-for="dropItem in dropdownItems" :key="dropItem.id" class="dropdown-item-override">
-                          <router-link :to="{ name: 'collection', params: { id: dropItem.id } }" class="text-neutral-200">
+                          <router-link :to="{ name: 'collection', params: { id: dropItem.id } }" class="text-neutral-200"
+                            @click="$emit('update:modelValue', null)">
                             {{ dropItem.name }}
                           </router-link>
                         </DropdownMenuItem>
@@ -424,13 +425,18 @@ watch(() => props.modelValue, (newValue) => {
                   <template v-else>
                     <BreadcrumbLink v-if="index < visibleItems.length - 1" as-child>
                       <router-link :to="{ name: 'collection', params: { id: item.id } }"
-                        class="max-w-20 truncate md:max-w-none text-neutral-400 hover:text-neutral-200">
+                        class="max-w-20 truncate md:max-w-none text-neutral-400 hover:text-neutral-200"
+                        @click="$emit('update:modelValue', null)">
                         {{ item.name }}
                       </router-link>
                     </BreadcrumbLink>
-                    <BreadcrumbPage v-else class="max-w-20 truncate md:max-w-none font-medium text-neutral-200">
-                      {{ item.name }}
-                    </BreadcrumbPage>
+                    <BreadcrumbLink v-else as-child>
+                      <router-link :to="{ name: 'collection', params: { id: item.id } }"
+                        class="max-w-20 truncate md:max-w-none font-medium text-neutral-200 hover:text-neutral-300"
+                        @click="$emit('update:modelValue', null)">
+                        {{ item.name }}
+                      </router-link>
+                    </BreadcrumbLink>
                   </template>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator v-if="index < visibleItems.length - 1" class="text-neutral-500" />
