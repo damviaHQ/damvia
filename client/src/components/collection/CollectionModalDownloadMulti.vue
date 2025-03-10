@@ -89,14 +89,12 @@ watch([() => globalStore.selection, () => props.modelValue], () => {
     .then((data) => {
       res.value = data
       form.value.downloadType = data.allowDirectDownload ? "direct" : "email"
-      // Reset the checkbox state when new files are loaded
       form.value.isAcceptingTerms = false
     })
     .catch((error) => toast.error((error as Error).message))
 })
 
 watchEffect(() => {
-  // Force original format if image compression is disabled
   if (!allowImageCompression.value && form.value.imageFormat !== "original") {
     form.value.imageFormat = "original"
   }
@@ -112,7 +110,6 @@ watchEffect(() => {
 })
 
 watchEffect(() => {
-  // Reset error state when checkbox is changed
   if (hasLicenses.value) {
     hasTermsError.value = false;
   }

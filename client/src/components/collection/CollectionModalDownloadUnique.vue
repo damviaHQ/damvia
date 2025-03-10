@@ -102,16 +102,13 @@ const files = computed(() => props.files ?? props.collection?.files)
 const currentFile = computed<File>(() => files.value?.find((file: File) => file.id === props.modelValue))
 const allowDirectDownload = computed(() => { return !currentFile.value || parseInt(currentFile.value.size, 10) <= 5_000_000_000 })
 
-// Add a query to fetch the collection data for the file when it's opened from search results
 const { data: fileCollection } = useQuery({
   queryKey: computed(() => ["file-collection", props.modelValue]),
   queryFn: () => currentFile.value?.collectionId ? trpc.collection.findById.query(currentFile.value.collectionId) : null,
   enabled: computed(() => !!currentFile.value && !props.collection && !!currentFile.value.collectionId)
 })
 
-// Update the collectionPath computed property to use the fileCollection data if available
 const collectionPath = computed<Collection[]>(() => {
-  // Use the fileCollection data if available, otherwise use the props.collection
   const collection = fileCollection.value || props.collection
   if (!collection) {
     return []
@@ -196,7 +193,6 @@ watch(
 )
 
 watchEffect(() => {
-  // Reset error state when checkbox is changed
   if (hasLicense.value) {
     hasTermsError.value = false;
   }
@@ -264,7 +260,6 @@ async function download() {
   isLoading.value = true
   hasTermsError.value = false
   try {
-    // If there's no license, set isAcceptingTerms to true for the API call
     const formData = {
       ...form.value,
       isAcceptingTerms: hasLicense.value ? form.value.isAcceptingTerms : true,
@@ -274,7 +269,6 @@ async function download() {
     const downloadRes = await trpc.download.create.mutate(formData as any)
     await queryClient.invalidateQueries({ queryKey: ["downloads"] })
     
-    // Reset the checkbox state
     form.value.isAcceptingTerms = false
     
     if (downloadRes.url) {
@@ -310,7 +304,6 @@ function truncateFileName(name: string, maxLength: number = 60) {
 const modalRef = ref<HTMLElement | null>(null)
 
 function handleKeyDown(event: KeyboardEvent) {
-  // Check if the modal is open
   if (modalRef.value && currentFile.value) {
     if (event.key === "ArrowLeft") {
       event.preventDefault()
@@ -330,7 +323,6 @@ onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown)
 })
 
-// Focus the modal when it opens
 watch(() => props.modelValue, (newValue) => {
   if (newValue && modalRef.value) {
     nextTick(() => {
@@ -338,7 +330,6 @@ watch(() => props.modelValue, (newValue) => {
     })
   }
   
-  // Reset the checkbox state when the modal is closed
   if (!newValue) {
     form.value.isAcceptingTerms = false
   }

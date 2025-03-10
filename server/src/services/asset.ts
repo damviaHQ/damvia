@@ -71,20 +71,16 @@ export async function updateFileContent(file: AssetFile): Promise<void> {
 }
 
 export async function generateFileThumbnail(file: AssetFile, contentPath: string): Promise<string | null> {
-	// Get lowercase file extension
 	const extension = file.name.split('.').pop()?.toLowerCase();
 	
-	// Check if this is a video file either by MIME type or extension
 	const videoExtensions = ['mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'm4v'];
 	const isVideo = file.mimeType.startsWith('video/') || 
 				   (extension && videoExtensions.includes(extension));
 	
-	// Check if this is an image file either by MIME type or extension
 	const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif'];
 	const isImage = file.mimeType.startsWith('image/') || 
 				   (extension && imageExtensions.includes(extension));
 				
-	// Check if this is a vector file (EPS, AI, PDF)
 	const vectorExtensions = ['eps', 'ai', 'pdf', 'svg'];
 	const isVector = file.mimeType === 'application/postscript' || 
 					file.mimeType === 'application/pdf' ||
@@ -92,7 +88,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					file.mimeType === 'image/svg+xml' ||
 					(extension && vectorExtensions.includes(extension));
 	
-	// Check if this is a PowerPoint file
 	const pptExtensions = ['ppt', 'pptx', 'ppsx', 'pps', 'potx', 'pot'];
 	const isPowerPoint = file.mimeType === 'application/vnd.ms-powerpoint' || 
 					    file.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
@@ -109,7 +104,7 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					count: 1,
 					folder: thumbnailFolder,
 					size: '1280x?',
-					timestamps: ['10%'], // Take thumbnail from 10% into the video
+					timestamps: ['10%'],
 					filename: 'thumbnail-%b.png'
 				})
 					.on('filenames', (filenames) => _filenames = filenames)
@@ -144,10 +139,9 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 			// For TIFF files, use a higher pixel limit and downscale first if needed
 			if (isTiff) {
 				try {
-					// Use Sharp with increased limits for large TIFF files
 					await sharp(contentPath, { 
 						limitInputPixels: 1000000000, // Increase pixel limit (default is 268402689)
-						pages: 1 // Only process the first page for multi-page TIFFs
+						pages: 1
 					})
 					.resize({ height: 1280 })
 					.toFormat('webp')
@@ -175,7 +169,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					}
 				}
 			} else {
-				// For regular images, use the standard approach
 				await sharp(contentPath)
 					.resize({ height: 1280 })
 					.toFormat('webp')
@@ -197,15 +190,12 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 			const thumbnailPath = await tmpFile();
 			
 			if (extension === 'svg' || file.mimeType === 'image/svg+xml') {
-				// For SVG files, use Sharp directly
 				await sharp(contentPath)
 					.resize({ height: 1280 })
 					.toFormat('png')
 					.toFile(tempPngPath);
 			} else if (extension === 'pdf' || file.mimeType === 'application/pdf') {
 					await new Promise<void>((resolve, reject) => {
-						// Use Ghostscript to convert PDF to PNG
-						// Quote paths to handle spaces and special characters
 						const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${tempPngPath}" "${contentPath}"`;
 						exec(cmd, (error) => {
 							if (error) {
@@ -217,10 +207,7 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 						});
 					});
 			} else {
-				// For EPS and AI files, use Ghostscript via child_process
 				await new Promise<void>((resolve, reject) => {
-					// Use Ghostscript to convert EPS/AI to PNG
-					// Quote paths to handle spaces and special characters
 					const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dEPSCrop -r300 -sOutputFile="${tempPngPath}" "${contentPath}"`;
 					exec(cmd, (error) => {
 						if (error) {
@@ -233,13 +220,11 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				});
 			}
 			
-			// Convert the PNG to WebP for the final thumbnail
 			await sharp(tempPngPath)
 				.resize({ height: 1280 })
 				.toFormat('webp')
 				.toFile(thumbnailPath);
 			
-			// Clean up the temporary PNG file
 			rm(tempPngPath).catch((error) => 
 				logger.error("Failed to delete temporary PNG", { error: error.message })
 			);
@@ -258,10 +243,8 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 			const tempPngPath = await tmpFile();
 			const thumbnailPath = await tmpFile();
 			
-			// Create a temporary directory specifically for this PowerPoint conversion
 			const powerPointTempDir = join(await tmpDir(), `ppt_${uuid()}`);
 			
-			// Ensure the directory exists
 			await new Promise<void>((resolve, reject) => {
 				const mkdirCmd = process.platform === 'win32' 
 					? `mkdir "${powerPointTempDir}"` 
@@ -277,11 +260,9 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				});
 			});
 			
-			// Create a safe filename without spaces or special characters
 			const safeFilename = `powerpoint_${uuid()}.${extension}`;
 			const safeTempPath = join(powerPointTempDir, safeFilename);
 			
-			// Copy the original file to the temp path with a safe filename
 			await new Promise<void>((resolve, reject) => {
 				const copyCmd = process.platform === 'win32' 
 					? `copy "${contentPath}" "${safeTempPath}"` 
@@ -297,9 +278,7 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				});
 			});
 			
-			// Use LibreOffice to convert PowerPoint to PDF with the safe filename
 			await new Promise<void>((resolve, reject) => {
-				// Quote paths to handle spaces
 				const cmd = `soffice --headless --convert-to pdf --outdir "${powerPointTempDir}" "${safeTempPath}"`;
 				exec(cmd, async (error) => {
 					if (error) {
@@ -309,13 +288,10 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 					}
 					
 					try {
-						// Get the PDF filename (same as safe filename but with .pdf extension)
 						const pdfFilename = safeFilename.substring(0, safeFilename.lastIndexOf('.')) + '.pdf';
 						const pdfPath = join(powerPointTempDir, pdfFilename);
 						
-						// Use Ghostscript to convert PDF to PNG
 						await new Promise<void>((resolveGs, rejectGs) => {
-							// Quote paths to handle spaces
 							const gsCmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=pngalpha -dFirstPage=1 -dLastPage=1 -r300 -sOutputFile="${tempPngPath}" "${pdfPath}"`;
 							exec(gsCmd, (gsError) => {
 								if (gsError) {
@@ -327,7 +303,6 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 							});
 						});
 						
-						// Clean up the temporary files
 						rm(pdfPath, { force: true }).catch(e => 
 							logger.error("Failed to delete temporary PDF", { error: e.message })
 						);
@@ -342,18 +317,15 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 				});
 			});
 			
-			// Clean up the temporary directory
 			rm(powerPointTempDir, { recursive: true, force: true }).catch(e => 
 				logger.error("Failed to delete temporary directory", { error: e.message })
 			);
 			
-			// Convert the PNG to WebP for the final thumbnail
 			await sharp(tempPngPath)
 				.resize({ height: 1280 })
 				.toFormat('webp')
 				.toFile(thumbnailPath);
 			
-			// Clean up the temporary PNG file
 			rm(tempPngPath).catch((error) => 
 				logger.error("Failed to delete temporary PNG", { error: error.message })
 			);
@@ -514,13 +486,11 @@ export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
 	}
 	await dataSource.getRepository(AssetFile).save(file)
 
-	// requesting file content update if checksum is changed or file is creating
 	if (file.externalChecksum !== opts.externalChecksum || file.status === AssetFileStatus.CREATING) {
 		await assetUpdateContentQueue.push({ assetFileId: file.id })
 	}
 
 	const folderChanged = previousFolder?.id !== file.folder?.id
-	// synchronize collections
 	if (folderChanged || file.status === AssetFileStatus.CREATING) {
 		if (folderChanged) {
 			await dataSource.query(`DELETE FROM collection_files WHERE asset_file_id = $1`, [file.id])
