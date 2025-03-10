@@ -183,7 +183,7 @@ const itemsToDisplay = 5
 const dropdownItems = computed<Collection[]>(() => {
   const path = collectionPath.value
   if (path.length <= itemsToDisplay) return []
-  return path.slice(1, -2)
+  return path.slice(2, -3)
 })
 
 const visibleItems = computed<CollectionWithPath[]>(() => {
@@ -191,8 +191,9 @@ const visibleItems = computed<CollectionWithPath[]>(() => {
   if (path.length <= itemsToDisplay) return path
   return [
     path[0],
+    path[1],
     { id: "ellipsis", name: "...", isEllipsis: true } as CollectionWithPath,
-    ...path.slice(-2),
+    ...path.slice(-3),
   ]
 })
 
@@ -412,7 +413,7 @@ watch(() => props.modelValue, (newValue) => {
                         <BreadcrumbEllipsis class="h-4 w-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="start" class="bg-neutral-700 text-neutral-200 border-neutral-600">
-                        <DropdownMenuItem v-for="dropItem in dropdownItems" :key="dropItem.id" class="hover:bg-neutral-600">
+                        <DropdownMenuItem v-for="dropItem in dropdownItems" :key="dropItem.id" class="dropdown-item-override">
                           <router-link :to="{ name: 'collection', params: { id: dropItem.id } }" class="text-neutral-200">
                             {{ dropItem.name }}
                           </router-link>
@@ -626,6 +627,10 @@ watch(() => props.modelValue, (newValue) => {
 </template>
 
 <style scoped lang="scss">
+.dropdown-item-override:hover {
+  @apply bg-neutral-600;
+}
+
 .icon-download {
   fill: var(--primary-color80);
   padding-top: 2px;
