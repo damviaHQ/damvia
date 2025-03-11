@@ -30,7 +30,6 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import {
@@ -137,6 +136,58 @@ const isVectorFile = computed(() => {
          currentFile.value.name.toLowerCase().endsWith('.eps') ||
          currentFile.value.mimeType === 'application/postscript' ||
          currentFile.value.mimeType === 'application/illustrator'
+})
+
+const isTextFile = computed(() => {
+  if (!currentFile.value) return false
+  const filename = currentFile.value.name.toLowerCase()
+  return filename.endsWith('.txt') || 
+         filename.endsWith('.md') || 
+         filename.endsWith('.json') ||
+         filename.endsWith('.xml') ||
+         filename.endsWith('.html') ||
+         filename.endsWith('.htm') ||
+         filename.endsWith('.css') ||
+         filename.endsWith('.js') ||
+         filename.endsWith('.ts') ||
+         filename.endsWith('.yaml') ||
+         filename.endsWith('.yml') ||
+         currentFile.value.mimeType === 'text/plain' ||
+         currentFile.value.mimeType === 'text/markdown' ||
+         currentFile.value.mimeType === 'application/json' ||
+         currentFile.value.mimeType === 'text/xml' ||
+         currentFile.value.mimeType === 'text/html' ||
+         currentFile.value.mimeType === 'text/css' ||
+         currentFile.value.mimeType === 'text/javascript' ||
+         currentFile.value.mimeType === 'application/javascript' ||
+         currentFile.value.mimeType === 'application/typescript' ||
+         currentFile.value.mimeType === 'text/yaml'
+})
+
+const isFontFile = computed(() => {
+  if (!currentFile.value) return false
+  const filename = currentFile.value.name.toLowerCase()
+  return filename.endsWith('.ttf') || 
+         filename.endsWith('.otf') ||
+         currentFile.value.mimeType === 'font/ttf' ||
+         currentFile.value.mimeType === 'font/otf' ||
+         currentFile.value.mimeType === 'application/x-font-ttf' ||
+         currentFile.value.mimeType === 'application/x-font-otf' ||
+         currentFile.value.mimeType === 'application/vnd.ms-fontobject'
+})
+
+const isVideoFile = computed(() => {
+  if (!currentFile.value) return false
+  const filename = currentFile.value.name.toLowerCase()
+  return filename.endsWith('.mp4') || 
+         filename.endsWith('.mov') || 
+         filename.endsWith('.avi') ||
+         filename.endsWith('.mkv') ||
+         filename.endsWith('.wmv') ||
+         filename.endsWith('.flv') ||
+         filename.endsWith('.webm') ||
+         filename.endsWith('.m4v') ||
+         currentFile.value.mimeType.startsWith('video/')
 })
 
 const isPowerPoint = computed(() => {
@@ -468,8 +519,24 @@ watch(() => props.modelValue, (newValue) => {
           </div>
         </div>
         <div class="gallery-modal__preview-thumbnail-container">
-          <video v-if="currentFile.mimeType.startsWith('video/')" :src="currentFile.fileURL" controls
+          <video v-if="isVideoFile && currentFile.fileURL" :src="currentFile.fileURL" controls
             class="gallery-modal__preview-thumbnail" />
+          <div v-else-if="isVideoFile && !currentFile.fileURL" class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename">
+              {{ 
+                currentFile.name.toLowerCase().endsWith('.mp4') ? 'MP4 Video' :
+                currentFile.name.toLowerCase().endsWith('.mov') ? 'MOV Video' :
+                currentFile.name.toLowerCase().endsWith('.avi') ? 'AVI Video' :
+                currentFile.name.toLowerCase().endsWith('.mkv') ? 'MKV Video' :
+                currentFile.name.toLowerCase().endsWith('.wmv') ? 'WMV Video' :
+                currentFile.name.toLowerCase().endsWith('.flv') ? 'FLV Video' :
+                currentFile.name.toLowerCase().endsWith('.webm') ? 'WebM Video' :
+                currentFile.name.toLowerCase().endsWith('.m4v') ? 'M4V Video' :
+                'Video'
+              }} Preview Not Available
+            </div>
+          </div>
           <iframe v-else-if="isPdf" :src="`${currentFile.fileURL}#toolbar=0&navpanes=0&scrollbar=1`"
             class="gallery-modal__preview-thumbnail gallery-modal__pdf-preview" 
             width="90%" height="90%" frameborder="0">
@@ -478,10 +545,13 @@ watch(() => props.modelValue, (newValue) => {
               <a :href="currentFile.fileURL" target="_blank" class="pdf-fallback-link">Click here to view the PDF</a>
             </div>
           </iframe>
-          <img v-else-if="(currentFile.mimeType.startsWith('image/') || isVectorFile || 
+          <img v-else-if="(currentFile.mimeType.startsWith('image/') || 
+                          isVectorFile || 
                           (isPowerPoint && hasThumbnail) || 
                           (isWord && hasThumbnail) || 
-                          (isExcel && hasThumbnail))" 
+                          (isExcel && hasThumbnail) ||
+                          (isTextFile && hasThumbnail) ||
+                          (isFontFile && hasThumbnail))" 
                :src="currentFile.thumbnailURL"
                :alt="currentFile.name" 
                class="gallery-modal__preview-thumbnail" />
@@ -497,9 +567,45 @@ watch(() => props.modelValue, (newValue) => {
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
             <div class="gallery-modal__placeholder-filename">Excel Spreadsheet Preview Not Available</div>
           </div>
+          <div v-else-if="isTextFile && !hasThumbnail" class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename">
+              {{ 
+                currentFile.name.toLowerCase().endsWith('.html') || currentFile.name.toLowerCase().endsWith('.htm') ? 'HTML File' :
+                currentFile.name.toLowerCase().endsWith('.xml') ? 'XML File' :
+                currentFile.name.toLowerCase().endsWith('.json') ? 'JSON File' :
+                currentFile.name.toLowerCase().endsWith('.md') ? 'Markdown File' :
+                currentFile.name.toLowerCase().endsWith('.yaml') || currentFile.name.toLowerCase().endsWith('.yml') ? 'YAML File' :
+                currentFile.name.toLowerCase().endsWith('.css') ? 'CSS File' :
+                currentFile.name.toLowerCase().endsWith('.js') ? 'JavaScript File' :
+                currentFile.name.toLowerCase().endsWith('.ts') ? 'TypeScript File' :
+                'Text File'
+              }} Preview Not Available
+            </div>
+          </div>
+          <div v-else-if="isFontFile && !hasThumbnail" class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename">
+              {{ 
+                currentFile.name.toLowerCase().endsWith('.ttf') ? 'TTF Font' :
+                currentFile.name.toLowerCase().endsWith('.otf') ? 'OTF Font' :
+                'Font'
+              }} Preview Not Available
+            </div>
+          </div>
+          <div v-else-if="isVectorFile && !hasThumbnail" class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename">
+              {{ 
+                currentFile.name.toLowerCase().endsWith('.ai') ? 'Adobe Illustrator' :
+                currentFile.name.toLowerCase().endsWith('.eps') ? 'EPS Vector' :
+                'Vector File'
+              }} Preview Not Available
+            </div>
+          </div>
           <div v-else class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename"> No preview available</div>
+            <div class="gallery-modal__placeholder-filename">No preview available</div>
           </div>
         </div>
       </div>
