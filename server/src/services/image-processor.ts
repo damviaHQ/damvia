@@ -367,7 +367,7 @@ export async function processImageThumbnail(
         if (isPsd) {
             try {
                 await new Promise<void>((resolve, reject) => {
-                    const cmd = `magick "${contentPath}[0]" -resize 1920x1280 -quality 85 "${thumbnailPath}.webp"`;
+                    const cmd = `convert "${contentPath}[0]" -resize 1920x1280 -quality 85 "${thumbnailPath}.webp"`;
                     exec(cmd, (error) => {
                         if (error) {
                             reject(error);
@@ -381,7 +381,7 @@ export async function processImageThumbnail(
             } catch (psdError) {
                 try {
                     await new Promise<void>((resolve, reject) => {
-                        const cmd = `magick "${contentPath}" -flatten -resize 1920x1280 -quality 85 "${thumbnailPath}.webp"`;
+                        const cmd = `convert "${contentPath}" -flatten -resize 1920x1280 -quality 85 "${thumbnailPath}.webp"`;
                         exec(cmd, (error) => {
                             if (error) {
                                 reject(error);
@@ -536,7 +536,7 @@ export async function processFontThumbnail(
         const sampleText = `ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n1234567890\nThe quick brown fox jumps over the lazy dog.\nPack my box with five dozen liquor jugs.\nSphynx of black quartz, judge my vow.`;
         
         await new Promise<void>((resolve, reject) => {
-            const cmd = `magick -size 1920x1280 -background white -fill black -font "${contentPath}" -pointsize 48 -gravity center label:"${sampleText}" -quality 90 "${thumbnailPath}.webp"`;
+            const cmd = `convert -size 1920x1280 -background white -fill black -font "${contentPath}" -pointsize 48 -gravity center label:"${sampleText}" -quality 90 "${thumbnailPath}.webp"`;
             exec(cmd, (error) => {
                 if (error) {
                     reject(error);
@@ -552,7 +552,7 @@ export async function processFontThumbnail(
             const fallbackThumbnailPath = await tmpFile();
             const simpleSampleText = `Font: ${file.name}\n\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n1234567890`;
             await new Promise<void>((resolve, reject) => {
-                const cmd = `magick -size 1280x720 -background white -fill black -pointsize 36 -gravity center label:"${simpleSampleText}" -quality 85 "${fallbackThumbnailPath}.webp"`;
+                const cmd = `convert -size 1280x720 -background white -fill black -pointsize 36 -gravity center label:"${simpleSampleText}" -quality 85 "${fallbackThumbnailPath}.webp"`;
                 exec(cmd, (error) => {
                     if (error) {
                         reject(error);
