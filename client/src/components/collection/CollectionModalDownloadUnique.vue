@@ -130,6 +130,15 @@ const isPdf = computed(() => {
          currentFile.value.name.toLowerCase().endsWith('.pdf')
 })
 
+const isPsd = computed(() => {
+  if (!currentFile.value) return false
+  return currentFile.value.name.toLowerCase().endsWith('.psd') || 
+         currentFile.value.mimeType === 'image/vnd.adobe.photoshop' || 
+         currentFile.value.mimeType === 'application/photoshop' || 
+         currentFile.value.mimeType === 'application/psd' || 
+         currentFile.value.mimeType === 'image/psd'
+})
+
 const isVectorFile = computed(() => {
   if (!currentFile.value) return false
   return currentFile.value.name.toLowerCase().endsWith('.ai') || 
@@ -547,6 +556,7 @@ watch(() => props.modelValue, (newValue) => {
           </iframe>
           <img v-else-if="(currentFile.mimeType.startsWith('image/') || 
                           isVectorFile || 
+                          isPsd ||
                           (isPowerPoint && hasThumbnail) || 
                           (isWord && hasThumbnail) || 
                           (isExcel && hasThumbnail) ||
@@ -602,6 +612,10 @@ watch(() => props.modelValue, (newValue) => {
                 'Vector File'
               }} Preview Not Available
             </div>
+          </div>
+          <div v-else-if="isPsd && !hasThumbnail" class="gallery-modal__placeholder-container">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
+            <div class="gallery-modal__placeholder-filename">Photoshop PSD Preview Not Available</div>
           </div>
           <div v-else class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
