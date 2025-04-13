@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionDialogCreate from "@/components/collection/CollectionDialogCreate.vue"
-import Loader from "@/components/Loader.vue"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -29,7 +28,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ChevronDown, ChevronRight, CirclePlus, Folder } from "lucide-vue-next"
+import { ChevronDown, ChevronRight, CirclePlus, Folder, Loader2Icon } from "lucide-vue-next"
 import { TreeItem, TreeRoot } from 'radix-vue'
 import { ref } from "vue"
 
@@ -57,8 +56,14 @@ function openCreateCollection() {
   isCollectionModalOpen.value = true
 }
 
+const isLoading = ref(false)
+
 async function addToCollection() {
-  if (!selectedCollection.value) return
+  if (!selectedCollection.value || isLoading.value) {
+    return
+  }
+
+  isLoading.value = true
   try {
     await trpc.collection.addItems.mutate({
       id: selectedCollection.value.id,
@@ -72,6 +77,8 @@ async function addToCollection() {
   } catch (error) {
     console.error("Error adding items to collection:", error)
     toast.error("Failed to add items to collection")
+  } finally {
+    isLoading.value = false
   }
 }
 </script>
@@ -119,8 +126,9 @@ async function addToCollection() {
       </div>
       <DialogFooter class="mt-4">
         <Button variant="link" @click="emit('update:modelValue', false)">Cancel</Button>
-        <Button @click="addToCollection" :disabled="!selectedCollection">
+        <Button @click="addToCollection" :disabled="!selectedCollection || isLoading">
           Add to {{ selectedCollection ? selectedCollection.name : 'Collection' }}
+          <Loader2Icon v-if="isLoading" class="h-4 w-4 animate-spin ml-2" />
         </Button>
       </DialogFooter>
     </DialogContent>

@@ -13,7 +13,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import Loader from "@/components/Loader.vue"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -30,6 +29,7 @@ import { RouterOutput, trpc } from "@/services/server.ts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
+import {Loader2Icon} from "lucide-vue-next";
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -44,7 +44,7 @@ const form = ref<{
   collectionId?: string
 }>({ name: '' })
 
-const { isPending, isError, error, isSuccess, mutate } = useMutation({
+const { isPending, error, mutate } = useMutation({
   mutationFn: (data: { name: string; parentId?: string }) =>
     trpc.collection.createUserCollection.mutate(data),
   onSuccess: (collection) => {
@@ -138,6 +138,7 @@ function handleKeyDown(event: KeyboardEvent) {
           </Button>
           <Button type="submit" :disabled="isPending">
             Create
+            <Loader2Icon v-if="isPending" class="h-4 w-4 animate-spin ml-2" />
           </Button>
         </DialogFooter>
       </form>
