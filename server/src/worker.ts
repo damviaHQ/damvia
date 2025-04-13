@@ -48,23 +48,26 @@ type CreateQueueOptions<T> = {
 
 export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQueueOptions<T>) {
 	workerInitializers.push(async () => {
+		await boss.createQueue(name)
+
 		if (cron) {
 			await boss.schedule(name, cron)
 		}
-		await boss.work<T>(name, workerOptions ?? { newJobCheckInterval: 100 }, async (job) => {
-			try {
-				await processor(job.data)
-			} catch (error) {
-				logger.error('job', {
-					status: 'failed',
-					queue: job.name,
-					jobId: job.id,
-					error: error.message,
-					stacktrace: error.stacktrace,
+
+		await boss.work<T>(name, workerOptions, (jobs) =>
+			Promise.all(jobs.map(async (job) =>
+				processor(job.data).catch((error) => {
+					logger.error('job', {
+						status: 'failed',
+						queue: job.name,
+						jobId: job.id,
+						error: error.message,
+						stacktrace: error.stacktrace,
+					})
+					throw error
 				})
-				throw error
-			}
-		})
+			))
+		)
 	})
 
 	return {
@@ -91,7 +94,9 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 
 export async function startWorker() {
 	await boss.start()
-	await Promise.all(workerInitializers.map((initializer) => initializer()))
+	for (const initializer of workerInitializers) {
+		await initializer()
+	}
 }
 
 export const mailerEmailVerificationQueue = createQueue<{ userId: string }>({
@@ -153,7 +158,7 @@ export const assetUpdateContentQueue = createQueue<{ assetFileId: string }>({
 					await updateFileContent(content)
 				}
 			}),
-	workerOptions: { teamSize: 10, teamConcurrency: 20 },
+	workerOptions: { batchSize: 10 },
 })
 
 export const assetProcessDeletionQueue = createQueue<void>({
@@ -171,7 +176,7 @@ export const assetAssignProductsToAssetFilesQueue = createQueue<void>({
 export const collectionSynchronizationQueue = createQueue<{ collectionId: string }>({
 	name: 'collection/synchronization',
 	processor: (data) => dataSource.transaction((em) => synchronizeCollection(em, data.collectionId)),
-	workerOptions: { teamSize: 10, teamConcurrency: 20 },
+	workerOptions: { batchSize: 10 },
 })
 
 export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({
@@ -185,7 +190,7 @@ export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({
 		await createDownloadArchive({ em, download })
 		await mailerDownloadReadyQueue.push({ downloadId: download.id })
 	}),
-	workerOptions: { teamSize: 1, teamConcurrency: 5 },
+	workerOptions: { batchSize: 1 },
 })
 
 export const downloadProcessExpiredQueue = createQueue<void>({
