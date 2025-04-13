@@ -75,12 +75,12 @@ async function createInvitation(sendEmail: boolean) {
     await queryClient.invalidateQueries({
       queryKey: ["collection", props.collection.id],
     })
-    resetForm()
     if (sendEmail) {
       toast.success("The invitation link has been sent to your guest")
     } else {
       await copyInvitationLink(form.value.email!)
     }
+    resetForm()
   } catch (error) {
     const { fieldErrors } = extractErrors(error as Error)
     formErrors.value = fieldErrors
