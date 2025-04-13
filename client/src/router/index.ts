@@ -45,11 +45,12 @@ const router = createRouter({
 		{ name: 'admin-page', path: '/admin/pages/:id', component: () => import('@/views/admin/pages/admin-page-edit.vue'), meta: { layout: 'admin' } },
 		{ name: 'privacy-policy', path: '/privacy-policy', component: () => import('@/views/public/public-privacy-policy.vue'), meta: { layout: 'public' } },
 		{ name: 'legal-information', path: '/legal-information', component: () => import('@/views/public/public-legal-information.vue'), meta: { layout: 'public' } },
+		{ name: 'link-expired', path: '/link-expired', component: () => import('@/views/public/public-link-expired.vue'), meta: { layout: 'public' } },
 	],
 })
 
 const authRoutes = ['login', 'sign-up', 'password-reset', 'password-update']
-const publicRoutes = ['legal-information', 'privacy-policy']
+const publicRoutes = ['legal-information', 'privacy-policy', 'link-expired']
 
 router.beforeEach((to) => {
 	const store = useGlobalStore()
