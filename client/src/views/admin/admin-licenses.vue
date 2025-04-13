@@ -25,13 +25,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
-import { Button } from "@/components/ui/button"
+import {Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage,} from "@/components/ui/breadcrumb"
+import {Button} from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -40,35 +35,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  RangeCalendarCell,
-  RangeCalendarCellTrigger,
-  RangeCalendarGrid,
-  RangeCalendarGridBody,
-  RangeCalendarGridHead,
-  RangeCalendarGridRow,
-  RangeCalendarHeadCell,
-} from '@/components/ui/range-calendar'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { useGlobalToast } from "@/composables/useGlobalToast"
-import { RouterOutput, trpc } from "@/services/server.ts"
-import { CalendarDate, type DateValue, isEqualMonth } from '@internationalized/date'
-import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, CirclePlus, PencilLine, Trash2 } from "lucide-vue-next"
-import { type DateRange, RangeCalendarRoot, useDateFormatter } from 'radix-vue'
-import { type Grid, createMonth, toDate } from 'radix-vue/date'
-import { computed, ref, watch } from 'vue'
+import {Input} from "@/components/ui/input"
+import {Label} from "@/components/ui/label"
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow,} from "@/components/ui/table"
+import {useGlobalToast} from "@/composables/useGlobalToast"
+import {RouterOutput, trpc} from "@/services/server.ts"
+import {CalendarDate, parseDate} from '@internationalized/date'
+import {useQuery, useQueryClient} from "@tanstack/vue-query"
+import {CirclePlus, PencilLine, Trash2, XIcon} from "lucide-vue-next"
+import {useDateFormatter} from 'radix-vue'
+import {toDate} from 'radix-vue/date'
+import {computed, ref} from 'vue'
 import Treeselect from "vue3-treeselect-ts"
+import {QuillEditor} from "@vueup/vue-quill";
+import "@vueup/vue-quill/dist/vue-quill.snow.css"
+import DatePickerInput from "@/components/DatePickerInput.vue";
+import {subDays, addDays} from 'date-fns'
 
 const toast = useGlobalToast()
 const modalState = ref("closed")
@@ -78,27 +60,12 @@ const formatter = useDateFormatter(locale.value)
 const form = ref({
   id: '',
   name: '',
-  usageRange: {
-    start: new CalendarDate(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()),
-    end: new CalendarDate(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()).add({ days: 7 }),
-  },
+  details: '',
+  usageFrom: null,
+  usageTo: null,
   scopes: [],
   allowedRegionIds: [],
 })
-const firstMonthPlaceholder = ref(form.value.usageRange.start)
-const secondMonthPlaceholder = ref(form.value.usageRange.start.add({ months: 1 }))
-const firstMonth = ref(createMonth({
-  dateObj: firstMonthPlaceholder.value,
-  locale: locale.value,
-  fixedWeeks: true,
-  weekStartsOn: 0,
-}))
-const secondMonth = ref(createMonth({
-  dateObj: secondMonthPlaceholder.value,
-  locale: locale.value,
-  fixedWeeks: true,
-  weekStartsOn: 0,
-}))
 const licenseScopeOptions = [
   { id: "digital", label: "Digital" },
   { id: "print", label: "Print" },
@@ -111,53 +78,17 @@ const { data: regions } = useQuery({
   queryKey: ["regions"],
   queryFn: () => trpc.region.list.query(),
 })
-
 const regionOptions = computed(() =>
   regions.value?.map((region) => ({ label: region.name, id: region.id })) ?? []
 )
-
-function updateMonth(reference: 'first' | 'second', months: number) {
-  if (reference === 'first') {
-    firstMonthPlaceholder.value = firstMonthPlaceholder.value.add({ months })
-    secondMonthPlaceholder.value = firstMonthPlaceholder.value.add({ months: 1 })
-  } else {
-    secondMonthPlaceholder.value = secondMonthPlaceholder.value.add({ months })
-    firstMonthPlaceholder.value = secondMonthPlaceholder.value.subtract({ months: 1 })
-  }
-}
-
-watch(firstMonthPlaceholder, (_placeholder) => {
-  firstMonth.value = createMonth({
-    dateObj: _placeholder,
-    weekStartsOn: 0,
-    fixedWeeks: false,
-    locale: locale.value,
-  })
-  // Ensure secondMonthPlaceholder is always one month ahead
-  secondMonthPlaceholder.value = _placeholder.add({ months: 1 })
-})
-
-watch(secondMonthPlaceholder, (_placeholder) => {
-  secondMonth.value = createMonth({
-    dateObj: _placeholder,
-    weekStartsOn: 0,
-    fixedWeeks: false,
-    locale: locale.value,
-  })
-  // Ensure firstMonthPlaceholder is always one month behind
-  if (isEqualMonth(_placeholder, firstMonthPlaceholder.value)) {
-    firstMonthPlaceholder.value = _placeholder.subtract({ months: 1 })
-  }
-})
 
 function openCreateModal() {
   form.value = {
     id: '',
     name: '',
-    usageRange: {
-      start: new CalendarDate(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()),
-      end: new CalendarDate(new Date().getFullYear(), new Date().getMonth() + 1, new Date().getDate()).add({ days: 7 }),
-    },
+    usageFrom: null,
+    usageTo: null,
+    details: '',
     scopes: [],
     allowedRegionIds: [],
   }
@@ -168,10 +99,9 @@ function openEditModal(license: RouterOutput["license"]["list"][number]) {
   form.value = {
     id: license.id,
     name: license.name,
-    usageRange: {
-      start: license.usageFrom ? new CalendarDate(new Date(license.usageFrom).getFullYear(), new Date(license.usageFrom).getMonth() + 1, new Date(license.usageFrom).getDate()) : undefined,
-      end: license.usageTo ? new CalendarDate(new Date(license.usageTo).getFullYear(), new Date(license.usageTo).getMonth() + 1, new Date(license.usageTo).getDate()) : undefined,
-    },
+    usageFrom: license.usageFrom ? parseDate(license.usageFrom) : null,
+    usageTo: license.usageTo ? parseDate(license.usageTo) : null,
+    details: license.details,
     scopes: license.scopes,
     allowedRegionIds: license.allowedRegionIds,
   }
@@ -183,8 +113,8 @@ async function onModalSubmit(event: Event) {
 
   const formData = {
     ...form.value,
-    usageFrom: form.value.usageRange.start.toString(),
-    usageTo: form.value.usageRange.end.toString(),
+    usageFrom: form.value.usageFrom?.toString?.() ?? null,
+    usageTo: form.value.usageTo?.toString?.() ?? null,
   }
 
   const action = modalState.value === "creating" ? trpc.license.create : trpc.license.update
@@ -312,7 +242,7 @@ function formatDate(date: CalendarDate | undefined) {
   </div>
 
   <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && (modalState = 'closed')">
-    <DialogContent class="sm:max-w-[480px]">
+    <DialogContent class="sm:max-w-[480px] overflow-y-auto max-h-[calc(100vh-32px)]">
       <form @submit.prevent="onModalSubmit" class="flex flex-col gap-4 py-4">
         <DialogHeader>
           <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} License</DialogTitle>
@@ -327,89 +257,52 @@ function formatDate(date: CalendarDate | undefined) {
           <Input id="name" v-model="form.name" placeholder="License name" />
         </div>
         <div class="flex flex-col gap-2">
-          <Label for="usageRange">Usage Period *</Label>
-          <Popover>
-            <PopoverTrigger as-child>
-              <Button variant="outline" class="w-full justify-start text-left font-normal">
-                <CalendarIcon class="mr-2 h-4 w-4" />
-                {{
-                  form.usageRange.start ? formatDate(form.usageRange.start) : "Start date"
-                }}
-                -
-                {{ form.usageRange.end ? formatDate(form.usageRange.end) : "End date" }}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent class="w-auto p-0" @update:open="(open) => !open">
-              <RangeCalendarRoot v-model="form.usageRange" class="p-3">
-                <div class="flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0">
-                  <div>
-                    <div class="flex items-center justify-between">
-                      <Button variant="outline" class="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-                        @click="updateMonth('first', -1)">
-                        <ChevronLeft class="h-4 w-4" />
-                      </Button>
-                      <div class="text-sm font-medium">
-                        {{ formatter.fullMonthAndYear(toDate(firstMonth.value)) }}
-                      </div>
-                      <Button variant="outline" class="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-                        @click="updateMonth('first', 1)">
-                        <ChevronRight class="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <RangeCalendarGrid>
-                      <RangeCalendarGridHead>
-                        <RangeCalendarGridRow>
-                          <RangeCalendarHeadCell v-for="day in firstMonth.weekDays" :key="day" class="w-full">
-                            {{ day }}
-                          </RangeCalendarHeadCell>
-                        </RangeCalendarGridRow>
-                      </RangeCalendarGridHead>
-                      <RangeCalendarGridBody>
-                        <RangeCalendarGridRow v-for="(weekDates, index) in firstMonth.rows" :key="`weekDate-${index}`"
-                          class="mt-2 w-full">
-                          <RangeCalendarCell v-for="weekDate in weekDates" :key="weekDate.toString()" :date="weekDate">
-                            <RangeCalendarCellTrigger :day="weekDate" :month="firstMonth.value" />
-                          </RangeCalendarCell>
-                        </RangeCalendarGridRow>
-                      </RangeCalendarGridBody>
-                    </RangeCalendarGrid>
-                  </div>
-                  <div>
-                    <div class="flex items-center justify-between">
-                      <Button variant="outline" class="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-                        @click="updateMonth('second', -1)">
-                        <ChevronLeft class="h-4 w-4" />
-                      </Button>
-                      <div class="text-sm font-medium">
-                        {{ formatter.fullMonthAndYear(toDate(secondMonth.value)) }}
-                      </div>
-                      <Button variant="outline" class="h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-                        @click="updateMonth('second', 1)">
-                        <ChevronRight class="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <RangeCalendarGrid>
-                      <RangeCalendarGridHead>
-                        <RangeCalendarGridRow>
-                          <RangeCalendarHeadCell v-for="day in secondMonth.weekDays" :key="day" class="w-full">
-                            {{ day }}
-                          </RangeCalendarHeadCell>
-                        </RangeCalendarGridRow>
-                      </RangeCalendarGridHead>
-                      <RangeCalendarGridBody>
-                        <RangeCalendarGridRow v-for="(weekDates, index) in secondMonth.rows" :key="`weekDate-${index}`"
-                          class="mt-2 w-full">
-                          <RangeCalendarCell v-for="weekDate in weekDates" :key="weekDate.toString()" :date="weekDate">
-                            <RangeCalendarCellTrigger :day="weekDate" :month="secondMonth.value" />
-                          </RangeCalendarCell>
-                        </RangeCalendarGridRow>
-                      </RangeCalendarGridBody>
-                    </RangeCalendarGrid>
-                  </div>
-                </div>
-              </RangeCalendarRoot>
-            </PopoverContent>
-          </Popover>
+          <Label for="name">Details</Label>
+          <div class="bg-white flex-grow overflow-hidden">
+            <QuillEditor
+              ref="editor"
+              v-model:content="form.details"
+              class="bg-white flex-grow flex flex-col"
+              theme="snow"
+              toolbar="essential"
+              placeholder="..."
+              content-type="html"
+            />
+          </div>
+        </div>
+        <div class="flex flex-col gap-2">
+          <Label for="usageFrom">Usage From</Label>
+          <div class="flex gap-2">
+            <DatePickerInput
+              :model-value="form.usageFrom"
+              @update:modelValue="(event) => {
+                form.usageFrom = new CalendarDate(event.year, event.month, event.day)
+                if (form.usageTo && form.usageFrom.compare(form.usageTo) > 1) {
+                  form.usageTo = null
+                }
+              }"
+            />
+            <Button type="button" variant="ghost" size="icon" @click="form.usageFrom = null">
+              <XIcon />
+            </Button>
+          </div>
+        </div>
+        <div class="flex flex-col gap-2">
+          <Label for="usageTo">Usage To</Label>
+          <div class="flex gap-2">
+            <DatePickerInput
+              :model-value="form.usageTo"
+              @update:modelValue="(event) => {
+                form.usageTo = new CalendarDate(event.year, event.month, event.day)
+                if (form.usageFrom && form.usageTo.compare(form.usageFrom) < 1) {
+                  form.usageFrom = null
+                }
+              }"
+            />
+            <Button type="button" variant="ghost" size="icon" @click="form.usageTo = null">
+              <XIcon />
+            </Button>
+          </div>
         </div>
         <div class="flex flex-col gap-2">
           <Label for="scopes">Usage Scopes *</Label>
@@ -424,11 +317,9 @@ function formatDate(date: CalendarDate | undefined) {
         <DialogFooter class="sm:justify-between items-center">
           <div class="text-sm text-gray-500">* Required</div>
           <Button type="submit" :disabled="form.name === '' ||
-            form.usageRange.start === '' ||
-            form.usageRange.end === '' ||
             form.scopes.length === 0 ||
             form.allowedRegionIds.length === 0
-            ">
+          ">
             {{ modalState === "creating" ? "Create" : "Save" }}
           </Button>
         </DialogFooter>

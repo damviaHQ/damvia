@@ -24,6 +24,7 @@ export function formatLicense(license: License) {
 	return {
 		id: license.id,
 		name: license.name,
+		details: license.details,
 		usageFrom: license.usageFrom,
 		usageTo: license.usageTo,
 		scopes: license.scopes,
@@ -43,8 +44,9 @@ export default router({
 		.input(
 			z.object({
 				name: z.string().max(50).optional(),
-				usageFrom: z.coerce.date(),
-				usageTo: z.coerce.date(),
+				details: z.string().nullable().optional(),
+				usageFrom: z.coerce.date().nullable().optional(),
+				usageTo: z.coerce.date().nullable().optional(),
 				scopes: z.array(z.nativeEnum(LicenseScope)),
 				allowedRegionIds: z.array(z.string().uuid()),
 			}),
@@ -52,6 +54,7 @@ export default router({
 		.mutation(async ({ input }) => {
 			const license = new License()
 			license.name = input.name
+			license.details = input.details
 			license.usageFrom = input.usageFrom
 			license.usageTo = input.usageTo
 			license.scopes = input.scopes
@@ -65,8 +68,9 @@ export default router({
 			z.object({
 				id: z.string().uuid(),
 				name: z.string().max(50).optional(),
-				usageFrom: z.coerce.date(),
-				usageTo: z.coerce.date(),
+				details: z.string().nullable().optional(),
+				usageFrom: z.coerce.date().nullable().optional(),
+				usageTo: z.coerce.date().nullable().optional(),
 				scopes: z.array(z.nativeEnum(LicenseScope)),
 				allowedRegionIds: z.array(z.string().uuid()),
 			})
@@ -78,6 +82,7 @@ export default router({
 			}
 
 			license.name = input.name
+			license.details = input.details
 			license.usageFrom = input.usageFrom
 			license.usageTo = input.usageTo
 			license.scopes = input.scopes

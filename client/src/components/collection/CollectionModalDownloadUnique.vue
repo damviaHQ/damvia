@@ -53,8 +53,10 @@ import {
   StarOff,
   Trash2,
   X,
+  CircleHelpIcon,
 } from "lucide-vue-next"
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from "vue"
+import {Dialog, DialogContent, DialogTrigger} from "@/components/ui/dialog";
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
 type Collection = RouterOutput["collection"]["findById"]
@@ -126,22 +128,22 @@ const hasThumbnail = computed(() => {
 
 const isPdf = computed(() => {
   if (!currentFile.value) return false
-  return currentFile.value.mimeType === 'application/pdf' || 
+  return currentFile.value.mimeType === 'application/pdf' ||
          currentFile.value.name.toLowerCase().endsWith('.pdf')
 })
 
 const isPsd = computed(() => {
   if (!currentFile.value) return false
-  return currentFile.value.name.toLowerCase().endsWith('.psd') || 
-         currentFile.value.mimeType === 'image/vnd.adobe.photoshop' || 
-         currentFile.value.mimeType === 'application/photoshop' || 
-         currentFile.value.mimeType === 'application/psd' || 
+  return currentFile.value.name.toLowerCase().endsWith('.psd') ||
+         currentFile.value.mimeType === 'image/vnd.adobe.photoshop' ||
+         currentFile.value.mimeType === 'application/photoshop' ||
+         currentFile.value.mimeType === 'application/psd' ||
          currentFile.value.mimeType === 'image/psd'
 })
 
 const isVectorFile = computed(() => {
   if (!currentFile.value) return false
-  return currentFile.value.name.toLowerCase().endsWith('.ai') || 
+  return currentFile.value.name.toLowerCase().endsWith('.ai') ||
          currentFile.value.name.toLowerCase().endsWith('.eps') ||
          currentFile.value.mimeType === 'application/postscript' ||
          currentFile.value.mimeType === 'application/illustrator'
@@ -150,8 +152,8 @@ const isVectorFile = computed(() => {
 const isTextFile = computed(() => {
   if (!currentFile.value) return false
   const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.txt') || 
-         filename.endsWith('.md') || 
+  return filename.endsWith('.txt') ||
+         filename.endsWith('.md') ||
          filename.endsWith('.json') ||
          filename.endsWith('.xml') ||
          filename.endsWith('.html') ||
@@ -176,7 +178,7 @@ const isTextFile = computed(() => {
 const isFontFile = computed(() => {
   if (!currentFile.value) return false
   const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.ttf') || 
+  return filename.endsWith('.ttf') ||
          filename.endsWith('.otf') ||
          currentFile.value.mimeType === 'font/ttf' ||
          currentFile.value.mimeType === 'font/otf' ||
@@ -188,8 +190,8 @@ const isFontFile = computed(() => {
 const isVideoFile = computed(() => {
   if (!currentFile.value) return false
   const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.mp4') || 
-         filename.endsWith('.mov') || 
+  return filename.endsWith('.mp4') ||
+         filename.endsWith('.mov') ||
          filename.endsWith('.avi') ||
          filename.endsWith('.mkv') ||
          filename.endsWith('.wmv') ||
@@ -202,8 +204,8 @@ const isVideoFile = computed(() => {
 const isPowerPoint = computed(() => {
   if (!currentFile.value) return false
   const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.ppt') || 
-         filename.endsWith('.pptx') || 
+  return filename.endsWith('.ppt') ||
+         filename.endsWith('.pptx') ||
          filename.endsWith('.ppsx') ||
          filename.endsWith('.pps') ||
          filename.endsWith('.potx') ||
@@ -216,8 +218,8 @@ const isPowerPoint = computed(() => {
 const isWord = computed(() => {
   if (!currentFile.value) return false
   const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.doc') || 
-         filename.endsWith('.docx') || 
+  return filename.endsWith('.doc') ||
+         filename.endsWith('.docx') ||
          filename.endsWith('.rtf') ||
          filename.endsWith('.odt') ||
          currentFile.value.mimeType === 'application/msword' ||
@@ -229,8 +231,8 @@ const isWord = computed(() => {
 const isExcel = computed(() => {
   if (!currentFile.value) return false
   const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.xls') || 
-         filename.endsWith('.xlsx') || 
+  return filename.endsWith('.xls') ||
+         filename.endsWith('.xlsx') ||
          filename.endsWith('.csv') ||
          filename.endsWith('.ods') ||
          currentFile.value.mimeType === 'application/vnd.ms-excel' ||
@@ -351,12 +353,12 @@ async function download() {
       isAcceptingTerms: hasLicense.value ? form.value.isAcceptingTerms : true,
       collectionFileIds: [currentFile.value.id],
     };
-    
+
     const downloadRes = await trpc.download.create.mutate(formData as any)
     await queryClient.invalidateQueries({ queryKey: ["downloads"] })
-    
+
     form.value.isAcceptingTerms = false
-    
+
     if (downloadRes.url) {
       window.open(downloadRes.url, "_blank")
       emit("update:modelValue", null)
@@ -415,7 +417,7 @@ watch(() => props.modelValue, (newValue) => {
       modalRef.value?.focus()
     })
   }
-  
+
   if (!newValue) {
     form.value.isAcceptingTerms = false
   }
@@ -441,7 +443,7 @@ watch(() => props.modelValue, (newValue) => {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        
+
         <div class="flex items-center gap-6 ml-4">
           <template v-if="haveAccessToFavorites">
             <button v-if="isFavorite(currentFile)" @click="removeFromFavorite(currentFile)" type="button"
@@ -459,7 +461,7 @@ watch(() => props.modelValue, (newValue) => {
           </button>
         </div>
       </div>
-      
+
       <div class="flex items-center gap-2">
         <div v-if="hasCollectionPath" class="gallery-modal__breadcrumb">
           <Breadcrumb>
@@ -504,7 +506,7 @@ watch(() => props.modelValue, (newValue) => {
             </BreadcrumbList>
           </Breadcrumb>
         </div>
-        
+
         <Button variant="ghost" size="icon" type="button"
           class="text-neutral-200 hover:text-neutral-300 bg-transparent hover:bg-neutral-700 ml-2"
           @click="$emit('update:modelValue', null)">
@@ -533,7 +535,7 @@ watch(() => props.modelValue, (newValue) => {
           <div v-else-if="isVideoFile && !currentFile.fileURL" class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
             <div class="gallery-modal__placeholder-filename">
-              {{ 
+              {{
                 currentFile.name.toLowerCase().endsWith('.mp4') ? 'MP4 Video' :
                 currentFile.name.toLowerCase().endsWith('.mov') ? 'MOV Video' :
                 currentFile.name.toLowerCase().endsWith('.avi') ? 'AVI Video' :
@@ -547,23 +549,23 @@ watch(() => props.modelValue, (newValue) => {
             </div>
           </div>
           <iframe v-else-if="isPdf" :src="`${currentFile.fileURL}#toolbar=0&navpanes=0&scrollbar=1`"
-            class="gallery-modal__preview-thumbnail gallery-modal__pdf-preview" 
+            class="gallery-modal__preview-thumbnail gallery-modal__pdf-preview"
             width="90%" height="90%" frameborder="0">
             <div class="pdf-fallback">
               <p>It appears your browser doesn't support embedded PDFs.</p>
               <a :href="currentFile.fileURL" target="_blank" class="pdf-fallback-link">Click here to view the PDF</a>
             </div>
           </iframe>
-          <img v-else-if="(currentFile.mimeType.startsWith('image/') || 
-                          isVectorFile || 
+          <img v-else-if="(currentFile.mimeType.startsWith('image/') ||
+                          isVectorFile ||
                           isPsd ||
-                          (isPowerPoint && hasThumbnail) || 
-                          (isWord && hasThumbnail) || 
+                          (isPowerPoint && hasThumbnail) ||
+                          (isWord && hasThumbnail) ||
                           (isExcel && hasThumbnail) ||
                           (isTextFile && hasThumbnail) ||
-                          (isFontFile && hasThumbnail))" 
+                          (isFontFile && hasThumbnail))"
                :src="currentFile.thumbnailURL"
-               :alt="currentFile.name" 
+               :alt="currentFile.name"
                class="gallery-modal__preview-thumbnail" />
           <div v-else-if="isPowerPoint && !hasThumbnail" class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
@@ -580,7 +582,7 @@ watch(() => props.modelValue, (newValue) => {
           <div v-else-if="isTextFile && !hasThumbnail" class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
             <div class="gallery-modal__placeholder-filename">
-              {{ 
+              {{
                 currentFile.name.toLowerCase().endsWith('.html') || currentFile.name.toLowerCase().endsWith('.htm') ? 'HTML File' :
                 currentFile.name.toLowerCase().endsWith('.xml') ? 'XML File' :
                 currentFile.name.toLowerCase().endsWith('.json') ? 'JSON File' :
@@ -596,7 +598,7 @@ watch(() => props.modelValue, (newValue) => {
           <div v-else-if="isFontFile && !hasThumbnail" class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
             <div class="gallery-modal__placeholder-filename">
-              {{ 
+              {{
                 currentFile.name.toLowerCase().endsWith('.ttf') ? 'TTF Font' :
                 currentFile.name.toLowerCase().endsWith('.otf') ? 'OTF Font' :
                 'Font'
@@ -606,7 +608,7 @@ watch(() => props.modelValue, (newValue) => {
           <div v-else-if="isVectorFile && !hasThumbnail" class="gallery-modal__placeholder-container">
             <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
             <div class="gallery-modal__placeholder-filename">
-              {{ 
+              {{
                 currentFile.name.toLowerCase().endsWith('.ai') ? 'Adobe Illustrator' :
                 currentFile.name.toLowerCase().endsWith('.eps') ? 'EPS Vector' :
                 'Vector File'
@@ -708,7 +710,18 @@ watch(() => props.modelValue, (newValue) => {
             <div v-if="currentFile.license" class="flex items-center text-neutral-300">
               <Copyright class="w-4 h-4 mr-4 text-neutral-50" />
               <div>
-                <div class="text-sm mb-1 text-neutral-200">
+                <Dialog v-if="currentFile.license.details">
+                  <DialogTrigger as-child>
+                    <button class="flex items-center text-sm mb-1 text-neutral-200">
+                      {{ currentFile.license.name }}
+                      <CircleHelpIcon class="ml-2 h-4 w-4" />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <div v-html="currentFile.license.details" />
+                  </DialogContent>
+                </Dialog>
+                <div v-else class="flex items-center text-sm mb-1 text-neutral-200">
                   {{ currentFile.license.name }}
                 </div>
                 <div class="text-neutral-300 text-xs">
@@ -776,7 +789,7 @@ watch(() => props.modelValue, (newValue) => {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .gallery-modal__header > div:last-child {
     width: 100%;
     justify-content: space-between;
