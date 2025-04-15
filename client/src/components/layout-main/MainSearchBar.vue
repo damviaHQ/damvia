@@ -120,6 +120,9 @@ function handleRouteQueryArray(
   return query as string[]
 }
 
+const LOCAL_STORAGE_SEARCH_OPTIONS_KEY = 'damvia_search_options'
+const hasSearchOptions = ref(!!localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY))
+
 function getInitialSearchQuery() {
   if (route.name === "search") {
     return {
@@ -128,6 +131,17 @@ function getInitialSearchQuery() {
       searchScope:
         (route.query.search_scope as string) ?? Object.keys(searchScopeOptions.value)[0],
       exactMatch: route.query.exact_match === "true",
+    }
+  }
+
+  let searchOptions: any = localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
+  if (searchOptions) {
+    searchOptions = JSON.parse(searchOptions)
+    return {
+      query: currentQuery.value,
+      assetTypes: searchOptions?.assetTypes ?? [],
+      searchScope: searchOptions?.searchScope ?? "all",
+      exactMatch: searchOptions?.exactMatch ?? false,
     }
   }
 
@@ -243,6 +257,12 @@ function search() {
     delete routeQuery.exact_match
   }
 
+  localStorage.setItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY, JSON.stringify({
+    assetTypes: searchQuery.value.assetTypes,
+    searchScope: searchQuery.value.searchScope,
+    exactMatch: searchQuery.value.exactMatch || false,
+  }))
+  hasSearchOptions.value = true
   router.push({ name: "search", query: routeQuery })
   searchQueryValue.value = ""
   isModalOpen.value = false
@@ -340,6 +360,12 @@ function saveEdit(index: number, newValue: string) {
     }
   }
   editingIndex.value = null
+}
+
+function clearSearchOptions() {
+  localStorage.removeItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
+  hasSearchOptions.value = false
+  resetSearch()
 }
 
 onMounted(() => {
@@ -461,11 +487,20 @@ onUnmounted(() => {
           <div>{{ filesNotFound.data.value.join(", ") }}</div>
         </div>
         <Button type="button" @click="search" class="px-10 py-5">Search</Button>
-        <Button type="button" variant="ghost"
-          class="bg-transparent text-neutral-500 hover:bg-transparent hover:text-red-500 text-sm p-0 mt-1.5"
-          @click="resetSearch">
-          Clear search
-        </Button>
+        <div class="flex items-center gap-4 mt-2">
+          <Button
+            type="button" variant="ghost" @click="resetSearch"
+            class="bg-transparent text-neutral-500 hover:bg-transparent hover:text-red-500 text-sm p-0 mt-1.5"
+          >
+            Clear search
+          </Button>
+          <Button
+            v-if="hasSearchOptions" type="button" variant="ghost" @click="clearSearchOptions"
+            class="bg-transparent text-neutral-500 hover:bg-transparent hover:text-red-500 text-sm p-0 mt-1.5"
+          >
+            Reset to default
+          </Button>
+        </div>
       </div>
     </div>
   </modal>
