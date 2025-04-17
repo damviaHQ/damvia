@@ -718,7 +718,7 @@ watch(() => props.modelValue, (newValue) => {
                     </button>
                   </DialogTrigger>
                   <DialogContent>
-                    <div v-html="currentFile.license.details" />
+                    <div class="max-h-[80vh] overflow-auto" v-html="currentFile.license.details" />
                   </DialogContent>
                 </Dialog>
                 <div v-else class="flex items-center text-sm mb-1 text-neutral-200">

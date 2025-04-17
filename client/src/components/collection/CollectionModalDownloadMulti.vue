@@ -335,7 +335,7 @@ function removeFromSelection(file: { id: string }) {
                       </button>
                     </DialogTrigger>
                     <DialogContent>
-                      <div v-html="license.details" />
+                      <div class="max-h-[80vh] overflow-auto" v-html="license.details" />
                     </DialogContent>
                   </Dialog>
                   <div v-else class="text-sm mb-1 text-neutral-200">
