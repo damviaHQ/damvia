@@ -12,40 +12,41 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { fromFile as fileTypeFromFile } from "file-type"
+import {loadEsm} from 'load-esm';
 import ffmpeg from "fluent-ffmpeg"
-import { exec } from "node:child_process"
-import { existsSync } from "node:fs"
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import {exec} from "node:child_process"
+import {mkdtemp, rm} from "node:fs/promises"
+import {tmpdir} from "node:os"
+import {join} from "node:path"
 import sharp from "sharp"
-import { v4 as uuid } from 'uuid'
-import { AssetFile, AssetFileStatus } from "../entity/asset-file"
-import { AssetFolder, AssetFolderStatus } from "../entity/asset-folder"
-import { Collection } from "../entity/collection"
-import { CollectionFile } from "../entity/collection-file"
-import { Product } from "../entity/product"
-import { assetsS3, assetsS3Bucket, assetUpdater, dataSource, logger } from "../env"
-import { assetUpdateContentQueue, collectionSynchronizationQueue } from "../worker"
+import {v4 as uuid} from 'uuid'
+import {AssetFile, AssetFileStatus} from "../entity/asset-file"
+import {AssetFolder, AssetFolderStatus} from "../entity/asset-folder"
+import {Collection} from "../entity/collection"
+import {CollectionFile} from "../entity/collection-file"
+import {Product} from "../entity/product"
+import {assetsS3, assetsS3Bucket, assetUpdater, dataSource, logger} from "../env"
+import {assetUpdateContentQueue, collectionSynchronizationQueue} from "../worker"
 import {
-	LIBREOFFICE_EXTENSIONS,
-	GHOSTSCRIPT_EXTENSIONS,
-	VIDEO_EXTENSIONS,
-	IMAGE_EXTENSIONS,
-	FONT_EXTENSIONS,
-	LIBREOFFICE_MIMETYPES,
-	GHOSTSCRIPT_MIMETYPES,
-	VIDEO_MIMETYPES,
-	IMAGE_MIMETYPES,
-	FONT_MIMETYPES,
-	isFileType,
 	convertOfficeToPng,
 	convertVectorToPng,
+	FONT_EXTENSIONS,
+	FONT_MIMETYPES,
 	generateVideoThumbnail,
+	GHOSTSCRIPT_EXTENSIONS,
+	GHOSTSCRIPT_MIMETYPES,
+	IMAGE_EXTENSIONS,
+	IMAGE_MIMETYPES,
+	isFileType,
+	LIBREOFFICE_EXTENSIONS,
+	LIBREOFFICE_MIMETYPES,
+	processFontThumbnail,
 	processImageThumbnail,
-	processFontThumbnail
+	VIDEO_EXTENSIONS,
+	VIDEO_MIMETYPES
 } from "./image-processor"
+
+const fileTypeModule = loadEsm<typeof import('file-type')>('file-type')
 
 let _tmpDir = null
 export async function tmpDir() {
@@ -61,6 +62,7 @@ export async function tmpFile() {
 
 export async function updateFileContent(file: AssetFile): Promise<void> {
 	const contentPath = await assetUpdater().fetchFileContent(file)
+	const { fileTypeFromFile } = await fileTypeModule
 	const fileType = await fileTypeFromFile(contentPath)
 	file.mimeType = fileType?.ext === 'webp' ? 'image/webp' : (fileType?.mime ?? 'application/octet-stream')
 	await assetsS3().fPutObject(assetsS3Bucket(), file.originalStorageKey, contentPath, { 'Content-Type': file.mimeType })
@@ -91,7 +93,7 @@ export async function updateFileContent(file: AssetFile): Promise<void> {
 
 	file.status = AssetFileStatus.UP_TO_DATE
 	await dataSource.getRepository(AssetFile).save(file)
-	
+
 	if (thumbnailPath) {
 		rm(thumbnailPath).catch((error) => logger.error("Failed to delete thumbnail", { error: error.message }))
 	}
@@ -104,10 +106,10 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 	const isVector = isFileType(file, GHOSTSCRIPT_EXTENSIONS, GHOSTSCRIPT_MIMETYPES);
 	const isOfficeDoc = isFileType(file, LIBREOFFICE_EXTENSIONS, LIBREOFFICE_MIMETYPES);
 	const isFont = isFileType(file, FONT_EXTENSIONS, FONT_MIMETYPES);
-	
+
 	let pngPath = null;
 	let thumbnailPath = null;
-	
+
 	try {
 		if (isVideo) {
 			pngPath = await generateVideoThumbnail(file, contentPath, tmpFile, tmpDir);
@@ -120,15 +122,15 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 		} else if (isVector) {
 			pngPath = await convertVectorToPng(file, contentPath, tmpFile);
 		}
-		
+
 		if (pngPath) {
 			thumbnailPath = await tmpFile();
-			
+
 			await sharp(pngPath)
 				.resize({ height: 1280 })
 				.toFormat('webp')
 				.toFile(thumbnailPath);
-			
+
 			rm(pngPath, { force: true }).catch(() => {});
 			return thumbnailPath;
 		}
@@ -156,17 +158,17 @@ export async function extractDimensions(file: AssetFile, contentPath: string): P
 				resolve(null)
 			})
 		})
-	} else if (file.mimeType.startsWith('image/') || 
-	           file.mimeType === 'application/photoshop' || 
-	           file.mimeType === 'application/psd' || 
+	} else if (file.mimeType.startsWith('image/') ||
+	           file.mimeType === 'application/photoshop' ||
+	           file.mimeType === 'application/psd' ||
 	           file.name.toLowerCase().endsWith('.psd')) {
-		
-		const isPsd = file.mimeType === 'image/vnd.adobe.photoshop' || 
-		             file.mimeType === 'application/photoshop' || 
-		             file.mimeType === 'application/psd' || 
+
+		const isPsd = file.mimeType === 'image/vnd.adobe.photoshop' ||
+		             file.mimeType === 'application/photoshop' ||
+		             file.mimeType === 'application/psd' ||
 		             file.mimeType === 'image/psd' ||
 		             file.name.toLowerCase().endsWith('.psd');
-		
+
 		if (isPsd) {
 			try {
 				return new Promise((resolve, reject) => {
@@ -176,7 +178,7 @@ export async function extractDimensions(file: AssetFile, contentPath: string): P
 							resolve(null);
 							return;
 						}
-						
+
 						const dimensions = stdout.trim().split('x');
 						if (dimensions.length === 2) {
 							const width = parseInt(dimensions[0], 10);
@@ -193,14 +195,14 @@ export async function extractDimensions(file: AssetFile, contentPath: string): P
 				return null;
 			}
 		}
-		
+
 		try {
-			const isTiff = file.mimeType === 'image/tiff' || 
-						  file.name.toLowerCase().endsWith('.tiff') || 
+			const isTiff = file.mimeType === 'image/tiff' ||
+						  file.name.toLowerCase().endsWith('.tiff') ||
 						  file.name.toLowerCase().endsWith('.tif');
-			
+
 			if (isTiff || parseInt(file.size, 10) > 50 * 1024 * 1024) {
-				const meta = await sharp(contentPath, { 
+				const meta = await sharp(contentPath, {
 					limitInputPixels: 0,
 					pages: 1
 				}).metadata();
