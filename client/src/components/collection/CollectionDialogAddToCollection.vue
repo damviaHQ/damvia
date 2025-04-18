@@ -32,6 +32,7 @@ import { ChevronDown, ChevronRight, CirclePlus, Folder, Loader2Icon } from "luci
 import { TreeItem, TreeRoot } from 'radix-vue'
 import {computed, ref} from "vue"
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import CollectionDialogCreatePublic from "@/components/collection/CollectionDialogCreatePublic.vue";
 
 const queryClient = useQueryClient()
 const toast = useGlobalToast()
@@ -41,6 +42,7 @@ const emit = defineEmits<{
 }>()
 
 const globalStore = useGlobalStore()
+const tabId = ref('private')
 const isCollectionModalOpen = ref(false)
 const selectedCollection = ref<RouterOutput["collection"]["tree"][number] | null>(null)
 
@@ -60,10 +62,6 @@ const usablePublicCollections = computed(() => (publicCollections.value ?? []).f
 
 function handleSelect(collection: RouterOutput["collection"]["tree"][number]) {
   selectedCollection.value = collection
-}
-
-function openCreateCollection() {
-  isCollectionModalOpen.value = true
 }
 
 const isLoading = ref(false)
@@ -102,7 +100,7 @@ async function addToCollection() {
           Choose one of your collections to add your selected items or create a new one.
         </DialogDescription>
       </DialogHeader>
-      <Tabs default-value="private">
+      <Tabs v-model="tabId">
         <div class="mt-4">
           <div class="flex justify-between items-center mb-2">
             <TabsList>
@@ -113,7 +111,7 @@ async function addToCollection() {
                 Public Collections
               </TabsTrigger>
             </TabsList>
-            <Button variant="ghost" @click="openCreateCollection">
+            <Button variant="ghost" @click="isCollectionModalOpen = true">
               Create new
               <CirclePlus class="h-4 w-4 ml-2" />
             </Button>
@@ -198,5 +196,6 @@ async function addToCollection() {
       </DialogFooter>
     </DialogContent>
   </Dialog>
-  <CollectionDialogCreate v-model="isCollectionModalOpen" />
+  <CollectionDialogCreate v-if="tabId === 'private'" v-model="isCollectionModalOpen" />
+  <CollectionDialogCreatePublic v-if="tabId === 'public'" v-model="isCollectionModalOpen" />
 </template>
