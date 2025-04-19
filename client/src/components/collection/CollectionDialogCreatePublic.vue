@@ -30,6 +30,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
 import {Loader2Icon} from "lucide-vue-next";
+import {Checkbox} from "@/components/ui/checkbox";
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -39,52 +40,67 @@ const emit = defineEmits<{
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
 
-const form = ref<{
-  name: string
-  collectionId?: string
-}>({ name: '' })
+const form = ref<{ name: string; collectionId?: string; draft: boolean }>({
+  name: '',
+  draft: false,
+})
 
 const { isPending, error, mutate } = useMutation({
-  mutationFn: (data: { name: string; parentId?: string }) =>
-    trpc.collection.createUserCollection.mutate(data),
-  onSuccess: (collection) => {
-    queryClient.invalidateQueries({ queryKey: ["collection", "tree"] })
-    queryClient.invalidateQueries({ queryKey: ["menu-items"] })
-    queryClient.invalidateQueries({ queryKey: ["collection", "ListPrivateCollections"] })
+  mutationFn() {
+    return trpc.collection.create.mutate({
+      name: form.value.name!,
+      parentId: form.value.collectionId,
+      public: true,
+      draft: form.value.collectionId ? undefined : form.value.draft ?? false,
+    })
+  },
+  async onSuccess(collection) {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["collection", "tree"] }),
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] }),
+      queryClient.invalidateQueries({ queryKey: ["collection", "ListPrivateCollections"] }),
+      queryClient.invalidateQueries({ queryKey: ['collection', 'treeAdmin', 'public'] }),
+    ])
     toast.success("Your collection is created. You can now add files to it.")
     emit("update:modelValue", false)
     emit("created", collection)
   },
-  onError: (error: Error) => {
+  onError(error: Error) {
     toast.error(error.message)
   }
 })
 
-const { data: privateCollections } = useQuery({
-  queryKey: ["collection", "ListPrivateCollections"],
-  queryFn: () => trpc.collection.ListPrivateCollections.query(),
+const { data: collections } = useQuery({
+  queryKey: ["collection", "tree"],
+  queryFn: () => trpc.collection.tree.query(),
 })
 
 watch(
   () => props.modelValue,
   () => {
-    form.value = { name: '' }
+    form.value = { name: '', draft: false }
   }
 )
 
 const collectionOptions = computed(() => {
-  if (!privateCollections.value) {
+  if (!collections.value) {
     return []
   }
 
-  function formatCollectionArray(collections: RouterOutput["collection"]["ListPrivateCollections"]): any {
-    return collections.map((c) => ({
-      id: c.id,
-      label: c.name,
-      children: c.children && c.children.length > 0 ? formatCollectionArray(c.children) : undefined,
-    }))
+  function formatCollectionArray(collections: RouterOutput["collection"]["tree"]): any {
+    if (!collections.some((c: RouterOutput["collection"]["tree"][number]) => !c.synchronized)) {
+      return undefined
+    }
+
+    return collections
+        .filter((c: RouterOutput["collection"]["tree"][number]) => !c.synchronized)
+        .map((c: RouterOutput["collection"]["tree"][number]) => ({
+          id: c.id,
+          label: c.name,
+          children: c.children ? formatCollectionArray(c.children) : undefined,
+        }))
   }
-  return formatCollectionArray(privateCollections.value)
+  return formatCollectionArray(collections.value)
 })
 
 async function onSubmit() {
@@ -92,10 +108,8 @@ async function onSubmit() {
     toast.error("Collection name is required")
     return
   }
-  await mutate({
-    name: form.value.name,
-    parentId: form.value.collectionId,
-  })
+
+  return mutate()
 }
 
 function handleKeyDown(event: KeyboardEvent) {
@@ -111,7 +125,7 @@ function handleKeyDown(event: KeyboardEvent) {
     <DialogContent class="sm:max-w-[425px]">
       <form @submit.prevent="onSubmit" @keydown="handleKeyDown">
         <DialogHeader>
-          <DialogTitle>Create a private collection</DialogTitle>
+          <DialogTitle>Create a public collection</DialogTitle>
           <DialogDescription>
             Give your collection a name <span v-if="collectionOptions.length > 0" class="text-muted-foreground">and
               optionally place it inside a
@@ -130,6 +144,10 @@ function handleKeyDown(event: KeyboardEvent) {
             <Treeselect v-model="form.collectionId" class="mb-075" placeholder="Parent collection"
               :options="collectionOptions" :clearable="true" :flat="true" />
           </div>
+          <div class="flex items-center gap-2">
+            <Checkbox v-model:checked="form.draft" id="draft" />
+            <Label for="draft">Draft</Label>
+          </div>
         </div>
 
         <DialogFooter>
@@ -145,29 +163,3 @@ function handleKeyDown(event: KeyboardEvent) {
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-.create-collection-modal__type-container {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.create-collection-modal__type {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  gap: 1rem;
-  cursor: pointer;
-  padding: 0.75rem;
-}
-
-.create-collection-modal__type--active {
-  border: 1px solid var(--primary-color);
-}
-
-.create-collection-modal__type svg {
-  width: 2rem;
-  height: 2rem;
-}
-</style>

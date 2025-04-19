@@ -28,11 +28,14 @@ export class License {
 	@Column()
 	name: string
 
-	@Column({ type: 'date' })
-	usageFrom: Date
+	@Column({ nullable: true })
+	details: string | null
 
-	@Column({ type: 'date' })
-	usageTo: Date
+	@Column({ type: 'date', nullable: true })
+	usageFrom: Date | null
+
+	@Column({ type: 'date', nullable: true })
+	usageTo: Date | null
 
 	@Column({ type: 'text', enum: LicenseScope, array: true })
 	scopes: LicenseScope[]

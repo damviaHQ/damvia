@@ -26,8 +26,9 @@ import { useGlobalStore } from "@/stores/globalStore"
 import { getFileExtension } from "@/utils/fileExtention"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQueryClient } from "@tanstack/vue-query"
-import { Copyright, FileStack, X } from "lucide-vue-next"
+import {CircleHelpIcon, Copyright, FileStack, X} from "lucide-vue-next"
 import { computed, ref, watch, watchEffect } from "vue"
+import {Dialog, DialogContent, DialogTrigger} from "@/components/ui/dialog";
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: "update:modelValue", isOpen: boolean): void }>()
@@ -125,20 +126,20 @@ function download() {
 
   isLoading.value = true
   hasTermsError.value = false
-  
+
   const formData = {
     ...form.value,
     isAcceptingTerms: hasLicenses.value ? form.value.isAcceptingTerms : true,
     collectionFileIds: res.value?.files.map((file) => file.id),
   };
-  
+
   trpc.download.create
     .mutate(formData as any)
     .then((res) => {
       queryClient.invalidateQueries({ queryKey: ["downloads"] })
-      
+
       form.value.isAcceptingTerms = false
-      
+
       emit("update:modelValue", false)
       if (res.url) {
         window.open(res.url, "_blank")
@@ -326,7 +327,18 @@ function removeFromSelection(file: { id: string }) {
               <div v-for="license in res.licenses" :key="license.id" class="flex items-center text-neutral-300">
                 <Copyright class="w-4 h-4 mr-4 text-neutral-50" />
                 <div class="flex flex-col">
-                  <div class="text-sm mb-1 text-neutral-200">
+                  <Dialog v-if="license.details">
+                    <DialogTrigger as-child>
+                      <button class="flex items-center text-sm mb-1 text-neutral-200">
+                        {{ license.name }}
+                        <CircleHelpIcon class="ml-2 h-4 w-4" />
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <div class="max-h-[80vh] overflow-auto" v-html="license.details" />
+                    </DialogContent>
+                  </Dialog>
+                  <div v-else class="text-sm mb-1 text-neutral-200">
                     {{ license.name }}
                   </div>
                   <div class="text-neutral-300 text-xs">

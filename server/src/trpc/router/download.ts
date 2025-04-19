@@ -24,20 +24,26 @@ import {
 	DownloadVideoFormat,
 	DownloadVideoResolution
 } from "../../entity/download"
-import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
+import {apiURL, assetsS3, assetsS3Bucket, dataSource} from "../../env"
 import { userCollectionFilesQuery } from "../../services/collection"
 import { createDownloadArchive } from "../../services/download"
 import { downloadCreateArchiveQueue } from "../../worker"
 import { authMiddleware, publicProcedure, router, userApproved } from "../index"
 
 export async function formatDownload(download: Download) {
+	let url: string | null = null
+	if (download.status === DownloadStatus.READY) {
+		const downloadURL = new URL(apiURL())
+		downloadURL.pathname = `/v1/downloads/${download.id}`
+		url = downloadURL.toString()
+	}
+
 	return {
 		id: download.id,
 		status: download.status,
 		fileCount: download.collectionFileIds.length,
 		downloadType: download.type,
-		url: download.status === DownloadStatus.READY
-			? await assetsS3().presignedGetObject(assetsS3Bucket(), download.storageKey) : null,
+		url,
 		expiresAt: download.expiresAt,
 		createdAt: download.createdAt,
 		updatedAt: download.updatedAt,

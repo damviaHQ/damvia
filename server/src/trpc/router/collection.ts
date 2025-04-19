@@ -163,10 +163,11 @@ export async function formatCollectionFile({ file, productAttributes }: FormatCo
 			id: file.assetFile.license.id,
 			name: file.assetFile.license.name,
 			scopes: file.assetFile.license.scopes,
+			details: file.assetFile.license.details,
 			allowedRegionIds: file.assetFile.license.allowedRegionIds,
 			expired:
-				new Date(file.assetFile.license.usageFrom).getTime() >= Date.now() &&
-				new Date(file.assetFile.license.usageTo).getTime() <= Date.now(),
+				(file.assetFile.license.usageFrom && new Date(file.assetFile.license.usageFrom).getTime() >= Date.now()) &&
+				(file.assetFile.license.usageTo && new Date(file.assetFile.license.usageTo).getTime() <= Date.now()),
 		} : null,
 	}
 }

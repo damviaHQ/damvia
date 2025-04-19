@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionDialogCreate from "@/components/collection/CollectionDialogCreate.vue"
-import Loader from "@/components/Loader.vue"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -29,9 +28,11 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ChevronDown, ChevronRight, CirclePlus, Folder } from "lucide-vue-next"
+import { ChevronDown, ChevronRight, CirclePlus, Folder, Loader2Icon } from "lucide-vue-next"
 import { TreeItem, TreeRoot } from 'radix-vue'
-import { ref } from "vue"
+import {computed, ref} from "vue"
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import CollectionDialogCreatePublic from "@/components/collection/CollectionDialogCreatePublic.vue";
 
 const queryClient = useQueryClient()
 const toast = useGlobalToast()
@@ -41,24 +42,36 @@ const emit = defineEmits<{
 }>()
 
 const globalStore = useGlobalStore()
+const tabId = ref('private')
 const isCollectionModalOpen = ref(false)
 const selectedCollection = ref<RouterOutput["collection"]["tree"][number] | null>(null)
 
-const { status, data: collections } = useQuery({
+const { status, data: privateCollections } = useQuery({
   queryKey: ["collection", "ListPrivateCollections"],
   queryFn: () => trpc.collection.ListPrivateCollections.query(),
 })
+
+const { data: publicCollections } = useQuery({
+  queryKey: ['collection', 'treeAdmin', 'public'],
+  queryFn: () => trpc.collection.treeAdmin.query(),
+})
+
+const usablePublicCollections = computed(() => (publicCollections.value ?? []).filter(
+  (collection: RouterOutput['collection']['findById']) => !collection.synchronized,
+))
 
 function handleSelect(collection: RouterOutput["collection"]["tree"][number]) {
   selectedCollection.value = collection
 }
 
-function openCreateCollection() {
-  isCollectionModalOpen.value = true
-}
+const isLoading = ref(false)
 
 async function addToCollection() {
-  if (!selectedCollection.value) return
+  if (!selectedCollection.value || isLoading.value) {
+    return
+  }
+
+  isLoading.value = true
   try {
     await trpc.collection.addItems.mutate({
       id: selectedCollection.value.id,
@@ -72,6 +85,8 @@ async function addToCollection() {
   } catch (error) {
     console.error("Error adding items to collection:", error)
     toast.error("Failed to add items to collection")
+  } finally {
+    isLoading.value = false
   }
 }
 </script>
@@ -85,45 +100,102 @@ async function addToCollection() {
           Choose one of your collections to add your selected items or create a new one.
         </DialogDescription>
       </DialogHeader>
-      <div class="mt-4">
-        <div class="flex justify-between items-center mb-2">
-          <h3 class="text-sm font-medium">Your Collections</h3>
-          <Button variant="link" @click="openCreateCollection" class="text-neutral-600 px-0">
-            <CirclePlus class="h-4 w-4 mr-2" />
-            Create a new collection
-          </Button>
-        </div>
-        <ScrollArea class="min-h-[200px] max-h-[400px] w-full rounded-md border">
-          <div class="p-4">
-            <div v-if="!collections || collections.length === 0" class="text-sm text-muted-foreground">
-              No collections found. Create your first collection to get started.
-            </div>
-            <TreeRoot v-else v-slot="{ flattenItems }" :items="collections" :get-key="(item) => item.id"
-              :get-children="(item) => item.children">
-              <TreeItem v-for="item in flattenItems" :key="item._id" v-slot="{ isExpanded }"
-                :style="{ paddingLeft: `${item.level * 16}px` }" v-bind="item.bind"
-                class="flex items-center py-2 hover:bg-neutral-100 rounded cursor-pointer"
-                :class="{ 'bg-neutral-100': selectedCollection?.id === item.value.id }"
-                @click="handleSelect(item.value)">
-                <template v-if="item.value.children && item.value.children.length > 0">
-                  <ChevronDown v-if="isExpanded" class="h-4 w-4 mr-2" />
-                  <ChevronRight v-else class="h-4 w-4 mr-2" />
-                </template>
-                <div v-else class="w-4 h-4 mr-2"></div>
-                <Folder class="h-5 w-5 mr-2 text-neutral-600" />
-                <span class="flex-grow text-sm">{{ item.value.name }}</span>
-              </TreeItem>
-            </TreeRoot>
+      <Tabs v-model="tabId">
+        <div class="mt-4">
+          <div class="flex justify-between items-center mb-2">
+            <TabsList>
+              <TabsTrigger value="private">
+                Your Collections
+              </TabsTrigger>
+              <TabsTrigger v-if="globalStore.user?.role === 'admin'" value="public">
+                Public Collections
+              </TabsTrigger>
+            </TabsList>
+            <Button variant="ghost" @click="isCollectionModalOpen = true">
+              Create new
+              <CirclePlus class="h-4 w-4 ml-2" />
+            </Button>
           </div>
-        </ScrollArea>
-      </div>
+          <TabsContent value="private">
+            <ScrollArea class="min-h-[200px] max-h-[400px] w-full rounded-md border">
+              <div class="p-4">
+                <div v-if="!privateCollections || privateCollections.length === 0" class="text-sm text-muted-foreground">
+                  No collections found. Create your first collection to get started.
+                </div>
+                <TreeRoot
+                  v-else
+                  v-slot="{ flattenItems }"
+                  :items="privateCollections"
+                  :get-key="(item) => item.id"
+                  :get-children="(item) => item.children"
+                >
+                  <TreeItem
+                    v-for="item in flattenItems" :key="item._id" v-slot="{ isExpanded }"
+                    :style="{ paddingLeft: `${item.level * 16}px` }" v-bind="item.bind"
+                    class="flex items-center py-2 hover:bg-neutral-100 rounded cursor-pointer"
+                    :class="{ 'bg-neutral-100': selectedCollection?.id === item.value.id }"
+                    @click="handleSelect(item.value)"
+                  >
+                    <template v-if="item.value.children && item.value.children.length > 0">
+                      <ChevronDown v-if="isExpanded" class="h-4 w-4 mr-2" />
+                      <ChevronRight v-else class="h-4 w-4 mr-2" />
+                    </template>
+                    <div v-else class="w-4 h-4 mr-2"></div>
+                    <Folder class="h-5 w-5 mr-2 text-neutral-600" />
+                    <span class="flex-grow text-sm">{{ item.value.name }}</span>
+                  </TreeItem>
+                </TreeRoot>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+          <TabsContent value="public">
+            <ScrollArea class="min-h-[200px] max-h-[400px] w-full rounded-md border">
+              <div class="p-4">
+                <div v-if="!usablePublicCollections?.length" class="text-sm text-muted-foreground">
+                  No collections found. Create your first collection to get started.
+                </div>
+                <TreeRoot
+                  v-else
+                  v-slot="{ flattenItems }"
+                  :items="usablePublicCollections"
+                  :get-key="(item) => item.id"
+                  :get-children="(item) => item.children"
+                >
+                  <TreeItem
+                    v-for="item in flattenItems"
+                    :key="item._id"
+                    v-slot="{ isExpanded }"
+                    :style="{ paddingLeft: `${item.level * 16}px` }"
+                    v-bind="item.bind"
+                    class="flex items-center py-2 hover:bg-neutral-100 rounded cursor-pointer"
+                    :class="{ 'bg-neutral-100': selectedCollection?.id === item.value.id }"
+                    @click="handleSelect(item.value)"
+                  >
+                    <template v-if="item.value.children && item.value.children.length > 0">
+                      <ChevronDown v-if="isExpanded" class="h-4 w-4 mr-2" />
+                      <ChevronRight v-else class="h-4 w-4 mr-2" />
+                    </template>
+                    <div v-else class="w-4 h-4 mr-2" />
+                    <Folder class="h-5 w-5 mr-2 text-neutral-600" />
+                    <span class="flex-grow text-sm">
+                      {{ item.value.name }}
+                    </span>
+                  </TreeItem>
+                </TreeRoot>
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </div>
+      </Tabs>
       <DialogFooter class="mt-4">
         <Button variant="link" @click="emit('update:modelValue', false)">Cancel</Button>
-        <Button @click="addToCollection" :disabled="!selectedCollection">
+        <Button @click="addToCollection" :disabled="!selectedCollection || isLoading">
           Add to {{ selectedCollection ? selectedCollection.name : 'Collection' }}
+          <Loader2Icon v-if="isLoading" class="h-4 w-4 animate-spin ml-2" />
         </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
-  <CollectionDialogCreate v-model="isCollectionModalOpen" />
+  <CollectionDialogCreate v-if="tabId === 'private'" v-model="isCollectionModalOpen" />
+  <CollectionDialogCreatePublic v-if="tabId === 'public'" v-model="isCollectionModalOpen" />
 </template>
