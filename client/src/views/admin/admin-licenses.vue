@@ -50,7 +50,6 @@ import Treeselect from "vue3-treeselect-ts"
 import {QuillEditor} from "@vueup/vue-quill";
 import "@vueup/vue-quill/dist/vue-quill.snow.css"
 import DatePickerInput from "@/components/DatePickerInput.vue";
-import {subDays, addDays} from 'date-fns'
 
 const toast = useGlobalToast()
 const modalState = ref("closed")
@@ -242,79 +241,83 @@ function formatDate(date: CalendarDate | undefined) {
   </div>
 
   <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && (modalState = 'closed')">
-    <DialogContent class="sm:max-w-[480px] overflow-y-auto max-h-[calc(100vh-32px)]">
-      <form @submit.prevent="onModalSubmit" class="flex flex-col gap-4 py-4">
-        <DialogHeader>
-          <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} License</DialogTitle>
-          <DialogDescription>
-            Licenses help you restrict access to your assets by time and region and define
-            the scopes of usage. At the end of the usage period, the assets won't be
-            visible anymore.
-          </DialogDescription>
-        </DialogHeader>
-        <div class="flex flex-col gap-2">
-          <Label for="name">Name *</Label>
-          <Input id="name" v-model="form.name" placeholder="License name" />
-        </div>
-        <div class="flex flex-col gap-2">
-          <Label for="name">Details</Label>
-          <div class="bg-white flex-grow overflow-hidden">
-            <QuillEditor
-              ref="editor"
-              v-model:content="form.details"
-              class="bg-white flex-grow flex flex-col"
-              theme="snow"
-              toolbar="essential"
-              placeholder="..."
-              content-type="html"
-            />
+    <DialogContent class="sm:max-w-[900px] md:max-w-[1000px] lg:max-w-[1200px] flex flex-col overflow-hidden bg-white max-h-[90vh]">
+      <DialogHeader>
+        <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} License</DialogTitle>
+        <DialogDescription>
+          Licenses help you restrict access to your assets by time and region and define
+          the scopes of usage. At the end of the usage period, the assets won't be
+          visible anymore.
+        </DialogDescription>
+      </DialogHeader>
+      <form @submit.prevent="onModalSubmit" class="flex flex-col h-full">
+        <div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-full px-4 mb-20">
+          <div class="flex flex-col gap-4 pr-4 overflow-y-auto max-h-[60vh]">
+            <div class="flex flex-col gap-2">
+              <Label for="name">Name *</Label>
+              <Input id="name" v-model="form.name" placeholder="License name" />
+            </div>
+            <div class="flex flex-col gap-2">
+              <Label for="usageFrom">Usage From</Label>
+              <div class="flex gap-2">
+                <DatePickerInput
+                  :model-value="form.usageFrom"
+                  @update:modelValue="(event) => {
+                    form.usageFrom = new CalendarDate(event.year, event.month, event.day)
+                    if (form.usageTo && form.usageFrom.compare(form.usageTo) > 1) {
+                      form.usageTo = null
+                    }
+                  }"
+                />
+                <Button type="button" variant="ghost" size="icon" @click="form.usageFrom = null">
+                  <XIcon />
+                </Button>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2">
+              <Label for="usageTo">Usage To</Label>
+              <div class="flex gap-2">
+                <DatePickerInput
+                  :model-value="form.usageTo"
+                  @update:modelValue="(event) => {
+                    form.usageTo = new CalendarDate(event.year, event.month, event.day)
+                    if (form.usageFrom && form.usageTo.compare(form.usageFrom) < 1) {
+                      form.usageFrom = null
+                    }
+                  }"
+                />
+                <Button type="button" variant="ghost" size="icon" @click="form.usageTo = null">
+                  <XIcon />
+                </Button>
+              </div>
+            </div>
+            <div class="flex flex-col gap-2">
+              <Label for="scopes">Usage Scopes *</Label>
+              <Treeselect v-model="form.scopes" :options="licenseScopeOptions" :multiple="true"
+                placeholder="Select scopes" />
+            </div>
+            <div class="flex flex-col gap-2">
+              <Label for="allowedRegions">Allowed Regions *</Label>
+              <Treeselect v-model="form.allowedRegionIds" :options="regionOptions" :multiple="true"
+                placeholder="Select allowed regions" />
+            </div>
+          </div>
+          <div class="flex flex-col gap-2 h-full">
+            <Label for="details">Details</Label>
+            <div class="bg-white flex-grow overflow-visible" style="min-height: 50vh; max-height: 65vh; margin-bottom: 20px;">
+              <QuillEditor
+                ref="editor"
+                v-model:content="form.details"
+                class="bg-white h-full quill-wrapper"
+                theme="snow"
+                toolbar="essential"
+                placeholder="..."
+                content-type="html"
+              />
+            </div>
           </div>
         </div>
-        <div class="flex flex-col gap-2">
-          <Label for="usageFrom">Usage From</Label>
-          <div class="flex gap-2">
-            <DatePickerInput
-              :model-value="form.usageFrom"
-              @update:modelValue="(event) => {
-                form.usageFrom = new CalendarDate(event.year, event.month, event.day)
-                if (form.usageTo && form.usageFrom.compare(form.usageTo) > 1) {
-                  form.usageTo = null
-                }
-              }"
-            />
-            <Button type="button" variant="ghost" size="icon" @click="form.usageFrom = null">
-              <XIcon />
-            </Button>
-          </div>
-        </div>
-        <div class="flex flex-col gap-2">
-          <Label for="usageTo">Usage To</Label>
-          <div class="flex gap-2">
-            <DatePickerInput
-              :model-value="form.usageTo"
-              @update:modelValue="(event) => {
-                form.usageTo = new CalendarDate(event.year, event.month, event.day)
-                if (form.usageFrom && form.usageTo.compare(form.usageFrom) < 1) {
-                  form.usageFrom = null
-                }
-              }"
-            />
-            <Button type="button" variant="ghost" size="icon" @click="form.usageTo = null">
-              <XIcon />
-            </Button>
-          </div>
-        </div>
-        <div class="flex flex-col gap-2">
-          <Label for="scopes">Usage Scopes *</Label>
-          <Treeselect v-model="form.scopes" :options="licenseScopeOptions" :multiple="true"
-            placeholder="Select scopes" />
-        </div>
-        <div class="flex flex-col gap-2">
-          <Label for="allowedRegions">Allowed Regions *</Label>
-          <Treeselect v-model="form.allowedRegionIds" :options="regionOptions" :multiple="true"
-            placeholder="Select allowed regions" />
-        </div>
-        <DialogFooter class="sm:justify-between items-center">
+        <div class="px-4 mt-6 flex justify-between items-center fixed-footer">
           <div class="text-sm text-gray-500">* Required</div>
           <Button type="submit" :disabled="form.name === '' ||
             form.scopes.length === 0 ||
@@ -322,7 +325,7 @@ function formatDate(date: CalendarDate | undefined) {
           ">
             {{ modalState === "creating" ? "Create" : "Save" }}
           </Button>
-        </DialogFooter>
+        </div>
       </form>
     </DialogContent>
   </Dialog>
@@ -339,5 +342,39 @@ function formatDate(date: CalendarDate | undefined) {
   display: block;
   margin-bottom: 0.5rem;
   font-size: 0.8rem;
+}
+
+.fixed-footer {
+  position: absolute;
+  bottom: 1rem;
+  left: 0;
+  right: 0;
+  background: white;
+  padding-top: 1rem;
+  margin-top: 10px;
+}
+
+.quill-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.ql-editor) {
+  overflow-y: auto;
+  font-size: 0.875rem;
+  min-height: 450px;
+  max-height: 900px;
+  height: 100%;
+}
+
+:deep(.ql-container) {
+  height: 100%;
+  border: 1px solid #ccc;
+  border-top: none;
+}
+
+:deep(.ql-toolbar) {
+  background: white;
+  border: 1px solid #ccc;
 }
 </style>
