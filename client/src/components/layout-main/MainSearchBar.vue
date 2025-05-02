@@ -123,13 +123,25 @@ function handleRouteQueryArray(
 const LOCAL_STORAGE_SEARCH_OPTIONS_KEY = 'damvia_search_options'
 const hasSearchOptions = ref(!!localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY))
 
+function getDefaultSearchState() {
+  return {
+    query: Array.isArray(currentQuery.value) ? currentQuery.value : [],
+    assetTypes: (assetTypes.value ?? [])
+        .filter((assetType: any) => assetType.includeInSearchByDefault)
+        .map((assetType: any) => assetType.id),
+    searchScope: Object.keys(searchScopeOptions.value)[0],
+    exactMatch: false,
+  }
+}
+
+
 function getInitialSearchQuery() {
   if (route.name === "search") {
     return {
       query: currentQuery.value,
       assetTypes: handleRouteQueryArray(route.query.asset_types),
       searchScope:
-        (route.query.search_scope as string) ?? Object.keys(searchScopeOptions.value)[0],
+          (route.query.search_scope as string) ?? Object.keys(searchScopeOptions.value)[0],
       exactMatch: route.query.exact_match === "true",
     }
   }
@@ -145,14 +157,7 @@ function getInitialSearchQuery() {
     }
   }
 
-  return {
-    query: currentQuery.value,
-    assetTypes: (assetTypes.value ?? [])
-      .filter((assetType) => assetType.includeInSearchByDefault)
-      .map((assetType) => assetType.id),
-    searchScope: "all",
-    exactMatch: false,
-  }
+  return getDefaultSearchState()
 }
 const searchQuery = ref(getInitialSearchQuery())
 
@@ -365,7 +370,8 @@ function saveEdit(index: number, newValue: string) {
 function clearSearchOptions() {
   localStorage.removeItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
   hasSearchOptions.value = false
-  resetSearch()
+  searchQuery.value = getDefaultSearchState()
+  searchQueryValue.value = ""
 }
 
 onMounted(() => {
