@@ -53,15 +53,6 @@ function parseQueryParts(query: string) {
 }
 const searchInput: Ref<HTMLInputElement | null> = ref(null) // Auto focus when modal opens
 const isModalOpen = ref(false)
-watch(isModalOpen, (newValue) => {
-  if (newValue) {
-    nextTick(() => {
-      if (searchInput.value) {
-        searchInput.value.focus()
-      }
-    })
-  }
-})
 const currentQuery = computed((): string | string[] => {
   if (route.name === "search") {
     if (route.query.exact_match === "true") {
@@ -88,6 +79,7 @@ const filesNotFoundQuery = computed(() => {
   if (route.name !== "search") {
     return null
   }
+
   return {
     query: parseQueryParts((route.query.q as string) ?? ""),
     assetTypes: handleRouteQueryArray(route.query.asset_types),
@@ -122,6 +114,7 @@ function handleRouteQueryArray(
 
 const LOCAL_STORAGE_SEARCH_OPTIONS_KEY = 'damvia_search_options'
 const hasSearchOptions = ref(!!localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY))
+const requestClearSearchOptions = ref(false)
 
 function getDefaultSearchState() {
   return {
@@ -133,7 +126,6 @@ function getDefaultSearchState() {
     exactMatch: false,
   }
 }
-
 
 function getInitialSearchQuery() {
   if (route.name === "search") {
@@ -268,6 +260,9 @@ function search() {
     exactMatch: searchQuery.value.exactMatch || false,
   }))
   hasSearchOptions.value = true
+  if (requestClearSearchOptions.value) {
+    localStorage.removeItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
+  }
   router.push({ name: "search", query: routeQuery })
   searchQueryValue.value = ""
   isModalOpen.value = false
@@ -368,11 +363,21 @@ function saveEdit(index: number, newValue: string) {
 }
 
 function clearSearchOptions() {
-  localStorage.removeItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
-  hasSearchOptions.value = false
   searchQuery.value = getDefaultSearchState()
   searchQueryValue.value = ""
+  requestClearSearchOptions.value = true
 }
+
+watch(isModalOpen, (newValue) => {
+  requestClearSearchOptions.value = false
+  if (newValue) {
+    nextTick(() => {
+      if (searchInput.value) {
+        searchInput.value.focus()
+      }
+    })
+  }
+})
 
 onMounted(() => {
   document.addEventListener("click", handleDocumentClick)
@@ -501,7 +506,8 @@ onUnmounted(() => {
             Clear search
           </Button>
           <Button
-            v-if="hasSearchOptions" type="button" variant="ghost" @click="clearSearchOptions"
+            v-if="hasSearchOptions && !requestClearSearchOptions" @click="clearSearchOptions"
+            type="button" variant="ghost"
             class="bg-transparent text-neutral-500 hover:bg-transparent hover:text-red-500 text-sm p-0 mt-1.5"
           >
             Reset to default
