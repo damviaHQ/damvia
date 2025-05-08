@@ -386,10 +386,6 @@ export async function assignProductsToAssetFiles() {
 
 		const [, productKey, productView] = match
 		const product = await dataSource.getRepository(Product).findOneBy({ productKey })
-		if (!product) {
-			continue
-		}
-
 		assetFile.product = product
 		assetFile.productView = productView || null
 
