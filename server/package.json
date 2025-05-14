@@ -23,7 +23,7 @@
     "liquidjs": "^10.21.0",
     "load-esm": "^1.0.2",
     "mime-types": "^3.0.1",
-    "minio": "^8.0.5",
+    "minio": "^7.1.3",
     "nodemailer": "^6.10.1",
     "pg": "^8.14.1",
     "pg-boss": "^10.2.0",
