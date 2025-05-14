@@ -176,7 +176,7 @@ export const assetAssignProductsToAssetFilesQueue = createQueue<void>({
 export const collectionSynchronizationQueue = createQueue<{ collectionId: string }>({
 	name: 'collection/synchronization',
 	processor: (data) => dataSource.transaction((em) => synchronizeCollection(em, data.collectionId)),
-	workerOptions: { batchSize: 10 },
+	workerOptions: { batchSize: 1 },
 })
 
 export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({
