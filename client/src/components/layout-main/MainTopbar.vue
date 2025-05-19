@@ -130,8 +130,10 @@ const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-
             Administrate
           </DropdownMenuLabel>
           <DropdownMenuItem v-if="['admin'].includes(globalStore.user?.role ?? '')">
-            <Settings class="mr-2 h-4 w-4" />
-            <router-link :to="{ name: 'admin-menu-items' }">Settings</router-link>
+            <router-link :to="{ name: 'admin-menu-items' }" class="flex items-center">
+              <Settings class="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </router-link>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')">
             <router-link :to="{ name: 'admin-users' }" class="flex items-center">
