@@ -232,11 +232,28 @@ function handleCellClick(rowIndex: number, columnId: string) {
       const tableRect = tableEl?.getBoundingClientRect()
       
       if (tableRect) {
+        // Check if cell is close to the right edge of the window
+        const distanceToRightEdge = window.innerWidth - rect.right
+        const idealEditorWidth = Math.max(rect.width, 250) // Minimum editor width for comfort
+        const isNearRightEdge = distanceToRightEdge < idealEditorWidth - rect.width
+        
+        // Calculate optimal left position
+        let leftPos = rect.left - tableRect.left
+        let editorWidth = idealEditorWidth
+        
+        // If near right edge, adjust position to expand to the left
+        if (isNearRightEdge) {
+          // Calculate how much we can expand to the left
+          const availableSpace = Math.min(rect.right - 20, window.innerWidth - 20)
+          editorWidth = Math.min(idealEditorWidth, availableSpace)
+          leftPos = rect.right - tableRect.left - editorWidth
+        }
+        
         // Position the editor
         editorPosition.value = {
           top: rect.top - tableRect.top,
-          left: rect.left - tableRect.left,
-          width: rect.width,
+          left: leftPos,
+          width: editorWidth,
           maxHeight: Math.min(400, window.innerHeight - rect.top - 50) // Allow more height but limit by window
         }
         
