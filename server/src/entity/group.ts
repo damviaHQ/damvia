@@ -15,13 +15,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import {
 	Column,
 	CreateDateColumn,
-	Entity,
+	Entity, JoinTable, ManyToMany,
 	OneToMany,
 	PrimaryColumn,
 	PrimaryGeneratedColumn,
 	UpdateDateColumn
 } from "typeorm"
 import { User } from "./user"
+import {UserGroup} from "./user-group";
 
 @Entity('groups')
 export class Group {
@@ -35,8 +36,8 @@ export class Group {
 	@Column({ default: false })
 	default: boolean
 
-	@OneToMany(() => User, (u) => u.group)
-	users: User[]
+	@OneToMany(() => UserGroup, userGroup => userGroup.group)
+	userGroups: UserGroup[];
 
 	@CreateDateColumn()
 	createdAt: Date

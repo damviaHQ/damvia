@@ -37,6 +37,7 @@ import { toTypedSchema } from "@vee-validate/zod"
 import { useForm } from "vee-validate"
 import { computed, ref, watch } from "vue"
 import * as z from "zod"
+import SelectGroupInput from "@/components/SelectGroupInput.vue";
 
 type UserRole = RouterOutput['user']['list'][number]['role']
 
@@ -48,7 +49,7 @@ const props = defineProps<{
     company: string
     regionId: string
     role: UserRole
-    groupId: string
+    groupIds: string[]
   }
 }>()
 const emit = defineEmits<{ updated: []; close: [] }>()
@@ -70,7 +71,7 @@ const formSchema = toTypedSchema(
     company: z.string().min(2).max(50),
     regionId: z.string().min(1),
     role: z.enum(["guest", "member", "manager", "admin"] as const),
-    groupId: z.string().uuid("Invalid group"),
+    groupIds: z.string().uuid("Invalid group").array(),
   })
 )
 const { handleSubmit, values, setValues } = useForm({
@@ -96,7 +97,7 @@ watch(
         regionId: user.regionId,
         email: user.email,
         role: user.role,
-        groupId: user.groupId,
+        groupIds: user.groups?.map((group) => group.id) ?? [],
       })
     }
   },
@@ -112,7 +113,7 @@ const onSubmit = handleSubmit(async (formValues) => {
     if (isCurrentUserManager.value) {
       updatedValues.regionId = props.user.regionId
       updatedValues.role = props.user.role
-      updatedValues.groupId = props.user.groupId
+      updatedValues.groupIds = props.user.groupIds
     }
 
     await trpc.user.update.mutate({
@@ -209,21 +210,10 @@ const onSubmit = handleSubmit(async (formValues) => {
         <FormMessage />
       </FormItem>
     </FormField>
-    <FormField v-if="!isCurrentUserManager" v-slot="{ componentField }" name="groupId">
+    <FormField v-if="!isCurrentUserManager" v-slot="{ componentField }" name="groupIds">
       <FormItem>
-        <FormLabel>Group</FormLabel>
-        <FormControl>
-          <Select v-bind="componentField">
-            <SelectTrigger>
-              <SelectValue placeholder="Select a group" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="group in groups" :key="group.id" :value="group.id">
-                {{ group.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </FormControl>
+        <FormLabel>Groups</FormLabel>
+        <SelectGroupInput v-bind="componentField" />
         <FormMessage />
       </FormItem>
     </FormField>

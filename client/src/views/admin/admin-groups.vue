@@ -202,16 +202,16 @@ async function moveUsersAndRemoveGroup() {
     <DialogContent class="sm:max-w-[425px]">
       <form @submit.prevent="onModalSubmit">
         <DialogHeader>
-          <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} page</DialogTitle>
+          <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} group</DialogTitle>
           <DialogDescription>
-            Enter the name for your page and click
+            Enter the name for the group and click
             {{ modalState === "creating" ? "Create" : "Edit" }}.
           </DialogDescription>
         </DialogHeader>
         <div class="flex flex-col gap-4 py-4">
           <div class="flex flex-col gap-2">
             <Label for="name">Name *</Label>
-            <Input id="name" v-model="form.name" placeholder="Page name" />
+            <Input id="name" v-model="form.name" placeholder="Group name" />
           </div>
         </div>
         <DialogFooter class="sm:justify-between items-center">

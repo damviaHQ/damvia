@@ -99,6 +99,12 @@ export class Collection {
 	@Column({ default: false, nullable: false })
 	hasThumbnail: boolean
 
+	@Column({ type: "text", default: [], nullable: false, array: true })
+	limitedToGroupIds: string[]
+
+	@Column({ type: "boolean", nullable: false, default: true })
+	canEditLimitedToGroupIds: boolean
+
 	@OneToOne(() => Page, (page) => page.collection)
 	page?: Page | null
 

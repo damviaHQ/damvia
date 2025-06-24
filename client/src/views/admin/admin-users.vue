@@ -282,54 +282,66 @@ function openEditDialog(user: User) {
           <TableCell class="max-w-[150px]">
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger as="div" class="truncate text-left">{{
-                  user.name
-                  }}</TooltipTrigger>
-                <TooltipContent>{{ user.name }}</TooltipContent>
+                <TooltipTrigger as="div" class="truncate text-left">
+                  {{ user.name }}
+                </TooltipTrigger>
+                <TooltipContent>
+                  {{ user.name }}
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </TableCell>
           <TableCell class="max-w-[200px]">
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger as="div" class="truncate text-left">{{
-                  user.email
-                  }}</TooltipTrigger>
-                <TooltipContent>{{ user.email }}</TooltipContent>
+                <TooltipTrigger as="div" class="truncate text-left">
+                  {{ user.email }}
+                </TooltipTrigger>
+                <TooltipContent>
+                  {{ user.email }}
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </TableCell>
           <TableCell class="max-w-[150px]">
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger as="div" class="truncate text-left">{{
-                  user.company || "N/A"
-                  }}</TooltipTrigger>
-                <TooltipContent>{{ user.company || "N/A" }}</TooltipContent>
+                <TooltipTrigger as="div" class="truncate text-left">
+                  {{ user.company || "N/A" }}
+                </TooltipTrigger>
+                <TooltipContent>
+                  {{ user.company || "N/A" }}
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </TableCell>
-          <TableCell>{{ dayjs(user.createdAt).format("YYYY/MM/DD") }}</TableCell>
+          <TableCell>
+            {{ dayjs(user.createdAt).format("YYYY/MM/DD") }}
+          </TableCell>
           <TableCell>
             {{ user.role }}
           </TableCell>
           <TableCell class="max-w-[100px]">
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger as="div" class="truncate text-left">{{
-                  user.region || "N/A"
-                  }}</TooltipTrigger>
-                <TooltipContent>{{ user.region || "N/A" }}</TooltipContent>
+                <TooltipTrigger as="div" class="truncate text-left">
+                  {{ user.region || "N/A" }}
+                </TooltipTrigger>
+                <TooltipContent>
+                  {{ user.region || "N/A" }}
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </TableCell>
           <TableCell class="max-w-[100px]">
             <TooltipProvider>
               <Tooltip>
-                <TooltipTrigger as="div" class="truncate text-left">{{
-                  user.group?.name || "N/A"
-                  }}</TooltipTrigger>
-                <TooltipContent>{{ user.group?.name || "N/A" }}</TooltipContent>
+                <TooltipTrigger as="div" class="truncate text-left">
+                  {{ user.groups?.map(g => g.name).join(', ') || "N/A" }}
+                </TooltipTrigger>
+                <TooltipContent>
+                  {{ user.groups?.map(g => g.name).join(', ') || "N/A" }}
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </TableCell>
@@ -358,14 +370,18 @@ function openEditDialog(user: User) {
               @click="openEditDialog(user)">
               <UserPen class="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="sm" type="button" @click="
-              isAlertOpen = true
-            deletingUserId = {
-              email: user.email,
-              id: user.id,
-            };
-            " class="btn btn-outline-danger btn-small"
-              :disabled="user.role === 'admin' && globalStore.user?.role !== 'admin'">
+            <Button
+              variant="ghost" size="sm" type="button"
+              @click="
+                isAlertOpen = true
+                deletingUserId = {
+                  email: user.email,
+                  id: user.id,
+                };
+              "
+              class="btn btn-outline-danger btn-small"
+              :disabled="user.role === 'admin' && globalStore.user?.role !== 'admin'"
+            >
               <Trash2 class="w-4 h-4" />
             </Button>
           </TableCell>

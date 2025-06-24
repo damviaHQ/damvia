@@ -12,19 +12,20 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { FastifyRequest } from 'fastify'
-import { sign, verify } from "jsonwebtoken"
-import { createHash, randomBytes } from 'node:crypto'
-import { EntityManager } from "typeorm"
-import { AuthorizedDomain } from "../entity/authorized-domain"
-import { Collection } from "../entity/collection"
-import { Download } from "../entity/download"
-import { Region } from "../entity/region"
-import { User, UserRole } from "../entity/user"
-import { dataSource, passwordLessAuth, secret } from "../env"
-import { mailerEmailVerificationQueue } from "../worker"
-import { removeDownloads } from "./download"
-import { CollectionInvitation } from "../entity/collection-invitation"
+import {FastifyRequest} from 'fastify'
+import {sign, verify} from "jsonwebtoken"
+import {createHash, randomBytes} from 'node:crypto'
+import {EntityManager} from "typeorm"
+import {AuthorizedDomain} from "../entity/authorized-domain"
+import {Collection} from "../entity/collection"
+import {Download} from "../entity/download"
+import {Region} from "../entity/region"
+import {User, UserRole} from "../entity/user"
+import {dataSource, passwordLessAuth, secret} from "../env"
+import {mailerEmailVerificationQueue} from "../worker"
+import {removeDownloads} from "./download"
+import {CollectionInvitation} from "../entity/collection-invitation"
+import {UserGroup} from "../entity/user-group";
 
 export type CreateUserOptions = {
 	name: string
@@ -38,8 +39,14 @@ export async function createUser(opts: CreateUserOptions) {
 	const user = new User()
 	user.name = opts.name
 	user.company = opts.company
-	user.region = await dataSource.getRepository(Region).findOneBy({ id: opts.regionId })
-	user.groupId = user.region?.defaultGroupId
+	user.region = await dataSource.getRepository(Region).findOne({
+		where: { id: opts.regionId },
+	})
+	if (user.region?.defaultGroupId) {
+		const userGroup = new UserGroup()
+		userGroup.groupId = user.region.defaultGroupId
+		user.userGroups = [userGroup]
+	}
 	user.email = opts.email
 	user.role = UserRole.MEMBER
 	user.emailVerificationCode = randomBytes(12).toString('hex')
@@ -67,8 +74,14 @@ export async function createGuestUser(opts: CreateGuestUserOptions) {
 	const user = new User()
 	user.name = 'NA'
 	user.company = 'NA'
-	user.region = await dataSource.getRepository(Region).findOneBy({ id: opts.regionId })
-	user.groupId = user.region?.defaultGroupId
+	user.region = await dataSource.getRepository(Region).findOne({
+		where: { id: opts.regionId },
+	})
+	if (user.region?.defaultGroupId) {
+		const userGroup = new UserGroup()
+		userGroup.groupId = user.region.defaultGroupId
+		user.userGroups = [userGroup]
+	}
 	user.email = opts.email
 	user.approved = true
 	user.emailVerified = true
@@ -106,7 +119,16 @@ export async function getUserFromRequest(req: FastifyRequest): Promise<User | nu
 		return null
 	}
 
-	return dataSource.getRepository(User).findOneBy({ id: userId })
+	return dataSource.getRepository(User).findOne({
+		where: {
+			id: userId,
+		},
+		relations: {
+			userGroups: {
+				group: true,
+			},
+		},
+	})
 }
 
 export function hashPassword(raw: string) {

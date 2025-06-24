@@ -81,6 +81,8 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		thumbnailURL: collection.hasThumbnail
 			? await mainS3().presignedGetObject(mainS3Bucket(), collection.thumbnailStorageKey)
 			: null,
+		limitedToGroupIds: collection.limitedToGroupIds,
+		canEditLimitedToGroupIds: collection.canEditLimitedToGroupIds,
 	}
 }
 
@@ -518,6 +520,7 @@ export default router({
 				public: z.boolean().optional(),
 				draft: z.boolean().optional(),
 				hasThumbnail: z.boolean().optional(),
+				limitedToGroupIds: z.string().array().optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
@@ -539,14 +542,21 @@ export default router({
 			if (!collection.public && !collection.ownerId) {
 				collection.ownerId = ctx.user.id
 			}
+			if (collection.canEditLimitedToGroupIds && input.limitedToGroupIds !== undefined) {
+				collection.limitedToGroupIds = input.limitedToGroupIds
+			}
 
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
 				const children = await em.getTreeRepository(Collection).findDescendants(collection)
-				await em.getRepository(Collection).update(
-					{ id: In(children.map((child) => child.id)) },
-					{ draft: collection.draft, ownerId: collection.ownerId },
-				)
+				await em.getRepository(Collection).update({
+					id: In(children.map((child) => child.id).filter((childId) => childId !== collection.id)),
+				}, {
+					draft: collection.draft,
+					ownerId: collection.ownerId,
+					limitedToGroupIds: collection.limitedToGroupIds,
+					canEditLimitedToGroupIds: collection.limitedToGroupIds.length === 0,
+				})
 				await syncCollectionMenuItems(em, collection, true)
 				if (!collection.hasThumbnail) {
 					await mainS3().removeObjects(mainS3Bucket(), [collection.thumbnailStorageKey])

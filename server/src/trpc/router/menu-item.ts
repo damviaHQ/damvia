@@ -47,17 +47,21 @@ type BuildMenuItemTreeOptions = {
 
 export function buildMenuItemTree({ menuItems, userCollectionIds, parentId = null }: BuildMenuItemTreeOptions) {
 	return menuItems
-		.filter((current) =>
-			current.parentId === parentId &&
-			(current.type !== MenuItemType.COLLECTION || userCollectionIds.includes(current.collectionId))
-		)
+		.filter((current) => current.parentId === parentId)
 		.map((current) => {
 			const children = buildMenuItemTree({ menuItems, userCollectionIds, parentId: current.id })
-			return {
-				...formatMenuItem(current),
-				children: children.length ? children : undefined,
+			const isCurrentVisible = current.type !== MenuItemType.COLLECTION || userCollectionIds.includes(current.collectionId)
+			if (isCurrentVisible || children.length > 0) {
+				return {
+					...formatMenuItem(current),
+					children: children.length ? children : undefined,
+					hasAccess: isCurrentVisible,
+				}
 			}
+
+			return null
 		})
+		.filter(Boolean)
 }
 
 export default router({

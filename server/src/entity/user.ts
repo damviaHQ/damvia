@@ -15,7 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import {
 	Column,
 	CreateDateColumn,
-	Entity,
+	Entity, JoinTable, ManyToMany,
 	ManyToOne,
 	OneToMany,
 	PrimaryColumn,
@@ -26,6 +26,7 @@ import { CollectionInvitation } from "./collection-invitation"
 import { Group } from "./group"
 import { Region } from "./region"
 import { UserFavorite } from "./user-favorite"
+import {UserGroup} from "./user-group";
 
 export enum UserRole {
 	ADMIN = "admin",
@@ -67,11 +68,8 @@ export class User {
 	@Column({ default: false })
 	approved: boolean
 
-	@Column()
-	groupId: string
-
-	@ManyToOne(() => Group, (g) => g.users)
-	group: Group
+	@OneToMany(() => UserGroup, userGroup => userGroup.user, {cascade: true})
+	userGroups: UserGroup[];
 
 	@Column()
 	regionId: string

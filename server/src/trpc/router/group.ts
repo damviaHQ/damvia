@@ -12,13 +12,13 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { TRPCError } from "@trpc/server"
-import { z } from "zod"
-import { Group } from "../../entity/group"
-import { Region } from "../../entity/region"
-import { User } from "../../entity/user"
-import { dataSource } from "../../env"
-import { authMiddleware, publicProcedure, router, userAdmin, userManagerOrAdmin } from "../index"
+import {TRPCError} from "@trpc/server"
+import {z} from "zod"
+import {Group} from "../../entity/group"
+import {Region} from "../../entity/region"
+import {dataSource} from "../../env"
+import {authMiddleware, publicProcedure, router, userAdmin, userManagerOrAdmin} from "../index"
+import {UserGroup} from "../../entity/user-group";
 
 export function formatGroup(group: Group) {
 	return {
@@ -94,7 +94,7 @@ export default router({
 				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cannot remove default group.' })
 			}
 
-			const usersCount = await dataSource.getRepository(User).countBy({ groupId: group.id })
+			const usersCount = await dataSource.getRepository(UserGroup).countBy({ groupId: group.id })
 			const regionsCount = await dataSource.getRepository(Region).countBy({ defaultGroupId: group.id })
 
 			if (usersCount > 0 || regionsCount > 0) {
@@ -118,7 +118,7 @@ export default router({
 			}
 
 			await dataSource.transaction(async (em) => {
-				await em.getRepository(User).update({ groupId: fromGroup.id }, { groupId: toGroup.id })
+				await em.getRepository(UserGroup).update({ groupId: fromGroup.id }, { groupId: toGroup.id })
 				await em.getRepository(Region).update({ defaultGroupId: fromGroup.id }, { defaultGroupId: toGroup.id })
 			})
 		}),

@@ -41,10 +41,11 @@ export function userCollectionsQuery(user: User): SelectQueryBuilder<Collection>
 				q = q.orWhere("collection.public IS TRUE")
 			} else if (user.role !== UserRole.GUEST) {
 				q = q.orWhere(
-					"(collection.public IS TRUE AND collection.draft IS FALSE) AND (asset_folder.license_id IS NULL OR (:regionId = ANY(license.allowed_region_ids) AND (license.usage_from IS NULL OR license.usage_from <= now()) AND (license.usage_to IS NULL OR license.usage_to >= now())))",
+					"(collection.public IS TRUE AND collection.draft IS FALSE) AND (array_length(collection.limited_to_group_ids, 1) = 0) AND (asset_folder.license_id IS NULL OR (:regionId = ANY(license.allowed_region_ids) AND (license.usage_from IS NULL OR license.usage_from <= now()) AND (license.usage_to IS NULL OR license.usage_to >= now())))",
 					{ regionId: user.regionId },
 				)
 			}
+			q.orWhere('((SELECT array_agg(group_id::text) FROM user_groups WHERE user_id = :userId) && "collection"."limited_to_group_ids")')
 			q.orWhere("(SELECT COUNT(*) FROM collection_invitations WHERE collection_invitations.user_id = :userId AND collection_invitations.collection_id::text = ANY(string_to_array(collection.mpath, '.')) AND collection_invitations.expires_at > now()) > 0")
 			return q
 		}))
@@ -90,10 +91,11 @@ export function userCollectionFilesQuery(user: User): SelectQueryBuilder<Collect
 				q = q.orWhere("collection.public IS TRUE")
 			} else if (user.role !== UserRole.GUEST) {
 				q = q.orWhere(
-					"(collection.public IS TRUE AND collection.draft IS FALSE) AND (asset_file.license_id IS NULL OR (:regionId = ANY(license.allowed_region_ids) AND (license.usage_from IS NULL OR license.usage_from <= now()) AND (license.usage_to IS NULL OR license.usage_to >= now())))",
+					"(collection.public IS TRUE AND collection.draft IS FALSE) AND (array_length(collection.limited_to_group_ids, 1) = 0) AND (asset_file.license_id IS NULL OR (:regionId = ANY(license.allowed_region_ids) AND (license.usage_from IS NULL OR license.usage_from <= now()) AND (license.usage_to IS NULL OR license.usage_to >= now())))",
 					{ regionId: user.regionId }
 				)
 			}
+			q.orWhere('((SELECT array_agg(group_id::text) FROM user_groups WHERE user_id = :userId) && "collection"."limited_to_group_ids")')
 			q.orWhere("(SELECT COUNT(*) FROM collection_invitations WHERE collection_invitations.user_id = :userId AND collection_invitations.collection_id::text = ANY(string_to_array(collection.mpath, '.')) AND collection_invitations.expires_at > now()) > 0")
 			return q
 		}))

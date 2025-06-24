@@ -59,7 +59,7 @@ function handleLinkClick(event: MouseEvent) {
 
 <template>
   <div class="layout-link-tree__wrapper">
-    <router-link v-if="item.type === 'collection'" :to="{ name: routeName, params: { id: item.collectionId } }"
+    <router-link v-if="item.type === 'collection' && item.hasAccess" :to="{ name: routeName, params: { id: item.collectionId } }"
       @click.exact="handleLinkClick"
       active-class="layout-menu-tree__item--active border-l-2 ml-[-2px] border-neutral-300 text-neutral-900 font-medium"
       class="layout-menu-tree__item flex py-2.5 items-center text-sm no-underline pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900">
@@ -87,7 +87,7 @@ function handleLinkClick(event: MouseEvent) {
         marginTop: item.data.spacingTop ? `${item.data.spacingTop}px` : '0px',
         marginBottom: item.data.spacingBottom ? `${item.data.spacingBottom}px` : '0px',
       }" />
-    <div v-if="open" class="pl-4">
+    <div v-if="open || !item.hasAccess" :class="item.hasAccess && 'pl-4'">
       <MainMenuTree v-for="child in sortedChildren" :key="child.id" :item="child" :open-items="openItems"
         :route-name="routeName" />
     </div>

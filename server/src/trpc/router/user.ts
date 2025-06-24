@@ -26,6 +26,7 @@ import {
 	mailerUserApprovedEmailQueue
 } from "../../worker"
 import { authMiddleware, publicProcedure, router, userManagerOrAdmin } from "../index"
+import {UserGroup} from "../../entity/user-group";
 
 export function formatPublicUser(user: User) {
 	return {
@@ -54,7 +55,10 @@ export function formatPublicUserForAdmin(user: User) {
 		approved: user.approved,
 		createdAt: user.createdAt,
 		updatedAt: user.updatedAt,
-		group: user.group ? { id: user.group.id, name: user.group.name } : null,
+		groups: user.userGroups.map((userGroup) => ({
+			id: userGroup.group.id,
+			name: userGroup.group.name,
+		}))
 	}
 }
 
@@ -210,7 +214,7 @@ export default router({
 			regionId: z.string().uuid('Invalid region'),
 			email: z.string().email(),
 			role: z.nativeEnum(UserRole),
-			groupId: z.string().uuid('Invalid group'),
+			groupIds: z.string().uuid('Invalid group').array(),
 		}))
 		.mutation(async ({ ctx, input }) => {
 			const user = await dataSource.getRepository(User).findOneBy(
@@ -232,17 +236,18 @@ export default router({
 				user.emailVerificationCode = randomBytes(8).toString('hex')
 			}
 
+			let shouldUpdateUserGroups = false
 			if (ctx.user.role === UserRole.ADMIN) {
 				user.regionId = input.regionId
 				user.role = input.role
-				user.groupId = input.groupId
+				shouldUpdateUserGroups = true
 			} else if (ctx.user.role === UserRole.MANAGER) {
 				if (!isCurrentUserManager) {
 					if (input.role === UserRole.ADMIN || input.role === UserRole.MANAGER) {
 						throw new TRPCError({ code: 'FORBIDDEN', message: 'Managers cannot set admin or manager roles.' })
 					}
 					user.regionId = input.regionId
-					user.groupId = input.groupId
+					shouldUpdateUserGroups = true
 					if (input.role === UserRole.MEMBER || input.role === UserRole.GUEST) {
 						user.role = input.role
 					}
@@ -251,6 +256,16 @@ export default router({
 
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(User).save(user)
+				if (shouldUpdateUserGroups) {
+					await em.getRepository(UserGroup).delete({userId: user.id})
+					user.userGroups = input.groupIds.map((groupId) => {
+						const userGroup = new UserGroup()
+						userGroup.groupId = groupId
+						userGroup.userId = user.id
+						return userGroup
+					})
+					await em.getRepository(UserGroup).save(user.userGroups)
+				}
 				await mailerEmailVerificationQueue.push({ userId: user.id })
 			})
 
@@ -277,7 +292,12 @@ export default router({
 			.query(async ({ ctx }) => {
 				const users = await dataSource.getRepository(User).find({
 					where: ctx.user.role === UserRole.ADMIN ? {} : { regionId: ctx.user.regionId },
-					relations: ['region', 'group'],
+					relations: {
+						region: true,
+						userGroups: {
+							group: true,
+						},
+					},
 				})
 				return users.map(formatPublicUserForAdmin)
 			}),

@@ -24,25 +24,27 @@ import { useQueryClient } from "@tanstack/vue-query"
 import { EyeOff, ImageMinus, ImageUp, Trash } from "lucide-vue-next"
 import { ref, toRefs, watch } from "vue"
 import { useRouter } from "vue-router"
+import SelectGroupInput from "@/components/SelectGroupInput.vue";
 
 const props = defineProps<{
-  collection: RouterOutput["collection"]["findById"] | RouterOutput["collection"]["treeAdmin"][number]
-  modelValue: boolean
+  collection: RouterOutput["collection"]["findById"] | RouterOutput["collection"]["treeAdmin"][number];
+  modelValue: boolean;
 }>()
 const emit = defineEmits<{
   (e: "update:modelValue", isOpen: boolean): void;
-  (e: "updated", collection: RouterOutput["collection"]["update"]): void
+  (e: "updated", collection: RouterOutput["collection"]["update"]): void;
 }>()
 const { collection, modelValue } = toRefs(props)
 const toast = useGlobalToast()
 const router = useRouter()
 const queryClient = useQueryClient()
 const form = ref<{
-  name?: string
-  description?: string
-  draft?: boolean
-  thumbnailFile?: File
-  thumbnailURL?: string | null
+  name?: string;
+  description?: string;
+  draft?: boolean;
+  thumbnailFile?: File;
+  thumbnailURL?: string | null;
+  limitedToGroupIds?: string[];
 }>({})
 function updateForm() {
   form.value = {
@@ -50,6 +52,7 @@ function updateForm() {
     description: collection.value.description,
     draft: collection.value.draft,
     thumbnailURL: collection.value.thumbnailURL,
+    limitedToGroupIds: collection.value.limitedToGroupIds,
   }
 }
 
@@ -110,6 +113,7 @@ async function onSubmit() {
       description: form.value.description,
       draft: form.value.draft,
       hasThumbnail: !!form.value.thumbnailURL,
+      limitedToGroupIds: form.value.limitedToGroupIds,
     }
 
     if (!props.collection.synchronized) {
@@ -172,9 +176,18 @@ async function clearCustomLayout() {
         <Checkbox id="draft" v-model:checked="form.draft" />
         <Label for="draft" class="flex items-center text-sm font-medium">
           <EyeOff class="w-4 h-4 mr-2" />
-          Hide <span class="text-sm ml-1 font-normal text-gray-500">(No one can see this collection and assets
-            inside)</span>
+          Hide <span class="text-sm ml-1 font-normal text-gray-500">
+            (No one can see this collection and assets inside)
+          </span>
         </Label>
+      </div>
+      <div v-if="collection.canEditLimitedToGroupIds">
+        <Label for="limitedToGroupIds" class="text-sm font-medium">Limit access to the following groups</Label>
+        <SelectGroupInput
+          v-model="form.limitedToGroupIds"
+          id="limitedToGroupIds"
+          placeholder="Select groups..."
+        />
       </div>
       <div class="flex flex-col space-y-4">
         <Label for="thumbnail" class="text-sm font-medium">Custom Thumbnail</Label>
