@@ -13,13 +13,14 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import PgBoss from "pg-boss"
-import { AssetFile } from "./entity/asset-file"
+import {AssetFile, AssetFileStatus} from "./entity/asset-file"
 import { CollectionInvitation } from "./entity/collection-invitation"
 import { Download } from "./entity/download"
 import { User } from "./entity/user"
-import { dataSource, logger } from "./env"
+import {dataSource, logger} from "./env"
 import { assignProductsToAssetFiles, processDeletion, updateFileContent } from "./services/asset"
 import { synchronizeCollection } from "./services/collection"
+import { integrityCheck as systemIntegrityCheck } from "./services/system"
 import { createDownloadArchive, processExpiredDownloads } from "./services/download"
 import {
 	sendDownloadReady,
@@ -197,4 +198,10 @@ export const downloadProcessExpiredQueue = createQueue<void>({
 	name: 'download/process-expired',
 	processor: () => processExpiredDownloads(),
 	cron: '* * * * *',
+})
+
+export const systemIntegrityCheckQueue = createQueue<void>({
+	name: 'system/integrity-check',
+	processor: systemIntegrityCheck,
+	cron: '0 5 * * *',
 })

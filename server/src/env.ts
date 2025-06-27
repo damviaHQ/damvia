@@ -12,6 +12,8 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import 'dotenv/config'
+import "reflect-metadata"
 import { Client as MinioClient } from 'minio'
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
