@@ -187,7 +187,9 @@ export default router({
 
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(User).save(user)
-				await mailerEmailVerificationQueue.push({ userId: user.id })
+				if (!user.emailVerified) {
+					await mailerEmailVerificationQueue.push({ userId: user.id })
+				}
 			})
 
 			return formatPublicUser(user)
@@ -266,7 +268,9 @@ export default router({
 					})
 					await em.getRepository(UserGroup).save(user.userGroups)
 				}
-				await mailerEmailVerificationQueue.push({ userId: user.id })
+				if (!user.emailVerified) {
+					await mailerEmailVerificationQueue.push({ userId: user.id })
+				}
 			})
 
 			return user
