@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import PgBoss from "pg-boss"
-import {AssetFile, AssetFileStatus} from "./entity/asset-file"
+import { AssetFile } from "./entity/asset-file"
 import { CollectionInvitation } from "./entity/collection-invitation"
 import { Download } from "./entity/download"
 import { User } from "./entity/user"
@@ -34,7 +34,7 @@ import {
 
 const workerInitializers: (() => Promise<any>)[] = []
 
-const boss = new PgBoss(process.env.DATABASE_URL ?? 'postgresql://dam:dam@localhost/dam')
+export const boss = new PgBoss(process.env.DATABASE_URL ?? 'postgresql://dam:dam@localhost/dam')
 
 boss.on('error', (error) => {
 	logger.error('worker error', { error })
