@@ -3,16 +3,13 @@ import {assetsS3, assetsS3Bucket, dataSource} from "../env";
 import {assetUpdateContentQueue} from "../worker";
 
 export async function integrityCheck() {
-	const assetFiles = await dataSource.getRepository(AssetFile).find({
-		where: {
-			status: AssetFileStatus.UP_TO_DATE,
-		},
-	})
+	const assetFiles = await dataSource.getRepository(AssetFile).find()
 	const assetFilesByStorageKeyToSync = Object.fromEntries(assetFiles.map((file) => [file.originalStorageKey, file]))
 	await new Promise((resolve, reject) => {
 		assetsS3().listObjects(assetsS3Bucket(), 'asset-file/')
 			.on('data', (item) => {
-				if (parseInt(assetFilesByStorageKeyToSync[item.name]?.size, 0) === item.size) {
+				const assetFile = assetFilesByStorageKeyToSync[item.name]
+				if (parseInt(assetFile?.size, 0) === item.size && assetFile?.status === AssetFileStatus.UP_TO_DATE) {
 					delete assetFilesByStorageKeyToSync[item.name];
 				}
 			})
