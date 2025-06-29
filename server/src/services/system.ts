@@ -26,14 +26,12 @@ export async function integrityCheck() {
 		assetFile.status = AssetFileStatus.OUTDATED
 	})
 	if (assetFilesToSync.length > 0) {
-		await dataSource.transaction(async (em) => {
-			await em.getRepository(AssetFile).save(assetFilesToSync)
-			await assetUpdateContentQueue.bulkPush(assetFilesToSync.map((assetFile) => ({
-				data: {
-					assetFileId: assetFile.id,
-				},
-			})))
-		})
+		await dataSource.getRepository(AssetFile).save(assetFilesToSync)
+		await assetUpdateContentQueue.bulkPush(assetFilesToSync.map((assetFile) => ({
+			data: {
+				assetFileId: assetFile.id,
+			},
+		})))
 	}
 	console.log('Successfully updated assets files')
 
@@ -45,9 +43,9 @@ export async function integrityCheck() {
 				FROM (
 					SELECT collection_files.id
 					FROM collection_files
-					INNER JOIN collections collection_file_collection ON collections.id::text = ANY(string_to_array(collection_file_collection.mpath, '.'))
+					INNER JOIN collections collection_file_collection ON collection_files.collection_id = collection_file_collection.id
 					INNER JOIN asset_files ON collection_files.asset_file_id = asset_files.id AND asset_files.has_thumbnail
-					WHERE collection_files.collection_id = collections.id
+					WHERE collections.id::text = ANY(string_to_array(collection_file_collection.mpath, '.'))
 					ORDER BY array_position(string_to_array(collections.mpath, '.'), collection_files.collection_id::text) NULLS LAST, collection_files.created_at
 					LIMIT 4
 				) AS subquery
