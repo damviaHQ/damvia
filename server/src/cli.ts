@@ -11,6 +11,7 @@ async function run() {
 	checkIntegrityCmd.action(async () => {
 		console.log('Running integrity check...')
 		await systemService.integrityCheck()
+		process.exit(0)
 	})
 
 	program
