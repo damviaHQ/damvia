@@ -471,7 +471,7 @@ onUnmounted(() => {
       </div>
       <div class="search-bar__modal-query">
         <template v-if="Array.isArray(searchQuery.query)">
-          <button v-for="(element, index) in searchQuery.query" :key="index"
+          <div v-for="(element, index) in searchQuery.query" :key="index"
             class="tags flex items-center bg-neutral-50 text-neutral-500 font-medium ring-2 ring-neutral-200 hover:ring-neutral-300 text-base px-[0.2em] py-0.5 max-w-[260px] overflow-clip cursor-pointer whitespace-nowrap"
             @click="editingIndex === index ? null : (editingIndex = index)" @dblclick="startEditing(index)">
             <div v-if="editingIndex !== index" class="text-sm pl-[0.5em] pr-[0.2em]">
@@ -483,7 +483,7 @@ onUnmounted(() => {
             <button type="button" @click.stop="removeQueryPart(index)">
               <X class="w-4 h-4 text-neutral-600 hover:text-red-400 ml-1" />
             </button>
-          </button>
+          </div>
           <input class="search-bar__modal-query-input" type="text"
             placeholder="Paste multiple product references or files separated by spaces." @keydown="handleKeydown"
             @paste="handlePaste" v-model="searchQueryValue" ref="searchInput" />

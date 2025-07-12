@@ -551,10 +551,6 @@ watch(() => props.modelValue, (newValue) => {
           <iframe v-else-if="isPdf" :src="`${currentFile.fileURL}#toolbar=0&navpanes=0&scrollbar=1`"
             class="gallery-modal__preview-thumbnail gallery-modal__pdf-preview"
             width="90%" height="90%" frameborder="0">
-            <div class="pdf-fallback">
-              <p>It appears your browser doesn't support embedded PDFs.</p>
-              <a :href="currentFile.fileURL" target="_blank" class="pdf-fallback-link">Click here to view the PDF</a>
-            </div>
           </iframe>
           <img v-else-if="(currentFile.mimeType.startsWith('image/') ||
                           isVectorFile ||
