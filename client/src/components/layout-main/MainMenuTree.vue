@@ -31,6 +31,22 @@ const sortedChildren = computed(() => {
   return sortBy(props.item.children, "position")
 })
 
+const isActiveItem = computed(() => {
+  const itemId = props.item.collectionId || props.item.pageId
+  return itemId && props.openItems[props.openItems.length - 1] === itemId
+})
+
+const activeChildIndex = computed(() => {
+  if (!sortedChildren.value.length || !open.value) return -1
+  
+  return sortedChildren.value.findIndex(child => {
+    const childId = child.collectionId || child.pageId
+    return childId && props.openItems.includes(childId)
+  })
+})
+
+const hasActiveChild = computed(() => activeChildIndex.value >= 0)
+
 watch(
   () => props.openItems,
   (next, prev) => {
@@ -61,35 +77,48 @@ function handleLinkClick(event: MouseEvent) {
   <div class="layout-link-tree__wrapper">
     <router-link v-if="item.type === 'collection' && item.hasAccess" :to="{ name: routeName, params: { id: item.collectionId } }"
       @click.exact="handleLinkClick"
-      active-class="layout-menu-tree__item--active border-l-2 ml-[-2px] border-neutral-300 text-neutral-900 font-medium"
-      class="layout-menu-tree__item flex py-2.5 items-center text-sm no-underline pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900">
+      :class="[
+        'layout-menu-tree__item flex h-11 items-center text-sm no-underline font-medium pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
+        isActiveItem && 'layout-menu-tree__item--active'
+      ]">
       <Button type="button" variant="ghost" v-if="item.children?.length > 0" @click.prevent="open = !open"
-        class="layout-menu-tree__icon-wrapper flex cursor-pointer border-none w-fit p-1.5 mr-0.5 hover:bg-neutral-200">
-        <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4" />
+        class="layout-menu-tree__icon-wrapper flex cursor-pointer border-none w-fit p-1.5 hover:bg-neutral-200 relative">
+        <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4 ml-[0.5px]" />
         <ChevronRight v-else class="w-4 h-4 min-w-4 min-h-4" />
+        <!-- Vertical line starts from chevron button -->
+        <span v-if="hasActiveChild" class="active-line-start"></span>
       </Button>
-      <div v-else class="w-4 h-4 min-w-4 min-h-4" />
-      <div class="flex items-center font-medium">{{ item.collectionName }}</div>
+      <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[10px] pl-[18px]" />
+      <div class="flex items-center">{{ item.collectionName }}</div>
     </router-link>
     <router-link v-if="item.type === 'page'" :to="{ name: 'page', params: { id: item.pageId } }"
       @click.exact="handleLinkClick"
-      active-class="layout-menu-tree__item--active border-l-2 ml-[-2px] border-neutral-300 text-neutral-900 font-medium"
-      class="layout-menu-tree__item flex items-center text-sm no-underline pl-[1px] py-2.5 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900">
-      <div class="h-4 w-4" />
-      <div class="flex items-center font-medium">{{ item.pageName }}</div>
+      :class="[
+        'layout-menu-tree__item flex h-11 items-center text-sm font-medium no-underline py-2.5 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
+        isActiveItem ? 'layout-menu-tree__item--active' : ''
+      ]">
+      <div class="h-4 w-4 min-w-4 min-h-4" />
+      <div class="flex items-center">{{ item.pageName }}</div>
     </router-link>
     <a v-if="item.type === 'text'" :href="item.data?.url" :target="item.data?.external ? '_blank' : '_self'"
       class="layout-link-tree__link" :class="!item.data?.url && 'pointer-events-none'">
-      <div class="flex items-center font-medium pl-[9px]">{{ item.data?.text }}</div>
+      <div class="flex items-center pl-[3px]">{{ item.data?.text }}</div>
     </a>
     <div v-if="item.type === 'divider'"
       :class="['h-px', item.data.border ? 'bg-neutral-400' : 'bg-transparent', 'divider']" :style="{
         marginTop: item.data.spacingTop ? `${item.data.spacingTop}px` : '0px',
         marginBottom: item.data.spacingBottom ? `${item.data.spacingBottom}px` : '0px',
       }" />
-    <div v-if="open || !item.hasAccess" :class="item.hasAccess && 'pl-4'">
-      <MainMenuTree v-for="child in sortedChildren" :key="child.id" :item="child" :open-items="openItems"
-        :route-name="routeName" />
+    <div v-if="open || !item.hasAccess" :class="[
+      item.hasAccess && 'pl-4', 
+      'children-container',
+      hasActiveChild && 'has-active-child'
+    ]" :style="{ '--active-index': activeChildIndex }">
+      <MainMenuTree v-for="(child, index) in sortedChildren" :key="child.id" 
+        :item="child" 
+        :open-items="openItems"
+        :route-name="routeName"
+        :class="index === activeChildIndex && 'is-active-child'" />
     </div>
   </div>
 </template>
@@ -97,6 +126,7 @@ function handleLinkClick(event: MouseEvent) {
 <style scoped>
 .layout-link-tree__wrapper {
   @apply flex flex-col;
+  position: relative; 
 }
 
 .layout-link-tree__link {
@@ -116,6 +146,50 @@ function handleLinkClick(event: MouseEvent) {
 }
 
 .divider-color {
-  @apply bg-neutral-400;
+  @apply bg-neutral-200;
+}
+
+.children-container {
+  position: relative;
+}
+
+.active-line-start {
+  position: absolute;
+  left: 14px;
+  bottom: -18px; 
+  width: 1px;
+  height: 17px;
+  background-color: rgb(212, 212, 212);
+  z-index: 1;
+}
+
+.children-container.has-active-child::before {
+  content: "";
+  position: absolute;
+  left: 15px; 
+  top: 0;
+  width: 1px;
+  background-color: rgb(212, 212, 212);
+  height: calc(var(--active-index, 0) * 44px + 22px);
+  z-index: 0;
+}
+
+.is-active-child {
+  position: relative;
+}
+
+.is-active-child::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 22px;
+  width: 8px;
+  height: 1px;
+  background-color: rgb(212, 212, 212);
+  z-index: 1;
+}
+
+.layout-menu-tree__item--active {
+  @apply bg-neutral-100 text-neutral-900 font-bold;
 }
 </style>

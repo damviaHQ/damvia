@@ -69,16 +69,23 @@ const flattenCollections = computed(() => {
 })
 
 const openCollections = computed(() => {
-  if (!(route.name === "collection" && route.params.id)) {
-    return []
-  }
-
-  const collection = flattenCollections.value.find((item) => item.id === route.params.id)
   const ids: string[] = []
-  for (let current = collection; current; current = current.parent) {
-    ids.push(current.id)
+  
+  if (route.name === "collection" && route.params.id) {
+    const collection = flattenCollections.value.find((item) => item.id === route.params.id)
+    for (let current = collection; current; current = current.parent) {
+      ids.push(current.id)
+    }
+    return ids.reverse()
   }
-  return ids.reverse()
+  
+  if (route.name === "page" && route.params.id) {
+    const pageId = route.params.id as string
+    ids.push(pageId)
+    return ids
+  }
+  
+  return []
 })
 
 const myCollectionsActive = computed(
