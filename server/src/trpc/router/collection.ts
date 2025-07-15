@@ -179,7 +179,10 @@ export default router({
 	tree: publicProcedure
 		.use(authMiddleware(userApproved))
 		.query(async ({ ctx }) => {
-			const collections = await userCollectionsQuery(ctx.user).getMany()
+			const collections = await userCollectionsQuery(ctx.user)
+				.leftJoinAndSelect('collection.page', 'page')
+				.leftJoinAndSelect('page.blocks', 'blocks')
+				.getMany()
 			return buildTree({ collections, user: ctx.user })
 		}),
 	treeAdmin: publicProcedure

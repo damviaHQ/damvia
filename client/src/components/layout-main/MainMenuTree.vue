@@ -88,13 +88,13 @@ function handleLinkClick(event: MouseEvent) {
         <!-- Vertical line starts from chevron button -->
         <span v-if="hasActiveChild" class="active-line-start"></span>
       </Button>
-      <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[2px]" />
+      <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[3px]" />
       <div class="flex items-center">{{ item.collectionName }}</div>
     </router-link>
     <router-link v-if="item.type === 'page'" :to="{ name: 'page', params: { id: item.pageId } }"
       @click.exact="handleLinkClick"
       :class="[
-        'layout-menu-tree__item flex h-9 items-center text-sm font-medium no-underline py-2.5 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
+        'layout-menu-tree__item flex h-9 items-center text-sm no-underline pl-[5px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
         isActiveItem ? 'layout-menu-tree__item--active' : ''
       ]">
       <div class="h-4 w-4 min-w-4 min-h-4" />
@@ -102,7 +102,7 @@ function handleLinkClick(event: MouseEvent) {
     </router-link>
     <a v-if="item.type === 'text'" :href="item.data?.url" :target="item.data?.external ? '_blank' : '_self'"
       class="layout-link-tree__link" :class="!item.data?.url && 'pointer-events-none'">
-      <div class="flex items-center pl-[3px]">{{ item.data?.text }}</div>
+      <div class="flex items-center pl-[14px]">{{ item.data?.text }}</div>
     </a>
     <div v-if="item.type === 'divider'"
       :class="['h-px', item.data.border ? 'bg-neutral-400' : 'bg-transparent', 'divider']" :style="{

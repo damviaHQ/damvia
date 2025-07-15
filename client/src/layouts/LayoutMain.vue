@@ -81,6 +81,72 @@ const openCollections = computed(() => {
   
   if (route.name === "page" && route.params.id) {
     const pageId = route.params.id as string
+    
+    const owningCollection = flattenCollections.value.find((collection) => 
+      collection.page?.id === pageId
+    )
+    
+    if (owningCollection) {
+      for (let current = owningCollection; current; current = current.parent) {
+        ids.push(current.id)
+      }
+      ids.reverse()
+    } else {
+      const findMenuItemByPageId = (items: any[], pageId: string): any => {
+        for (const item of items) {
+          if (item.pageId === pageId) {
+            return item
+          }
+          if (item.children) {
+            const found = findMenuItemByPageId(item.children, pageId)
+            if (found) return found
+          }
+        }
+        return null
+      }
+      
+      const menuItem = findMenuItemByPageId(menuItems.value || [], pageId)
+      
+      if (menuItem) {
+        if (!menuItem.collectionId && menuItem.parentId) {
+          const findParentCollectionId = (items: any[], parentId: string): string | null => {
+            for (const item of items) {
+              if (item.id === parentId) {
+                return item.collectionId || (item.parentId ? findParentCollectionId(items, item.parentId) : null)
+              }
+              if (item.children) {
+                const found = findParentCollectionId(item.children, parentId)
+                if (found) return found
+              }
+            }
+            return null
+          }
+          
+          const parentCollectionId = findParentCollectionId(menuItems.value || [], menuItem.parentId)
+          
+          if (parentCollectionId) {
+            const collection = flattenCollections.value.find(c => c.id === parentCollectionId)
+            
+            if (collection) {
+              for (let current = collection; current; current = current.parent) {
+                ids.push(current.id)
+              }
+              ids.reverse()
+            }
+          }
+        } else if (menuItem.collectionId) {
+          const collection = flattenCollections.value.find(c => c.id === menuItem.collectionId)
+          
+          if (collection) {
+            for (let current = collection; current; current = current.parent) {
+              ids.push(current.id)
+            }
+            ids.reverse()
+          }
+        }
+      }
+    }
+    
     ids.push(pageId)
     return ids
   }
