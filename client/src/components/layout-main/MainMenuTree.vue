@@ -78,7 +78,7 @@ function handleLinkClick(event: MouseEvent) {
     <router-link v-if="item.type === 'collection' && item.hasAccess" :to="{ name: routeName, params: { id: item.collectionId } }"
       @click.exact="handleLinkClick"
       :class="[
-        'layout-menu-tree__item flex h-11 items-center text-sm no-underline font-medium pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
+        'layout-menu-tree__item flex h-9 items-center text-sm no-underline font-medium pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
         isActiveItem && 'layout-menu-tree__item--active'
       ]">
       <Button type="button" variant="ghost" v-if="item.children?.length > 0" @click.prevent="open = !open"
@@ -94,7 +94,7 @@ function handleLinkClick(event: MouseEvent) {
     <router-link v-if="item.type === 'page'" :to="{ name: 'page', params: { id: item.pageId } }"
       @click.exact="handleLinkClick"
       :class="[
-        'layout-menu-tree__item flex h-11 items-center text-sm font-medium no-underline py-2.5 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
+        'layout-menu-tree__item flex h-9 items-center text-sm font-medium no-underline py-2.5 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
         isActiveItem ? 'layout-menu-tree__item--active' : ''
       ]">
       <div class="h-4 w-4 min-w-4 min-h-4" />
@@ -170,7 +170,7 @@ function handleLinkClick(event: MouseEvent) {
   top: 0;
   width: 1px;
   background-color: rgb(212, 212, 212);
-  height: calc(var(--active-index, 0) * 44px + 22px);
+  height: calc(var(--active-index, 0) * 36px + 18px);
   z-index: 0;
 }
 
@@ -182,7 +182,7 @@ function handleLinkClick(event: MouseEvent) {
   content: "";
   position: absolute;
   left: -4px;
-  top: 22px;
+  top: 18px;
   width: 6px;
   height: 1px;
   background-color: rgb(212, 212, 212);
