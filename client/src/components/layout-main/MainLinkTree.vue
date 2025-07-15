@@ -21,6 +21,23 @@ type Item = { id: string; name: string; children: Item[] }
 const props = defineProps<{ routeName: string; item: Item; openItems: string[] }>()
 const open = ref(props.openItems.includes(props.item.id))
 
+const activeChildIndex = computed(() => {
+  if (!sortedChildren.value.length || !open.value) return -1
+  
+  return sortedChildren.value.findIndex(child => {
+    const hasActiveChild = (item: Item): boolean => {
+      if (props.openItems.includes(item.id)) return true
+      if (item.children) {
+        return item.children.some(child => hasActiveChild(child))
+      }
+      return false
+    }
+    return hasActiveChild(child)
+  })
+})
+
+const hasActiveChild = computed(() => activeChildIndex.value >= 0)
+
 const sortedChildren = computed(() => {
   if (!props.item.children) {
     return []
@@ -59,18 +76,24 @@ function handleLinkClick(event: MouseEvent) {
   <div>
     <router-link :to="{ name: routeName, params: { id: item.id } }" @click.exact="handleLinkClick"
       active-class="layout-link-tree__item--active border-l-2 ml-[-2px] border-neutral-300 text-neutral-900 font-medium"
-      class="layout-link-tree__item flex items-center text-sm no-underline pl-[1px] py-2.5 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900">
+      class="layout-link-tree__item flex h-9 items-center text-sm no-underline font-medium pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900">
       <Button v-if="item.children?.length > 0" @click.prevent="open = !open" variant="ghost" type="button"
-        class="layout-link-tree__icon-wrapper flex cursor-pointer border-none w-fit p-1.5 mr-0.5 hover:bg-neutral-200">
-        <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4" />
+        class="layout-link-tree__icon-wrapper flex cursor-pointer border-none w-fit p-0.5 hover:bg-neutral-200 relative">
+        <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4 ml-[0.5px]" />
         <ChevronRight v-else class="w-4 h-4 min-w-4 min-h-4" />
+        <!-- Vertical line starts from chevron button -->
+        <span v-if="hasActiveChild" class="active-line-start"></span>
       </Button>
-      <div v-else class="w-4 h-4 min-w-4 min-h-4" />
-      <div class="flex items-center font-medium">{{ item.name }}</div>
+      <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[2px]" />
+      <div class="flex items-center">{{ item.name }}</div>
     </router-link>
-    <div v-if="open" class="pl-4">
-      <MainLinkTree v-for="child in sortedChildren" :key="child.id" :item="child" :open-items="openItems"
-        :route-name="routeName" />
+    <div v-if="open" :class="[
+      'pl-4',
+      'children-container',
+      hasActiveChild && 'has-active-child'
+    ]" :style="{ '--active-index': activeChildIndex }">
+      <MainLinkTree v-for="(child, index) in sortedChildren" :key="child.id" :item="child" :open-items="openItems"
+        :route-name="routeName" :class="index === activeChildIndex && 'is-active-child'" />
     </div>
   </div>
 </template>
@@ -83,5 +106,45 @@ function handleLinkClick(event: MouseEvent) {
 
 .layout-link-tree__root--active .layout-link-tree__name {
   font-weight: 900;
+}
+
+.children-container {
+  position: relative;
+}
+
+.active-line-start {
+  position: absolute;
+  left: 10px;
+  bottom: -18px; 
+  width: 1px;
+  height: 13px;
+  background-color: rgb(212, 212, 212);
+  z-index: 1;
+}
+
+.children-container.has-active-child::before {
+  content: "";
+  position: absolute;
+  left: 11px; 
+  top: 0;
+  width: 1px;
+  background-color: rgb(212, 212, 212);
+  height: calc(var(--active-index, 0) * 36px + 18px);
+  z-index: 0;
+}
+
+.is-active-child {
+  position: relative;
+}
+
+.is-active-child::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 18px;
+  width: 6px;
+  height: 1px;
+  background-color: rgb(212, 212, 212);
+  z-index: 1;
 }
 </style>

@@ -95,6 +95,23 @@ const myCollectionsActive = computed(
 )
 const isMyCollectionsTabOpen = ref<boolean>(false)
 
+const activeCollectionIndex = computed(() => {
+  if (!myCollections.value?.length || !isMyCollectionsTabOpen.value) return -1
+  
+  return myCollections.value.findIndex(collection => {
+    const hasActiveChild = (item: Collection): boolean => {
+      if (openCollections.value?.includes(item.id)) return true
+      if (item.children) {
+        return item.children.some(child => hasActiveChild(child))
+      }
+      return false
+    }
+    return hasActiveChild(collection)
+  })
+})
+
+const hasActiveCollection = computed(() => activeCollectionIndex.value >= 0)
+
 watch([myCollectionsActive], () => {
   isMyCollectionsTabOpen.value = myCollectionsActive.value
 })
@@ -110,23 +127,33 @@ watch([myCollectionsActive], () => {
             My Favorites
           </Button>
         </router-link>
-        <div
-          class="dashboard-layout__menu-collection flex items-center justify-between text-sm font-medium no-underline text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200">
-          <Button variant="ghost" type="button" @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen"
-            class="flex cursor-pointer border-none w-fit gap-1.5 hover:bg-transparent pl-2.5"
-            :class="{ 'pl-1': myCollections?.length }">
-            <ChevronDown v-if="isMyCollectionsTabOpen && myCollections?.length > 0" class="w-4 h-4 min-w-4 min-h-4" />
-            <ChevronRight v-else-if="myCollections?.length > 0" class="w-4 h-4 min-w-4 min-h-4" />
-            My Collections
-          </Button>
-          <Button variant="ghost" type="button" size="icon" @click="isDialogCreateCollectionOpen = true"
-            class="flex cursor-pointer border-none w-fit gap-1.5 hover:bg-transparent">
-            <CirclePlus class="w-5 h-5 text-neutral-600 hover:text-neutral-900 mr-3" />
-          </Button>
-        </div>
-        <div v-if="isMyCollectionsTabOpen" class="pl-3">
-          <MainLinkTree v-if="myCollections" v-for="collection in myCollections" :key="collection.id" :item="collection"
-            :open-items="openCollections ?? []" route-name="collection" />
+        <div class="my-collections-wrapper">
+          <div
+            class="dashboard-layout__menu-collection flex items-center justify-between text-sm font-medium no-underline text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200">
+            <Button variant="ghost" type="button" @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen"
+              class="flex cursor-pointer border-none w-fit gap-1.5 hover:bg-transparent pl-2.5 relative"
+              :class="{ 'pl-1': myCollections?.length }">
+              <ChevronDown v-if="isMyCollectionsTabOpen && myCollections?.length > 0" class="w-4 h-4 min-w-4 min-h-4" />
+              <ChevronRight v-else-if="myCollections?.length > 0" class="w-4 h-4 min-w-4 min-h-4" />
+              My Collections
+              <!-- Vertical line starts from chevron button -->
+              <span v-if="hasActiveCollection" class="active-line-start"></span>
+            </Button>
+            <Button variant="ghost" type="button" size="icon" @click="isDialogCreateCollectionOpen = true"
+              class="flex cursor-pointer border-none w-fit gap-1.5 hover:bg-transparent">
+              <CirclePlus class="w-5 h-5 text-neutral-600 hover:text-neutral-900 mr-3" />
+            </Button>
+          </div>
+          <div v-if="isMyCollectionsTabOpen" :class="[
+            'pl-3',
+            'children-container',
+            'my-collections-children',
+            hasActiveCollection && 'has-active-child'
+          ]" :style="{ '--active-index': activeCollectionIndex }">
+            <MainLinkTree v-if="myCollections" v-for="(collection, index) in myCollections" :key="collection.id" :item="collection"
+              :open-items="openCollections ?? []" route-name="collection" 
+              :class="index === activeCollectionIndex && 'is-active-child'" />
+          </div>
         </div>
       </div>
       <MainLinkTree v-if="globalStore.user?.role === 'guest'" v-for="collection in publicCollections"
@@ -169,5 +196,57 @@ watch([myCollectionsActive], () => {
   margin: 0 auto 2rem;
   width: 132px;
   height: auto;
+}
+
+.my-collections-wrapper {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.children-container {
+  position: relative;
+}
+
+.active-line-start {
+  position: absolute;
+  left: 10px;
+  bottom: -18px; 
+  width: 1px;
+  height: 13px;
+  background-color: rgb(212, 212, 212);
+  z-index: 1;
+}
+
+.children-container.has-active-child::before {
+  content: "";
+  position: absolute;
+  left: 11px; 
+  top: 0;
+  width: 1px;
+  background-color: rgb(212, 212, 212);
+  height: calc(var(--active-index, 0) * 36px + 18px);
+  z-index: 0;
+}
+
+.is-active-child {
+  position: relative;
+}
+
+.is-active-child::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 18px;
+  width: 6px;
+  height: 1px;
+  background-color: rgb(212, 212, 212);
+  z-index: 1;
+}
+
+/* Remove border from active elements within My Collections */
+.my-collections-children :deep(.layout-link-tree__item--active) {
+  border-left: none !important;
+  margin-left: 0 !important;
 }
 </style>
