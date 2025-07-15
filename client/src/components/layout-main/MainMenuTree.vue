@@ -82,13 +82,13 @@ function handleLinkClick(event: MouseEvent) {
         isActiveItem && 'layout-menu-tree__item--active'
       ]">
       <Button type="button" variant="ghost" v-if="item.children?.length > 0" @click.prevent="open = !open"
-        class="layout-menu-tree__icon-wrapper flex cursor-pointer border-none w-fit p-1.5 hover:bg-neutral-200 relative">
+        class="layout-menu-tree__icon-wrapper flex cursor-pointer border-none w-fit p-1 hover:bg-neutral-200 relative">
         <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4 ml-[0.5px]" />
         <ChevronRight v-else class="w-4 h-4 min-w-4 min-h-4" />
         <!-- Vertical line starts from chevron button -->
         <span v-if="hasActiveChild" class="active-line-start"></span>
       </Button>
-      <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[10px] pl-[18px]" />
+      <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[6px] pl-[14px]" />
       <div class="flex items-center">{{ item.collectionName }}</div>
     </router-link>
     <router-link v-if="item.type === 'page'" :to="{ name: 'page', params: { id: item.pageId } }"
@@ -110,7 +110,7 @@ function handleLinkClick(event: MouseEvent) {
         marginBottom: item.data.spacingBottom ? `${item.data.spacingBottom}px` : '0px',
       }" />
     <div v-if="open || !item.hasAccess" :class="[
-      item.hasAccess && 'pl-4', 
+      item.hasAccess && 'pl-6', 
       'children-container',
       hasActiveChild && 'has-active-child'
     ]" :style="{ '--active-index': activeChildIndex }">
@@ -155,10 +155,10 @@ function handleLinkClick(event: MouseEvent) {
 
 .active-line-start {
   position: absolute;
-  left: 14px;
+  left: 12px;
   bottom: -18px; 
   width: 1px;
-  height: 17px;
+  height: 13px;
   background-color: rgb(212, 212, 212);
   z-index: 1;
 }
@@ -166,7 +166,7 @@ function handleLinkClick(event: MouseEvent) {
 .children-container.has-active-child::before {
   content: "";
   position: absolute;
-  left: 15px; 
+  left: 13px; 
   top: 0;
   width: 1px;
   background-color: rgb(212, 212, 212);
@@ -181,9 +181,9 @@ function handleLinkClick(event: MouseEvent) {
 .is-active-child::before {
   content: "";
   position: absolute;
-  left: -1px;
+  left: -11px;
   top: 22px;
-  width: 8px;
+  width: 14px;
   height: 1px;
   background-color: rgb(212, 212, 212);
   z-index: 1;
