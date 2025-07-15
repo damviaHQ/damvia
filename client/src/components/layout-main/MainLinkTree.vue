@@ -75,7 +75,7 @@ function handleLinkClick(event: MouseEvent) {
 <template>
   <div>
     <router-link :to="{ name: routeName, params: { id: item.id } }" @click.exact="handleLinkClick"
-      active-class="layout-link-tree__item--active border-l-2 ml-[-2px] border-neutral-300 text-neutral-900 font-medium"
+      active-class="layout-link-tree__item--active border-l-2 ml-[-2px] border-transparent text-neutral-900 font-medium"
       class="layout-link-tree__item flex h-9 items-center text-sm no-underline font-medium pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900">
       <Button v-if="item.children?.length > 0" @click.prevent="open = !open" variant="ghost" type="button"
         class="layout-link-tree__icon-wrapper flex cursor-pointer border-none w-fit p-0.5 hover:bg-neutral-200 relative">

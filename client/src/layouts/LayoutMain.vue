@@ -221,10 +221,4 @@ watch([myCollectionsActive], () => {
   background-color: rgb(212, 212, 212);
   z-index: 1;
 }
-
-/* Remove border from active elements within My Collections */
-.my-collections-children :deep(.layout-link-tree__item--active) {
-  border-left: none !important;
-  margin-left: 0 !important;
-}
 </style>
