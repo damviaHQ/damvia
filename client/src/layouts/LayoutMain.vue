@@ -102,7 +102,7 @@ watch([myCollectionsActive], () => {
 
 <template>
   <div class="dashboard-layout flex min-h-screen h-full max-h-screen m-0 pt-[88px] w-full overflow-auto">
-    <div class="dashboard-layout__menu bg-neutral-100 py-6 px-4 w-full max-w-[320px] overflow-y-auto max-h-screen">
+    <div class="dashboard-layout__menu bg-neutral-100 py-6 px-3 w-full max-w-[320px] overflow-y-auto max-h-screen">
       <div v-if="globalStore.user?.role !== 'guest'" class="mb-8 overflow-auto">
         <router-link :to="{ name: 'favorites' }">
           <Button variant="ghost" type="button"
