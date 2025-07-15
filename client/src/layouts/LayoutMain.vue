@@ -136,7 +136,6 @@ watch([myCollectionsActive], () => {
               <ChevronDown v-if="isMyCollectionsTabOpen && myCollections?.length > 0" class="w-4 h-4 min-w-4 min-h-4" />
               <ChevronRight v-else-if="myCollections?.length > 0" class="w-4 h-4 min-w-4 min-h-4" />
               My Collections
-              <!-- Vertical line starts from chevron button -->
               <span v-if="hasActiveCollection" class="active-line-start"></span>
             </Button>
             <Button variant="ghost" type="button" size="icon" @click="isDialogCreateCollectionOpen = true"
@@ -170,27 +169,6 @@ watch([myCollectionsActive], () => {
 </template>
 
 <style scoped lang="scss">
-.dashboard-layout__packshot-finder {
-  display: flex;
-  align-items: center;
-  text-decoration: none;
-  color: var(--primary-color);
-  font-size: 0.9rem;
-  cursor: pointer;
-  padding: 0.5rem 1rem;
-  border-radius: var(--border-radius);
-
-  padding-left: 2.5rem;
-
-  text-decoration: none;
-  cursor: pointer;
-  transition: color 0.2s ease;
-
-  &:hover {
-    background: var(--terniary-color);
-  }
-}
-
 .dashboard-layout__navigation-logo {
   display: block;
   margin: 0 auto 2rem;
@@ -210,8 +188,8 @@ watch([myCollectionsActive], () => {
 
 .active-line-start {
   position: absolute;
-  left: 10px;
-  bottom: -18px; 
+  left: 11px;
+  bottom: -2px; 
   width: 1px;
   height: 13px;
   background-color: rgb(212, 212, 212);
@@ -236,9 +214,9 @@ watch([myCollectionsActive], () => {
 .is-active-child::before {
   content: "";
   position: absolute;
-  left: -4px;
+  left: -1px;
   top: 18px;
-  width: 6px;
+  width: 5px;
   height: 1px;
   background-color: rgb(212, 212, 212);
   z-index: 1;
