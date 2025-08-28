@@ -186,7 +186,7 @@ const searchResults = computed(() =>
   Object.entries(groupBy(search.value?.results ?? [], "assetTypeId")).map(
     ([assetTypeId, results]) => ({
       assetType: assetTypes.value?.find((assetType: any) => assetType.id === assetTypeId),
-      results,
+      results: results.sort((a: any, b: any) => a.name.localeCompare(b.name)),
     })
   )
 )
