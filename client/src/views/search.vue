@@ -53,9 +53,43 @@ const { data: productViews } = useQuery({
   queryKey: ["product-views"],
   queryFn: () => trpc.asset.listProductViews.query(),
 })
-const { data: productFacets } = useQuery({
+const { data: allProductFacets } = useQuery({
   queryKey: ["products", "attributes", "facets"],
   queryFn: () => trpc.productAttribute.listFacets.query(),
+})
+
+const productFacets = computed(() => {
+  if (!allProductFacets.value) {
+    return []
+  }
+
+  return allProductFacets.value.map((facet: any) => {
+    const searchData = searchForFacets.value || search.value
+    if (!searchData?.results || searchData.results.length === 0) {
+      return facet
+    }
+
+    const valuesInResults = new Set<string>()
+    
+    searchData.results.forEach((result: any) => {
+      if (result.product?.attributes) {
+        const attribute = result.product.attributes.find((attr: any) => attr.name === facet.name)
+        if (attribute?.value) {
+          const value = attribute.value
+          if (Array.isArray(value)) {
+            value.forEach(v => valuesInResults.add(v))
+          } else {
+            valuesInResults.add(value)
+          }
+        }
+      }
+    })
+
+    return {
+      ...facet,
+      values: Array.from(valuesInResults)
+    }
+  })
 })
 const { data: collection } = useQuery({
   enabled() {
@@ -73,11 +107,11 @@ const collectionName = computed(() => {
 })
 const assetTypeOptions = computed(() =>
   (assetTypes.value ?? [])
-    .map((assetType) => ({
+    .map((assetType: any) => ({
       label: assetType.name,
       id: assetType.id,
     }))
-    .sort((a, b) => a.label.localeCompare(b.label))
+    .sort((a: {label: string, id: string}, b: {label: string, id: string}) => a.label.localeCompare(b.label))
 )
 const searchScopeOptions = computed(() => {
   const globalOptions = [{ label: "Every collections", id: "all" }]
@@ -97,11 +131,11 @@ const searchScopeOptions = computed(() => {
 })
 const productViewOptions = computed(() =>
   (productViews.value ?? [])
-    .map((productView) => ({
+    .map((productView: any) => ({
       label: productView,
       id: productView,
     }))
-    .sort((a, b) => a.label.localeCompare(b.label))
+    .sort((a: {label: string, id: string}, b: {label: string, id: string}) => a.label.localeCompare(b.label))
 )
 
 function handleRouteQueryArray(
@@ -143,10 +177,15 @@ const { status, data: search, error } = useQuery({
   queryFn: () => trpc.collection.search.query(form.value),
 })
 
+const { data: searchForFacets } = useQuery({
+  queryKey: computed(() => ["search-for-facets", { ...form.value, attributes: {} }]),
+  queryFn: () => trpc.collection.search.query({ ...form.value, attributes: {} }),
+})
+
 const searchResults = computed(() =>
   Object.entries(groupBy(search.value?.results ?? [], "assetTypeId")).map(
     ([assetTypeId, results]) => ({
-      assetType: assetTypes.value?.find((assetType) => assetType.id === assetTypeId),
+      assetType: assetTypes.value?.find((assetType: any) => assetType.id === assetTypeId),
       results,
     })
   )
@@ -360,7 +399,7 @@ function openMemberDialog() {
         <Label>{{ facet.displayName || facet.name }}</Label>
         <treeselect :model-value="form.attributes[facet.id] ?? []" :clearable="true" :multiple="true"
           @update:modelValue="handleSetQuery(`attributes[${facet.id}]`, $event)"
-          :options="facet.values.map((value) => ({ label: value, id: value })).sort((a, b) => a.label.localeCompare(b.label))" placeholder="All"
+          :options="facet.values.map((value: string) => ({ label: value, id: value })).sort((a: {label: string, id: string}, b: {label: string, id: string}) => a.label.localeCompare(b.label))" placeholder="All"
           no-options-text="No options available." />
       </div>
     </div>
