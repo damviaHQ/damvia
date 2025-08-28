@@ -72,10 +72,12 @@ const collectionName = computed(() => {
   return ""
 })
 const assetTypeOptions = computed(() =>
-  (assetTypes.value ?? []).map((assetType) => ({
-    label: assetType.name,
-    id: assetType.id,
-  }))
+  (assetTypes.value ?? [])
+    .map((assetType) => ({
+      label: assetType.name,
+      id: assetType.id,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 )
 const searchScopeOptions = computed(() => {
   const globalOptions = [{ label: "Every collections", id: "all" }]
@@ -94,10 +96,12 @@ const searchScopeOptions = computed(() => {
     : globalOptions
 })
 const productViewOptions = computed(() =>
-  (productViews.value ?? []).map((productView) => ({
-    label: productView,
-    id: productView,
-  }))
+  (productViews.value ?? [])
+    .map((productView) => ({
+      label: productView,
+      id: productView,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 )
 
 function handleRouteQueryArray(
@@ -356,7 +360,7 @@ function openMemberDialog() {
         <Label>{{ facet.displayName || facet.name }}</Label>
         <treeselect :model-value="form.attributes[facet.id] ?? []" :clearable="true" :multiple="true"
           @update:modelValue="handleSetQuery(`attributes[${facet.id}]`, $event)"
-          :options="facet.values.map((value) => ({ label: value, id: value }))" placeholder="All"
+          :options="facet.values.map((value) => ({ label: value, id: value })).sort((a, b) => a.label.localeCompare(b.label))" placeholder="All"
           no-options-text="No options available." />
       </div>
     </div>
