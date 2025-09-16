@@ -19,10 +19,8 @@ import {
 } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials'
 import { DriveItem } from '@microsoft/microsoft-graph-types'
 import { writeFile } from "node:fs/promises"
-import { In, Not } from "typeorm"
-import { AssetFile, AssetFileStatus } from "../entity/asset-file"
-import { AssetFolder, AssetFolderStatus } from "../entity/asset-folder"
-import { dataSource } from "../env"
+import { AssetFile } from "../entity/asset-file"
+import { AssetFolder } from "../entity/asset-folder"
 import { tmpFile, upsertFile, upsertFolder } from "../services/asset"
 import AssetUpdater from "./base"
 
@@ -69,14 +67,18 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 			nextLink = res['@odata.nextLink']
 		}
 
-		await dataSource.getRepository(AssetFolder).update(
-			{ id: Not(In(syncFolderIds)) },
-			{ status: AssetFolderStatus.PENDING_DELETION }
-		)
-		await dataSource.getRepository(AssetFile).update(
-			{ id: Not(In(syncFileIds)) },
-			{ status: AssetFileStatus.PENDING_DELETION }
-		)
+		const [allAssetFolderIds, allAssetFileIds] = await Promise.all([
+			this.getAllAssetFolderIds(),
+			this.getAllAssetFileIds()
+		])
+
+		const assetFolderIdsToDelete = this.arrayDifference(allAssetFolderIds, syncFolderIds)
+		const assetFileIdsToDelete = this.arrayDifference(allAssetFileIds, syncFileIds)
+
+		await Promise.all([
+			this.deleteAssetFoldersInBatches(assetFolderIdsToDelete),
+			this.deleteAssetFilesInBatches(assetFileIdsToDelete)
+		])
 	}
 
 	async fetchFileContent(file: AssetFile): Promise<string> {

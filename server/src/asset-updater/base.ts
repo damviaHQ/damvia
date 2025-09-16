@@ -12,7 +12,10 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { AssetFile } from "../entity/asset-file"
+import { In } from "typeorm"
+import { dataSource } from "../env"
+import { AssetFile, AssetFileStatus } from "../entity/asset-file"
+import { AssetFolder, AssetFolderStatus } from "../entity/asset-folder"
 
 export default class AssetUpdater {
 	async initialize() {
@@ -25,5 +28,48 @@ export default class AssetUpdater {
 
 	async fetchFileContent(file: AssetFile): Promise<string> {
 		throw new Error('Unimplemented')
+	}
+
+	protected async getAllAssetFolderIds(): Promise<string[]> {
+		const result = await dataSource.getRepository(AssetFolder)
+			.createQueryBuilder('folder')
+			.select('folder.id')
+			.getRawMany()
+
+		return result.map(row => row.folder_id)
+	}
+
+	protected async getAllAssetFileIds(): Promise<string[]> {
+		const result = await dataSource.getRepository(AssetFile)
+			.createQueryBuilder('file')
+			.select('file.id')
+			.getRawMany()
+
+		return result.map(row => row.file_id)
+	}
+
+	protected arrayDifference(allIds: string[], keepIds: string[]): string[] {
+		const keepSet = new Set(keepIds)
+		return allIds.filter(id => !keepSet.has(id))
+	}
+
+	protected async deleteAssetFoldersInBatches(idsToDelete: string[], batchSize: number = 1000): Promise<void> {
+		for (let i = 0; i < idsToDelete.length; i += batchSize) {
+			const batch = idsToDelete.slice(i, i + batchSize)
+			await dataSource.getRepository(AssetFolder).update(
+				{ id: In(batch) },
+				{ status: AssetFolderStatus.PENDING_DELETION }
+			)
+		}
+	}
+
+	protected async deleteAssetFilesInBatches(idsToDelete: string[], batchSize: number = 1000): Promise<void> {
+		for (let i = 0; i < idsToDelete.length; i += batchSize) {
+			const batch = idsToDelete.slice(i, i + batchSize)
+			await dataSource.getRepository(AssetFile).update(
+				{ id: In(batch) },
+				{ status: AssetFileStatus.PENDING_DELETION }
+			)
+		}
 	}
 }

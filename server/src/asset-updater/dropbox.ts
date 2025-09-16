@@ -16,10 +16,9 @@ import { Dropbox, DropboxAuth, files } from 'dropbox'
 import { writeFile } from "fs/promises"
 import { lookup } from 'mime-types'
 import path from 'path'
-import { In, Not } from "typeorm"
-import { AssetFile, AssetFileStatus } from "../entity/asset-file"
-import { AssetFolder, AssetFolderStatus } from "../entity/asset-folder"
-import { dataSource, logger } from "../env"
+import { AssetFile } from "../entity/asset-file"
+import { AssetFolder } from "../entity/asset-folder"
+import { logger } from "../env"
 import { tmpFile, upsertFile, upsertFolder } from "../services/asset"
 import AssetUpdater from "./base"
 
@@ -204,14 +203,18 @@ export default class DropboxAssetUpdater extends AssetUpdater {
         }
       }
 
-      await dataSource.getRepository(AssetFolder).update(
-        { id: Not(In(syncFolderIds)) },
-        { status: AssetFolderStatus.PENDING_DELETION }
-      );
-      await dataSource.getRepository(AssetFile).update(
-        { id: Not(In(syncFileIds)) },
-        { status: AssetFileStatus.PENDING_DELETION }
-      );
+      const [allAssetFolderIds, allAssetFileIds] = await Promise.all([
+        this.getAllAssetFolderIds(),
+        this.getAllAssetFileIds()
+      ])
+
+      const assetFolderIdsToDelete = this.arrayDifference(allAssetFolderIds, syncFolderIds)
+      const assetFileIdsToDelete = this.arrayDifference(allAssetFileIds, syncFileIds)
+
+      await Promise.all([
+        this.deleteAssetFoldersInBatches(assetFolderIdsToDelete),
+        this.deleteAssetFilesInBatches(assetFileIdsToDelete)
+      ])
     } catch (error) {
       if (error.status === 401) {
         logger.warn('Dropbox token expired, attempting to refresh');
