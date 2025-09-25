@@ -273,8 +273,8 @@ const table = useVueTable<File>({
                         {{ cell.row.original.name }}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{{ cell.row.original.name }}</p>
+                    <TooltipContent class="max-w-sm">
+                      <p class="whitespace-pre-wrap break-words">{{ cell.row.original.name }}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -307,12 +307,12 @@ const table = useVueTable<File>({
             <TooltipProvider v-else>
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <div class="truncate">
+                  <div class="truncate max-w-xs">
                     {{ cell.getValue() }}
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ cell.getValue() }}</p>
+                <TooltipContent class="max-w-sm">
+                  <p class="whitespace-pre-wrap break-words">{{ cell.getValue() }}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
