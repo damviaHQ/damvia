@@ -281,7 +281,7 @@ export default router({
 				]
 				const fileTypeQueries = {
 					document: `asset_file.mime_type IN (${documentMimeTypes.map((type) => `'${type}'`).join(', ')})`,
-					video: "asset_file.mime_type ILIKE 'video/%'",
+					video: "asset_file.mime_type ILIKE 'video/%' OR asset_file.mime_type = 'application/mp4'",
 					image: "asset_file.mime_type ILIKE 'image/%'",
 				}
 				const queries = input.fileTypes.map((type) => fileTypeQueries[type]).filter((q) => q)
