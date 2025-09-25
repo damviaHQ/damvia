@@ -156,7 +156,7 @@ function goToCollection(collectionId: string) {
           </TableCell>
           <TableCell :class="{ 'opacity-50': isExpired(link) }">
             <Badge v-if="!isExpired(link) && globalStore.user?.role === 'admin'"
-              :class="link.collection.public ? 'bg-amber-500 hover:bg-amber-600' : 'bg-green-500 hover:bg-green-600'">
+              :class="link.collection.public ? 'bg-sky-500 hover:bg-sky-600' : 'bg-green-500 hover:bg-green-600'">
               {{ link.collection.public ? 'Public' : 'Private' }}
             </Badge>
             <Badge v-else-if="isExpired(link)" class="bg-neutral-500 hover:bg-neutral-600">Expired</Badge>

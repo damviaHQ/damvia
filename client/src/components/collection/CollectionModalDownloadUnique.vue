@@ -633,7 +633,7 @@ watch(() => props.modelValue, (newValue) => {
                 { name: 'WEBP', value: 'webp' },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`"
-                  class="border border-amber-400 text-amber-400 min-w-max" />
+                  class="border border-sky-400 text-sky-400 min-w-max" />
                 <Label :for="`image-format-${option.value}`">{{ option.name }}</Label>
               </div>
             </div>
@@ -663,7 +663,7 @@ watch(() => props.modelValue, (newValue) => {
                 },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`image-quality-${option.value}`"
-                  class="border border-amber-400 text-amber-400 min-w-max" />
+                  class="border border-sky-400 text-sky-400 min-w-max" />
                 <div>
                   <Label :for="`image-quality-${option.value}`">{{ option.name }}</Label>
                   <p class="text-sm text-neutral-400">{{ option.description }}</p>
@@ -691,7 +691,7 @@ watch(() => props.modelValue, (newValue) => {
                 },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"
-                  class="border border-amber-400 text-amber-400 min-w-max" />
+                  class="border border-sky-400 text-sky-400 min-w-max" />
                 <div>
                   <Label :for="`download-type-${option.value}`">{{ option.name }}</Label>
                   <p class="text-sm text-neutral-400">{{ option.description }}</p>
@@ -731,12 +731,12 @@ watch(() => props.modelValue, (newValue) => {
             </div>
             <div class="flex items-center py-6 gap-4">
               <Checkbox id="terms" v-model:checked="form.isAcceptingTerms"
-                class="border-amber-400 [&>*]:bg-amber-400 [&>*]:text-neutral-800"
+                class="border-sky-400 [&>*]:bg-sky-400 [&>*]:text-neutral-800"
                 :class="{ 'border-red-500': hasTermsError }" />
               <Label for="terms" class="text-sm leading-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 :class="{
                   'text-red-500': hasTermsError,
-                  'text-amber-400': !hasTermsError && form.isAcceptingTerms,
+                  'text-sky-400': !hasTermsError && form.isAcceptingTerms,
                 }">
                 By downloading this asset, I hereby agree to respect the Asset Usage
                 Licensing Agreement.
@@ -746,13 +746,13 @@ watch(() => props.modelValue, (newValue) => {
         </div>
         <div>
           <Button @click="download"
-            class="w-full text-neutral-800 ring-amber-400 hover:text-neutral-900 hover:bg-amber-500 hover:ring-amber-400 bg-amber-400"
+            class="w-full text-neutral-800 ring-sky-400 hover:text-neutral-900 hover:bg-sky-500 hover:ring-sky-400 bg-sky-400"
             :class="{
-              'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-amber-400 hover:text-amber-400 hover:bg-neutral-800': hasLicense && !form.isAcceptingTerms,
+              'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-sky-400 hover:text-sky-400 hover:bg-neutral-800': hasLicense && !form.isAcceptingTerms,
             }" :disabled="isLoading">
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>
-          <div :class="{ '!text-neutral-200': hasLicense && !form.isAcceptingTerms }" class="text-sm text-amber-400 mt-2">
+          <div :class="{ '!text-neutral-200': hasLicense && !form.isAcceptingTerms }" class="text-sm text-sky-400 mt-2">
             Total Size: {{ formatFileSize(currentFile.size) }}
           </div>
         </div>

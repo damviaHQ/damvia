@@ -1,4 +1,4 @@
-version: '3'
+name: damvia-preview
 services:
   postgres:
     image: postgres:15
