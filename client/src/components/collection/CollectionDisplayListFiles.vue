@@ -51,6 +51,12 @@ const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
 const currentCollectionFileId = ref<string | null>(null)
 const hoveredRowId = ref<string | null>(null)
+const copiedCellId = ref<string | null>(null)
+
+function isTextTruncated(element: HTMLElement | null): boolean {
+  if (!element) return false
+  return element.scrollWidth > element.clientWidth
+}
 const haveAccessToFavorites = globalStore.user?.role !== "guest"
 const { data: favorites } = useQuery({
   queryKey: ["favorites"],
@@ -136,6 +142,18 @@ async function remove(file: File) {
     })
   } catch (error) {
     toast.error((error as Error).message)
+  }
+}
+
+async function copyToClipboard(text: string, cellId: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    copiedCellId.value = cellId
+    setTimeout(() => {
+      copiedCellId.value = null
+    }, 1500)
+  } catch (error) {
+    console.error("Failed to copy to clipboard:", error)
   }
 }
 
@@ -269,11 +287,21 @@ const table = useVueTable<File>({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <div class="collection-list-files__filename max-w-[400px] truncate">
-                        {{ cell.row.original.name }}
+                      <div class="relative">
+                        <div
+                          ref="filenameRef"
+                          class="collection-list-files__filename max-w-[400px] truncate cursor-pointer"
+                          @click.stop="copyToClipboard(cell.row.original.name, `${cell.row.id}-filename`)"
+                        >
+                          {{ cell.row.original.name }}
+                        </div>
+                        <div v-if="copiedCellId === `${cell.row.id}-filename`"
+                             class="absolute -top-8 left-0 text-xs text-neutral-500 bg-white px-2 py-1 rounded shadow-sm border border-neutral-200 z-20 copied-indicator">
+                          copied
+                        </div>
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent class="max-w-sm">
+                    <TooltipContent v-if="cell.row.original.name.length > 50" class="max-w-sm">
                       <p class="whitespace-pre-wrap break-words">{{ cell.row.original.name }}</p>
                     </TooltipContent>
                   </Tooltip>
@@ -304,14 +332,23 @@ const table = useVueTable<File>({
                 </Button>
               </div>
             </div>
-            <TooltipProvider v-else>
+            <TooltipProvider v-else-if="cell.column.id !== 'actions'">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <div class="truncate max-w-xs">
-                    {{ cell.getValue() }}
+                  <div class="relative">
+                    <div
+                      class="truncate max-w-xs cursor-pointer"
+                      @click="copyToClipboard(String(cell.getValue() || ''), `${cell.row.id}-${cell.column.id}`)"
+                    >
+                      {{ cell.getValue() }}
+                    </div>
+                    <div v-if="copiedCellId === `${cell.row.id}-${cell.column.id}`"
+                         class="absolute -top-8 left-0 text-xs text-neutral-500 bg-white px-2 py-1 rounded shadow-sm border border-neutral-200 z-20 copied-indicator">
+                      copied
+                    </div>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent class="max-w-sm">
+                <TooltipContent v-if="String(cell.getValue() || '').length > 30" class="max-w-sm">
                   <p class="whitespace-pre-wrap break-words">{{ cell.getValue() }}</p>
                 </TooltipContent>
               </Tooltip>
@@ -451,5 +488,28 @@ tr:hover .collection-list-files__button.visible-on-hover {
   z-index: 1;
   display: flex;
   align-items: center;
+}
+
+.copied-indicator {
+  animation: fadeInOut 1.5s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.8);
+  }
 }
 </style>
