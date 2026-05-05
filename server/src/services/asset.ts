@@ -61,43 +61,61 @@ export async function tmpFile() {
 }
 
 export async function updateFileContent(file: AssetFile): Promise<void> {
-	const contentPath = await assetUpdater().fetchFileContent(file)
-	const { fileTypeFromFile } = await fileTypeModule
-	const fileType = await fileTypeFromFile(contentPath)
-	file.mimeType = fileType?.ext === 'webp' ? 'image/webp' : (fileType?.mime ?? 'application/octet-stream')
-	await assetsS3().fPutObject(assetsS3Bucket(), file.originalStorageKey, contentPath, { 'Content-Type': file.mimeType })
-
-	let thumbnailPath = null
+	const contentPath = await assetUpdater().fetchFileContent(file).catch((error) => {
+		throw new Error(`Failed to fetch file content (asset file id: ${file.id}): ${error.message}`)
+	})
 	try {
-		thumbnailPath = await generateFileThumbnail(file, contentPath)
-		if (thumbnailPath) {
-			await assetsS3().fPutObject(assetsS3Bucket(), file.thumbnailStorageKey, thumbnailPath, { 'Content-Type': 'image/webp' })
-			if (!file.hasThumbnail) {
-				file.hasThumbnail = true
+		const { fileTypeFromFile } = await fileTypeModule
+		const fileType = await fileTypeFromFile(contentPath).catch(
+			(error) => Promise.reject(
+				new Error(`Failed to detect file type (asset file id: ${file.id}): ${error.message}`),
+			),
+		)
+		file.mimeType = fileType?.ext === 'webp' ? 'image/webp' : (fileType?.mime ?? 'application/octet-stream')
+
+		await assetsS3().fPutObject(assetsS3Bucket(), file.originalStorageKey, contentPath, {
+			'Content-Type': file.mimeType,
+		}).catch((error) => {
+			logger.error(`Failed to upload file to S3 (asset file id: ${file.id}): ${error.message}`)
+		})
+
+		let thumbnailPath = null
+		try {
+			thumbnailPath = await generateFileThumbnail(file, contentPath)
+			if (thumbnailPath) {
+				await assetsS3().fPutObject(assetsS3Bucket(), file.thumbnailStorageKey, thumbnailPath, {
+					'Content-Type': 'image/webp',
+				})
+				if (!file.hasThumbnail) {
+					file.hasThumbnail = true
+				}
+			} else if (file.hasThumbnail) {
+				file.hasThumbnail = false
+				await assetsS3().removeObjects(assetsS3Bucket(), [file.thumbnailStorageKey])
 			}
-		} else if (file.hasThumbnail) {
-			file.hasThumbnail = false
-			await assetsS3().removeObjects(assetsS3Bucket(), [file.thumbnailStorageKey])
+		} catch (error) {
 		}
-	} catch (error) {
-	}
 
-	try {
-		const dimensions = await extractDimensions(file, contentPath)
-		if (dimensions) {
-			file.width = dimensions.width
-			file.height = dimensions.height
+		try {
+			const dimensions = await extractDimensions(file, contentPath)
+			if (dimensions) {
+				file.width = dimensions.width
+				file.height = dimensions.height
+			}
+		} catch (error) {
 		}
-	} catch (error) {
-	}
 
-	file.status = AssetFileStatus.UP_TO_DATE
-	await dataSource.getRepository(AssetFile).save(file)
+		file.status = AssetFileStatus.UP_TO_DATE
+		await dataSource.getRepository(AssetFile).save(file)
 
-	if (thumbnailPath) {
-		rm(thumbnailPath).catch((error) => logger.error("Failed to delete thumbnail", { error: error.message }))
+		if (thumbnailPath) {
+			rm(thumbnailPath).catch(
+				(error) => logger.error("Failed to delete thumbnail", { error: error.message }),
+			)
+		}
+	} finally {
+		rm(contentPath).catch((error) => logger.error("Failed to delete file", { error: error.message }))
 	}
-	rm(contentPath).catch((error) => logger.error("Failed to delete file", { error: error.message }))
 }
 
 export async function generateFileThumbnail(file: AssetFile, contentPath: string): Promise<string | null> {

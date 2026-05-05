@@ -18,7 +18,7 @@ import {
 	TokenCredentialAuthenticationProvider
 } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials'
 import { DriveItem } from '@microsoft/microsoft-graph-types'
-import { writeFile } from "node:fs/promises"
+import { writeFile, rm as removeFile } from "node:fs/promises"
 import { AssetFile } from "../entity/asset-file"
 import { AssetFolder } from "../entity/asset-folder"
 import { tmpFile, upsertFile, upsertFolder } from "../services/asset"
@@ -82,10 +82,15 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 	}
 
 	async fetchFileContent(file: AssetFile): Promise<string> {
-		const stream = await this.graphClient.api(`/users/${this.user}/drive/items/${file.externalId}/content`).getStream()
 		const originalFilePath = await tmpFile()
-		await writeFile(originalFilePath, stream)
-		return originalFilePath
+		try {
+			const stream = await this.graphClient.api(`/users/${this.user}/drive/items/${file.externalId}/content`).getStream()
+			await writeFile(originalFilePath, stream)
+			return originalFilePath
+		} catch (error) {
+			await removeFile(originalFilePath)
+			throw error
+		}
 	}
 
 	private async upsertItem(item: DriveItem): Promise<AssetFolder | AssetFile> {
