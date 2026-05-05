@@ -66,11 +66,10 @@ export async function updateFileContent(file: AssetFile): Promise<void> {
 	})
 	try {
 		const { fileTypeFromFile } = await fileTypeModule
-		const fileType = await fileTypeFromFile(contentPath).catch(
-			(error) => Promise.reject(
-				new Error(`Failed to detect file type (asset file id: ${file.id}): ${error.message}`),
-			),
-		)
+		const fileType = await fileTypeFromFile(contentPath).catch((error) => {
+			logger.error(`Failed to detect file type (asset file id: ${file.id}): ${error.message}`)
+			return null;
+		})
 		file.mimeType = fileType?.ext === 'webp' ? 'image/webp' : (fileType?.mime ?? 'application/octet-stream')
 
 		await assetsS3().fPutObject(assetsS3Bucket(), file.originalStorageKey, contentPath, {
