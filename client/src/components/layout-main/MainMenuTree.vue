@@ -14,6 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useIsTruncated } from "@/composables/useIsTruncated"
 import { RouterOutput } from "@/services/server.ts"
 import { sortBy } from "lodash"
 import { ChevronDown, ChevronRight } from "lucide-vue-next"
@@ -23,6 +25,17 @@ type MenuItem = RouterOutput["menuItem"]["list"][number]
 
 const props = defineProps<{ routeName: string; item: MenuItem; openItems: string[] }>()
 const open = ref(props.openItems.includes(props.item.collectionId))
+
+const labelRef = ref<HTMLElement | null>(null)
+const { isTruncated, check } = useIsTruncated()
+const tooltipOpen = ref(false)
+function onRowEnter() {
+  check(labelRef.value)
+  if (isTruncated.value) tooltipOpen.value = true
+}
+function onRowLeave() {
+  tooltipOpen.value = false
+}
 
 const sortedChildren = computed(() => {
   if (!props.item.children) {
@@ -75,35 +88,45 @@ function handleLinkClick(event: MouseEvent) {
 
 <template>
   <div class="layout-link-tree__wrapper">
-    <router-link v-if="item.type === 'collection' && item.hasAccess" :to="{ name: routeName, params: { id: item.collectionId } }"
-      @click.exact="handleLinkClick"
-      :class="[
-        'layout-menu-tree__item flex h-9 items-center text-sm no-underline font-medium pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
-        isActiveItem && 'layout-menu-tree__item--active'
-      ]">
-      <Button type="button" variant="ghost" v-if="item.children?.length > 0" @click.prevent="open = !open"
-        class="layout-menu-tree__icon-wrapper flex cursor-pointer border-none w-fit p-0.5 hover:bg-neutral-200 relative">
-        <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4 ml-[0.5px]" />
-        <ChevronRight v-else class="w-4 h-4 min-w-4 min-h-4" />
-        <!-- Vertical line starts from chevron button -->
-        <span v-if="hasActiveChild" class="active-line-start"></span>
-      </Button>
-      <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[3px]" />
-      <div class="flex items-center">{{ item.collectionName }}</div>
-    </router-link>
-    <router-link v-if="item.type === 'page'" :to="{ name: 'page', params: { id: item.pageId } }"
-      @click.exact="handleLinkClick"
-      :class="[
-        'layout-menu-tree__item flex h-9 items-center text-sm no-underline pl-[5px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900',
-        isActiveItem ? 'layout-menu-tree__item--active' : ''
-      ]">
-      <div class="h-4 w-4 min-w-4 min-h-4" />
-      <div class="flex items-center">{{ item.pageName }}</div>
-    </router-link>
-    <a v-if="item.type === 'text'" :href="item.data?.url" :target="item.data?.external ? '_blank' : '_self'"
-      class="layout-link-tree__link" :class="!item.data?.url && 'pointer-events-none'">
-      <div class="flex items-center pl-[14px]">{{ item.data?.text }}</div>
-    </a>
+    <Tooltip v-if="(item.type === 'collection' && item.hasAccess) || item.type === 'page' || item.type === 'text'"
+      :open="tooltipOpen">
+      <TooltipTrigger as-child>
+        <router-link v-if="item.type === 'collection' && item.hasAccess" :to="{ name: routeName, params: { id: item.collectionId } }"
+          @click.exact="handleLinkClick" @mouseenter="onRowEnter" @mouseleave="onRowLeave"
+          :class="[
+            'layout-menu-tree__item flex h-9 items-center text-sm no-underline font-medium pl-[1px] pr-2 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 min-w-0',
+            isActiveItem && 'layout-menu-tree__item--active'
+          ]">
+          <Button type="button" variant="ghost" v-if="item.children?.length > 0" @click.prevent="open = !open"
+            class="layout-menu-tree__icon-wrapper flex cursor-pointer border-none w-fit p-0.5 hover:bg-neutral-200 relative shrink-0">
+            <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4 ml-[0.5px]" />
+            <ChevronRight v-else class="w-4 h-4 min-w-4 min-h-4" />
+            <!-- Vertical line starts from chevron button -->
+            <span v-if="hasActiveChild" class="active-line-start"></span>
+          </Button>
+          <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[3px] shrink-0" />
+          <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.collectionName }}</div>
+        </router-link>
+        <router-link v-else-if="item.type === 'page'" :to="{ name: 'page', params: { id: item.pageId } }"
+          @click.exact="handleLinkClick" @mouseenter="onRowEnter" @mouseleave="onRowLeave"
+          :class="[
+            'layout-menu-tree__item flex h-9 items-center text-sm no-underline pl-[5px] pr-2 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 min-w-0',
+            isActiveItem ? 'layout-menu-tree__item--active' : ''
+          ]">
+          <div class="h-4 w-4 min-w-4 min-h-4 shrink-0" />
+          <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.pageName }}</div>
+        </router-link>
+        <a v-else-if="item.type === 'text'" :href="item.data?.url" :target="item.data?.external ? '_blank' : '_self'"
+          @mouseenter="onRowEnter" @mouseleave="onRowLeave"
+          class="layout-link-tree__link min-w-0" :class="!item.data?.url && 'pointer-events-none'">
+          <div ref="labelRef" class="truncate min-w-0 flex-1 pl-[14px]">{{ item.data?.text }}</div>
+        </a>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="start" :side-offset="6" :align-offset="-2"
+        class="bg-white text-neutral-900 text-sm font-medium border-neutral-200 shadow-md px-2 py-1.5 rounded-md max-w-[480px]">
+        {{ item.type === 'collection' ? item.collectionName : item.type === 'page' ? item.pageName : item.data?.text }}
+      </TooltipContent>
+    </Tooltip>
     <div v-if="item.type === 'divider'"
       :class="['h-px', item.data.border ? 'bg-neutral-400' : 'bg-transparent', 'divider']" :style="{
         marginTop: item.data.spacingTop ? `${item.data.spacingTop}px` : '0px',

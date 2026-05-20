@@ -14,12 +14,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useIsTruncated } from "@/composables/useIsTruncated"
 import { ChevronDown, ChevronRight } from "lucide-vue-next"
 import { computed, ref, watch } from "vue"
 
 type Item = { id: string; name: string; children: Item[] }
 const props = defineProps<{ routeName: string; item: Item; openItems: string[] }>()
 const open = ref(props.openItems.includes(props.item.id))
+
+const labelRef = ref<HTMLElement | null>(null)
+const { isTruncated, check } = useIsTruncated()
+const tooltipOpen = ref(false)
+function onRowEnter() {
+  check(labelRef.value)
+  if (isTruncated.value) tooltipOpen.value = true
+}
+function onRowLeave() {
+  tooltipOpen.value = false
+}
 
 const activeChildIndex = computed(() => {
   if (!sortedChildren.value.length || !open.value) return -1
@@ -74,19 +87,28 @@ function handleLinkClick(event: MouseEvent) {
 
 <template>
   <div>
-    <router-link :to="{ name: routeName, params: { id: item.id } }" @click.exact="handleLinkClick"
-      active-class="layout-link-tree__item--active border-l-2 ml-[-2px] border-transparent text-neutral-900 font-medium"
-      class="layout-link-tree__item flex h-9 items-center text-sm no-underline font-medium pl-[1px] text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900">
-      <Button v-if="item.children?.length > 0" @click.prevent="open = !open" variant="ghost" type="button"
-        class="layout-link-tree__icon-wrapper flex cursor-pointer border-none w-fit p-0.5 hover:bg-neutral-200 relative">
-        <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4 ml-[0.5px]" />
-        <ChevronRight v-else class="w-4 h-4 min-w-4 min-h-4" />
-        <!-- Vertical line starts from chevron button -->
-        <span v-if="hasActiveChild" class="active-line-start"></span>
-      </Button>
-      <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[2px]" />
-      <div class="flex items-center">{{ item.name }}</div>
-    </router-link>
+    <Tooltip :open="tooltipOpen">
+      <TooltipTrigger as-child>
+        <router-link :to="{ name: routeName, params: { id: item.id } }" @click.exact="handleLinkClick"
+          @mouseenter="onRowEnter" @mouseleave="onRowLeave"
+          active-class="layout-link-tree__item--active border-l-2 ml-[-2px] border-transparent text-neutral-900 font-medium"
+          class="layout-link-tree__item flex h-9 items-center text-sm no-underline font-medium pl-[1px] pr-2 text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900 min-w-0">
+          <Button v-if="item.children?.length > 0" @click.prevent="open = !open" variant="ghost" type="button"
+            class="layout-link-tree__icon-wrapper flex cursor-pointer border-none w-fit p-0.5 hover:bg-neutral-200 relative shrink-0">
+            <ChevronDown v-if="open" class="w-4 h-4 min-w-4 min-h-4 ml-[0.5px]" />
+            <ChevronRight v-else class="w-4 h-4 min-w-4 min-h-4" />
+            <!-- Vertical line starts from chevron button -->
+            <span v-if="hasActiveChild" class="active-line-start"></span>
+          </Button>
+          <div v-else class="w-4 h-4 min-w-4 min-h-4 mr-[2px] shrink-0" />
+          <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.name }}</div>
+        </router-link>
+      </TooltipTrigger>
+      <TooltipContent side="right" align="start" :side-offset="6" :align-offset="-2"
+        class="bg-white text-neutral-900 text-sm font-medium border-neutral-200 shadow-md px-2 py-1.5 rounded-md max-w-[480px]">
+        {{ item.name }}
+      </TooltipContent>
+    </Tooltip>
     <div v-if="open" :class="[
       'pl-4',
       'children-container',

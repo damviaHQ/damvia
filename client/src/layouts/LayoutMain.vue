@@ -18,13 +18,63 @@ import MainLinkTree from "@/components/layout-main/MainLinkTree.vue"
 import MainMenuTree from "@/components/layout-main/MainMenuTree.vue"
 import MainTopbar from "@/components/layout-main/MainTopbar.vue"
 import { Button } from "@/components/ui/button"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
 import { sortBy } from "lodash"
 import { ChevronDown, ChevronRight, CirclePlus } from "lucide-vue-next"
-import { computed, ref, watch } from "vue"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
+
+const SIDEBAR_WIDTH_KEY = "damvia.sidebarWidth"
+const SIDEBAR_MIN = 240
+const SIDEBAR_MAX = 600
+const SIDEBAR_DEFAULT = 320
+
+function readStoredWidth(): number {
+  const raw = typeof localStorage !== "undefined" ? localStorage.getItem(SIDEBAR_WIDTH_KEY) : null
+  const parsed = raw ? parseInt(raw, 10) : NaN
+  if (Number.isFinite(parsed)) {
+    return Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, parsed))
+  }
+  return SIDEBAR_DEFAULT
+}
+
+const sidebarWidth = ref<number>(readStoredWidth())
+const isResizing = ref<boolean>(false)
+
+function onResizeMove(e: MouseEvent) {
+  if (!isResizing.value) return
+  const next = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, e.clientX))
+  sidebarWidth.value = next
+}
+
+function onResizeEnd() {
+  if (!isResizing.value) return
+  isResizing.value = false
+  document.body.style.cursor = ""
+  document.body.style.userSelect = ""
+  document.removeEventListener("mousemove", onResizeMove)
+  document.removeEventListener("mouseup", onResizeEnd)
+  try {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth.value))
+  } catch (_) { /* storage unavailable */ }
+}
+
+function startResize(e: MouseEvent) {
+  e.preventDefault()
+  isResizing.value = true
+  document.body.style.cursor = "col-resize"
+  document.body.style.userSelect = "none"
+  document.addEventListener("mousemove", onResizeMove)
+  document.addEventListener("mouseup", onResizeEnd)
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener("mousemove", onResizeMove)
+  document.removeEventListener("mouseup", onResizeEnd)
+})
 
 const route = useRoute()
 const isDialogCreateCollectionOpen = ref<boolean>(false)
@@ -185,7 +235,11 @@ watch([myCollectionsActive], () => {
 
 <template>
   <div class="dashboard-layout flex min-h-screen h-full max-h-screen m-0 pt-[88px] w-full overflow-auto">
-    <div class="dashboard-layout__menu bg-neutral-100 py-6 px-3 w-full max-w-[320px] overflow-y-auto max-h-screen">
+    <TooltipProvider :delay-duration="0" :disable-hoverable-content="true">
+    <div class="dashboard-layout__menu relative bg-neutral-100 py-6 px-3 overflow-y-auto max-h-screen shrink-0"
+      :style="{ width: sidebarWidth + 'px' }">
+      <div class="dashboard-layout__resizer" @mousedown="startResize"
+        :class="{ 'dashboard-layout__resizer--active': isResizing }" />
       <div v-if="globalStore.user?.role !== 'guest'" class="mb-8 overflow-auto">
         <router-link :to="{ name: 'favorites' }">
           <Button variant="ghost" type="button"
@@ -226,7 +280,8 @@ watch([myCollectionsActive], () => {
       <MainMenuTree v-else-if="menuItems" v-for="item in sortBy(menuItems, 'position')" :key="item.id" :item="item"
         :open-items="openCollections ?? []" route-name="collection" />
     </div>
-    <div class="w-full overflow-auto p-2">
+    </TooltipProvider>
+    <div class="w-full overflow-auto p-2 min-w-0">
       <MainTopbar />
       <slot></slot>
     </div>
@@ -240,6 +295,24 @@ watch([myCollectionsActive], () => {
   margin: 0 auto 2rem;
   width: 132px;
   height: auto;
+}
+
+.dashboard-layout__resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+  z-index: 10;
+  user-select: none;
+
+  &:hover,
+  &--active {
+    background-color: rgb(212, 212, 212);
+  }
 }
 
 .my-collections-wrapper {
