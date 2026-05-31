@@ -309,6 +309,7 @@ export async function deleteFolder(folderId: string): Promise<void> {
 		where: { id: folderId },
 		relations: ['children', 'files'],
 	})
+	if (!folder) return
 	for (const child of folder.children) {
 		await deleteFolder(child.id)
 	}
@@ -377,6 +378,7 @@ export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
 
 export async function deleteFile(fileId: string): Promise<void> {
 	const file = await dataSource.getRepository(AssetFile).findOneBy({ id: fileId })
+	if (!file) return
 	await dataSource.transaction(async (em) => {
 		await em.getRepository(CollectionFile).delete({ assetFileId: file.id })
 		await em.getRepository(AssetFile).remove(file)
