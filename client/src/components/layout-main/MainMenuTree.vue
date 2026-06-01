@@ -75,7 +75,9 @@ watch(
 function handleLinkClick(event: MouseEvent) {
   const isClickRelatedToArrow = event
     .composedPath()
-    .some((el) => (el as HTMLDivElement).classList?.contains("h-4 w-4-wrapper"))
+    .some((el) =>
+      (el as HTMLDivElement).classList?.contains("layout-menu-tree__icon-wrapper")
+    )
   if (
     props.openItems[props.openItems.length - 1] === props.item.collectionId &&
     !isClickRelatedToArrow
