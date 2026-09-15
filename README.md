@@ -22,12 +22,14 @@ The full documentation (installation, configuration, integrations, deployment, a
 ## Quick Setup Guide
 
 1. Clone the repository:
+
    ```
    git clone https://github.com/damviaHQ/damvia.git
    cd damvia
    ```
 
 2. Install dependencies:
+
    ```
    cd server && npm install
    cd ../client && npm install
@@ -77,4 +79,4 @@ Damvia is released under the [GNU Affero General Public License v3.0](https://gi
 
 ---
 
-Developed with ❤️ by [Mon Agence Créative](https://www.monagencecreative.com)
+Developed with ❤️ by [Hive Horizon](https://www.hivehorizon.com)
