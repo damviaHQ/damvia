@@ -7,6 +7,7 @@ function resolveColor(value, fallback) {
   const color = (value || fallback).trim()
   const match = color.match(/^([a-z]+)-(\d{2,3})$/)
   if (match && twColors[match[1]]?.[match[2]]) return twColors[match[1]][match[2]]
+  if (/^[0-9a-f]{3,8}$/i.test(color)) return `#${color}`
   return color
 }
 

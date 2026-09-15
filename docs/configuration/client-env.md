@@ -3,7 +3,7 @@ title: Client configuration
 description: "The client has four build-time variables: the API endpoint and three brand colours."
 sidebar:
   order: 3
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The client is a static bundle built by Vite. Its configuration is read when you run `npm run dev` or `npm run build`, and the values end up inside the JavaScript. Changing `client/.env` on a running dev server has no effect until it restarts; changing it in production means rebuilding and redeploying the bundle.
@@ -13,7 +13,8 @@ Copy `client/.env.template` to `client/.env`:
 ```bash
 VITE_API_ENDPOINT=http://localhost:3000/trpc
 
-# Brand color: a Tailwind color name (red-500) or any CSS color (#e11d48).
+# Brand color: a Tailwind color name (red-500) or a hex color without # (e11d48).
+# "#" starts a comment in .env files: write "#e11d48" in quotes or drop the #.
 # Defaults: sky-400 / sky-500 / sky-600. Restart dev server or rebuild after changing.
 VITE_BRAND_COLOR=
 VITE_BRAND_COLOR_HOVER=
@@ -31,7 +32,10 @@ The three `VITE_BRAND_COLOR*` variables define the `brand` colour family in `cli
 | Form | Example | Resolved as |
 |---|---|---|
 | Tailwind colour name and shade | `red-500`, `emerald-600` | The hex value from Tailwind's default palette. |
-| Any CSS colour | `#e11d48`, `rgb(225 29 72)`, `hsl(346 77% 50%)` | Used verbatim. |
+| Hex without `#` | `e11d48`, `777` | Prefixed with `#`. |
+| Any other CSS colour | `"#e11d48"`, `rgb(225 29 72)`, `hsl(346 77% 50%)` | Used verbatim. |
+
+`#` starts a comment in a `.env` file, so an unquoted `VITE_BRAND_COLOR=#e11d48` is read as empty and the default sky colour is used. Quote it or drop the `#`.
 
 | Variable | Default | Where it shows |
 |---|---|---|

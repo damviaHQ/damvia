@@ -3,7 +3,7 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
@@ -81,7 +81,7 @@ Client variables are read by Vite **at build time** and baked into the bundle. C
 | Variable | Default | Purpose |
 |---|---|---|
 | `VITE_API_ENDPOINT` | `http://localhost:3000/trpc` | Full URL of the server's tRPC endpoint, that is `API_URL` plus `/trpc`. |
-| `VITE_BRAND_COLOR` | `sky-400` | Accent colour. A Tailwind colour name (`red-500`) or any CSS colour (`#e11d48`). |
+| `VITE_BRAND_COLOR` | `sky-400` | Accent colour. A Tailwind colour name (`red-500`) or a hex colour without `#` (`e11d48`). `#` starts a comment in `.env`, so `#e11d48` needs quotes. |
 | `VITE_BRAND_COLOR_HOVER` | `sky-500` | Hover shade of the accent. |
 | `VITE_BRAND_COLOR_STRONG` | `sky-600` | Strong shade of the accent, used for emphasis text. |
 
