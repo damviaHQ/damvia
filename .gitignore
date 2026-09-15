@@ -22,3 +22,4 @@ dist-ssr
 *.iml
 .env.*
 !.env.template
+/server/plans
