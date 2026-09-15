@@ -8,6 +8,10 @@ Damvia is an open-source Digital Asset Management (DAM) solution that works nati
 - **Interactive Folder Pages**: Transform folders into rich, visual asset collections
 - **Advanced Search**: Find assets quickly using product metadata
 
+## Documentation
+
+The full documentation (installation, configuration, integrations, deployment, administration, reference) lives in [`docs/`](docs/README.md) and is published on the Damvia website.
+
 ## Installation Requirements
 
 - Dedicated Server
@@ -19,7 +23,7 @@ Damvia is an open-source Digital Asset Management (DAM) solution that works nati
 
 1. Clone the repository:
    ```
-   git clone https://github.com/your-username/damvia.git
+   git clone https://github.com/damviaHQ/damvia.git
    cd damvia
    ```
 
@@ -30,7 +34,7 @@ Damvia is an open-source Digital Asset Management (DAM) solution that works nati
    ```
 
 3. Configure environment variables:
-   - Copy `.env.example` to `.env` in both `/server` and `/client` directories
+   - Copy `.env.template` to `.env` in both `/server` and `/client` directories
    - Update the `.env` files with your settings, including:
      - PRODUCT_MATCHING_REGEX
      - SMTP configuration
@@ -59,6 +63,13 @@ Damvia is an open-source Digital Asset Management (DAM) solution that works nati
    docker-compose up -d
    npm run dev
    ```
+
+7. Start the client in a second terminal:
+   ```
+   cd client
+   npm run dev
+   ```
+   Then open http://localhost:5173. See [docs/getting-started/first-admin.md](docs/getting-started/first-admin.md) to create the first administrator.
 
 ## License
 

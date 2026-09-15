@@ -1,0 +1,24 @@
+---
+title: Configuration
+description: Damvia is configured almost entirely through environment variables; this group explains them by concern.
+sidebar:
+  order: 1
+lastUpdated: 2026-09-15
+---
+
+There is no settings database and no config file besides the two `.env` files and the mail templates. Everything an instance needs is an environment variable read once at startup, which makes an instance reproducible from its `.env` and its database.
+
+The single exception is the login background image, which an admin uploads from `/admin/settings` and which is stored in the main S3 bucket, not in configuration.
+
+| Page | Covers |
+|---|---|
+| [Server configuration](./server-env.md) | The server's `.env`, group by group: application URLs and secret, database, storage, mail, cloud sync, PIM. |
+| [Client configuration](./client-env.md) | The client's build-time variables: API endpoint and brand colours. |
+| [Email templates](./email-templates.md) | The `mailconfig.json` format, the seven templates and the variables each can use. |
+| [Branding](./branding.md) | Everything that changes the look: app name, colours, login background, logo and favicon. |
+
+The exhaustive table with defaults is [Environment variables](../reference/environment-variables.md). Provider setup (Dropbox app, Azure registration, SMTP, buckets) is in [Integrations](../integrations/index.md).
+
+:::caution
+Two defaults are safe on a laptop and dangerous on a server: `APP_SECRET` (signs every session token) and the MinIO credentials in `MAIN_S3_URL` / `ASSETS_S3_URL`. Change both before exposing an instance.
+:::
