@@ -103,7 +103,7 @@ function openDialog(type: "add" | "edit") {
           <FilePenLine v-if="item.type === 'page'" class="w-4 h-4" />
           <LetterText v-if="item.type === 'text'" class="w-4 h-4" />
           <Folder v-if="item.type === 'collection' && !item.synchronized" class="w-4 h-4 text-neutral-600" />
-          <IconCloudSync v-if="item.type === 'collection' && item.synchronized" class="!w-8 !h-8 text-sky-600" />
+          <IconCloudSync v-if="item.type === 'collection' && item.synchronized" class="!w-8 !h-8 text-brand-strong" />
         </div>
       </div>
       <div @click="isOpen = !isOpen" class="flex w-full min-w-[20rem] items-center">

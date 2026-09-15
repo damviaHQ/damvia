@@ -1,4 +1,14 @@
+const path = require("node:path")
 const animate = require("tailwindcss-animate")
+const twColors = require("tailwindcss/colors")
+require("dotenv").config({ path: path.join(__dirname, ".env"), quiet: true })
+
+function resolveColor(value, fallback) {
+  const color = (value || fallback).trim()
+  const match = color.match(/^([a-z]+)-(\d{2,3})$/)
+  if (match && twColors[match[1]]?.[match[2]]) return twColors[match[1]][match[2]]
+  return color
+}
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -25,6 +35,11 @@ module.exports = {
     },
     extend: {
       colors: {
+        brand: {
+          DEFAULT: resolveColor(process.env.VITE_BRAND_COLOR, "sky-400"),
+          hover: resolveColor(process.env.VITE_BRAND_COLOR_HOVER, "sky-500"),
+          strong: resolveColor(process.env.VITE_BRAND_COLOR_STRONG, "sky-600"),
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
