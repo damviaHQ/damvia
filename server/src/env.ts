@@ -139,6 +139,7 @@ export function assetUpdater(): AssetUpdater {
         process.env.DROPBOX_APP_KEY,
         process.env.DROPBOX_APP_SECRET,
         process.env.DROPBOX_REFRESH_TOKEN,
+        process.env.DROPBOX_USE_TEAM_ROOT === 'true',
       )
     } else if (process.env.ASSET_UPDATER === 'onedrive') {
       _assetUpdater = new OneDriveAssetUpdater(

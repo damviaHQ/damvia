@@ -30,6 +30,7 @@ export default class DropboxAssetUpdater extends AssetUpdater {
     private readonly appKey: string,
     private readonly appSecret: string,
     private readonly refreshToken: string,
+    private readonly useTeamRoot = false,
   ) {
     super()
     this.auth = new DropboxAuth({
@@ -47,6 +48,23 @@ export default class DropboxAssetUpdater extends AssetUpdater {
     } catch (error) {
       logger.error('Failed to refresh Dropbox token', { error })
       throw error
+    }
+
+    const account = await this.client.usersGetCurrentAccount()
+    const rootInfo = account.result.root_info
+    logger.info('Dropbox account', {
+      email: account.result.email,
+      rootType: rootInfo['.tag'],
+      rootNamespaceId: rootInfo.root_namespace_id,
+      homeNamespaceId: rootInfo.home_namespace_id,
+    })
+
+    if (this.useTeamRoot && rootInfo.root_namespace_id !== rootInfo.home_namespace_id) {
+      this.client = new Dropbox({
+        auth: this.auth,
+        pathRoot: JSON.stringify({ '.tag': 'root', root: rootInfo.root_namespace_id }),
+      })
+      logger.info('Dropbox listing team root namespace')
     }
   }
 
@@ -92,6 +110,11 @@ export default class DropboxAssetUpdater extends AssetUpdater {
 
         cursor = response.result.has_more ? response.result.cursor : undefined;
       } while (cursor);
+
+      if (allFolders.length === 0 && allFiles.length === 0) {
+        logger.warn('Dropbox listing is empty, skipping sync to avoid deleting all assets. Check the app permission type, the account and DROPBOX_USE_TEAM_ROOT.');
+        return;
+      }
 
       allFolders.sort((a, b) => {
         const pathA = (a as files.FolderMetadata).path_display || '';
