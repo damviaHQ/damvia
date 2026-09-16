@@ -3,12 +3,12 @@ title: Background jobs
 description: Every queue and cron the worker runs, what triggers it, and what it does.
 sidebar:
   order: 3
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. The worker starts inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
 
-All queues are declared in `server/src/worker.ts`. Every job is sent with `retryBackoff: true`, so a failed job is retried with exponential backoff, and jobs that carry a `uniqueKey` are deduplicated by pg-boss's `singletonKey`.
+All queues are declared in `server/src/worker.ts`. The push helpers set `retryBackoff: true`. In installed pg-boss 10.2.0, defaults allow two retries after the initial attempt and expire active jobs after 15 minutes. `uniqueKey` is passed as `singletonKey`, but standard queues without a singleton window do not deduplicate it; no current business caller provides a key.
 
 ## Scheduled jobs
 
@@ -17,7 +17,7 @@ All queues are declared in `server/src/worker.ts`. Every job is sent with `retry
 | `asset/process-deletion` | `* * * * *` (every minute) | Deletes asset files and folders whose status is `pending_deletion`: removes the original and thumbnail from the assets bucket and the database rows. |
 | `download/process-expired` | `* * * * *` (every minute) | Marks downloads past their `expiresAt` as `expired` and deletes the archive from the assets bucket. |
 | `asset/assign-products-to-asset-files` | `*/5 * * * *` (every 5 minutes) | Matches every asset file name against `PRODUCT_MATCHING_REGEX` and links it to the product with the captured key. See [Products and PIM](../administration/products-and-pim.md). |
-| `system/integrity-check` | `0 5 * * *` (daily at 05:00, server time) | Compares the database with the assets bucket, re-queues files whose object is missing or has a different size, and recomputes each collection's four sample thumbnails. Same code as the [`check-integrity` CLI command](./cli.md). |
+| `system/integrity-check` | `0 5 * * *` (daily at 05:00 UTC) | Compares the database with the assets bucket, re-queues files whose object is missing or has a different size, and recomputes each collection's four sample thumbnails. Same code as the [`check-integrity` CLI command](./cli.md). |
 
 ## On-demand jobs
 

@@ -3,7 +3,7 @@ title: Products and PIM
 description: Import a product catalogue from CSV, link files to products by file name, and turn product columns into search facets.
 sidebar:
   order: 9
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The PIM section stores a flat product catalogue and links asset files to it by parsing file names. Once linked, product columns can be searched, offered as filters and displayed next to files.
@@ -25,7 +25,7 @@ The PIM section stores a flat product catalogue and links asset files to it by p
 
 ## Import products from CSV
 
-`/admin/products/import` (admin only), titled `Import Products from CSV file`, parses the file in the browser with papaparse using `header: true`. The screen states the contract: the first row holds the column names, data starts on the second row, and Excel files or files padded with empty rows are not accepted.
+`/admin/products/import` (admin only), titled `Import Products from CSV file`, parses the file in the browser with papaparse using `header: true`. The first CSV row must contain column names, with data starting on the second row. The importer does not accept Excel files or files padded with empty rows.
 
 1. `Select a CSV File`.
 2. Under `2. Select Columns to Import`, untick columns you do not want; a preview shows the first two rows.
@@ -74,3 +74,17 @@ How each flag is used by `collection.search` in `server/src/trpc/router/collecti
 - **viewable**: `formatCollectionFile` returns the product's viewable attributes with each file, so they can be shown in details and as list columns configured on the [asset type](./asset-types.md).
 
 A product view filter only matches files whose asset type has `is_related_to_products` set, so tag your packshot folders with such a type. Results are paginated 300 per page.
+
+## Reproducible import fixture
+
+Save this UTF-8 example as `products.csv` and use `sku` as the key on an empty test catalogue:
+
+```csv
+sku,name,colour,category
+ABC123-001,Example shirt,Blue,Clothing
+ABC123-002,Example bag,Black,Accessories
+```
+
+With `PRODUCT_MATCHING_REGEX=^(.{6}-\d{3})(?:\.(\d{2}))?`, `ABC123-001.00.jpg` links to the first product with view `00`. Set `PIM_PRODUCT_VIEW=00`; declare `colour` as facetable and `name` as searchable/viewable. On first comparison both records are `new`; after import, the same CSV should be `unchanged`. Change Blue to Green to exercise `changed`, and repeat a SKU to exercise `duplicate`.
+
+CSV is parsed into JSON before submission. The API body limit is 5 MiB, so the JSON request size, not only the CSV size, determines whether a large import fits. Split into batches while keeping the same key column. The admin UI restricts product editing, but `pim.updateProduct` currently has no authentication middleware; see [Known limitations](../reference/known-limitations.md).

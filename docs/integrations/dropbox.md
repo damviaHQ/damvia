@@ -3,7 +3,7 @@ title: Dropbox
 description: Create a Dropbox app, obtain a refresh token, and choose between a member's folder and the Business team space.
 sidebar:
   order: 2
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The Dropbox driver (`server/src/asset-updater/dropbox.ts`) lists the whole Dropbox recursively every 5 minutes and downloads file contents on demand, using an app key, an app secret and a long-lived refresh token. Nothing is written to Dropbox.
@@ -72,8 +72,12 @@ If a listing returns no folders and no files, the driver logs `Dropbox listing i
 
 ## Token expiry during a run
 
-A `401` from Dropbox during listing or download makes the driver refresh the access token and retry once. Persistent `401`s mean the refresh token was revoked.
+A `401` from Dropbox during listing or download makes the driver refresh the access token and recursively retry. There is no explicit retry bound, so repeated `401`s can continue until another failure. Check credentials, token revocation and permissions rather than assuming a single retry.
 
 :::note
 Dropbox's `files/list_folder` with `recursive: true` on a very large account can take several minutes per run. The next run is scheduled 5 minutes after the previous one ends, not on a fixed clock.
 :::
+
+If fetching a page of the Dropbox listing fails, the sync stops before checking which assets to delete. If saving an individual file or folder fails, however, the driver logs the error and continues. That item may then be missing from the list of assets to keep and be marked for deletion. Check these individual errors even when the final log says the sync succeeded.
+
+The Dropbox SDK returns each download in memory as `fileBinary` before the driver writes it to disk. Allow enough memory for several downloads at once.

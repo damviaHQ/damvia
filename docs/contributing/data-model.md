@@ -3,7 +3,7 @@ title: Data model
 description: Every TypeORM entity with its table, key columns, relations and enums, the three materialized-path trees, the database triggers, and how to write a migration.
 sidebar:
   order: 3
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 This page maps the code in `server/src/entity/` and `server/src/migrations/` so you can add a column, a table or a trigger without surprises. What each object means for an administrator is in [Core concepts](../introduction/concepts.md).
@@ -87,3 +87,5 @@ Steps for a schema change:
 4. Add a row to the migrations table in [Upgrading](../deployment/upgrading.md) and update this page.
 
 `npm run typeorm` is `typeorm-ts-node-commonjs`, the TypeORM CLI over the TypeScript sources. The existing migrations have the shape `migration:generate` produces, but no generate command is recorded in the repository and generation against `src/env.ts` has not been verified; hand-writing the file as above is the known path. `down` methods exist, but the documented rollback in [Upgrading](../deployment/upgrading.md) is a database restore.
+
+Mosaic selection prioritises files directly in the current collection, then descendant files by creation date; it does not sort all descendant levels by depth. There is no sample-file trigger for `collection_files` deletion, so the integrity check may be needed to remove stale ids.

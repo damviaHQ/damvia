@@ -3,12 +3,10 @@ title: Configuration
 description: Damvia is configured almost entirely through environment variables; this group explains them by concern.
 sidebar:
   order: 1
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
-There is no settings database and no config file besides the two `.env` files and the mail templates. Everything an instance needs is an environment variable read once at startup, which makes an instance reproducible from its `.env` and its database.
-
-The single exception is the login background image, which an admin uploads from `/admin/settings` and which is stored in the main S3 bucket, not in configuration.
+Runtime configuration is read from environment variables and the mail templates. Restoring an instance also requires its database and main S3 bucket: that bucket holds collection thumbnails, page images and videos, and the login background. Keep configuration, secrets and application version alongside those backups; see [Backups](../deployment/backups.md).
 
 | Page | Covers |
 |---|---|

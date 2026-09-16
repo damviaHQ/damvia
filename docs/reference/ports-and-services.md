@@ -3,7 +3,7 @@ title: Ports and services
 description: What listens where, in development with docker-compose and in production.
 sidebar:
   order: 5
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Damvia is two processes you run (API and client) plus three services it depends on (Postgres, S3-compatible storage, SMTP). The development `server/docker-compose.yml` provides the three services with fixed ports and credentials.
@@ -18,7 +18,7 @@ Damvia is two processes you run (API and client) plus three services it depends 
 | MinIO (`minio` in compose) | `9000` API, `8090` console | root user `dam`, password `damdamdamdam` | Create the buckets `dam` and `dam-assets` in the console at `http://localhost:8090`. Data in the named volume `minio`. |
 | MailHog (`mailhog` in compose) | `1025` SMTP, `8025` web UI | none | Matches the code defaults `SMTP_HOST=localhost`, `SMTP_PORT=1025`. Read outgoing mail at `http://localhost:8025`. |
 
-The compose project is named `damvia-preview`, so its containers and volumes are prefixed `damvia-preview-`.
+The compose project is named `damvia-preview`, so Compose normally names containers with `damvia-preview-` and volumes with `damvia-preview_` (for example `damvia-preview_postgres`).
 
 ## Production
 

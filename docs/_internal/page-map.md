@@ -40,3 +40,15 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/asset-updater/base.ts`, `services/asset.ts` (`upsertFolder`, `upsertFile`) | `contributing/storage-drivers.md` |
 | Folder layout of `server/src` and `client/src` | `contributing/architecture.md` |
 | Package scripts, AGPL header, PR process | `contributing/index.md` |
+
+## Cross-cutting operator references
+
+| Concern | Pages |
+|---|---|
+| JWT, password reset, invitation expiry and signed storage links | `administration/accounts-and-links.md` |
+| Worker failures, provider credentials, temporary storage and monitoring | `deployment/operations.md` |
+| Release, installation and restore qualification | `deployment/acceptance-checklist.md`, `reference/validation-status.md` |
+| Unresolved implementation defects | `reference/known-limitations.md` (remove or update entries when fixed) |
+| Documentation rendering and validation | `docs/README.md`, `scripts/`, `.github/workflows/docs.yml`; matching renderer and build checks in the website repository |
+
+End-user instructions are intentionally outside this technical documentation.

@@ -3,7 +3,7 @@ title: Server configuration
 description: What each group of server variables controls, and the values that trip people up.
 sidebar:
   order: 2
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 `server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
@@ -21,15 +21,15 @@ Auth tokens are JSON Web Tokens signed with `APP_SECRET` and valid for 180 days.
 - With the default value anyone can mint a valid token for any user id. Set a long random string (`openssl rand -hex 32`).
 - Rotating the secret invalidates every token at once: every user is logged out and every unexpired invitation link stops working.
 
-## Password or magic link, not both
+## Passwordless mode changes the login flow
 
 `ENABLE_PASSWORD_LESS_AUTH=true` switches the whole instance to email login: sign-up stores no password, the login form asks for an email only, and each login queues a `mailer/log-in` email with a link that carries a fresh token. With `false` (the default), users have passwords. The same email path is also used, regardless of the flag, when the login page is opened through a collection share link: the link carries an `auth_params` parameter with `magicLink: true` and the invited email, and the form then sends a login email instead of asking for a password.
 
-Passwords are stored as an unsalted SHA-512 hex digest (`hashPassword` in `server/src/services/user.ts`). Passwordless mode avoids storing passwords at all; consider it when your SMTP delivery is reliable.
+Passwords are stored as an unsalted SHA-512 hex digest (`hashPassword` in `server/src/services/user.ts`). Passwordless sign-up stores no password, but enabling the flag does not erase existing hashes or disable the password-reset API.
 
 ## Worker on or off
 
-`ENABLE_WORKER=true` starts pg-boss in the same process as the API. Emails, file downloads and thumbnails, archives, deletions and the daily integrity check all run there. `npm run dev` sets it; `npm start` does not, so a production deployment must set it explicitly on at least one process. The cloud sync loop is **not** controlled by this flag and runs in every server process. Details in [Worker and scaling](../deployment/worker-and-scaling.md).
+`ENABLE_WORKER=true` starts pg-boss in the same process as the API. Emails, file downloads and thumbnails, archives, deletions and the daily integrity check all run there. `npm run dev` sets it; `npm start` does not, so a production deployment must set it explicitly on the single server process. The cloud sync loop is **not** controlled by this flag and runs in every server process. With the flag off, this process does not start the pg-boss producer either, so publishing jobs can fail. Details in [Worker and scaling](../deployment/worker-and-scaling.md).
 
 ## One database for data and jobs
 
@@ -60,3 +60,7 @@ Passwords are stored as an unsalted SHA-512 hex digest (`hashPassword` in `serve
 | `PORT` | The container runtime imposes a port. Default `3000`. |
 | `NODE_ENV` | `npm start` already sets `production`. |
 | `APP_NAME` | Shown as the browser tab title and in the public `env` query. |
+
+`APP_SECRET` must be non-empty. An absent variable uses the hard-coded default, while `APP_SECRET=` remains an empty string and can prevent JWT signing. See [Accounts and links](../administration/accounts-and-links.md) for token lifetime and revocation limits.
+
+For `docker run --env-file`, use literal `KEY=value` lines without quotes or inline comments. The server template uses separate comment lines. Docker does not parse this file as dotenv or as a shell script.

@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -23,11 +23,11 @@ findById: publicProcedure
 		if (!collection) {
 			throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
 		}
-		return formatCollection(collection)
+		return formatCollection({ collection })
 	}),
 ```
 
-`ctx` is `{ req, res, user }`; `user` is the `User` entity loaded from the JWT or `null`. Each router file is `export default router({ ... })`, mounted under its key in `router/index.ts`, which also declares the only top-level procedure, `env`. Routers return plain objects built by local `format*` helpers, never raw entities. Renaming a procedure is a client change too, since the client is compiled against `AppRouter`.
+`ctx` is `{ req, res, user }`; `user` is the `User` entity loaded from the JWT or `null`. Each router file is `export default router({ ... })`, mounted under its key in `router/index.ts`, which also declares the only top-level procedure, `env`. Prefer plain objects built by local `format*` helpers. Current exceptions `user.update` and `pim.updateProduct` return entities directly; review sensitive fields rather than assuming every result is filtered. Renaming a procedure is a client change too, since the client is compiled against `AppRouter`.
 
 ## Four predicates gate access
 
@@ -44,7 +44,7 @@ Per-object rules (own region for managers, `collection.canEdit(user)`, visibilit
 
 ## Errors carry a code, and validation errors carry field errors
 
-Procedures throw `TRPCError` with one of four codes: `UNAUTHORIZED` (only from `authMiddleware`), `NOT_FOUND`, `BAD_REQUEST` and `FORBIDDEN`. When zod rejects the input, tRPC raises `BAD_REQUEST` with a `ZodError` cause, and the `errorFormatter` in `trpc/index.ts` rewrites it to `message: 'Invalid request.'` and adds `data.fieldErrors` (the result of `error.cause.flatten().fieldErrors`, an object of field name to array of messages).
+Common explicit `TRPCError` codes are `UNAUTHORIZED` (only from `authMiddleware`), `NOT_FOUND`, `BAD_REQUEST` and `FORBIDDEN`. When zod rejects the input, tRPC raises `BAD_REQUEST` with a `ZodError` cause, and the `errorFormatter` in `trpc/index.ts` rewrites it to `message: 'Invalid request.'` and adds `data.fieldErrors` (the result of `error.cause.flatten().fieldErrors`, an object of field name to array of messages).
 
 On the client, `extractErrors(error)` in `client/src/services/server.ts` returns `{ message, fieldErrors }` with the first message of each field, ready for a form.
 
@@ -73,9 +73,9 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `login` | mutation | public | Password login returning the JWT, or pushes `mailer/log-in` when passwordless or `magicLink` |
 | `sendResetPasswordEmail` | mutation | public | Pushes `mailer/password-reset` |
 | `resetPassword` | mutation | public | Sets a new password given the email and the reset token |
-| `resendVerificationEmail` | mutation | public | Pushes `mailer/email-verification` for a user id |
+| `resendVerificationEmail` | mutation | public | Publicly targets an unverified user id and also returns a JWT; see known limitations |
 | `me` | query | login | Current user |
-| `updateProfile` | mutation | login | Own name, company, email |
+| `updateProfile` | mutation | login | Own name/company; changing email requires admin |
 | `verifyEmail` | mutation | login | Consumes `?verificationCode=` |
 | `removeAccount` | mutation | login | Deletes own account (`FORBIDDEN` for any other id) |
 | `findById` | query | `userManagerOrAdmin` | One user (managers: own region) |
@@ -103,7 +103,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
 | `tree` | query | `userApproved` | Collections visible to the user, as a tree |
-| `treeAdmin` | query | `userAdmin` | Full tree for the admin screen |
+| `treeAdmin` | query | `userAdmin` | Public collection tree for the admin screen |
 | `search` | query | `userApproved` | Files matching text, asset types, product facets and scope |
 | `searchNotFound` | query | `userApproved` | Returns the search terms that matched no file name in the same scope |
 | `findById` | query | `userApproved` | One collection with files, children, invitations |
@@ -117,7 +117,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `presignedThumbnailUploadUrl` | query | `userApproved` | Presigned PUT for `collections/{id}-thumbnail` |
 | `removeFiles` | mutation | `userApproved` | Removes collection files |
 | `remove` | mutation | `userApproved` | Deletes a collection the caller can edit |
-| `getFiles` | mutation | `userApproved` | Resolves a selection (files and collections) into files, licenses and `allowDirectDownload` (total under 2 GB) |
+| `getFiles` | mutation | `userApproved` | Resolves a selection (files and collections) into files, licenses and `allowDirectDownload` (total at most 2,000,000,000 bytes) |
 | `invitation.create` | mutation | `userApproved` | Invites an email to a collection, creating a guest user when unknown; pushes `mailer/invitation` |
 | `invitation.remove` | mutation | `userApproved` | Revokes an invitation |
 | `invitation.getUserInvitations` | query | login | Invitations on collections the caller owns (admins: also public ones) |
@@ -137,7 +137,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `favorite.list` | query | `userApproved`, `userMember` | The caller's favourite collection files |
 | `favorite.add`, `favorite.remove` | mutation | `userApproved`, `userMember` | Toggle a favourite |
 | `download.list` | query | `userApproved` | The caller's `ready` and `preparing` downloads, plus those `expired` in the last month |
-| `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` above 10 GB); `email` type pushes `download/create-archive` |
+| `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` at or above 10,000,000,000 bytes); `email` type pushes `download/create-archive` |
 
 ### `pim` and `productAttribute`
 
@@ -173,3 +173,5 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `settings.getAuthBackgroundUploadUrl` | query | `userAdmin` | Presigned PUT for the temporary background |
 | `settings.processAuthBackgroundImage` | mutation | `userAdmin` | Converts the temporary upload to WebP (quality 80) at `settings/auth-background.webp` |
 | `settings.removeAuthBackgroundImage` | mutation | `userAdmin` | Deletes the background |
+
+Uncaught database, storage or service exceptions can also surface as `INTERNAL_SERVER_ERROR`. The normal role predicates do not cover all current mutations; [Known limitations](../reference/known-limitations.md) lists the access-control exceptions.

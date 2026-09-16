@@ -16,62 +16,14 @@ The full documentation (installation, configuration, integrations, deployment, a
 
 - Dedicated Server
 - SMTP provider (e.g., Postmark)
-- Database backup solution
-- Note: You don't need to backup data outside the DB as cloud storage retains all assets
+- Backup solution for PostgreSQL, the main S3 bucket, and configuration/secrets
+- Asset originals and previews can be rebuilt only while cloud sources remain available; download archives cannot. See [Backups](docs/deployment/backups.md).
 
-## Quick Setup Guide
+## Quick setup
 
-1. Clone the repository:
+Follow [Local setup](docs/getting-started/local-setup.md) for the complete sequence: install both packages, start PostgreSQL/MinIO/MailHog, create the two buckets, configure the provider and a non-empty `APP_SECRET`, then start server and client. The server must run with `ENABLE_WORKER=true`.
 
-   ```
-   git clone https://github.com/damviaHQ/damvia.git
-   cd damvia
-   ```
-
-2. Install dependencies:
-
-   ```
-   cd server && npm install
-   cd ../client && npm install
-   ```
-
-3. Configure environment variables:
-   - Copy `.env.template` to `.env` in both `/server` and `/client` directories
-   - Update the `.env` files with your settings, including:
-     - PRODUCT_MATCHING_REGEX
-     - SMTP configuration
-     - Minio configuration
-
-4. Set up Minio:
-   - Login to Minio Dashboard and create 2 buckets that match the names in your config:
-     ```
-     MAIN_S3_URL=http://dam:damdamdamdam@localhost:9000/dam
-     ASSETS_S3_URL=http://dam:damdamdamdam@localhost:9000/dam-assets
-     ```
-     dam for user uploaded visuals
-     dam-assets for cloud storage assets
-
-5. Configure Mail:
-   - Update `mailconfig.json` with your content
-   - Convert to base64:
-     ```
-     cat mailconfig.json | base64
-     ```
-   - Copy the encoded string to the MAILCONFIG environment variable
-
-6. Start the services:
-   ```
-   cd server
-   docker-compose up -d
-   npm run dev
-   ```
-
-7. Start the client in a second terminal:
-   ```
-   cd client
-   npm run dev
-   ```
-   Then open http://localhost:5173. See [docs/getting-started/first-admin.md](docs/getting-started/first-admin.md) to create the first administrator.
+Create the first administrator using [First admin](docs/getting-started/first-admin.md), then execute the operator [acceptance checklist](docs/deployment/acceptance-checklist.md). Review [known limitations](docs/reference/known-limitations.md) and [validation status](docs/reference/validation-status.md) before deployment. End-user workflows will be documented separately.
 
 ## License
 

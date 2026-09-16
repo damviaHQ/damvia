@@ -3,7 +3,7 @@ title: Groups and regions
 description: What regions and groups are for, how users get them, and how groups restrict collections.
 sidebar:
   order: 3
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Regions and groups are the two axes Damvia uses to segment users. A region is chosen at sign-up and drives manager scope and license visibility; groups are memberships that can lock a collection to a subset of users. Both screens are admin only.
@@ -21,7 +21,7 @@ The initial migration creates one region named `Global` whose default group is t
 
 ### Remove a region
 
-`region.remove` refuses to delete the last region (`Cannot remove the last region.`) and refuses while users are attached (`Region has users. Please move them first.`). The screen opens a `Move Users` dialog that calls `region.moveUsers`, which sets `region_id` on every user of the source region to the target region. Once empty, deletion also removes the region id from `allowed_region_ids` of every license that referenced it, inside one transaction.
+`region.remove` refuses to delete the last region (`Cannot remove the last region.`) and refuses while users are attached (`Region has users. Please move them first.`). The screen opens a `Move Users` dialog that calls `region.moveUsers`, which sets `region_id` on every user of the source region to the target region. This move does not replace the users' group memberships. Once empty, deletion also removes the region id from `allowed_region_ids` of every license that referenced it, inside one transaction.
 
 ### What a region scopes
 
@@ -70,8 +70,12 @@ Two consequences follow directly from the SQL:
 - As soon as a collection has at least one group, it disappears from the generic public clause. Only members of those groups (or admins, the owner, or invited guests) still see it.
 - The group clause has no draft or license condition. A user in one of the allowed groups sees the collection even when it is a draft or its license does not cover their region.
 
-### Group limits propagate down the tree
+### Saving group restrictions updates existing sub-collections
 
-When `collection.update` saves `limitedToGroupIds`, it copies the same array to every descendant collection and sets their `can_edit_limited_to_group_ids` to true only if the array is empty. A sub-collection under a group-restricted parent therefore cannot loosen or change the restriction: `update` ignores `limitedToGroupIds` on a collection whose flag is false. Clearing the groups on the parent re-enables editing on the children.
+When `collection.update` saves `limitedToGroupIds`, it copies the same array to every descendant collection and sets their `can_edit_limited_to_group_ids` to true only if the array is empty. An existing descendant updated this way cannot loosen or change the restriction: `update` ignores `limitedToGroupIds` on a collection whose flag is false. Clearing the groups on the parent re-enables editing on the children.
 
 Only the collection owner or an admin can call `update` (`Collection.canEdit` in `server/src/entity/collection.ts`). Public collections have no owner, so in practice only admins set group limits on them. Details on the rest of the collection model are in [Collections and sharing](./collections-and-sharing.md).
+
+New child collections created manually, through synchronisation or duplication do not consistently inherit group restrictions. Visibility is checked per collection, so a restricted parent does not protect an unrestricted child. Reapply the parent restriction and verify every descendant after creation; This manual check is needed each time; the parent's restriction alone does not protect a new child.
+
+`group.moveUsersAndRegions` does not rewrite collections' `limited_to_group_ids`. Before removing or merging a group, inventory those arrays and explicitly review the affected collection permissions.

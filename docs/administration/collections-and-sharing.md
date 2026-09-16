@@ -3,7 +3,7 @@ title: Collections and sharing
 description: How collections are built, synchronized with folders, kept up to date by triggers, and shared with guests.
 sidebar:
   order: 7
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 A collection is the unit users browse: a named node in a tree that holds files and child collections. Public collections make up the catalogue and are managed by admins; private collections belong to one user. Either kind can be synchronized with a folder of the assets tree, or assembled by hand.
@@ -45,7 +45,7 @@ The `collection/synchronization` queue (one job at a time) runs `synchronizeColl
 1. Renames the collection to the folder's name and refreshes its menu items.
 2. Upserts one `collection_files` row per file of the folder and deletes rows that no longer match.
 3. Upserts one child collection per subfolder (matching on `parent_id` and `name`), copying `public`, `draft` and `owner_id` from the parent, and deletes children that no longer have a subfolder.
-4. Pushes one synchronization job per child, so the whole subtree converges.
+4. Pushes one synchronization job per child, so the same process copies the folder structure all the way down the tree.
 
 Jobs are triggered by `createFromAsset` and by the asset updater whenever a folder is created, renamed or moved (`upsertFolder`). Independently, `server/src/index.ts` runs this after every sync pass:
 
@@ -61,7 +61,7 @@ It back-fills any file that reached a linked folder between two synchronizations
 ## Triggers keep counts and previews fresh
 
 - `number_of_files` is incremented or decremented on every insert or delete in `collection_files`, for the collection and all its ancestors read from `mpath` (initial migration).
-- `sample_file_ids` is recomputed by the function `refresh_collection_sample_files_from_asset_files`, fired after insert and update on `asset_files` (migrations `1751012487660-add-trigger-to-sample-files.ts` and `1751187976556-update-asset-file-trigger.ts`). For the affected collection and its ancestors it selects up to 4 `collection_files` whose asset has a thumbnail, ordered by depth then creation date. The daily `system/integrity-check` job recomputes the same field for every collection.
+- `sample_file_ids` is recomputed by the function `refresh_collection_sample_files_from_asset_files`, fired after insert and update on `asset_files` (migrations `1751012487660-add-trigger-to-sample-files.ts` and `1751187976556-update-asset-file-trigger.ts`). For the affected collection and its ancestors it selects up to 4 `collection_files` whose asset has a thumbnail, prioritising files in the collection itself, then descendant files by creation date (not every descendant depth). The daily `system/integrity-check` job recomputes the same field for every collection.
 
 ## Edit and delete
 
@@ -73,16 +73,16 @@ It back-fills any file that reached a linked folder between two synchronizations
 
 `collection.ListPrivateCollections` returns the tree of collections where `public` is false and `owner_id` is the caller. This is the "my collections" area where members copy files with `addItems`.
 
-## Share a collection with a guest
+## How collection invitations work
 
-The `Share Collection` dialog (`CollectionDialogShare.vue`) is available to whoever can edit the collection. It asks for a `Guest Email Address` and an `Expiry Date` (defaults to 30 days ahead, must be after today) and offers two buttons:
+The sharing dialog (`CollectionDialogShare.vue`) is available to the collection owner or an admin. It asks for the guest's email address and an expiry date, initially set to 30 days ahead. The date must be in the future. The two buttons create the invitation in different ways:
 
 - `Send Invite` creates the invitation with `sendEmail: true`. A job on `mailer/invitation` sends a link to `/collections/{id}?dam_token=<jwt>`; the client stores that token in the `dam_token` cookie, so the guest is logged in on arrival.
 - `Copy Link` creates the invitation silently and copies a URL carrying `auth_params` (base64 of the email, `magicLink: true` and the collection). Opening it pre-fills the login form and sends a login email.
 
 On the server, `collection.invitation.create` looks up a user with that email. If none exists, `createGuestUser` creates one with `name` and `company` set to `NA`, role `guest`, `approved` and `emailVerified` true, the inviter's region and that region's default group. The invitation stores `collection_id`, `email`, `user_id` and `expires_at`.
 
-The dialog lists invitations with their expiry date, a `Copy Link` and a `Remove` button; `collection.invitation.remove` deletes the row. `collection.invitation.getUserInvitations` feeds the member links dialog with invitations on the caller's collections (and, for admins, on all public ones). Deleting a user deletes the invitations sent to their email.
+For revocation, `collection.invitation.remove` deletes the row. `collection.invitation.getUserInvitations` feeds the member links dialog with invitations on the caller's collections (and, for admins, on all public ones). Deleting a user deletes the invitations sent to their email.
 
 ## Who can see a collection
 
@@ -97,3 +97,7 @@ The dialog lists invitations with their expiry date, a `Copy Link` and a `Remove
 | Invitation | an unexpired invitation for the user exists on the collection or on any ancestor in `mpath` |
 
 Files follow the same rules through `userCollectionFilesQuery`, with the license read from the file. See [Licenses](./licenses.md) for the license clause and [Menu and pages](./menu-and-pages.md) for how public collections appear in the navigation.
+
+## Operational limits
+
+New children and duplicated collections do not reliably inherit group restrictions. See [Groups and regions](./groups-and-regions.md) before publishing a restricted subtree. Preview triggers do not cover `collection_files` deletions; the integrity check repairs stale mosaics. Invitation expiry is the start of the selected date in PostgreSQL's session timezone; it does not include the entire day. Already issued storage URLs are independent of invitation revocation.

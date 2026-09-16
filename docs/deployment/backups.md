@@ -1,56 +1,53 @@
 ---
 title: Backups
-description: The database and the main bucket are the state to protect; the assets bucket can be rebuilt from the cloud storage.
+description: Protect PostgreSQL, the main bucket and configuration together, and rehearse recovery with the matching application version.
 sidebar:
   order: 7
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
-Damvia stores three kinds of data with very different recovery stories. The README's advice, "you don't need to backup data outside the DB as cloud storage retains all assets", is right for the assets bucket and incomplete for the main bucket.
+A recoverable instance needs a consistent database backup, main-bucket backup, configuration/secrets and the application version that produced them. Re-importing cloud assets does not reconstruct users, permissions or editorial uploads.
 
-| Store | Contains | Recovery without a backup |
+| Store | Contents | Recovery |
 |---|---|---|
-| Postgres (`DATABASE_URL`) | Users, groups, regions, collections, pages, menu, products, licenses, asset types, the asset tree, downloads, job queue | None. This is the instance. |
-| Main bucket (`MAIN_S3_URL`) | Collection thumbnails, page images, login background | None. Admins re-upload by hand. |
-| Assets bucket (`ASSETS_S3_URL`) | Originals, previews, download archives | Rebuilt automatically: the integrity check re-queues every missing object from Dropbox or OneDrive. |
-| Dropbox / OneDrive | The source files | Not Damvia's responsibility, and Damvia never writes to it. |
+| PostgreSQL | Users, permissions, collections, pages, products, asset metadata, downloads and pg-boss jobs | Restore the database backup. |
+| Main bucket | Collection thumbnails, page images/videos, login background | Restore objects from the same backup window. |
+| Assets bucket | Originals, generated previews, prepared archives | Re-fetch originals/previews only if cloud sources remain accessible. Archives are not recreated. |
+| Configuration and code | Server secrets, client build settings, mail templates, custom branding, commit/image identifiers | Restore from your configuration and release archive. |
 
-## Database
+## Back up the database and files together
 
-Any Postgres backup method works. The minimum:
+1. Put the instance in maintenance and stop every Damvia server process, including worker and sync. Pause external writers to the buckets.
+2. Dump the database and copy the main bucket while application writes remain stopped. Use versioned backup destinations and record the exact application commit, container image id and client bundle.
+3. Include the assets bucket if preserving archives or reducing recovery time matters. Independently retain source files with the cloud provider.
+4. Save configuration in the secret store, then restart the instance and run the API/worker checks in [Operations](./operations.md).
+
+With `DATABASE_URL` supplied securely in the operator environment, the database command is:
 
 ```bash
 pg_dump --format=custom "$DATABASE_URL" > damvia-$(date +%F).dump
 ```
 
-Include the `pgboss` schema (the default `pg_dump` does): restoring it restores pending jobs. Excluding it is also acceptable, pg-boss recreates it and pending emails are lost.
+The default dump includes `pgboss`. Excluding or dropping that schema loses pending email, content-processing, synchronisation and archive jobs, not just mail. Recreating queues does not reconstruct every lost task. Versioning of a bucket alone is not a separate backup if the same credentials can delete versions.
 
-Restore with `pg_restore --clean --if-exists -d "$DATABASE_URL" damvia-....dump` into an empty database, then start the server; migrations detect the restored `migrations` table and run nothing.
+## Restore into an isolated instance first
 
-## Main bucket
+Keep the original instance unchanged during the drill. Use separate PostgreSQL and buckets, a private client/API and a test SMTP sink. Restored jobs may send real email or delete objects: replace their destinations before starting the application, and review queued payloads containing recipient addresses. Do not attach the restored application to production buckets.
 
-Small (thumbnails and a few images) and irreplaceable. Options:
+1. Stop all processes using the target database. Create an empty database with the required extensions and permissions from [Upgrading](./upgrading.md).
+2. Restore the dump into that empty target (`RESTORE_DATABASE_URL` must identify the new database):
 
-- MinIO: `mc mirror` the bucket to another location nightly, or back up the `minio` volume.
-- AWS S3: enable versioning, or replicate to a second bucket.
+   ```bash
+   pg_restore --exit-on-error --no-owner --dbname="$RESTORE_DATABASE_URL" damvia-YYYY-MM-DD.dump
+   ```
 
-## Assets bucket
+3. Restore the main bucket from the same recovery point. Restore the assets bucket or create it empty. Point the saved configuration at these isolated destinations and set the test SMTP settings.
+4. Start the **same application version** as the backup with `ENABLE_WORKER=true`. Startup, including CLI startup, runs migrations; a newer version can change the restored schema immediately.
+5. Confirm API/database access, a successful sync and worker progress. Run `npm run cli -- check-integrity` from `server/` once queues exist. It repairs missing/mismatched asset originals; it does not recreate download archives or main-bucket media.
+6. Verify account access, a restricted collection, a custom thumbnail, a page image/video and a generated preview. Inspect failed jobs and download records. Record elapsed recovery time and any lost archives.
 
-Skip it if the cloud storage is trusted and re-downloading is acceptable. After a loss:
+For a real recovery, apply this sequence to the intended destinations during maintenance, then run the [acceptance checklist](./acceptance-checklist.md) before reopening access. Do not restore the database while the worker is writing to it.
 
-1. Create the bucket again.
-2. Run `npm run cli -- check-integrity` (or wait for 05:00). Every asset file is marked `outdated` and queued; the worker re-downloads and re-thumbnails them, 10 at a time.
-3. Download archives are not recreated; users request downloads again.
+## Recovery cost
 
-For a large library this takes hours to days and consumes provider bandwidth, which is the argument for backing it up anyway when the cloud storage is far or metered.
-
-## Configuration
-
-`server/.env` (or the environment of the container), `client/.env`, and `mailconfig.json` or `MAILCONFIG` are the rest of the instance. Keep them in your secret store; the Dropbox refresh token in particular cannot be recovered from Dropbox and must be re-issued if lost.
-
-## Recovery drill
-
-1. Restore the database dump into a fresh Postgres.
-2. Restore or recreate both buckets.
-3. Start the server with the saved environment.
-4. Log in, open `/admin/assets` and a collection: thumbnails from the main bucket should show immediately; asset previews return as the integrity check and worker refill the assets bucket.
+Cloud re-import may take hours or days and consume provider bandwidth. The integrity schedule is 05:00 UTC; the CLI queues work immediately but does not wait for its completion. Same-size stale originals and missing previews require the targeted procedure in [Integrity check](./integrity-check.md).

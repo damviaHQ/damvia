@@ -3,7 +3,7 @@ title: Troubleshooting
 description: The failures a new instance meets first, what they mean, and the fix.
 sidebar:
   order: 6
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Symptoms are grouped by where you notice them. Server messages are quoted as they appear in the logs (Winston, plain text on stdout).
@@ -17,17 +17,17 @@ Symptoms are grouped by where you notice them. Server messages are quoted as the
 | `failed to start asset updater` then exit | The driver's `initialize()` failed: for Dropbox, the refresh token could not be exchanged (`Failed to refresh Dropbox token`). | Check `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN`. See [Dropbox](../integrations/dropbox.md). |
 | Connection refused on Postgres | `DATABASE_URL` unset and nothing listens on `localhost:5432`, or wrong credentials. | Start `docker-compose up -d` in `server/`, or set `DATABASE_URL`. |
 | `TypeError: Invalid URL` at first S3 use | `MAIN_S3_URL` or `ASSETS_S3_URL` missing or not a URL. | Use the `http://key:secret@host:port/bucket` form. |
-| Migration error at boot | Migrations run automatically and one failed, usually because the database was created by hand without the `uuid-ossp` extension or with a different schema. | Start from an empty database owned by the `DATABASE_URL` user. See [Upgrading](../deployment/upgrading.md). |
+| Migration error at boot | Migrations run automatically and one failed, usually because the database was created by hand without required `uuid-ossp` / `hstore` extensions or with a different schema. | For a new installation, use an empty owned database with the extensions. For an existing instance, inspect the failed migration and take a backup before any schema repair. See [Upgrading](../deployment/upgrading.md). |
 
 ## Sync does nothing
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | Log says `Dropbox listing is empty, skipping sync to avoid deleting all assets` | The app sees an empty root: wrong permission type (app folder vs full Dropbox), wrong account, or the files live in the team space while `DROPBOX_USE_TEAM_ROOT` is `false`. | Re-check the app's access type and set `DROPBOX_USE_TEAM_ROOT=true` for Dropbox Business team folders. |
-| Folders appear but files stay in status `creating` with no thumbnail | The worker is not running, so `asset/update-content` jobs pile up. | Run one process with `ENABLE_WORKER=true`. See [Worker and scaling](../deployment/worker-and-scaling.md). |
-| Files appear but have no preview | A system package is missing: `ffmpeg` (video), `ghostscript` (PDF, EPS, AI), `libreoffice` (office documents), `imagemagick`. | Install them; the `server/Dockerfile` does. Then run `npm run cli -- check-integrity` to re-queue the files. |
-| A file changed in Dropbox but Damvia still serves the old version | The sync does not compare checksums, so changed content is only caught by the daily integrity check, and only when the size differs. | Run the [integrity check](../deployment/integrity-check.md) by hand. If the new file has exactly the same size, set the row to `outdated` in SQL: `UPDATE asset_files SET status = 'outdated' WHERE name = '...';` and the worker re-fetches it. |
-| OneDrive: nothing is listed, no error | `ONEDRIVE_DRIVE` does not point to an existing path, or the app registration lacks `Files.Read.All` application permission with admin consent. | See [OneDrive](../integrations/onedrive.md). |
+| Folders appear but files stay in status `creating` with no thumbnail | The worker is off, queue publication failed, startup raced database/queue initialisation, or processing jobs failed. | Run one process with `ENABLE_WORKER=true`. See [Worker and scaling](../deployment/worker-and-scaling.md). |
+| Files appear but have no preview | A system package is missing: `ffmpeg` (video), `ghostscript` (PDF, EPS, AI), `libreoffice` (office documents), `imagemagick`. | Install them; the `server/Dockerfile` does. Then mark the affected asset ids `outdated` and run the CLI with the worker active; see the [targeted refresh procedure](../deployment/integrity-check.md#targeted-refresh-of-a-stale-original-or-missing-preview). |
+| A file changed in Dropbox but Damvia still serves the old version | The sync does not compare checksums, so changed content is only caught by the daily integrity check, and only when the size differs. | Run the [integrity check](../deployment/integrity-check.md) by hand. For a same-size change, first mark the specific asset id `outdated`, then run the CLI; changing the status alone does not publish a job. |
+| OneDrive: Graph reports an access/path error | `ONEDRIVE_DRIVE` does not point to an existing path, or the app registration lacks `Files.Read.All` application permission with admin consent. | See [OneDrive](../integrations/onedrive.md). |
 
 ## Users cannot get in
 

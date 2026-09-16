@@ -3,7 +3,7 @@ title: Client build
 description: Build the Vue client into static files and serve them with a history fallback.
 sidebar:
   order: 3
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The client is a Vite single-page application. `npm run build` produces a `dist/` folder of static files that any web server, CDN or object storage website endpoint can serve. There is no client Dockerfile or hosting configuration in the repository.
@@ -35,6 +35,8 @@ nginx:
 server {
   listen 443 ssl;
   server_name dam.example.com;
+  ssl_certificate /etc/letsencrypt/live/dam.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/dam.example.com/privkey.pem;
   root /srv/damvia/client/dist;
 
   location / {
@@ -70,3 +72,5 @@ Files under `assets/` carry a content hash in their name and can be cached forev
 ## Same host or separate host
 
 The client and the API can share a hostname (proxy `/trpc` and `/v1/` to the server, everything else to the static files) or use two hostnames. Both work because the API's CORS allows any origin and the session travels in an `authorization` header rather than a cookie. Example configurations are in [Reverse proxy](./reverse-proxy.md).
+
+The nginx examples assume certificates already issued at the displayed paths. Replace the hostnames and certificate paths, validate the configuration before reloading, and arrange certificate renewal. They do not provision certificates.

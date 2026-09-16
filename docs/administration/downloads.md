@@ -3,14 +3,14 @@ title: Downloads
 description: How download requests become files or archives, the formats and limits, and when links expire.
 sidebar:
   order: 10
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 A download is a request to package one or more visible files, optionally converted, into a single object in the assets bucket. Small requests are built during the request; larger ones are built by the worker and announced by email. Every link expires after 7 days.
 
 ## The download record
 
-`downloads` stores who asked, which `collection_files` ids, the chosen options and the lifecycle:
+`downloads` stores who asked, which `collection_files` ids, the chosen conversion options and the progress of the request:
 
 | Field | Values |
 | --- | --- |
@@ -33,8 +33,11 @@ The object is stored under `downloads/{id}` in the assets bucket (see [Object st
 
 The client applies stricter defaults before the server limit:
 
-- For a single file, `collection.getFiles` returns `allowDirectDownload` only when the selection is at most 2 GB; otherwise the `Direct download` option is disabled and only `Create a link` remains.
-- For several files, `CollectionModalDownloadMulti.vue` disables direct download above 5 GB or above 300 images, and disables PNG, JPG and WebP conversion above 300 images. The email option is described as `A zip is saved for 7 days in My Downloads. You will receive an email with the link when ready.`
+| Path | Effective limit |
+|---|---|
+| Single-file client (`CollectionModalDownloadUnique.vue`) | Direct download through 5,000,000,000 bytes. |
+| Multiple-file client (`CollectionModalDownloadMulti.vue`) | Direct download through 2,000,000,000 bytes via `getFiles.allowDirectDownload`, and at most 300 images. The extra 5 GiB check does not raise this limit. Image conversion is disabled above 300 images. |
+| Server `download.create` | Rejects total source sizes of 10,000,000,000 bytes or more, for either mode. |
 
 License acceptance shown in these dialogs is covered in [Licenses](./licenses.md).
 
@@ -71,8 +74,8 @@ A `ready` download exposes `url` as `API_URL/v1/downloads/{id}`. The route in `s
 
 The route carries no authentication, which is what makes the `Copy URL` action shareable. Anyone holding the link can fetch the object until expiry.
 
-## The member dialog
+## How download progress appears in the client
 
-`DialogMemberDownloads.vue` lists the downloads with `Creation date`, `Expiration date`, `Status` and `Number of files`, with `Download` and `Copy URL` buttons enabled only when a URL exists. A green `New` badge marks email downloads that became ready since the dialog was last seen.
+`DialogMemberDownloads.vue` shows each download's creation date, expiry date, status and number of files. The `Download` and `Copy URL` buttons are enabled when a download link is available. A green `New` badge highlights email downloads that finished since the dialog was last viewed.
 
-`client/src/stores/downloadStore.ts` polls `download.list` every 500 ms while an `email` download is `preparing` and stops when none is left, which is how the badge appears without a reload. Queue names and schedules are listed in [Background jobs](../reference/background-jobs.md).
+While an email download is still being prepared (`status = preparing`), `client/src/stores/downloadStore.ts` asks `download.list` for updates every 500 ms. This updates the status and badge without reloading the page. The checks stop once no email download is still being prepared. Queue names and schedules are listed in [Background jobs](../reference/background-jobs.md).

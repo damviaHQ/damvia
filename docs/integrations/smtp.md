@@ -3,7 +3,7 @@ title: SMTP
 description: Configure outgoing email with any SMTP provider; Postmark is the one the code is tuned for.
 sidebar:
   order: 4
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Damvia sends plain-text emails through Nodemailer over SMTP. There is no HTTP mail API integration and no HTML. Every message is sent by a worker job, so a working SMTP setup also needs a process with `ENABLE_WORKER=true`.
@@ -58,4 +58,4 @@ There is no digest, newsletter or notification email beyond these seven, and no 
 2. Watch the server log for a `job` line with `status: failed` and queue `mailer/password-reset` if delivery fails; Nodemailer's error message (authentication, connection, sender rejected) is included.
 3. On success nothing is logged; check the inbox or the provider's activity log.
 
-A failed mail job is retried with backoff by pg-boss, so fixing the SMTP settings and restarting the worker delivers the pending messages.
+Failed mail jobs use backoff with two retries after the initial attempt in installed pg-boss 10.2.0. Restarting after correcting SMTP can deliver jobs still eligible for retry; it does not revive permanently failed jobs. Inspect their state and trigger a fresh application action after checking provider logs for prior delivery.

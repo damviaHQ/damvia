@@ -8,7 +8,7 @@ lastUpdated: 2026-09-16
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
 
-The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). There is no schema validation: a missing variable takes its default, or throws when first used if it has none.
+The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). There is no schema validation: an absent variable may take its default, or throw when first used. Empty strings are distinct from absent variables, notably for `APP_SECRET`.
 
 ## Server
 
@@ -19,11 +19,11 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). T
 | `APP_NAME` | `Damvia - Open Source Digital Asset Management` | Returned by the public `env` query; the client uses it as the document title. |
 | `APP_URL` | `http://localhost:5173` | Public URL of the client. Every link in an email is built from it, and expired download links redirect to `APP_URL/link-expired`. |
 | `API_URL` | `http://localhost:3000` | Public URL of this server. Download links are `API_URL/v1/downloads/{id}`. |
-| `APP_SECRET` | `Damvia App Secret` | Secret used to sign JWT auth tokens (180-day lifetime). **Change it**: with the default, anyone can forge a token. Changing it later logs every user out. |
+| `APP_SECRET` | `Damvia App Secret` | Secret used to sign JWT auth tokens (180-day lifetime). An explicitly empty value stays empty and can prevent signing. **Change it**: with the default, anyone can forge a token. Changing it later logs every user out. |
 | `PORT` | `3000` | HTTP port the server listens on (`0.0.0.0`). |
 | `NODE_ENV` | unset | `production` in deployments. `npm start` sets it. |
 | `ENABLE_WORKER` | unset (worker off) | `true` starts the pg-boss worker inside this process. `npm run dev` sets it. See [Worker and scaling](../deployment/worker-and-scaling.md). |
-| `ENABLE_PASSWORD_LESS_AUTH` | `false` | `true` disables passwords entirely: sign-up stores none and login always emails a magic link. |
+| `ENABLE_PASSWORD_LESS_AUTH` | `false` | `true` selects passwordless sign-up/login; it does not erase existing hashes or disable password-reset endpoints. |
 
 ### Database
 
@@ -35,7 +35,7 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). T
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MAIN_S3_URL` | none, required | `http(s)://ACCESS_KEY:SECRET_KEY@host:port/bucket`. Bucket for collection and page thumbnails, page images and the login background. |
+| `MAIN_S3_URL` | none, required | `http(s)://ACCESS_KEY:SECRET_KEY@host:port/bucket`. Bucket for collection and page thumbnails, page images/videos and the login background. |
 | `ASSETS_S3_URL` | none, required | Same syntax. Bucket for asset originals (`asset-file/{id}`), asset thumbnails and download archives (`downloads/{id}`). |
 
 The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`. Details in [Object storage](../integrations/object-storage.md).
@@ -63,7 +63,7 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 | `ONEDRIVE_CLIENT_ID` | unset | Azure app registration client id. |
 | `ONEDRIVE_CLIENT_SECRET` | unset | Azure app client secret. |
 | `ONEDRIVE_USER` | unset | User principal name whose drive is synced, for example `assets@company.com`. |
-| `ONEDRIVE_DRIVE` | unset | Path inside that drive, Graph syntax, for example `root:/DAM`. See [OneDrive](../integrations/onedrive.md). |
+| `ONEDRIVE_DRIVE` | unset | Use `root` for the whole drive. Subfolder delta support is not validated; do not use the incomplete `root:/DAM` example. See [OneDrive](../integrations/onedrive.md). |
 
 ### PIM linking
 
@@ -81,7 +81,7 @@ Client variables are read by Vite **at build time** and baked into the bundle. C
 | Variable | Default | Purpose |
 |---|---|---|
 | `VITE_API_ENDPOINT` | `http://localhost:3000/trpc` | Full URL of the server's tRPC endpoint, that is `API_URL` plus `/trpc`. |
-| `VITE_BRAND_COLOR` | `sky-400` | Accent colour. A Tailwind colour name (`red-500`) or a hex colour without `#` (`e11d48`). `#` starts a comment in `.env`, so `#e11d48` needs quotes. |
+| `VITE_BRAND_COLOR` | `sky-400` | Accent colour. A Tailwind name (`red-500`), a hex colour without `#` (`e11d48`), or any CSS colour. In dotenv, quote values starting with `#`: `VITE_BRAND_COLOR="#e11d48"`. |
 | `VITE_BRAND_COLOR_HOVER` | `sky-500` | Hover shade of the accent. |
 | `VITE_BRAND_COLOR_STRONG` | `sky-600` | Strong shade of the accent, used for emphasis text. |
 

@@ -3,7 +3,7 @@ title: Reverse proxy
 description: Put HTTPS in front of the API and the client, and expose the S3 endpoint browsers must reach.
 sidebar:
   order: 4
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The server speaks plain HTTP on one port and expects a proxy to terminate TLS. Three hostnames are involved: the client (`APP_URL`), the API (`API_URL`) and the S3 endpoint from the bucket URLs, and all three must be reachable by browsers.
@@ -17,8 +17,8 @@ The server speaks plain HTTP on one port and expects a proxy to terminate TLS. T
 
 Two Fastify settings matter for the proxy:
 
-- `bodyLimit` is 5 MB. No file bytes go through the API (uploads use presigned URLs), so this only bounds JSON bodies such as CSV product imports, which are sent as JSON. Set the proxy's body limit at least as high.
-- `maxParamLength` is 5000, because tRPC encodes query inputs in the URL. Keep the proxy's URL length limit above 8 KB.
+- `bodyLimit` is 5 MiB (5,242,880 bytes). No file bytes go through the API (uploads use presigned URLs), so this only bounds JSON bodies such as CSV product imports, which are sent as JSON. Set the proxy's body limit at least as high.
+- `maxParamLength` is 5000 for path parameters, not query strings. tRPC query inputs travel in the query string; separately size and test the proxy request-line/header limits with representative queries.
 
 CORS is registered with `@fastify/cors` and no options, meaning any origin is allowed. The proxy does not need to add CORS headers and should not restrict them unless you want to lock the API to `APP_URL`, which you can do at the proxy level.
 
@@ -28,6 +28,8 @@ CORS is registered with `@fastify/cors` and no options, meaning any origin is al
 server {
   listen 443 ssl;
   server_name api.dam.example.com;
+  ssl_certificate /etc/letsencrypt/live/api.dam.example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/api.dam.example.com/privkey.pem;
   client_max_body_size 10m;
   large_client_header_buffers 4 16k;
 
@@ -88,4 +90,6 @@ Do not forward `/dam/` and `/dam-assets/` paths through the API hostname: the si
 
 ## Security headers
 
-The API sets none. Add `Strict-Transport-Security` and the usual headers at the proxy. If you add a `Content-Security-Policy` to the client, allow `connect-src` to the API and `img-src` and `media-src` to the S3 hostname, plus `fonts.googleapis.com` and `fonts.gstatic.com` for Inter.
+The API sets none. Add `Strict-Transport-Security` and the usual headers at the proxy. If you add a `Content-Security-Policy` to the client, allow the API and S3 in `connect-src` (including presigned PUT), S3 in `img-src`, `media-src` and `frame-src` (PDF iframe previews), `https://fonts.googleapis.com` in `style-src`, and `https://fonts.gstatic.com` in `font-src`. Include the client's own resources and validate in report-only mode before enforcing a complete policy.
+
+The nginx examples assume certificates already issued at the displayed paths. Replace the hostnames and certificate paths, validate the configuration before reloading, and arrange certificate renewal. They do not provision certificates.

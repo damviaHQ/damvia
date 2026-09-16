@@ -3,17 +3,17 @@ title: Object storage
 description: The two S3 buckets Damvia writes to, the URL syntax that configures them, and what browsers need to reach.
 sidebar:
   order: 5
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
-Damvia keeps its own copy of every asset in S3-compatible object storage, next to the previews it generates and the archives users download. It uses the MinIO client library, which speaks the S3 API, so MinIO, AWS S3 and compatible services (Cloudflare R2, Backblaze B2, Scaleway, DigitalOcean Spaces) all work.
+Damvia keeps its own copy of every asset in S3-compatible object storage, next to the previews it generates and the archives users download. It uses the MinIO client library and the S3 API. MinIO is the development configuration; other providers require validation of endpoint addressing, signatures, CORS and the operations below. API compatibility alone is not a tested support guarantee.
 
 ## Two buckets, two lifecycles
 
 | Bucket | Variable | Contains | Can be rebuilt? |
 |---|---|---|---|
-| Main | `MAIN_S3_URL` | Collection thumbnails, page images, the login background (`settings/auth-background.webp`) | No. These are uploaded by admins. Back it up. |
-| Assets | `ASSETS_S3_URL` | Asset originals at `asset-file/{id}`, their WebP thumbnails, download archives at `downloads/{id}` | Yes, from the cloud storage: the [integrity check](../deployment/integrity-check.md) re-queues every missing object. |
+| Main | `MAIN_S3_URL` | Collection thumbnails, page images/videos, the login background (`settings/auth-background.webp`) | No. These are uploaded by admins. Back it up. |
+| Assets | `ASSETS_S3_URL` | Asset originals at `asset-file/{id}`, their WebP thumbnails, download archives at `downloads/{id}` | Originals and generated previews, while sources remain available. Download archives are not recreated. See [Integrity check](../deployment/integrity-check.md). |
 
 The two variables may point to the same server with different bucket names, which is the usual setup. Damvia does not create buckets; create both before the first start.
 
@@ -26,7 +26,7 @@ scheme://ACCESS_KEY:SECRET_KEY@host[:port]/bucket
 | Part | Meaning |
 |---|---|
 | `scheme` | `https` enables TLS (`useSSL`), `http` disables it. |
-| `ACCESS_KEY:SECRET_KEY` | The credentials, URL-encoded if they contain `@`, `/` or `:`. |
+| `ACCESS_KEY:SECRET_KEY` | Credentials. The current code does not decode URL username/password escapes; credentials needing percent-encoding are not supported reliably. Use URL-safe credentials until the parser is corrected. |
 | `host[:port]` | The S3 endpoint. Port defaults to 443 for `https` and 80 for `http`. |
 | `/bucket` | The bucket name, nothing after it. |
 
@@ -54,7 +54,7 @@ Damvia never proxies file bytes through the API:
 
 Therefore the endpoint hostname in both URLs must be resolvable and reachable **from users' browsers**, over HTTPS in production, and the bucket must allow the presigned requests. With MinIO behind a reverse proxy, forward the S3 API port (9000 by default) on a public hostname and use that hostname in the URLs; the server can use the same hostname.
 
-CORS is only needed for the presigned PUT uploads (the browser performs a cross-origin PUT). Allow `PUT` and `GET` from `APP_URL`'s origin on the main bucket. Presigned GET links opened as navigations or `<img>` sources do not need CORS.
+CORS is needed for presigned PUT uploads and any cross-origin fetch/XHR reads (the browser performs a cross-origin PUT). Allow `PUT` and `GET` from `APP_URL`'s origin on the main bucket. Presigned GET links opened as navigations or `<img>` sources do not need CORS.
 
 ## Bucket policy
 
@@ -62,7 +62,7 @@ Keep both buckets private. Everything is accessed with presigned URLs signed by 
 
 ## Storage size
 
-The assets bucket holds every original once plus one WebP thumbnail per file, plus download archives for at most 7 days. Plan for slightly more than the size of the synced cloud storage.
+The assets bucket holds every original once plus one WebP thumbnail per file, plus download archives for at most 7 days. Include original sizes, previews and all archives retained concurrently; repeated exports can exceed the size of the source library.
 
 ## MinIO versus AWS
 
@@ -72,3 +72,23 @@ The assets bucket holds every original once plus one WebP thumbnail per file, pl
 | Public reachability | You expose port 9000 through your proxy | Already public; use the regional endpoint |
 | Backups | Back up the `minio` volume (main bucket at least) | Versioning or replication on the main bucket |
 | Cost | Your disk | Per GB stored and transferred; presigned downloads count as egress |
+
+## Main-bucket CORS example
+
+For an AWS S3 CORS configuration, replace the example origin with the exact `APP_URL` origin:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://dam.example.com"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
+    "AllowedHeaders": ["Content-Type", "x-amz-*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Use the equivalent CORS setting supported by your storage service; its configuration format may differ. Validate an OPTIONS preflight with `Access-Control-Request-Method: PUT` and `Access-Control-Request-Headers: content-type`, then an actual browser upload. Do not add OPTIONS to S3's allowed-method list. CORS does not make a private bucket public and does not replace signed authorisation.
+
+The CORS example follows the [AWS S3 CORS element reference](https://docs.aws.amazon.com/AmazonS3/latest/userguide/ManageCorsUsing.html); validate the equivalent settings on another provider.

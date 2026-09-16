@@ -3,7 +3,7 @@ title: Menu and pages
 description: Build the navigation menu and compose pages out of blocks, for the home screen and for collections.
 sidebar:
   order: 8
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The menu is the tree users see in the main layout; pages are block layouts that can be a standalone destination (for example the home page) or the landing view of a collection. Both are administered from the Content Management section.
@@ -34,7 +34,7 @@ Each item's menu offers `Add Item to Collection` (create a child) and, for colle
 
 ### Home, synchronization and visibility
 
-- `menuItem.setHome` clears `home` on every other item and sets it on the chosen one, in one transaction, so there is exactly one home item.
+- `menuItem.setHome` clears `home` on every other item and sets it on the chosen one, in one transaction, so that operation selects one home item. A new instance or deletion of that item can leave none; the client then chooses the first accessible collection or its welcome message.
 - Creating a collection item with `sync` also creates one child item per descendant collection, each with `data.sync`. From then on, `syncCollectionMenuItems` in `server/src/services/collection.ts` keeps synced items aligned: a new public sub-collection gets an item under each synced parent item, a root public collection gets a root item if it has none, and a collection that becomes non-public loses its items.
 - `menuItem.list`, used by every approved user, hides collection items whose collection the user cannot see. An item is still returned when one of its children is visible, but flagged `hasAccess: false`.
 

@@ -3,7 +3,7 @@ title: Integrations
 description: "How Damvia talks to the outside world: one cloud storage driver, an SMTP server, and two S3 buckets."
 sidebar:
   order: 1
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Damvia integrates with three kinds of external services. The cloud storage is where your files already live; Damvia only reads it. SMTP carries every account and notification email. S3-compatible storage holds Damvia's own copies, previews and archives.
@@ -26,14 +26,14 @@ One run does the following:
 
 1. Lists the whole tree from the provider (a full recursive listing for Dropbox, the delta feed for OneDrive).
 2. Upserts each folder and file by its provider id (`external_id`): new files get status `creating` and an `asset/update-content` job that downloads the content and builds the preview; existing files are updated in place (name, size, folder, inherited asset type and license). A changed file content is **not** detected here: the listing checksum is stored but not compared, so a file replaced in the cloud storage keeps its old copy until the daily [integrity check](../deployment/integrity-check.md) sees a size difference.
-3. Marks every folder and file that was **not** in the listing as `pending_deletion`, in batches of 1,000. The `asset/process-deletion` job removes them a minute later, including their objects in the assets bucket.
+3. Marks every folder and file that was **not** in the listing as `pending_deletion`, in batches of 1,000. The `asset/process-deletion` job checks them every minute, including their objects in the assets bucket.
 4. Inserts a `collection_files` row for every asset file whose folder is linked to a collection, so linked collections pick up new files without waiting for the `collection/synchronization` job.
 
 Step 3 is why an empty listing is treated as an error by the Dropbox driver: it would delete the whole library.
 
 ## Damvia never writes to the cloud storage
 
-Assets are downloaded, never uploaded, renamed or deleted at the provider. Renaming or moving a file in the cloud storage keeps its provider id, so Damvia updates the row in place; deleting it in the cloud storage deletes it from Damvia within about six minutes.
+Assets are downloaded, never uploaded, renamed or deleted at the provider. Renaming or moving a file in the cloud storage keeps its provider id, so Damvia updates the row in place; after a source file is deleted, a successful cloud listing marks its Damvia copy for deletion. The deletion job removes that copy on a later pass. This can take longer than six minutes: listings take time, the next sync waits five minutes, and the worker must be running.
 
 ## Rate limits and large libraries
 

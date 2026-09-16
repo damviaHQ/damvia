@@ -1,12 +1,12 @@
 ---
 title: Licenses
-description: Define usage licenses, attach them to folders, and understand exactly how they hide files and gate downloads.
+description: Define usage licenses, attach them to folders, and understand how access checks and download terms work.
 sidebar:
   order: 4
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
-A license describes under which terms, where and for how long a set of files may be used. Attaching a license to a folder in the assets tree hides its files from users outside the allowed regions or outside the validity period, and forces users who can see them to accept the terms before downloading.
+A license describes under which terms, where and for how long a set of files may be used. Attaching a license affects the public access branch. Owner, admin, group and invitation access can bypass it. The client displays an acceptance checkbox; this is not a server-side record of acceptance.
 
 ## Fields of a license
 
@@ -55,22 +55,22 @@ Read line by line for a member or manager:
 
 1. A collection or file with no license is visible (subject to public, draft and group rules).
 2. With a license, the user's `region_id` must be one of `allowed_region_ids`.
-3. If `usage_from` is set, it must be today or earlier; if `usage_to` is set, it must be today or later. Both are `date` columns compared with `now()`.
+3. If `usage_from` is set, it is effective from midnight; `usage_to` must still compare greater than or equal to `now()`. Both are `date` columns: a final date of today does not include the day after midnight in the PostgreSQL session timezone.
 
-The whole clause is ORed with the other access paths, so a license is bypassed when:
+A user can also gain access through the other permission rules. In those cases the licence does not block access, even if it has expired or excludes the user's region. This happens when:
 
 - the user is an **admin** (every public collection is visible),
 - the user **owns** the collection,
 - the user belongs to a **group** listed in `limited_to_group_ids`,
 - the user holds a **live invitation** on the collection or one of its ancestors.
 
-Guests never enter the public clause, so for them the license is never evaluated: they only see what the owner, group and invitation clauses grant.
+Guests cannot use ordinary public access. They see collections they own, collections available to their groups and collections shared with them by invitation. These permissions do not check the licence.
 
 :::note
 A manual (non-synchronized) collection has no asset folder, so the collection itself always passes the license check. Its files are still filtered one by one through `asset_file.license_id`, which means a collection can be visible while some of the files copied into it are hidden.
 :::
 
-## Users must accept the terms before downloading
+## Client acceptance is not server enforcement
 
 Every file returned to the client carries its license as `{ id, name, scopes, details, allowedRegionIds, expired }`. The two download dialogs use it:
 

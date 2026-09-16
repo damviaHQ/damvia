@@ -1,0 +1,906 @@
+{
+  "docs_html": 47,
+  "internal_links": 2432,
+  "broken_occurrences": 179,
+  "markdown_links": 179,
+  "affected_pages": 43,
+  "broken": [
+    {
+      "page": "/docs/configuration",
+      "href": "./server-env.md",
+      "resolved": "/docs/server-env.md"
+    },
+    {
+      "page": "/docs/configuration",
+      "href": "./client-env.md",
+      "resolved": "/docs/client-env.md"
+    },
+    {
+      "page": "/docs/configuration",
+      "href": "./email-templates.md",
+      "resolved": "/docs/email-templates.md"
+    },
+    {
+      "page": "/docs/configuration",
+      "href": "./branding.md",
+      "resolved": "/docs/branding.md"
+    },
+    {
+      "page": "/docs/configuration",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/configuration",
+      "href": "../integrations/index.md",
+      "resolved": "/integrations/index.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "./architecture.md",
+      "resolved": "/docs/architecture.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "./data-model.md",
+      "resolved": "/docs/data-model.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "./api.md",
+      "resolved": "/docs/api.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "./background-jobs.md",
+      "resolved": "/docs/background-jobs.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "./storage-drivers.md",
+      "resolved": "/docs/storage-drivers.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "../getting-started/local-setup.md",
+      "resolved": "/getting-started/local-setup.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "../reference/cli.md",
+      "resolved": "/reference/cli.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/contributing",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/introduction",
+      "href": "../getting-started/index.md",
+      "resolved": "/getting-started/index.md"
+    },
+    {
+      "page": "/docs/introduction",
+      "href": "./roles-and-access.md",
+      "resolved": "/docs/roles-and-access.md"
+    },
+    {
+      "page": "/docs/introduction",
+      "href": "./concepts.md",
+      "resolved": "/docs/concepts.md"
+    },
+    {
+      "page": "/docs/introduction",
+      "href": "./concepts.md",
+      "resolved": "/docs/concepts.md"
+    },
+    {
+      "page": "/docs/introduction",
+      "href": "./roles-and-access.md",
+      "resolved": "/docs/roles-and-access.md"
+    },
+    {
+      "page": "/docs/introduction",
+      "href": "../getting-started/index.md",
+      "resolved": "/getting-started/index.md"
+    },
+    {
+      "page": "/docs/integrations",
+      "href": "./dropbox.md",
+      "resolved": "/docs/dropbox.md"
+    },
+    {
+      "page": "/docs/integrations",
+      "href": "./onedrive.md",
+      "resolved": "/docs/onedrive.md"
+    },
+    {
+      "page": "/docs/integrations",
+      "href": "./smtp.md",
+      "resolved": "/docs/smtp.md"
+    },
+    {
+      "page": "/docs/integrations",
+      "href": "./object-storage.md",
+      "resolved": "/docs/object-storage.md"
+    },
+    {
+      "page": "/docs/integrations",
+      "href": "../deployment/integrity-check.md",
+      "resolved": "/deployment/integrity-check.md"
+    },
+    {
+      "page": "/docs/getting-started",
+      "href": "./local-setup.md",
+      "resolved": "/docs/local-setup.md"
+    },
+    {
+      "page": "/docs/getting-started",
+      "href": "../deployment/index.md",
+      "resolved": "/deployment/index.md"
+    },
+    {
+      "page": "/docs/getting-started",
+      "href": "../integrations/object-storage.md",
+      "resolved": "/integrations/object-storage.md"
+    },
+    {
+      "page": "/docs/getting-started",
+      "href": "../integrations/smtp.md",
+      "resolved": "/integrations/smtp.md"
+    },
+    {
+      "page": "/docs/getting-started",
+      "href": "../integrations/dropbox.md",
+      "resolved": "/integrations/dropbox.md"
+    },
+    {
+      "page": "/docs/getting-started",
+      "href": "../integrations/onedrive.md",
+      "resolved": "/integrations/onedrive.md"
+    },
+    {
+      "page": "/docs/getting-started",
+      "href": "../deployment/worker-and-scaling.md",
+      "resolved": "/deployment/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/deployment",
+      "href": "./server-docker.md",
+      "resolved": "/docs/server-docker.md"
+    },
+    {
+      "page": "/docs/deployment",
+      "href": "./worker-and-scaling.md",
+      "resolved": "/docs/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/deployment",
+      "href": "./client-build.md",
+      "resolved": "/docs/client-build.md"
+    },
+    {
+      "page": "/docs/deployment",
+      "href": "./reverse-proxy.md",
+      "resolved": "/docs/reverse-proxy.md"
+    },
+    {
+      "page": "/docs/deployment",
+      "href": "./upgrading.md",
+      "resolved": "/docs/upgrading.md"
+    },
+    {
+      "page": "/docs/deployment",
+      "href": "./backups.md",
+      "resolved": "/docs/backups.md"
+    },
+    {
+      "page": "/docs/deployment",
+      "href": "./integrity-check.md",
+      "resolved": "/docs/integrity-check.md"
+    },
+    {
+      "page": "/docs/deployment",
+      "href": "./backups.md",
+      "resolved": "/docs/backups.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./users-and-approval.md",
+      "resolved": "/docs/users-and-approval.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./groups-and-regions.md",
+      "resolved": "/docs/groups-and-regions.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./licenses.md",
+      "resolved": "/docs/licenses.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./asset-types.md",
+      "resolved": "/docs/asset-types.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./assets-tree.md",
+      "resolved": "/docs/assets-tree.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./collections-and-sharing.md",
+      "resolved": "/docs/collections-and-sharing.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./menu-and-pages.md",
+      "resolved": "/docs/menu-and-pages.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./products-and-pim.md",
+      "resolved": "/docs/products-and-pim.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./downloads.md",
+      "resolved": "/docs/downloads.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "./users-and-approval.md",
+      "resolved": "/docs/users-and-approval.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "../introduction/roles-and-access.md",
+      "resolved": "/introduction/roles-and-access.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/administration",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/reference",
+      "href": "../configuration/index.md",
+      "resolved": "/configuration/index.md"
+    },
+    {
+      "page": "/docs/reference",
+      "href": "../deployment/index.md",
+      "resolved": "/deployment/index.md"
+    },
+    {
+      "page": "/docs/reference",
+      "href": "./environment-variables.md",
+      "resolved": "/docs/environment-variables.md"
+    },
+    {
+      "page": "/docs/reference",
+      "href": "./background-jobs.md",
+      "resolved": "/docs/background-jobs.md"
+    },
+    {
+      "page": "/docs/reference",
+      "href": "./cli.md",
+      "resolved": "/docs/cli.md"
+    },
+    {
+      "page": "/docs/reference",
+      "href": "./ports-and-services.md",
+      "resolved": "/docs/ports-and-services.md"
+    },
+    {
+      "page": "/docs/reference",
+      "href": "./troubleshooting.md",
+      "resolved": "/docs/troubleshooting.md"
+    },
+    {
+      "page": "/docs/reference/ports-and-services",
+      "href": "../deployment/client-build.md",
+      "resolved": "/docs/deployment/client-build.md"
+    },
+    {
+      "page": "/docs/reference/ports-and-services",
+      "href": "../deployment/reverse-proxy.md",
+      "resolved": "/docs/deployment/reverse-proxy.md"
+    },
+    {
+      "page": "/docs/reference/environment-variables",
+      "href": "../configuration/server-env.md",
+      "resolved": "/docs/configuration/server-env.md"
+    },
+    {
+      "page": "/docs/reference/environment-variables",
+      "href": "../deployment/worker-and-scaling.md",
+      "resolved": "/docs/deployment/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/reference/environment-variables",
+      "href": "../integrations/object-storage.md",
+      "resolved": "/docs/integrations/object-storage.md"
+    },
+    {
+      "page": "/docs/reference/environment-variables",
+      "href": "../configuration/email-templates.md",
+      "resolved": "/docs/configuration/email-templates.md"
+    },
+    {
+      "page": "/docs/reference/environment-variables",
+      "href": "../integrations/dropbox.md",
+      "resolved": "/docs/integrations/dropbox.md"
+    },
+    {
+      "page": "/docs/reference/environment-variables",
+      "href": "../integrations/onedrive.md",
+      "resolved": "/docs/integrations/onedrive.md"
+    },
+    {
+      "page": "/docs/reference/environment-variables",
+      "href": "../administration/products-and-pim.md",
+      "resolved": "/docs/administration/products-and-pim.md"
+    },
+    {
+      "page": "/docs/reference/environment-variables",
+      "href": "../configuration/client-env.md",
+      "resolved": "/docs/configuration/client-env.md"
+    },
+    {
+      "page": "/docs/reference/background-jobs",
+      "href": "../deployment/worker-and-scaling.md",
+      "resolved": "/docs/deployment/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/reference/background-jobs",
+      "href": "../administration/products-and-pim.md",
+      "resolved": "/docs/administration/products-and-pim.md"
+    },
+    {
+      "page": "/docs/reference/background-jobs",
+      "href": "./cli.md",
+      "resolved": "/docs/reference/cli.md"
+    },
+    {
+      "page": "/docs/reference/background-jobs",
+      "href": "../configuration/email-templates.md",
+      "resolved": "/docs/configuration/email-templates.md"
+    },
+    {
+      "page": "/docs/reference/background-jobs",
+      "href": "../integrations/index.md",
+      "resolved": "/docs/integrations/index.md"
+    },
+    {
+      "page": "/docs/reference/troubleshooting",
+      "href": "../integrations/dropbox.md",
+      "resolved": "/docs/integrations/dropbox.md"
+    },
+    {
+      "page": "/docs/reference/troubleshooting",
+      "href": "../deployment/upgrading.md",
+      "resolved": "/docs/deployment/upgrading.md"
+    },
+    {
+      "page": "/docs/reference/troubleshooting",
+      "href": "../deployment/worker-and-scaling.md",
+      "resolved": "/docs/deployment/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/reference/troubleshooting",
+      "href": "../deployment/integrity-check.md",
+      "resolved": "/docs/deployment/integrity-check.md"
+    },
+    {
+      "page": "/docs/reference/troubleshooting",
+      "href": "../integrations/onedrive.md",
+      "resolved": "/docs/integrations/onedrive.md"
+    },
+    {
+      "page": "/docs/reference/troubleshooting",
+      "href": "../getting-started/first-admin.md",
+      "resolved": "/docs/getting-started/first-admin.md"
+    },
+    {
+      "page": "/docs/reference/troubleshooting",
+      "href": "../integrations/object-storage.md",
+      "resolved": "/docs/integrations/object-storage.md"
+    },
+    {
+      "page": "/docs/reference/troubleshooting",
+      "href": "../deployment/client-build.md",
+      "resolved": "/docs/deployment/client-build.md"
+    },
+    {
+      "page": "/docs/reference/cli",
+      "href": "../deployment/integrity-check.md",
+      "resolved": "/docs/deployment/integrity-check.md"
+    },
+    {
+      "page": "/docs/reference/cli",
+      "href": "../deployment/upgrading.md",
+      "resolved": "/docs/deployment/upgrading.md"
+    },
+    {
+      "page": "/docs/reference/cli",
+      "href": "../getting-started/first-admin.md",
+      "resolved": "/docs/getting-started/first-admin.md"
+    },
+    {
+      "page": "/docs/administration/products-and-pim",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/docs/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/administration/products-and-pim",
+      "href": "./asset-types.md",
+      "resolved": "/docs/administration/asset-types.md"
+    },
+    {
+      "page": "/docs/administration/licenses",
+      "href": "./groups-and-regions.md",
+      "resolved": "/docs/administration/groups-and-regions.md"
+    },
+    {
+      "page": "/docs/administration/licenses",
+      "href": "./assets-tree.md",
+      "resolved": "/docs/administration/assets-tree.md"
+    },
+    {
+      "page": "/docs/administration/users-and-approval",
+      "href": "../configuration/email-templates.md",
+      "resolved": "/docs/configuration/email-templates.md"
+    },
+    {
+      "page": "/docs/administration/users-and-approval",
+      "href": "../introduction/roles-and-access.md",
+      "resolved": "/docs/introduction/roles-and-access.md"
+    },
+    {
+      "page": "/docs/administration/users-and-approval",
+      "href": "./collections-and-sharing.md",
+      "resolved": "/docs/administration/collections-and-sharing.md"
+    },
+    {
+      "page": "/docs/administration/users-and-approval",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/docs/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/administration/assets-tree",
+      "href": "./asset-types.md",
+      "resolved": "/docs/administration/asset-types.md"
+    },
+    {
+      "page": "/docs/administration/assets-tree",
+      "href": "./licenses.md",
+      "resolved": "/docs/administration/licenses.md"
+    },
+    {
+      "page": "/docs/administration/assets-tree",
+      "href": "../integrations/object-storage.md",
+      "resolved": "/docs/integrations/object-storage.md"
+    },
+    {
+      "page": "/docs/administration/assets-tree",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/docs/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/administration/collections-and-sharing",
+      "href": "./groups-and-regions.md",
+      "resolved": "/docs/administration/groups-and-regions.md"
+    },
+    {
+      "page": "/docs/administration/collections-and-sharing",
+      "href": "./licenses.md",
+      "resolved": "/docs/administration/licenses.md"
+    },
+    {
+      "page": "/docs/administration/collections-and-sharing",
+      "href": "./menu-and-pages.md",
+      "resolved": "/docs/administration/menu-and-pages.md"
+    },
+    {
+      "page": "/docs/administration/asset-types",
+      "href": "./products-and-pim.md",
+      "resolved": "/docs/administration/products-and-pim.md"
+    },
+    {
+      "page": "/docs/administration/asset-types",
+      "href": "./assets-tree.md",
+      "resolved": "/docs/administration/assets-tree.md"
+    },
+    {
+      "page": "/docs/administration/asset-types",
+      "href": "./products-and-pim.md",
+      "resolved": "/docs/administration/products-and-pim.md"
+    },
+    {
+      "page": "/docs/administration/asset-types",
+      "href": "./menu-and-pages.md",
+      "resolved": "/docs/administration/menu-and-pages.md"
+    },
+    {
+      "page": "/docs/administration/menu-and-pages",
+      "href": "./asset-types.md",
+      "resolved": "/docs/administration/asset-types.md"
+    },
+    {
+      "page": "/docs/administration/menu-and-pages",
+      "href": "../integrations/object-storage.md",
+      "resolved": "/docs/integrations/object-storage.md"
+    },
+    {
+      "page": "/docs/administration/downloads",
+      "href": "../integrations/object-storage.md",
+      "resolved": "/docs/integrations/object-storage.md"
+    },
+    {
+      "page": "/docs/administration/downloads",
+      "href": "./licenses.md",
+      "resolved": "/docs/administration/licenses.md"
+    },
+    {
+      "page": "/docs/administration/downloads",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/docs/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/administration/groups-and-regions",
+      "href": "./users-and-approval.md",
+      "resolved": "/docs/administration/users-and-approval.md"
+    },
+    {
+      "page": "/docs/administration/groups-and-regions",
+      "href": "./licenses.md",
+      "resolved": "/docs/administration/licenses.md"
+    },
+    {
+      "page": "/docs/administration/groups-and-regions",
+      "href": "./collections-and-sharing.md",
+      "resolved": "/docs/administration/collections-and-sharing.md"
+    },
+    {
+      "page": "/docs/deployment/client-build",
+      "href": "../configuration/branding.md",
+      "resolved": "/docs/configuration/branding.md"
+    },
+    {
+      "page": "/docs/deployment/client-build",
+      "href": "./reverse-proxy.md",
+      "resolved": "/docs/deployment/reverse-proxy.md"
+    },
+    {
+      "page": "/docs/deployment/server-docker",
+      "href": "./worker-and-scaling.md",
+      "resolved": "/docs/deployment/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/deployment/server-docker",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/docs/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/deployment/server-docker",
+      "href": "./reverse-proxy.md",
+      "resolved": "/docs/deployment/reverse-proxy.md"
+    },
+    {
+      "page": "/docs/deployment/worker-and-scaling",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/docs/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/deployment/worker-and-scaling",
+      "href": "./server-docker.md",
+      "resolved": "/docs/deployment/server-docker.md"
+    },
+    {
+      "page": "/docs/deployment/reverse-proxy",
+      "href": "./client-build.md",
+      "resolved": "/docs/deployment/client-build.md"
+    },
+    {
+      "page": "/docs/getting-started/first-admin",
+      "href": "../administration/groups-and-regions.md",
+      "resolved": "/docs/administration/groups-and-regions.md"
+    },
+    {
+      "page": "/docs/getting-started/first-admin",
+      "href": "../administration/assets-tree.md",
+      "resolved": "/docs/administration/assets-tree.md"
+    },
+    {
+      "page": "/docs/getting-started/first-admin",
+      "href": "../administration/menu-and-pages.md",
+      "resolved": "/docs/administration/menu-and-pages.md"
+    },
+    {
+      "page": "/docs/getting-started/first-admin",
+      "href": "../administration/users-and-approval.md",
+      "resolved": "/docs/administration/users-and-approval.md"
+    },
+    {
+      "page": "/docs/getting-started/local-setup",
+      "href": "../integrations/dropbox.md",
+      "resolved": "/docs/integrations/dropbox.md"
+    },
+    {
+      "page": "/docs/getting-started/local-setup",
+      "href": "../integrations/onedrive.md",
+      "resolved": "/docs/integrations/onedrive.md"
+    },
+    {
+      "page": "/docs/getting-started/local-setup",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/docs/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/getting-started/local-setup",
+      "href": "./first-admin.md",
+      "resolved": "/docs/getting-started/first-admin.md"
+    },
+    {
+      "page": "/docs/integrations/onedrive",
+      "href": "../deployment/integrity-check.md",
+      "resolved": "/docs/deployment/integrity-check.md"
+    },
+    {
+      "page": "/docs/integrations/smtp",
+      "href": "../configuration/email-templates.md",
+      "resolved": "/docs/configuration/email-templates.md"
+    },
+    {
+      "page": "/docs/integrations/object-storage",
+      "href": "../deployment/integrity-check.md",
+      "resolved": "/docs/deployment/integrity-check.md"
+    },
+    {
+      "page": "/docs/integrations/dropbox",
+      "href": "../deployment/integrity-check.md",
+      "resolved": "/docs/deployment/integrity-check.md"
+    },
+    {
+      "page": "/docs/introduction/concepts",
+      "href": "./roles-and-access.md",
+      "resolved": "/docs/introduction/roles-and-access.md"
+    },
+    {
+      "page": "/docs/introduction/concepts",
+      "href": "./roles-and-access.md",
+      "resolved": "/docs/introduction/roles-and-access.md"
+    },
+    {
+      "page": "/docs/introduction/concepts",
+      "href": "./roles-and-access.md",
+      "resolved": "/docs/introduction/roles-and-access.md"
+    },
+    {
+      "page": "/docs/introduction/roles-and-access",
+      "href": "../administration/users-and-approval.md",
+      "resolved": "/docs/administration/users-and-approval.md"
+    },
+    {
+      "page": "/docs/introduction/roles-and-access",
+      "href": "../administration/groups-and-regions.md",
+      "resolved": "/docs/administration/groups-and-regions.md"
+    },
+    {
+      "page": "/docs/introduction/roles-and-access",
+      "href": "../administration/collections-and-sharing.md",
+      "resolved": "/docs/administration/collections-and-sharing.md"
+    },
+    {
+      "page": "/docs/introduction/roles-and-access",
+      "href": "../administration/licenses.md",
+      "resolved": "/docs/administration/licenses.md"
+    },
+    {
+      "page": "/docs/introduction/roles-and-access",
+      "href": "../administration/users-and-approval.md",
+      "resolved": "/docs/administration/users-and-approval.md"
+    },
+    {
+      "page": "/docs/contributing/background-jobs",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/docs/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/contributing/background-jobs",
+      "href": "../deployment/worker-and-scaling.md",
+      "resolved": "/docs/deployment/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/contributing/background-jobs",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/docs/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/contributing/background-jobs",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/docs/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "../introduction/concepts.md",
+      "resolved": "/docs/introduction/concepts.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "../deployment/worker-and-scaling.md",
+      "resolved": "/docs/deployment/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "./data-model.md",
+      "resolved": "/docs/contributing/data-model.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "./api.md",
+      "resolved": "/docs/contributing/api.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "./storage-drivers.md",
+      "resolved": "/docs/contributing/storage-drivers.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "./data-model.md",
+      "resolved": "/docs/contributing/data-model.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "../reference/background-jobs.md",
+      "resolved": "/docs/reference/background-jobs.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "./background-jobs.md",
+      "resolved": "/docs/contributing/background-jobs.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "../configuration/email-templates.md",
+      "resolved": "/docs/configuration/email-templates.md"
+    },
+    {
+      "page": "/docs/contributing/architecture",
+      "href": "./storage-drivers.md",
+      "resolved": "/docs/contributing/storage-drivers.md"
+    },
+    {
+      "page": "/docs/contributing/storage-drivers",
+      "href": "../integrations/dropbox.md",
+      "resolved": "/docs/integrations/dropbox.md"
+    },
+    {
+      "page": "/docs/contributing/storage-drivers",
+      "href": "../integrations/onedrive.md",
+      "resolved": "/docs/integrations/onedrive.md"
+    },
+    {
+      "page": "/docs/contributing/storage-drivers",
+      "href": "../administration/assets-tree.md",
+      "resolved": "/docs/administration/assets-tree.md"
+    },
+    {
+      "page": "/docs/contributing/storage-drivers",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/docs/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/contributing/storage-drivers",
+      "href": "../integrations/dropbox.md",
+      "resolved": "/docs/integrations/dropbox.md"
+    },
+    {
+      "page": "/docs/contributing/storage-drivers",
+      "href": "../integrations/index.md",
+      "resolved": "/docs/integrations/index.md"
+    },
+    {
+      "page": "/docs/contributing/api",
+      "href": "./architecture.md",
+      "resolved": "/docs/contributing/architecture.md"
+    },
+    {
+      "page": "/docs/contributing/api",
+      "href": "../introduction/roles-and-access.md",
+      "resolved": "/docs/introduction/roles-and-access.md"
+    },
+    {
+      "page": "/docs/contributing/data-model",
+      "href": "../introduction/concepts.md",
+      "resolved": "/docs/introduction/concepts.md"
+    },
+    {
+      "page": "/docs/contributing/data-model",
+      "href": "../deployment/upgrading.md",
+      "resolved": "/docs/deployment/upgrading.md"
+    },
+    {
+      "page": "/docs/contributing/data-model",
+      "href": "../deployment/upgrading.md",
+      "resolved": "/docs/deployment/upgrading.md"
+    },
+    {
+      "page": "/docs/configuration/branding",
+      "href": "./client-env.md",
+      "resolved": "/docs/configuration/client-env.md"
+    },
+    {
+      "page": "/docs/configuration/branding",
+      "href": "../deployment/backups.md",
+      "resolved": "/docs/deployment/backups.md"
+    },
+    {
+      "page": "/docs/configuration/server-env",
+      "href": "../reference/environment-variables.md",
+      "resolved": "/docs/reference/environment-variables.md"
+    },
+    {
+      "page": "/docs/configuration/server-env",
+      "href": "./client-env.md",
+      "resolved": "/docs/configuration/client-env.md"
+    },
+    {
+      "page": "/docs/configuration/server-env",
+      "href": "../deployment/worker-and-scaling.md",
+      "resolved": "/docs/deployment/worker-and-scaling.md"
+    },
+    {
+      "page": "/docs/configuration/server-env",
+      "href": "../deployment/upgrading.md",
+      "resolved": "/docs/deployment/upgrading.md"
+    },
+    {
+      "page": "/docs/configuration/server-env",
+      "href": "../integrations/object-storage.md",
+      "resolved": "/docs/integrations/object-storage.md"
+    },
+    {
+      "page": "/docs/configuration/server-env",
+      "href": "./email-templates.md",
+      "resolved": "/docs/configuration/email-templates.md"
+    },
+    {
+      "page": "/docs/configuration/server-env",
+      "href": "../administration/products-and-pim.md",
+      "resolved": "/docs/administration/products-and-pim.md"
+    },
+    {
+      "page": "/docs/configuration/email-templates",
+      "href": "../integrations/smtp.md",
+      "resolved": "/docs/integrations/smtp.md"
+    },
+    {
+      "page": "/docs/configuration/client-env",
+      "href": "../deployment/reverse-proxy.md",
+      "resolved": "/docs/deployment/reverse-proxy.md"
+    },
+    {
+      "page": "/docs/configuration/client-env",
+      "href": "./branding.md",
+      "resolved": "/docs/configuration/branding.md"
+    }
+  ],
+  "edit_links_correct": true,
+  "edit_count": 46
+}

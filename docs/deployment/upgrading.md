@@ -3,14 +3,14 @@ title: Upgrading
 description: Pull, build, restart; migrations run on their own at startup.
 sidebar:
   order: 6
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
-Upgrading an instance is rebuilding the two artefacts and restarting the server. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
+To upgrade an instance, rebuild the server image and client files, then deploy them together. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
 
 ## Procedure
 
-1. Back up the database (`pg_dump`). Migrations have `down` methods but the safe rollback is a restore.
+1. Take a consistent database/main-bucket/configuration backup as described in [Backups](./backups.md). Record the running image id and preserve it under a rollback tag before rebuilding `latest`: `docker image tag "$(docker inspect --format='{{.Image}}' damvia-server)" damvia-server:rollback-before-upgrade`. Also retain the old client bundle. Migrations have `down` methods, but the recovery plan is a matching-version restore.
 2. Pull the new version:
    ```bash
    git pull
@@ -19,7 +19,7 @@ Upgrading an instance is rebuilding the two artefacts and restarting the server.
    ```bash
    docker build -t damvia-server:latest server/
    docker stop damvia-server && docker rm damvia-server
-   docker run -d --name damvia-server --env-file /srv/damvia/server.env -e ENABLE_WORKER=true -p 3000:3000 damvia-server:latest
+   docker run -d --name damvia-server --env-file /srv/damvia/server.env -e ENABLE_WORKER=true --restart unless-stopped -p 127.0.0.1:3000:3000 damvia-server:latest
    ```
    Watch the logs: migrations run first; a migration error exits the process before it listens, and the previous image can be started again after a restore.
 4. Rebuild and redeploy the client:
@@ -29,7 +29,7 @@ Upgrading an instance is rebuilding the two artefacts and restarting the server.
    then copy `client/dist/` to the static host. Deploy the client **after** the server, since the client is built against the server's tRPC types and may call procedures the old server does not have.
 5. Check `docs/reference/environment-variables.md` of the new version (or the diff of `server/.env.template`) for new variables.
 
-Downtime is the server restart plus migration time, a few seconds on a normal database.
+Downtime includes maintenance, migrations and verification. Measure it on a restored copy; no duration is guaranteed.
 
 ## Migrations that exist
 
@@ -37,7 +37,7 @@ Downtime is the server restart plus migration time, a few seconds on a normal da
 |---|---|
 | `1726844037002-initial-migration` | Full schema, triggers for `number_of_files` and `sample_file_ids`, seeds the `Default` group and the `Global` region |
 | `1727629957517-add-searchable-to-product-attributes` | `searchable` flag on product attributes |
-| `1744549674740-add-details-to-licenses` | `details` text on licenses |
+| `1744549674740-add-details-to-licenses` | `details` text and nullable start/end dates on licenses |
 | `1750670845530-add-limited-to-group-ids-to-collections` | Group restriction on collections |
 | `1750683595547-create-user-groups` | Many-to-many user groups, migrating the previous single `group_id` |
 | `1750687616986-add-edit-to-limited-groups` | `can_edit_limited_to_group_ids` on collections |
@@ -48,15 +48,16 @@ TypeORM records applied migrations in the `migrations` table; the same migration
 
 ## Database permissions
 
-Migrations create tables, functions and triggers, and pg-boss creates the `pgboss` schema on first start. The `DATABASE_URL` user needs ownership of the database or `CREATE` on it. The `uuid-ossp` extension is used for `uuid_generate_v4()` defaults; on managed Postgres where extensions need a superuser, create it once by hand:
+Migrations create tables, functions and triggers, and pg-boss creates the `pgboss` schema on first start. The `DATABASE_URL` user needs ownership of the database or `CREATE` on it. The `uuid-ossp` extension supplies UUID defaults and `hstore` stores product metadata; on managed Postgres where extensions need a superuser, create it once by hand:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS hstore;
 ```
 
 ## Rolling back
 
-Restore the `pg_dump` taken in step 1 and start the previous image. The assets bucket is compatible across versions (objects are keyed by asset id), so nothing needs to be done there.
+Stop all application writers, restore the coordinated recovery point and restart the saved image with its matching client and configuration. Inspect storage-related migration changes; stable object ids alone do not guarantee cross-version compatibility. Follow [Backups](./backups.md) and verify jobs and media before reopening access.
 
 ## Version drift between client and server
 

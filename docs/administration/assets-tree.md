@@ -3,7 +3,7 @@ title: Assets tree
 description: Browse the folder tree synced from cloud storage, tag folders with types and licenses, and understand file statuses and thumbnails.
 sidebar:
   order: 6
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The assets tree is the mirror of the cloud folder Damvia synchronizes from Dropbox or OneDrive. Administrators do not upload files here; they browse what the sync brought in and decide, per folder, which asset type and license apply. Everything else on this page happens in background jobs.
@@ -38,7 +38,7 @@ Items that disappeared from the source are flagged `pending_deletion` in batches
 | Entity | Status | Meaning |
 | --- | --- | --- |
 | file | `creating` | Row exists, content not yet fetched |
-| file | `up_to_date` | Content and thumbnail stored |
+| file | `up_to_date` | Processing completed according to the application; does not guarantee original or thumbnail presence |
 | file | `outdated` | Content must be fetched again; set by the daily `system/integrity-check` job when it finds files to re-sync |
 | file | `pending_deletion` | Gone from the source, waiting for the deletion job |
 | folder | `up_to_date` | Present in the source |
@@ -85,3 +85,5 @@ Deleting a folder in the cloud source therefore deletes the synchronized collect
 :::
 
 Job names and schedules are summarized in [Background jobs](../reference/background-jobs.md).
+
+Original-upload errors are currently logged and absorbed, as are thumbnail/dimension failures. Processing can still set `up_to_date`; unsupported formats also legitimately lack previews. Verify stored objects independently. The integrity check verifies original presence/size, not thumbnail health; see [Integrity check](../deployment/integrity-check.md).

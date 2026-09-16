@@ -3,7 +3,7 @@ title: Administration
 description: Map of every admin screen, what it manages, and which role can open it.
 sidebar:
   order: 1
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The administration area lives under `/admin/...` in the client and is reached from the main layout. It groups everything a self-hoster or an administrator changes after the instance is running: who can log in, how assets are typed and licensed, what the menu and pages look like, and how the product catalogue is wired to files.
@@ -50,7 +50,7 @@ A manager who opens `/admin/users` is further limited to the users of their own 
 
 `client/src/router/index.ts` only checks that a visitor is authenticated: an unauthenticated visitor is redirected to `/login`, and an authenticated one is kept away from the auth pages. Nothing in the router compares the route to the user's role.
 
-Role enforcement happens on the server. Every tRPC procedure behind an admin screen is wrapped in `authMiddleware(...)` with one of the predicates defined in `server/src/trpc/index.ts`:
+Most admin procedures check the user's role on the server using `authMiddleware(...)` and the functions below. There are exceptions: `pim.updateProduct` is currently public, and some user-management checks are incomplete. See [Known limitations](../reference/known-limitations.md). The role-check functions are defined in `server/src/trpc/index.ts`:
 
 | Predicate | Passes when |
 | --- | --- |
@@ -68,3 +68,5 @@ A user who is authenticated but not yet verified and approved never reaches the 
 ## Where the data lives
 
 All admin screens talk to the tRPC API under `server/src/trpc/router/`. Most of the work described in these pages is done synchronously in the request, but a few actions push jobs to pg-boss queues (collection synchronization, archive creation, emails). Those queues and their crons are listed in [Background jobs](../reference/background-jobs.md), and the variables that shape them in [Environment variables](../reference/environment-variables.md).
+
+[Accounts and links](./accounts-and-links.md) covers session lifetime, expiry and revocation for operators. This documentation targets administrators and developers; end-user workflows will be maintained separately.

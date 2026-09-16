@@ -3,7 +3,7 @@ title: What is Damvia
 description: Damvia is a self-hosted Digital Asset Management layer that sits on top of your Dropbox or OneDrive and adds access control, collections, pages and product search.
 sidebar:
   order: 1
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 This page explains what Damvia does, who it is built for, what it deliberately does not do, and what it is made of. Read it before [Getting started](../getting-started/index.md) to decide whether it fits your setup.
@@ -36,7 +36,7 @@ Files of other types are still mirrored and downloadable, they simply have no pr
 - Access control: four roles, account approval, regions, groups, licenses and time-limited guest invitations. See [Roles and access](./roles-and-access.md).
 - Collections: a tree of curated sets of files. A collection can be bound to an asset folder so its content follows the storage automatically, or be assembled by hand.
 - Pages: editorial pages built from blocks (collections, files, latest files, text, image, video) and a configurable menu.
-- Search: full-text search on file names and on product attributes, with facets on asset types, product views, file kinds and any attribute flagged as facetable.
+- Search: case-insensitive substring matching (`ILIKE`) on file names and searchable product attributes; words are combined with OR and `exactMatch` matches the complete phrase as a substring, with facets on asset types, product views, file kinds and any attribute flagged as facetable.
 - PIM linking: products are imported from CSV, and `PRODUCT_MATCHING_REGEX` extracts a product key and a product view from each file name so files are linked to products automatically every 5 minutes.
 
 The domain model is described in [Core concepts](./concepts.md).
@@ -49,7 +49,7 @@ Damvia is designed for brand and marketing teams that hold product imagery, vide
 
 Damvia is not an upload tool. Users do not upload assets in the browser: assets arrive by adding files to the cloud storage, and they disappear by removing them there. The only in-app uploads are the collection thumbnail, images and videos placed in page blocks, and the login background image, all of which go to the main bucket rather than the assets bucket.
 
-Because the storage keeps every original, the README only asks you to back up the database. The assets bucket can be rebuilt from the cloud storage.
+Back up the database, main bucket and configuration/secrets together. Asset originals and generated previews can be rebuilt only while their sources remain available in the cloud storage. Download archives are not recreated. See [Backups](../deployment/backups.md).
 
 ## Tech stack
 
@@ -70,7 +70,7 @@ The `docker-compose.yml` in `server/` starts Postgres, MinIO and MailHog for loc
 Damvia is released under the GNU Affero General Public License v3 (see `LICENSE` at the repository root). For a self-hoster this means that if you modify Damvia and let users interact with it over a network, you must make the source code of your modified version available to those users.
 
 :::note
-Running an unmodified copy of Damvia for your own organisation does not require you to publish anything. The source-offer obligation only applies to modified versions.
+The statement above describes the network interaction requirement in AGPL section 13 for a modified version. It does not summarise all obligations when conveying copies; consult the repository licence for those conditions.
 :::
 
 Next: [Core concepts](./concepts.md), [Roles and access](./roles-and-access.md), [Getting started](../getting-started/index.md).

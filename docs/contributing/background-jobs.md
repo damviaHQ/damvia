@@ -3,7 +3,7 @@ title: Writing a background job
 description: Declare a pg-boss queue with createQueue, push jobs from the API, understand retries and deduplication, and run a job by hand.
 sidebar:
   order: 5
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 This page explains the job mechanism in `server/src/worker.ts` so you can add a queue or debug one. The list of existing queues, their crons and what they do is in [Background jobs](../reference/background-jobs.md); how to run the worker in production is in [Worker and scaling](../deployment/worker-and-scaling.md).
@@ -39,7 +39,7 @@ export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({
 - `push(data, { uniqueKey? })` calls `boss.send` with `retryBackoff: true` and `singletonKey: uniqueKey`.
 - `bulkPush([{ data, uniqueKey? }])` calls `boss.insert` with the same two options on every entry, in one round trip. `upsertFolder` uses it to queue one `collection/synchronization` per affected collection, and the integrity check to re-queue every outdated file.
 
-`retryBackoff: true` makes pg-boss retry a failed job with exponential backoff, using pg-boss's default retry limit since none is set here. A `singletonKey` deduplicates: pg-boss refuses a second job with the same key while one is still queued or active.
+`retryBackoff: true` makes pg-boss retry a failed job with exponential backoff, using pg-boss's default retry limit since none is set here. The installed defaults are two retries after the first attempt and a 15-minute active-job expiry. A `singletonKey` alone does not deduplicate the default `standard` queue: that requires an appropriate queue policy or `singletonSeconds` window and tests of its semantics. No current business call supplies `uniqueKey`.
 
 ## Registration happens at module load, activation in startWorker
 
@@ -47,7 +47,7 @@ export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({
 
 Two consequences for a new queue:
 
-1. Declare it as an `export const` in `worker.ts` and import that constant where you push (`services/asset.ts` imports `assetUpdateContentQueue` and `collectionSynchronizationQueue`; `trpc/router/user.ts` imports the mailer queues). A queue declared in another module would never be registered, because `startWorker` only knows about calls made while `worker.ts` was loaded.
+1. Declare it as an `export const` in `worker.ts` and import that constant where you push (`services/asset.ts` imports `assetUpdateContentQueue` and `collectionSynchronizationQueue`; `trpc/router/user.ts` imports the mailer queues). A declaration in another module is also registered if that module imports the same helper and is loaded before `startWorker()` runs.
 2. Pushing works in any process, worker or not: `push` only needs `boss` to be started. The API process starts `boss` inside `startWorker` when `ENABLE_WORKER=true`; the CLI starts it explicitly with `boss.start()`. A process that has neither cannot push.
 
 `worker.ts` imports the services, and `services/asset.ts` imports `worker.ts` back. This circular import works because the queue constants are only dereferenced inside functions, after both modules have loaded; keep new code in the same shape and do not call `push` at module top level.
@@ -66,7 +66,7 @@ then rethrown so pg-boss marks the job failed and schedules the retry. The wrapp
 
 Processors that touch more than one table run inside `dataSource.transaction(async (em) => ...)` and pass `em` down to the service (`synchronizeCollection(em, id)`, `createDownloadArchive({ em, download })`). The services accept an `EntityManager` for that reason; follow the same signature in a new service so the job can pass its transaction. Processors that do a single repository write (`mailer/*`, `asset/update-content`) use `dataSource.getRepository` directly.
 
-Because the transaction spans the whole processor, an exception rolls back every row the job wrote before pg-boss retries it. Side effects outside Postgres (an S3 upload, an email) are not rolled back; do them last, after the database work, as `download/create-archive` does by pushing `mailer/download-ready` at the end.
+Because the transaction spans the whole processor, an exception rolls back every row the job wrote before pg-boss retries it. S3 operations, email sends and queue sends through the separate boss connection do not participate in this transaction. Even a send at the end of the callback occurs before commit. Design retries to tolerate duplicates and partial side effects; the current wrapper does not provide exactly-once execution.
 
 ## Cron jobs receive no payload
 
@@ -99,5 +99,7 @@ The 5-minute cloud sync is not a job. It is a `setTimeout` loop in `server/src/i
 ## Checklist for a new queue
 
 1. `export const myQueue = createQueue<Payload>({ name: 'area/verb-object', processor, cron?, workerOptions? })` in `server/src/worker.ts`.
-2. Import `myQueue` where it is pushed and call `push` or `bulkPush`, with a `uniqueKey` when the same job must not be queued twice.
+2. Import `myQueue` where it is pushed and call `push` or `bulkPush`, with an explicit tested deduplication policy if duplicates must be prevented (`uniqueKey` alone is insufficient).
 3. Add a row to the table in [Background jobs](../reference/background-jobs.md); `scripts/check-docs.sh` fails when a queue name in `worker.ts` is missing there.
+
+Schedules use UTC because `boss.schedule` receives no `tz` option. A retry may overlap external work that exceeded the active-job expiry. Restarting a process is not a guarantee that a `preparing` download eventually completes: check terminal job failures and cleanup of temporary files.

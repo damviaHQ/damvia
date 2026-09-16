@@ -3,7 +3,7 @@ title: Users and approval
 description: How a visitor becomes a user, how approval and roles work, and what managers can and cannot do.
 sidebar:
   order: 2
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Users sign up themselves, verify their email address, and then wait for an administrator or a manager of their region to approve them, unless their email domain is on the authorized list. This page follows that path and the rules around roles, magic links, password resets and account removal.
@@ -22,15 +22,15 @@ The sign-up form (`/sign-up`) asks for a name, a company, a region picked from t
 | Approval | `approved` is true only if the part after `@` matches a row in `authorized_domains` |
 | Email | A job is pushed to `mailer/email-verification` |
 
-The API returns a JWT immediately, so the person is logged in, but `client/src/App.vue` shows a waiting screen instead of the app until both `emailVerified` and `approved` are true. A second sign-up with the same email fails with `Email address already taken.`
+The API returns a JWT immediately, so the person is logged in, but `client/src/app.vue` shows a waiting screen instead of the app until both `emailVerified` and `approved` are true. A second sign-up with the same email fails with `Email address already taken.`
 
 ## Verifying the email address triggers the approval request
 
-The verification email links to `APP_URL` with `?verificationCode=<code>`. `App.vue` watches the route, calls `user.verifyEmail` with the code and refreshes the user. On success the code is cleared and `emailVerified` becomes true.
+The verification email links to `APP_URL` with `?verificationCode=<code>`. `app.vue` watches the route, calls `user.verifyEmail` with the code and refreshes the user. On success the code is cleared and `emailVerified` becomes true.
 
 If the user is still unapproved at that moment, a job is pushed to `email/request-approval`. `sendRequestApprovalEmail` in `server/src/services/mailer.ts` sends one message to every user whose role is `manager` or `admin` **and** whose `region_id` equals the requester's. If that list is empty, no email is sent.
 
-The unverified screen offers to resend the verification email. That call, `user.resendVerificationEmail`, is a public procedure that takes the user id.
+The unverified screen offers to resend the verification email. That call, `user.resendVerificationEmail`, is a public procedure that takes the user id and returns a JWT for an unverified account. This is an authentication defect; see [Known limitations](../reference/known-limitations.md).
 
 ## Approve a pending user
 
@@ -79,7 +79,7 @@ With `ENABLE_PASSWORD_LESS_AUTH=true`:
 
 In password mode the same email flow is used when the login request carries `magicLink: true`, which the client sets when it was opened from an invitation link (see [Collections and sharing](./collections-and-sharing.md)).
 
-## Reset a password
+## Password-reset implementation
 
 `user.sendResetPasswordEmail` stores an 8-byte hex token in `reset_password_token` and pushes `mailer/password-reset`. The email links to `/password-update?email=<email>&token=<token>`. `user.resetPassword` checks the token, stores the new password (6 to 100 characters), clears the token and returns a JWT.
 
@@ -105,3 +105,9 @@ Passwords are hashed with SHA-512 and no salt (`hashPassword` in `server/src/ser
 :::caution
 Auth tokens are JWTs signed with `APP_SECRET` and valid for 180 days. The client stores the token in a `dam_token` cookie for 365 days. `APP_SECRET` falls back to a hard-coded default when unset, so always set it in production; see [Environment variables](../reference/environment-variables.md).
 :::
+
+## Account removal and manager-edit limitations
+
+`removeUser` does not remove or reassign private collections. Their owner foreign key can block the final user deletion. Resolve ownership or remove those collections through the application before attempting account removal. Earlier archive-object deletions are external effects and cannot be rolled back with the SQL transaction.
+
+The manager role check limits the new role but does not protect an existing administrator in the same region against demotion via `user.update`. That mutation also returns the saved entity directly. Until this is fixed, a manager account can change more than the intended role rules allow.

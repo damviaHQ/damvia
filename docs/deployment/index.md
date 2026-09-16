@@ -3,7 +3,7 @@ title: Deployment
 description: The production topology and the order to set it up in.
 sidebar:
   order: 1
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 A production Damvia is one Node.js process (API plus worker plus cloud sync), one static site, and three services. The repository ships a Dockerfile for the server and nothing else: how you host the static client, Postgres, S3 and SMTP is your choice.
@@ -34,7 +34,7 @@ A production Damvia is one Node.js process (API plus worker plus cloud sync), on
 - Postmark (or another SMTP relay) for mail.
 - A nightly `pg_dump` and a copy of the MinIO main bucket sent off the machine.
 
-The README's requirement list ("a dedicated server, an SMTP provider, a database backup solution") is exactly this.
+Keep configuration/secrets and application version with the database and main-bucket backups. The examples require deployment-specific credentials, DNS and certificate provisioning; they are not a tested turnkey production distribution.
 
 ## What you do not need
 
@@ -42,3 +42,7 @@ The README's requirement list ("a dedicated server, an SMTP provider, a database
 - No migration step on deploy: migrations run when the server starts.
 - No scheduled task outside the process: crons are pg-boss schedules inside the worker.
 - No backup of the assets bucket if the cloud storage is trusted: it can be rebuilt. The main bucket is different; see [Backups](./backups.md).
+
+## Validate and operate
+
+Use the [acceptance checklist](./acceptance-checklist.md) after setup and the [operations runbook](./operations.md) for monitoring. Review [known limitations](../reference/known-limitations.md) before exposing the API; the current code has access-control defects that documentation alone cannot resolve.

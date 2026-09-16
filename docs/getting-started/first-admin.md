@@ -3,7 +3,7 @@ title: First admin
 description: There is no seed command; the first administrator is a normal sign-up promoted with one SQL statement.
 sidebar:
   order: 3
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Every account is created through the sign-up form with the `member` role and, unless its email domain is pre-authorized, `approved = false`. Authorizing domains and approving users are admin actions, so the very first admin has to be promoted directly in the database.
@@ -42,7 +42,7 @@ The `email_verified` flag is set here only as a safety net; clicking the verific
 | Create regions and groups that match your organisation | `/admin/regions`, `/admin/groups` | A user belongs to exactly one region and gets the region's default group at sign-up. Managers act only inside their region. See [Groups and regions](../administration/groups-and-regions.md). |
 | Give each region a manager or admin | `/admin/users` | Approval requests are emailed to the admins and managers of the requester's region; a region with none sends the request to nobody. |
 | Check the assets tree | `/admin/assets` | Confirms the sync works. Assign asset types and licenses from here. See [Assets tree](../administration/assets-tree.md). |
-| Build the menu and a first collection | `/admin/menu-items`, `/admin/collections` | The home page is empty until a menu item is marked as home. See [Menu and pages](../administration/menu-and-pages.md). |
+| Build the menu and a first collection | `/admin/menu-items`, `/admin/collections` | Without a Home item, the client opens the first accessible collection or its welcome message. See [Menu and pages](../administration/menu-and-pages.md). |
 
 ## Adding more admins later
 

@@ -1,0 +1,32 @@
+{
+  "application_base": "f8eb687",
+  "public_documentation_pages": 51,
+  "source_checks": {
+    "variables": 32,
+    "queues": 14,
+    "errors": []
+  },
+  "regression_tests": {
+    "passed": 10,
+    "failed": 0
+  },
+  "website_with_corrected_working_tree_docs": {
+    "built_pages": 64,
+    "documentation_html_pages_including_redirect": 52,
+    "internal_links_checked": 3968,
+    "broken_links_or_anchors": 0
+  },
+  "website_with_current_pinned_submodule": {
+    "built_pages": 59,
+    "documentation_html_pages_including_redirect": 47,
+    "internal_links_checked": 3356,
+    "broken_links_or_anchors": 0
+  },
+  "actual_astro_invalid_metadata_test": "rejected boolean lastUpdated and non-numeric sidebar.order",
+  "server_types": "passed",
+  "client_build": "passed",
+  "client_types": "existing failure: seven syntax errors in src/views/search.vue:402",
+  "external_integration_tests": "not run",
+  "published": false,
+  "readability_review": "Rewrote abstract wording across the documentation; kept concrete UI descriptions and separated end-user tutorials."
+}

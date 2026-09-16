@@ -3,7 +3,7 @@ title: Core concepts
 description: The objects an administrator manipulates in Damvia, where each one comes from, and how they relate.
 sidebar:
   order: 2
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 This page describes the domain model behind the admin screens: what an asset, a collection, a page or a product is, and which of them you control versus which are mirrored. Access rules are in [Roles and access](./roles-and-access.md).
@@ -40,7 +40,7 @@ A collection is a named tree node (materialized path, unique `name` under a `par
 - `draft`: hides a public collection from members while it is being prepared.
 - `assetFolderId`: when set, the collection is synchronised. Its name follows the folder name, its files are the folder's files, and its children are generated from the sub-folders by the `collection/synchronization` queue. Files cannot be added to or removed from a synchronised collection.
 - `limitedToGroupIds` and `canEditLimitedToGroupIds`: restrict visibility to members of the listed groups; see [Roles and access](./roles-and-access.md).
-- `sampleFileIds`: up to four collection file ids maintained by database triggers, used to draw the thumbnail mosaic when no custom thumbnail is uploaded (`hasThumbnail`).
+- `sampleFileIds`: up to four collection file ids refreshed by database triggers and the integrity check (deletion alone can leave stale ids), used to draw the thumbnail mosaic when no custom thumbnail is uploaded (`hasThumbnail`).
 - `numberOfFiles`: maintained by insert and delete triggers on `collection_files`; the application never writes it.
 
 ## Collection files are join rows
@@ -51,7 +51,7 @@ A collection file links one asset file to one collection; the pair is unique. Fa
 
 A page is an editorial layout attached to at most one collection (`collectionId` is unique). It is made of blocks of type `collections`, `files`, `last_files`, `text`, `image` or `video`, each placed on a grid by `column`, `row` and `width`. Image and video blocks upload their media to the main bucket under `blocks/{pageId}/{uuid}`.
 
-Menu items build the sidebar. Their `type` is `collection`, `page`, `text` or `divider`; they nest via a materialized path and are ordered by `position`. Exactly one item can be flagged `home` and becomes the landing view. A menu entry is created automatically for every public root collection.
+Menu items build the sidebar. Their `type` is `collection`, `page`, `text` or `divider`; they nest via a materialized path and are ordered by `position`. At most one item is selected as `home` through `menuItem.setHome` and becomes the landing view. A menu entry is created automatically for every public root collection.
 
 ## Products and attributes drive search facets
 

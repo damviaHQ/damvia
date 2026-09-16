@@ -3,7 +3,7 @@ title: Email templates
 description: The seven transactional emails, the JSON that defines them, and the variables each template can use.
 sidebar:
   order: 4
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Every email Damvia sends is plain text rendered from a template with [LiquidJS](https://liquidjs.com). The templates live in one JSON document, either the file `server/mailconfig.json` or the `MAILCONFIG` environment variable holding the same JSON encoded in base64.
@@ -21,7 +21,7 @@ Every email Damvia sends is plain text rendered from a template with [LiquidJS](
 }
 ```
 
-Each key is a template name; each template has `from`, `subject` and `body`. `subject` and `body` are Liquid templates; `from` is used as is. Bodies are plain text (`\n` for new lines), not HTML. All seven keys must be present: the sender reads `mailConfig()[name]` without a fallback and would fail the job otherwise.
+Each key is a template name; each template has `from`, `subject` and `body`. Every `body` is a Liquid template. Only the `request-approval` subject is rendered with Liquid; the other six subjects and every `from` are used literally. Bodies are plain text (`\n` for new lines), not HTML. All seven keys must be present: the sender reads `mailConfig()[name]` without a fallback and would fail the job otherwise.
 
 ## The seven templates
 

@@ -3,7 +3,7 @@ title: Storage drivers
 description: "Add a cloud storage provider: the AssetUpdater base class, the upsertFolder and upsertFile contract, the deletion sweep, and the checklist for a new driver."
 sidebar:
   order: 6
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 This page describes what a storage driver must do so that a third provider can be added next to Dropbox and OneDrive. How the two existing drivers are configured is in [Dropbox](../integrations/dropbox.md) and [OneDrive](../integrations/onedrive.md); what happens to a file once it is known is in [Assets tree](../administration/assets-tree.md).
@@ -52,7 +52,7 @@ In the current code `file.externalChecksum = opts.externalChecksum` is assigned 
 
 ## The sweep deletes everything you did not list
 
-After the upserts, both drivers compute `arrayDifference(allIds, syncedIds)` for folders and files and mark the difference `pending_deletion`; the `asset/process-deletion` job then deletes those rows, their objects in the assets bucket and any collection bound to a deleted folder, every minute. The rule is therefore: **return every folder and file, or return nothing**. A partial listing (a paging error, a scope that silently narrowed, a token that lost access) deletes the assets you did not return.
+After the upserts, both drivers compute `arrayDifference(allIds, syncedIds)` for folders and files and mark the difference `pending_deletion`; the `asset/process-deletion` job then deletes those rows, their objects in the assets bucket and any collection bound to a deleted folder, every minute. The rule is therefore: **return every folder and file, or return nothing**. A successful but narrowed listing can delete omitted assets. If fetching a page fails and the error is allowed to propagate, the sync stops before marking assets for deletion. Dropbox instead catches individual upsert errors and continues. Those failed items can be missing from the list of ids to keep, so the final deletion step can mark them for removal.
 
 The Dropbox driver guards the empty case: when the listing yields no folder and no file it logs `Dropbox listing is empty, skipping sync to avoid deleting all assets` and returns before the sweep. A new driver needs the same guard, and should let a listing error propagate (the loop logs it and retries 5 minutes later) rather than swallow it and sweep.
 

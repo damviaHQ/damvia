@@ -52,3 +52,13 @@ Most of the interface uses the neutral grey palette from shadcn-vue and is not a
 ## No other client settings
 
 The app name in the tab title, the list of regions offered at sign-up and the passwordless flag come from the server at runtime through the public `env` query, so they follow the server's configuration without a client rebuild.
+
+## Hex colours in dotenv
+
+Bare hex values such as `VITE_BRAND_COLOR=e11d48` are supported. If including `#`, quote the value because dotenv treats an unquoted `#` as a comment:
+
+```dotenv
+VITE_BRAND_COLOR="#e11d48"
+VITE_BRAND_COLOR_HOVER="#be123c"
+VITE_BRAND_COLOR_STRONG="#9f1239"
+```

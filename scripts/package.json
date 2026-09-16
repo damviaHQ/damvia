@@ -1,0 +1,14 @@
+{
+  "name": "damvia-docs-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node check-docs.mjs",
+    "test": "node --test docs.test.mjs"
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.0",
+    "mdast-util-from-markdown": "^2.0.2",
+    "parse5": "^7.2.1"
+  }
+}

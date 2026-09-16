@@ -3,7 +3,7 @@ title: OneDrive
 description: Register an Azure application with Microsoft Graph permissions and point Damvia at one user's drive.
 sidebar:
   order: 3
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The OneDrive driver (`server/src/asset-updater/one-drive.ts`) uses Microsoft Graph with application credentials (client id and secret, no user login) to read the delta feed of one user's OneDrive for Business and download file contents.
@@ -17,7 +17,7 @@ The OneDrive driver (`server/src/asset-updater/one-drive.ts`) uses Microsoft Gra
 | `ONEDRIVE_CLIENT_ID` | The app registration's application (client) id |
 | `ONEDRIVE_CLIENT_SECRET` | A client secret created on the app registration |
 | `ONEDRIVE_USER` | The user principal name whose drive is read, for example `dam@company.com` |
-| `ONEDRIVE_DRIVE` | The path inside the drive in Graph syntax, for example `root:/DAM`. `root` alone syncs the entire drive. |
+| `ONEDRIVE_DRIVE` | Use `root` for the whole drive. Subfolder delta support requires separate validation. |
 
 ## 1. Register the application
 
@@ -31,14 +31,14 @@ In the Azure portal, under App registrations:
 
 ## 2. Pick the drive and folder
 
-The driver calls `/users/{ONEDRIVE_USER}/drive/{ONEDRIVE_DRIVE}/delta`. The path segment uses Graph's "path-based addressing": `root` is the drive root, `root:/Marketing/Assets` is a folder under it. If the path does not exist, Graph returns an error on the first call, logged as `failed to update assets`, and nothing is synced.
+The driver calls `/users/{ONEDRIVE_USER}/drive/{ONEDRIVE_DRIVE}/delta`. The documented full-drive form is `root`. Path-based addressing closes a path before an operation (for example `root:/Marketing/Assets:`); adding that colon does not establish that subfolder delta is supported for a Business drive. No real-tenant subfolder test has been performed. Use `root` for this recipe. If the path does not exist, Graph returns an error on the first call, logged as `failed to update assets`, and nothing is synced.
 
 ## What gets synced
 
 - The delta feed returns every item under the path. Items whose name starts with a dot and items with `size` 0 are skipped, so empty files never appear.
 - Items are keyed by their Graph id. Folders become asset folders with their parent's id; files become asset files with the `eTag` stored as checksum. The current sync does not compare it, so an edited file is only re-downloaded when the daily integrity check finds a different size. See [Integrity check](../deployment/integrity-check.md).
 - MIME type comes from Graph's `file.mimeType` at listing time and is re-detected from the content on download.
-- Anything not returned by the feed is marked `pending_deletion` and removed a minute later.
+- Anything not returned by the feed is marked `pending_deletion` and checked for removal by the per-minute deletion job.
 
 The driver always requests the full delta from the start (it does not persist a delta link), so each 5-minute run lists the whole subtree.
 
@@ -59,3 +59,5 @@ Startup prints `asset updater initialized` immediately (the OneDrive driver has 
 | `Authorization_RequestDenied` / `accessDenied` | `Files.Read.All` not granted as an application permission, or admin consent missing |
 | `invalid_client` | Wrong or expired client secret |
 | `itemNotFound` | `ONEDRIVE_USER` has no OneDrive provisioned, or `ONEDRIVE_DRIVE` path does not exist |
+
+See Microsoft's [path-addressing rules](https://learn.microsoft.com/en-us/graph/onedrive-addressing-driveitems) and [delta endpoint reference](https://learn.microsoft.com/en-us/graph/api/driveitem-delta?view=graph-rest-1.0) for the distinction between an addressable folder and a supported delta operation.

@@ -1,9 +1,9 @@
 ---
 title: Worker and scaling
-description: One flag turns the job worker on; the cloud sync loop is not gated by it, which shapes how many processes you can run.
+description: Understand which tasks run in the server process, why the worker must be enabled, and the current limits on running multiple processes.
 sidebar:
   order: 5
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 The server process has three roles: the HTTP API, the pg-boss worker, and the cloud sync loop. Only the worker is optional, and the way the three are coupled decides your scaling options.
@@ -27,10 +27,10 @@ Options, from simplest to most involved:
 | Need | Approach |
 |---|---|
 | Faster previews on first import | Give the single process more CPU; `asset/update-content` handles 10 jobs concurrently and LibreOffice or ffmpeg conversions are CPU-bound. |
-| API latency during heavy processing | Run two containers from the same image: one with `ENABLE_WORKER=true` that also receives no public traffic, one with `ENABLE_WORKER` unset that serves `API_URL`. Both still run the sync loop. |
+| API latency during heavy processing | Code changes are needed first: let the API connect to pg-boss to queue work, let a separate worker run that work, and ensure only one process syncs the cloud storage. With `ENABLE_WORKER` off today, the API can fail when it queues a task. |
 | No duplicate sync | Not configurable today. A second process always syncs. |
 
-pg-boss guarantees that a job is handled by one worker at a time, so several worker processes would be safe for the queues; the constraint is the sync loop, not the queues.
+pg-boss decides which worker picks up a job. If that job times out or is interrupted, a retry can repeat actions such as an upload or email send. Running the API and worker separately also requires code changes so the API can queue work and only one process runs cloud sync.
 
 ## Job concurrency inside the worker
 
@@ -44,10 +44,10 @@ Inside `download/create-archive`, files are transformed 25 at a time.
 
 ## Memory and disk
 
-- A full listing of the cloud storage is held in memory during sync; tens of thousands of entries is fine, millions is not.
+- A full listing of the cloud storage is held in memory during sync; no tested entry-count capacity is published. Dropbox file downloads also buffer content in memory.
 - Downloads and conversions use the OS temp directory; see [Server with Docker](./server-docker.md).
 - pg-boss stores jobs in the `pgboss` schema and archives completed ones; the tables grow with activity and pg-boss prunes them on its own schedule.
 
 ## Restarting
 
-A restart is safe at any point. Jobs in progress are retried after pg-boss's expiry interval, the sync loop starts over, and a half-built archive is left in the temp directory (cleaned when the container's `/tmp` is). Downloads that were `preparing` finish on the retry.
+With the installed pg-boss defaults, an active job expires after 15 minutes and a failed job can be retried twice. Restarting during a job can leave temporary files, an uploaded object or an email already sent. Jobs that have exhausted their retries are not restarted automatically, so a download can stay `preparing`. Check the failed job and its download record before submitting a new request. See [Operations](./operations.md).

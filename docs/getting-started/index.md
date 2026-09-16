@@ -3,7 +3,7 @@ title: Requirements
 description: "What you need before installing Damvia: runtime, services, a cloud storage app, and the media tools that make previews."
 sidebar:
   order: 1
-lastUpdated: 2026-09-15
+lastUpdated: 2026-09-16
 ---
 
 Damvia is a Node.js server, a static single-page client, and three services it depends on. This page lists what to have ready; [Local setup](./local-setup.md) walks through running it on one machine, and [Deployment](../deployment/index.md) through running it for real.
@@ -12,15 +12,15 @@ Damvia is a Node.js server, a static single-page client, and three services it d
 
 | Requirement | Version | Why |
 |---|---|---|
-| Node.js | 20 | The `server/Dockerfile` builds on `node:20`. The client builds on the same. |
+| Node.js | 22 for local checks; Docker currently 20 | The checked-in `server/Dockerfile` still builds on `node:20`, which is end-of-life. Build and test an image with a maintained Node version before production; see [Validation status](../reference/validation-status.md). |
 | npm | ships with Node | Both packages install with `npm install`. There is no monorepo tool; `client/` depends on `server/` through `"server": "file:../server"` for shared tRPC types, so install the server first. |
-| Git | any | The client's `file:` dependency and the docs workflow assume a clone, not a tarball. |
+| Git | any | Recommended for version tracking; an archive containing both `server/` and `client/` can also satisfy the local npm dependency. |
 
 ## Services
 
 | Service | Version | Notes |
 |---|---|---|
-| PostgreSQL | 15 | The only stateful store you must back up. pg-boss (the job queue) lives in the same database. The initial migration seeds one group (`Default`) and one region (`Global`). |
+| PostgreSQL | 15 | Back up with the main bucket and configuration. pg-boss (the job queue) lives in the same database. The initial migration seeds one group (`Default`) and one region (`Global`). |
 | S3-compatible object storage | MinIO or AWS S3 | Two buckets: one for app uploads (thumbnails, login background), one for asset originals, previews and download archives. Browsers talk to it directly through presigned URLs, so it must be reachable from users, not only from the server. See [Object storage](../integrations/object-storage.md). |
 | SMTP server | any | Every account flow (verification, approval, magic link, password reset, invitations, "download ready") is an email. Postmark is the provider the code is tuned for. See [SMTP](../integrations/smtp.md). |
 
@@ -55,10 +55,10 @@ The exact install line from `server/Dockerfile`:
 apt-get install -y ffmpeg ghostscript libreoffice coreutils imagemagick
 ```
 
-Images (`jpg`, `png`, `gif`, `bmp`, `webp`, `tiff`, `svg`, `psd`) go through `sharp`, which is bundled with the Node dependencies. Fonts (`ttf`, `otf`) are rendered to a specimen thumbnail without extra packages.
+Images (`jpg`, `png`, `gif`, `bmp`, `webp`, `tiff`, `svg`, `psd`) go through `sharp`, which is bundled with the Node dependencies. Fonts (`ttf`, `otf`) are rendered to a specimen thumbnail using ImageMagick `convert`.
 
 ## Sizing
 
-- The server keeps the full listing of the cloud storage in memory during each 5-minute sync, and downloads each file once to a temp directory before uploading it to S3. Give it disk in the temp directory at least as large as your biggest asset, plus room for a 10 GB download archive.
+- The server keeps the full listing of the cloud storage in memory during each 5-minute sync, and downloads each file once to a temp directory before uploading it to S3. Allow for up to ten concurrent asset downloads, archive source files, converted copies and the finished archive at the same time. The API limit bounds source bytes, not conversion output. Dropbox also buffers `fileBinary` in memory. Measure peak disk and memory with representative files; there is no verified minimum sizing.
 - LibreOffice conversions are the heaviest step; a small instance handles them, but expect the first sync of a large library to take hours.
-- One API process is enough for most teams. Running several is possible but the cloud sync runs in each of them; see [Worker and scaling](../deployment/worker-and-scaling.md).
+- One API process is enough for most teams. The documented operating topology is one process with `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md).
