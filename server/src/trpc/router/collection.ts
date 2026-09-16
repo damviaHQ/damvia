@@ -168,8 +168,8 @@ export async function formatCollectionFile({ file, productAttributes }: FormatCo
 			details: file.assetFile.license.details,
 			allowedRegionIds: file.assetFile.license.allowedRegionIds,
 			expired:
-				(file.assetFile.license.usageFrom && new Date(file.assetFile.license.usageFrom).getTime() >= Date.now()) &&
-				(file.assetFile.license.usageTo && new Date(file.assetFile.license.usageTo).getTime() <= Date.now()),
+				(file.assetFile.license.usageFrom && new Date(file.assetFile.license.usageFrom).toISOString().slice(0, 10) > new Date().toISOString().slice(0, 10)) ||
+				(file.assetFile.license.usageTo && new Date(file.assetFile.license.usageTo).toISOString().slice(0, 10) < new Date().toISOString().slice(0, 10)),
 		} : null,
 	}
 }
@@ -213,10 +213,11 @@ export default router({
 			})
 
 			let query = userCollectionFilesQuery(ctx.user)
+			searchableAttributes.forEach((attribute, index) => query.setParameter(`attribute${index}`, attribute.name))
 			if (input.query && input.exactMatch) {
 				const queryParts = [
 					'asset_file.name ILIKE :query',
-					...searchableAttributes.map((attribute) => `product.meta_data['${attribute.name}'] ILIKE :query`),
+					...searchableAttributes.map((attribute, index) => `(product.meta_data -> :attribute${index}) ILIKE :query`),
 				]
 				query.andWhere(`(${queryParts.join(' OR ')})`, { query: `%${input.query}%` })
 			} else if (input.query) {
@@ -226,7 +227,7 @@ export default router({
 						const where = index === 0 ? q.where : q.orWhere
 						const queryParts = [
 							`asset_file.name ILIKE :${queryKey}`,
-							...searchableAttributes.map((attribute) => `product.meta_data['${attribute.name}'] ILIKE :${queryKey}`),
+							...searchableAttributes.map((attribute, index) => `(product.meta_data -> :attribute${index}) ILIKE :${queryKey}`),
 						]
 						return where.call(q, `(${queryParts.join(' OR ')})`, { [queryKey]: `%${value}%` })
 					}, baseQuery),
@@ -313,39 +314,19 @@ export default router({
 			searchScope: z.string().optional().nullable(),
 		}))
 		.query(async ({ input, ctx }) => {
-			const collections = await userCollectionsQuery(ctx.user).getMany()
-			let queryParams = [input.query, collections.map((collection) => collection.id)] as any[]
-			let queryIndex = 3
-			let queryCriteria = [
-				`asset_files.name ILIKE '%' || t.tag || '%'`,
-				`collection_files.collection_id = ANY($2::uuid[])`,
-			]
-
-			if (input.assetTypes?.length) {
-				queryParams = [...queryParams, input.assetTypes]
-				queryCriteria = [...queryCriteria, `asset_files.asset_type_id = ANY($${queryIndex++}::uuid[])`]
-			}
-
+			const visible = userCollectionFilesQuery(ctx.user).select('asset_file.name', 'name')
+			if (input.assetTypes?.length) visible.andWhere('asset_file.asset_type_id IN (:...types)', { types: input.assetTypes })
 			if (input.searchScope === 'current_with_sub') {
-				queryParams = [...queryParams, `%${input.collectionId}.%`]
-				queryCriteria = [...queryCriteria, `collection.mpath ILIKE $${queryIndex++}`]
+				visible.andWhere('collection.mpath LIKE :path', { path: `%${input.collectionId}.%` })
 			} else if (input.searchScope === 'current' && input.collectionId) {
-				queryParams = [...queryParams, input.collectionId]
-				queryCriteria = [...queryCriteria, `collection.id = $${queryIndex++}`]
+				visible.andWhere('collection.id = :collectionId', { collectionId: input.collectionId })
 			}
-
+			const [sql, parameters] = visible.getQueryAndParameters()
+			const shifted = sql.replace(/\$(\d+)/g, (_, n) => `$${Number(n) + 1}`)
 			const result = await dataSource.query(`
-        SELECT t.tag
-        FROM unnest($1::text[]) AS t(tag)
-		 		LEFT JOIN LATERAL (
-					SELECT *
-					FROM asset_files
-			 		INNER JOIN collection_files ON collection_files.asset_file_id = asset_files.id
-					WHERE ${queryCriteria.join(' AND ')}
-				) AS subq ON true
-        GROUP BY t.tag
-        HAVING COUNT(subq) = 0;
-			`, queryParams)
+				SELECT tag FROM unnest($1::text[]) AS terms(tag)
+				WHERE NOT EXISTS (SELECT 1 FROM (${shifted}) AS visible WHERE visible.name ILIKE '%' || tag || '%')
+			`, [input.query, ...parameters])
 			return result.map((row) => row.tag) as string[]
 		}),
 	findById: publicProcedure
@@ -504,7 +485,7 @@ export default router({
 					.andWhereInIds(input.items.filter(v => v.type === 'collection').map(v => v.id))
 					.getMany()
 				for (const item of collectionsToDuplicate) {
-					await duplicateCollection({ em, source: item, destination: collection })
+					await duplicateCollection({ em, source: item, destination: collection, user: ctx.user })
 				}
 
 				const filesToDuplicate = await userCollectionFilesQuery(ctx.user)

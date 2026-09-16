@@ -71,7 +71,7 @@ Storage settings are covered in [Object storage](../integrations/object-storage.
 
 Intermediate PNGs are resized to a height of 1,280 pixels and encoded as WebP with `sharp`. Every thumbnail stored in the bucket is WebP. Files outside these families get no thumbnail and the client shows a placeholder.
 
-The `server/Dockerfile` installs the required system packages on `node:20`: `ffmpeg`, `ghostscript`, `libreoffice`, `coreutils` and `imagemagick`. A server running outside that image needs the same tools on its `PATH`.
+The `server/Dockerfile` installs the required system packages on `node:22-bookworm`: `ffmpeg`, `ghostscript`, `libreoffice`, `coreutils` and `imagemagick`. A server running outside that image needs the same tools on its `PATH`.
 
 ## The `asset/process-deletion` job
 

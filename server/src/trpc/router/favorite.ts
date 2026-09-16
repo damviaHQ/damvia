@@ -12,9 +12,9 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { userCollectionFilesQuery } from '../../services/collection'
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
-import { CollectionFile } from "../../entity/collection-file"
 import { ProductAttribute } from "../../entity/product-attribute"
 import { UserFavorite } from "../../entity/user-favorite"
 import { dataSource } from "../../env"
@@ -25,20 +25,13 @@ export default router({
 	list: publicProcedure
 		.use(authMiddleware(userApproved, userMember))
 		.query(async ({ ctx }) => {
-			const favorites = await dataSource.getRepository(UserFavorite).find({
-				where: { userId: ctx.user.id },
-				relations: {
-					collectionFile: {
-						assetFile: {
-							product: true,
-						},
-					},
-				},
-			})
+			const files = await userCollectionFilesQuery(ctx.user)
+				.innerJoin(UserFavorite, 'favorite', 'favorite.collection_file_id = collection_file.id AND favorite.user_id = :favoriteUserId', { favoriteUserId: ctx.user.id })
+				.getMany()
 			const productAttributes = await dataSource.getRepository(ProductAttribute).find()
 
-			return Promise.all(favorites.map((favorite) => formatCollectionFile({
-				file: favorite.collectionFile,
+			return Promise.all(files.map((file) => formatCollectionFile({
+				file,
 				productAttributes,
 			})))
 		}),
@@ -46,7 +39,7 @@ export default router({
 		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ collectionFileId: z.string().uuid() }))
 		.mutation(async ({ input, ctx }) => {
-			const collectionFile = await dataSource.getRepository(CollectionFile).findOneBy({ id: input.collectionFileId })
+			const collectionFile = await userCollectionFilesQuery(ctx.user).andWhere('collection_file.id = :fileId', { fileId: input.collectionFileId }).getOne()
 			if (!collectionFile) {
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection file not found.' })
 			}

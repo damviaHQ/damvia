@@ -12,7 +12,7 @@ Damvia is a Node.js server, a static single-page client, and three services it d
 
 | Requirement | Version | Why |
 |---|---|---|
-| Node.js | 22 for local checks; Docker currently 20 | The checked-in `server/Dockerfile` still builds on `node:20`, which is end-of-life. Build and test an image with a maintained Node version before production; see [Validation status](../reference/validation-status.md). |
+| Node.js | Current Node 22 | The server Dockerfile uses `node:22-bookworm`. See [Validation status](../reference/validation-status.md) for local checks. |
 | npm | ships with Node | Both packages install with `npm install`. There is no monorepo tool; `client/` depends on `server/` through `"server": "file:../server"` for shared tRPC types, so install the server first. |
 | Git | any | Recommended for version tracking; an archive containing both `server/` and `client/` can also satisfy the local npm dependency. |
 

@@ -209,6 +209,7 @@ export default router({
       return log
     }),
   updateProduct: publicProcedure
+    .use(authMiddleware(userAdmin))
     .input(
       z.object({
         id: z.string(),

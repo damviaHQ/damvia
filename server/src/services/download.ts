@@ -12,6 +12,8 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { userCollectionFilesQuery } from './collection'
+import { User } from '../entity/user'
 import archiver from 'archiver'
 import ffmpeg from "fluent-ffmpeg"
 import { randomUUID } from "node:crypto"
@@ -41,17 +43,14 @@ export type CreateDownloadArchiveOptions = {
 }
 
 export async function createDownloadArchive({ em, download }: CreateDownloadArchiveOptions) {
-	const collectionFiles = await em.getRepository(CollectionFile).find({
-		where: {
-			id: In(download.collectionFileIds),
-		},
-		relations: {
-			assetFile: true,
-			collection: true,
-		},
-	})
-	if (collectionFiles.length === 0) {
-		return
+	const user = await em.getRepository(User).findOneBy({ id: download.userId })
+	if (!user?.approved || !user.emailVerified || !download.collectionFileIds.length) {
+		throw new Error('Download access is no longer available.')
+	}
+	const collectionFiles = await userCollectionFilesQuery(user, em)
+		.andWhere('collection_file.id IN (:...ids)', { ids: download.collectionFileIds }).getMany()
+	if (collectionFiles.length !== new Set(download.collectionFileIds).size) {
+		throw new Error('Download access is no longer available.')
 	}
 
 	const workingDirectory = await mkdtemp(join(tmpdir(), `dam-asset-${randomUUID()}`))

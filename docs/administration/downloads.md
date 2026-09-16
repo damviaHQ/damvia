@@ -57,6 +57,8 @@ Conversions run only on files whose MIME type starts with `image/` or `video/` a
 | Video `webm` | ffmpeg with `libvpx` |
 | Video `high` / `medium` / `low` | Scaled to a width of 7680 / 1920 / 720 pixels, height kept proportional |
 
+The archive worker checks the requester’s current approval, collection access and file licences before preparing the export. If any selected file is no longer accessible, the job fails without producing an archive.
+
 Temporary files are written under the system temp directory and removed when the job ends. `ffmpeg` must be installed on the host; the `server/Dockerfile` provides it.
 
 ## Links expire after 7 days

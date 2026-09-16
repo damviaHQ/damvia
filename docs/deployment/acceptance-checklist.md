@@ -22,8 +22,8 @@ Prepare a nested folder containing an image, a PDF, a short video and a file typ
 | Import | Nested files/folders appear with correct sizes. Original bytes can be fetched; supported previews render. Unsupported types remain downloadable without a preview. |
 | Modified file | Verify both different-size and same-size replacement. Current checksum detection is defective; use targeted refresh and record the limit. |
 | Renamed/moved file | Provider id is retained. Check private curated associations as moves can remove them. |
-| Synchronised collection | After the jobs finish, sub-collections and files match the source folder. Check each new sub-collection's group restrictions: the code does not always copy them from the parent. |
-| Access | Use separate accounts to check public and draft collections, group restrictions, regional licences and invitations. Record cases where ownership, a group or an invitation grants access despite the licence. |
+| Synchronised collection | After the jobs finish, sub-collections and files match the source folder. Each new sub-collection inherits its parent’s group restrictions. |
+| Access | Use separate accounts to check public and draft collections, group restrictions, regional licences and invitations. Owners, group members and invitees must meet licence restrictions; admins are exempt. Drafts are visible only to admins and owners. |
 | Editorial upload | Upload a collection thumbnail and page image/video; validate PUT preflight and rendered GET URLs from the actual browser origin. |
 | PIM | Import the two-row [CSV fixture](../administration/products-and-pim.md#reproducible-import-fixture); verify key/view links after the scheduled job. |
 | Exports | Build a small direct export and an email export. Check archive contents, queue completion and delivery in the test sink. |

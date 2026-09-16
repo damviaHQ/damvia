@@ -50,13 +50,13 @@ A manager who opens `/admin/users` is further limited to the users of their own 
 
 `client/src/router/index.ts` only checks that a visitor is authenticated: an unauthenticated visitor is redirected to `/login`, and an authenticated one is kept away from the auth pages. Nothing in the router compares the route to the user's role.
 
-Most admin procedures check the user's role on the server using `authMiddleware(...)` and the functions below. There are exceptions: `pim.updateProduct` is currently public, and some user-management checks are incomplete. See [Known limitations](../reference/known-limitations.md). The role-check functions are defined in `server/src/trpc/index.ts`:
+Admin procedures require an approved, email-verified account with the appropriate role. The server checks these conditions using `authMiddleware(...)` and the predicates in `server/src/trpc/index.ts`:
 
 | Predicate | Passes when |
 | --- | --- |
 | `userApproved` | `approved` and `emailVerified` are both true |
-| `userAdmin` | role is `admin` |
-| `userManagerOrAdmin` | role is `admin` or `manager` |
+| `userAdmin` | approved, email-verified, role is `admin` |
+| `userManagerOrAdmin` | approved, email-verified, role is `admin` or `manager` |
 | `userMember` | role is `admin`, `manager` or `member` (excludes `guest`) |
 
 A member who types an admin URL by hand gets the screen shell, and the data calls fail with `UNAUTHORIZED`. See [Roles and access](../introduction/roles-and-access.md) for the role model.

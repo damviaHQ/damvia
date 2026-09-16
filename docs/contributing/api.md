@@ -27,7 +27,7 @@ findById: publicProcedure
 	}),
 ```
 
-`ctx` is `{ req, res, user }`; `user` is the `User` entity loaded from the JWT or `null`. Each router file is `export default router({ ... })`, mounted under its key in `router/index.ts`, which also declares the only top-level procedure, `env`. Prefer plain objects built by local `format*` helpers. Current exceptions `user.update` and `pim.updateProduct` return entities directly; review sensitive fields rather than assuming every result is filtered. Renaming a procedure is a client change too, since the client is compiled against `AppRouter`.
+`ctx` is `{ req, res, user }`; `user` is the `User` entity loaded from the JWT or `null`. Each router file is `export default router({ ... })`, mounted under its key in `router/index.ts`, which also declares the only top-level procedure, `env`. Prefer plain objects built by local `format*` helpers. `user.update` returns public profile fields. Product mutations return product entities. Renaming a procedure is a client change too, since the client is compiled against `AppRouter`.
 
 ## Four predicates gate access
 
@@ -37,8 +37,8 @@ findById: publicProcedure
 |---|---|
 | `userApproved` | `user.approved && user.emailVerified` |
 | `userMember` | `role` is `admin`, `manager` or `member` (not `guest`) |
-| `userManagerOrAdmin` | `role` is `admin` or `manager` |
-| `userAdmin` | `role` is `admin` |
+| `userManagerOrAdmin` | Approved, email-verified, and `role` is `admin` or `manager` |
+| `userAdmin` | Approved, email-verified, and `role` is `admin` |
 
 Per-object rules (own region for managers, `collection.canEdit(user)`, visibility through `userCollectionsQuery`) are enforced inside the procedure body, not by the middleware.
 
@@ -73,7 +73,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `login` | mutation | public | Password login returning the JWT, or pushes `mailer/log-in` when passwordless or `magicLink` |
 | `sendResetPasswordEmail` | mutation | public | Pushes `mailer/password-reset` |
 | `resetPassword` | mutation | public | Sets a new password given the email and the reset token |
-| `resendVerificationEmail` | mutation | public | Publicly targets an unverified user id and also returns a JWT; see known limitations |
+| `resendVerificationEmail` | mutation | login | Resends the caller’s verification email; no token is returned |
 | `me` | query | login | Current user |
 | `updateProfile` | mutation | login | Own name/company; changing email requires admin |
 | `verifyEmail` | mutation | login | Consumes `?verificationCode=` |
@@ -82,7 +82,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user |
 | `list` | query | `userManagerOrAdmin` | Users (managers: own region) |
 | `approve` | mutation | `userManagerOrAdmin` | Approves and pushes `email/user-approved` |
-| `remove` | mutation | `userManagerOrAdmin` | Deletes a user; managers cannot delete admins |
+| `remove` | mutation | `userManagerOrAdmin` | Deletes a user; managers can delete only members and guests in their region |
 
 ### `group`, `region`, `authorizedDomain`
 
@@ -147,7 +147,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `pim.compareCsv` | mutation | `userAdmin` | Diff of a parsed CSV against existing products |
 | `pim.importCsv` | mutation | `userAdmin` | Upserts products from a parsed CSV |
 | `pim.removeAllProducts` | mutation | `userAdmin` | Deletes every product |
-| `pim.updateProduct` | mutation | public | Replaces one product's `metaData` |
+| `pim.updateProduct` | mutation | `userAdmin` | Replaces one product's `metaData` |
 | `productAttribute.listAvailable` | query | `userAdmin` | Distinct `hstore` keys found in products |
 | `productAttribute.list` | query | `userAdmin` | Declared attributes |
 | `productAttribute.listFacets` | query | login | Facetable attributes with their distinct values |
@@ -174,4 +174,4 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `settings.processAuthBackgroundImage` | mutation | `userAdmin` | Converts the temporary upload to WebP (quality 80) at `settings/auth-background.webp` |
 | `settings.removeAuthBackgroundImage` | mutation | `userAdmin` | Deletes the background |
 
-Uncaught database, storage or service exceptions can also surface as `INTERNAL_SERVER_ERROR`. The normal role predicates do not cover all current mutations; [Known limitations](../reference/known-limitations.md) lists the access-control exceptions.
+Uncaught database, storage or service exceptions can also surface as `INTERNAL_SERVER_ERROR`.

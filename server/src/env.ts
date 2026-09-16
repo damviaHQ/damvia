@@ -26,6 +26,10 @@ import AssetUpdater from "./asset-updater/base"
 import DropboxAssetUpdater from "./asset-updater/dropbox"
 import OneDriveAssetUpdater from "./asset-updater/one-drive"
 
+import { validateAppSecret } from './services/credentials'
+
+const appSecret = validateAppSecret(process.env.APP_SECRET)
+
 export const logger = createLogger({
   format: format.combine(
     format.timestamp(),
@@ -74,7 +78,7 @@ export function passwordLessAuth() {
 }
 
 export function secret() {
-  return process.env.APP_SECRET ?? 'Damvia App Secret'
+  return appSecret
 }
 
 export function apiURL() {

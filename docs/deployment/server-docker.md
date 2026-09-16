@@ -6,18 +6,18 @@ sidebar:
 lastUpdated: 2026-09-16
 ---
 
-`server/Dockerfile` produces a self-contained image with Node 20, the media tools, the compiled server and the sources (the CLI still runs from TypeScript). Node 20 no longer receives normal maintenance updates. The Dockerfile still needs to be updated and tested with a maintained version. See [Validation status](../reference/validation-status.md).
+`server/Dockerfile` builds on Node 22 (Debian Bookworm) and includes the media tools, compiled server and sources. The CLI still runs from TypeScript. See [Validation status](../reference/validation-status.md) for completed checks.
 
 ## What the image contains
 
 ```dockerfile
-FROM node:20
+FROM node:22-bookworm
 WORKDIR /app
 RUN apt-get update
 RUN apt-get install -y ffmpeg ghostscript libreoffice coreutils imagemagick
 COPY package.json .
 COPY package-lock.json .
-RUN npm install
+RUN npm ci
 COPY . .
 RUN npm run build
 CMD ["npm", "start"]
@@ -36,7 +36,7 @@ From the `server/` folder:
 docker build -t damvia-server:latest .
 ```
 
-`npm install` installs dev dependencies too (the build needs `typescript`); the image is not slimmed. The checked-in `server/.dockerignore` excludes `node_modules`, `dist` and `.env` files before the build copies sources.
+`npm ci` installs the locked dependencies, including dev dependencies (the build needs `typescript`); the image is not slimmed. The checked-in `server/.dockerignore` excludes `node_modules`, `dist` and `.env` files before the build copies sources.
 
 ## Run
 

@@ -10,9 +10,9 @@ Account access, invitation access and object URLs have separate lifetimes. This 
 
 | Mechanism | Lifetime and revocation |
 |---|---|
-| JWT session and login/invitation tokens | Signed with `APP_SECRET`, expire after 180 days, reusable until expiry. No per-session revoke list is implemented. |
+| JWT session and login/invitation tokens | Signed with `APP_SECRET`, expire after 180 days. A password reset ends the account’s earlier sessions and login links; rotating the secret ends all sessions. |
 | Client `dam_token` cookie | Stored for 365 days; this does not extend the JWT's validity. |
-| Password-reset token | Stored in `reset_password_token`; checked and cleared on successful use, or replaced by another reset request. No time-based expiry is checked. |
+| Password-reset token | Expires after one hour. Stored as a hash, consumed once on success and replaced by another reset request. |
 | Collection invitation | Access branch expires at the start of the selected date; deleting the invitation removes that branch. Other owner/group/public grants remain. |
 | Presigned S3 URLs | Authorisation is embedded in the signed URL. Removing an invitation or rotating `APP_SECRET` does not revoke an already issued S3 URL. |
 | Public archive URL | `API_URL/v1/downloads/{id}` requires no session and redirects to a signed object URL until its seven-day expiry. |
@@ -25,6 +25,6 @@ Deleting a user prevents the API from loading that user for a JWT, but removal c
 
 ## Passwords and logs
 
-Passwords currently use unsalted SHA-512. Passwordless mode changes sign-up/login behaviour; it does not erase existing password hashes or remove the reset API. Protect backups and limit their access accordingly.
+Passwords use scrypt with a random salt per password. Older stored hashes are upgraded on successful login. Passwordless mode changes sign-up/login behaviour; it does not erase existing hashes or remove the reset API.
 
-The Fastify error hook can log procedure inputs, and email links can contain credentials. Limit access to logs and avoid copying tokens, reset links or provider secrets into tickets. The public resend-verification mutation and other access defects are listed in [Known limitations](../reference/known-limitations.md); session lifetime guidance does not compensate for those defects.
+API error logs contain the procedure path, error code, request id and user id, without request bodies or raw error objects. Keep email login links and reset links out of logs and tickets because they carry credentials.

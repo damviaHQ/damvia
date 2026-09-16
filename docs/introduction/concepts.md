@@ -65,7 +65,7 @@ A license (`name`, `details`) limits usage: `scopes` is any of `print` and `digi
 
 ## Regions, groups, users and invitations
 
-A user belongs to exactly one region and to any number of groups. Each region names a default group given to every new account. An invitation grants one email address access to one collection until `expiresAt`, creating a guest account if the address is unknown. Details are in [Roles and access](./roles-and-access.md).
+A user belongs to exactly one region and to any number of groups. Each region names a default group for members who sign up. Guests created by invitations start with no groups. An invitation grants one email address access to one collection until `expiresAt`, creating a guest account if the address is unknown. Details are in [Roles and access](./roles-and-access.md).
 
 ## Downloads are prepared archives
 

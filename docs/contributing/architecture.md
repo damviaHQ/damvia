@@ -21,7 +21,7 @@ Any failure in steps 2 to 4 logs the error and exits with code 1. Sync initialis
 
 ## Fastify exposes tRPC and one REST route
 
-`server/src/server.ts` builds Fastify with `maxParamLength: 5000` (path parameters, not the tRPC input query string) and `bodyLimit: 5242880`, registers `@fastify/cors` with defaults, and mounts `fastifyTRPCPlugin` under the prefix `/trpc` with `appRouter` and `createContext`. Its `onError` hook logs every procedure error as `http.request` with the `path`, the `input` and the `userId`.
+`server/src/server.ts` builds Fastify with `maxParamLength: 5000` (path parameters, not the tRPC input query string) and `bodyLimit: 5242880`, registers `@fastify/cors` with defaults, and mounts `fastifyTRPCPlugin` under the prefix `/trpc` with `appRouter` and `createContext`. Its `onError` hook logs every procedure error as `http.request` with the procedure `path`, error `code`, `requestId` and `userId`. It excludes request bodies and raw error objects.
 
 The only non-tRPC route is `GET /v1/downloads/:downloadId`: it loads the `Download`, redirects to `APP_URL/link-expired` when the row is missing or `expiresAt` is past, and otherwise redirects to a presigned URL of `downloads/{id}` in the assets bucket.
 
@@ -50,7 +50,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
 | `entity/` | 19 TypeORM entities and their enums |
 | `migrations/` | Hand-written SQL migrations, run at startup |
-| `services/` | `asset.ts` (upsert, deletion, thumbnails, product matching), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, password hashing, removal) |
+| `services/` | `asset.ts` (upsert, deletion, thumbnails, product matching), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation) |
 | `trpc/index.ts` | tRPC init, context, `authMiddleware` and the four predicates |
 | `trpc/router/` | 15 domain routers plus `collection/invitation.ts`, merged in `index.ts` with the public `env` query |
 | `util/array.ts` | `compact()` |

@@ -10,7 +10,7 @@ This page is the entry point for developers who want to change or extend Damvia.
 
 ## The development environment is the local setup
 
-Follow [Local setup](../getting-started/local-setup.md): `docker-compose up -d` in `server/` for Postgres, MailHog and MinIO, then `npm run dev` in `server/` and in `client/`. Nothing else is needed to develop; there is no separate test database or fixture set.
+Follow [Local setup](../getting-started/local-setup.md): `docker-compose up -d` in `server/` for Postgres, MailHog and MinIO, then `npm run dev` in `server/` and in `client/`. Security regression tests use their own disposable PostgreSQL database; keep it separate from development data.
 
 ## Two packages, linked by a file dependency
 
@@ -29,6 +29,7 @@ The repository holds two npm packages with their own `package.json` and `node_mo
 |---|---|---|
 | `server/` | `npm run dev` | `ENABLE_WORKER=true nodemon --exec ts-node src/index.ts`: API, worker and cloud sync in one process, restarted on save |
 | `server/` | `npm run build` | `NODE_ENV=production tsc` into `server/dist/` |
+| `server/` | `npm run test:security` | Builds the server and runs the database-backed security suite; requires `SECURITY_TEST_DATABASE_URL` pointing to a disposable database ending in `_test` |
 | `server/` | `npm start` | `NODE_ENV=production node dist/index.js` |
 | `server/` | `npm run cli -- <command>` | `ts-node src/cli.ts`; the only command is `check-integrity`, see [CLI](../reference/cli.md) |
 | `server/` | `npm run typeorm` | `typeorm-ts-node-commonjs`, the TypeORM CLI running on the TypeScript sources |
@@ -38,10 +39,11 @@ The repository holds two npm packages with their own `package.json` and `node_mo
 
 ## Automated checks and current failures
 
-Application checks and documentation checks are separate. Documentation now has source validation, regression tests and a pull-request workflow; there is no application integration test suite or ESLint/Prettier configuration. Application commands:
+Application checks and documentation checks are separate. Documentation has source validation, regression tests and a pull-request workflow. The server has a security regression suite and its own CI workflow; there is no ESLint/Prettier configuration. Application commands:
 
 - `cd client && npx vue-tsc --noEmit` type-checks the client, including the `.vue` files and the tRPC procedure types pulled from the server.
 - `cd server && npm run build` type-checks and compiles the server.
+- `cd server && npm run test:security` runs API, credential, access and migration tests against `SECURITY_TEST_DATABASE_URL`. The suite clears fixture tables and never loads the application’s `.env`. Use a disposable PostgreSQL 15 database. CI provides one automatically.
 
 Run both before opening a pull request and report failures. The client check currently fails; do not describe a Vite build as a passing type check. `server/tsconfig.json` does not enable `strict`; `client/tsconfig.json` does, with `noUnusedLocals` and `noUnusedParameters`.
 

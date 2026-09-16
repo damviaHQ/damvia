@@ -34,7 +34,7 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 | `ProductAttribute` (`product-attribute.ts`) | `product_attributes` | `name` (unique), `displayName`, `facetable`, `searchable` (indexed), `viewable` | No relations declared |
 | `Region` (`region.ts`) | `regions` | `name`, `defaultGroupId` | `defaultGroup`, `users` |
 | `Group` (`group.ts`) | `groups` | `name`, `default` | `userGroups` |
-| `User` (`user.ts`) | `users` | `name`, `company`, `email` (unique), `emailVerified`, `emailVerificationCode`, `password`, `resetPasswordToken`, `role`, `approved`, `regionId` | `region`, `userGroups` (cascade insert), `favorites`, `invitations`. Enum `UserRole`: `admin`, `manager`, `member`, `guest` (default) |
+| `User` (`user.ts`) | `users` | `name`, `company`, `email` (unique), `emailVerified`, `emailVerificationCode`, `password`, `resetPasswordToken` (hash), `resetPasswordExpiresAt` (`timestamptz`), `authVersion`, `role`, `approved`, `regionId` | `region`, `userGroups` (cascade insert), `favorites`, `invitations`. Enum `UserRole`: `admin`, `manager`, `member`, `guest` (default) |
 | `UserGroup` (`user-group.ts`) | `user_groups` | `userId`, `groupId` | Join table; both sides cascade on delete |
 | `UserFavorite` (`user-favorite.ts`) | `user_favorites` | Composite primary key `userId` + `collectionFileId` | Both sides cascade on delete |
 | `AuthorizedDomain` (`authorized-domain.ts`) | `authorized_domains` | `domain`, `detail` | No relations declared |
@@ -56,6 +56,8 @@ The application never writes `collections.number_of_files`, and rewrites `collec
 | `refresh_collection_number_of_files_on_delete()` | `refresh_collection_number_of_files_on_delete` | `after delete on collection_files` | Subtracts 1 on the same set |
 | `refresh_collection_sample_files()` | `refresh_collection_sample_files_on_insert`, `refresh_collection_sample_files_on_update` | `after insert` / `after update on collection_files` | Recomputes `sample_file_ids`: up to 4 collection file ids whose asset file `has_thumbnail`, for the collection and its ancestors |
 | `refresh_collection_sample_files_from_asset_files()` | `refresh_collection_sample_files_from_asset_files_on_insert`, `..._on_update` | `after insert` / `after update on asset_files` | Same recomputation, triggered when a file gains or loses its thumbnail. Created by `1751012487660-add-trigger-to-sample-files`, rewritten by `1751187976556-update-asset-file-trigger` with `create or replace function` |
+| `inherit_collection_groups()` | `inherit_collection_groups` | Before collection insert or changes to parent/group fields | Locks the parent row and copies its group restriction to the child; inherited restrictions cannot be changed on the child |
+| `propagate_collection_groups()` | `propagate_collection_groups` | After a collection’s group list changes | Updates direct children; their triggers carry the change down the tree |
 
 The first three come from `1726844037002-initial-migration`, which also creates every table with `uuid_generate_v4()` defaults (extension `uuid-ossp`), the `hstore` column of `products`, and seeds one group and the `Global` region.
 

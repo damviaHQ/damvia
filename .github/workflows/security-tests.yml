@@ -1,0 +1,40 @@
+name: Security regression tests
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - '.github/workflows/security-tests.yml'
+  push:
+    paths:
+      - 'server/**'
+      - '.github/workflows/security-tests.yml'
+permissions:
+  contents: read
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: damvia_test
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: damvia_security_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci --prefix server
+      - run: npm run test:security --prefix server
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://damvia_test:local-test-only@127.0.0.1:5432/damvia_security_test

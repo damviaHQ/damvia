@@ -50,8 +50,8 @@ export const authMiddleware =
 			return opts.next()
 		})
 export const userApproved = (u: User) => u?.approved && u?.emailVerified
-export const userAdmin = (u: User) => u?.role === UserRole.ADMIN
+export const userAdmin = (u: User) => userApproved(u) && u?.role === UserRole.ADMIN
 export const userMember = (u: User) => [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER].includes(u?.role)
-export const userManagerOrAdmin = (u: User) => [UserRole.ADMIN, UserRole.MANAGER].includes(u?.role)
+export const userManagerOrAdmin = (u: User) => userApproved(u) && [UserRole.ADMIN, UserRole.MANAGER].includes(u?.role)
 
 export { default as appRouter, AppRouter } from './router'

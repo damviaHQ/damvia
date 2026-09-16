@@ -31,6 +31,18 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
 
 Downtime includes maintenance, migrations and verification. Measure it on a restored copy; no duration is guaranteed.
 
+## Account and access changes in this upgrade
+
+Before restarting, set a randomly generated `APP_SECRET` of at least 32 bytes. The server and CLI validate it at startup; `openssl rand -hex 32` generates a suitable value.
+
+- Users must sign in again. Existing session and email login links are replaced by newly issued links; pending password resets must be requested again.
+- Passwords continue to work. Their stored hashes are upgraded on successful login; new and reset passwords use scrypt.
+- Collection descendants inherit their parent’s group restrictions. The migration updates existing descendants as well as enforcing inheritance for future children.
+- Guests start with no groups. The migration removes existing guests from their region’s default group. Review guests who intentionally need that group and explicitly reassign it after the upgrade; other memberships are preserved.
+- Licence dates and allowed regions apply to every non-admin user, including owners and invitees. Start and end dates are inclusive. Drafts are visible only to admins and their owner.
+
+Back up first and apply the migration with application writers stopped. Validate a restricted collection, an invited guest and an administrator before reopening access.
+
 ## Migrations that exist
 
 | Migration | What it did |
@@ -43,6 +55,7 @@ Downtime includes maintenance, migrations and verification. Measure it on a rest
 | `1750687616986-add-edit-to-limited-groups` | `can_edit_limited_to_group_ids` on collections |
 | `1751012487660-add-trigger-to-sample-files` | Trigger refreshing collection sample thumbnails |
 | `1751187976556-update-asset-file-trigger` | Same trigger, also fired on `asset_files` updates |
+| `1789516800000-secure-access` | Reset deadlines, account session versions, collection group inheritance and guest membership updates |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.
 

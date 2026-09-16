@@ -5,7 +5,8 @@
     "build": "NODE_ENV=production tsc",
     "dev": "ENABLE_WORKER=true nodemon --exec ts-node src/index.ts",
     "cli": "ts-node src/cli.ts",
-    "typeorm": "typeorm-ts-node-commonjs"
+    "typeorm": "typeorm-ts-node-commonjs",
+    "test:security": "npm run build && node --test test/security.cjs"
   },
   "dependencies": {
     "@azure/identity": "^4.9.0",

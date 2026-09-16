@@ -15,7 +15,7 @@ Collections live in `collections`, a materialized-path tree (`mpath`) with a uni
 | Column | Meaning |
 | --- | --- |
 | `public` | Part of the catalogue; public collections have no owner |
-| `draft` | Hidden from members through the public clause |
+| `draft` | Visible only to admins and the owner |
 | `owner_id` | The user who owns a private collection; null for public ones |
 | `asset_folder_id` | When set, the collection mirrors that folder and is "synchronized" |
 | `limited_to_group_ids`, `can_edit_limited_to_group_ids` | Group restriction; see [Groups and regions](./groups-and-regions.md) |
@@ -80,7 +80,7 @@ The sharing dialog (`CollectionDialogShare.vue`) is available to the collection 
 - `Send Invite` creates the invitation with `sendEmail: true`. A job on `mailer/invitation` sends a link to `/collections/{id}?dam_token=<jwt>`; the client stores that token in the `dam_token` cookie, so the guest is logged in on arrival.
 - `Copy Link` creates the invitation silently and copies a URL carrying `auth_params` (base64 of the email, `magicLink: true` and the collection). Opening it pre-fills the login form and sends a login email.
 
-On the server, `collection.invitation.create` looks up a user with that email. If none exists, `createGuestUser` creates one with `name` and `company` set to `NA`, role `guest`, `approved` and `emailVerified` true, the inviter's region and that region's default group. The invitation stores `collection_id`, `email`, `user_id` and `expires_at`.
+On the server, `collection.invitation.create` looks up a user with that email. If none exists, `createGuestUser` creates one with `name` and `company` set to `NA`, role `guest`, `approved` and `emailVerified` true, the inviter's region and no group memberships. The invitation stores `collection_id`, `email`, `user_id` and `expires_at`.
 
 For revocation, `collection.invitation.remove` deletes the row. `collection.invitation.getUserInvitations` feeds the member links dialog with invitations on the caller's collections (and, for admins, on all public ones). Deleting a user deletes the invitations sent to their email.
 
@@ -96,8 +96,8 @@ For revocation, `collection.invitation.remove` deletes the row. `collection.invi
 | Group | one of the user's groups is in `limited_to_group_ids` |
 | Invitation | an unexpired invitation for the user exists on the collection or on any ancestor in `mpath` |
 
-Files follow the same rules through `userCollectionFilesQuery`, with the license read from the file. See [Licenses](./licenses.md) for the license clause and [Menu and pages](./menu-and-pages.md) for how public collections appear in the navigation.
+Every non-admin user must also meet the licence’s region and date conditions, regardless of which access rule applies. Only admins and owners can see drafts. Files follow the same rules through `userCollectionFilesQuery`, with the licence read from the file. Copying a collection includes only the descendants and files the caller can currently access. See [Licenses](./licenses.md) for the license clause and [Menu and pages](./menu-and-pages.md) for how public collections appear in the navigation.
 
 ## Operational limits
 
-New children and duplicated collections do not reliably inherit group restrictions. See [Groups and regions](./groups-and-regions.md) before publishing a restricted subtree. Preview triggers do not cover `collection_files` deletions; the integrity check repairs stale mosaics. Invitation expiry is the start of the selected date in PostgreSQL's session timezone; it does not include the entire day. Already issued storage URLs are independent of invitation revocation.
+New children and copies inherit their destination parent’s group restrictions. See [Groups and regions](./groups-and-regions.md). Preview triggers do not cover `collection_files` deletions; the integrity check repairs stale mosaics. Invitation expiry is the start of the selected date in PostgreSQL's session timezone; it does not include the entire day. Already issued storage URLs are independent of invitation revocation.

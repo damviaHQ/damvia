@@ -25,10 +25,10 @@ All queues are declared in `server/src/worker.ts`. The push helpers set `retryBa
 |---|---|---|
 | `asset/update-content` | Cloud sync (`upsertFile`), integrity check | Downloads the file from Dropbox or OneDrive, detects its MIME type, uploads the original to `asset-file/{id}`, generates a WebP thumbnail, reads width and height, sets status `up_to_date`. Processes 10 jobs at a time (`batchSize: 10`). |
 | `collection/synchronization` | Linking a collection to an asset folder | Mirrors the folder's sub-tree into the collection tree. One job at a time. |
-| `download/create-archive` | `download.create` with type `email` | Builds the file or zip archive, uploads it to `downloads/{id}`, then pushes `mailer/download-ready`. One job at a time. |
+| `download/create-archive` | `download.create` with type `email` | Checks current access, builds the file or zip archive, uploads it to `downloads/{id}`, then pushes `mailer/download-ready`. One job at a time. |
 | `mailer/email-verification` | Sign-up, "resend verification" | Sends the `email-verification` template with the `?verificationCode=` link. |
 | `mailer/log-in` | Login in passwordless mode or with the magic-link option | Sends the `login` template with a 180-day auth token. |
-| `mailer/password-reset` | "Forgot password" | Sends the `reset-password` template. |
+| `mailer/password-reset` | "Forgot password" | Sends the `reset-password` template with the job’s token only if that reset request is still current and unexpired. |
 | `email/request-approval` | A user verifies their email while still unapproved | Sends the `request-approval` template to every admin and manager of the requester's region. |
 | `email/user-approved` | A manager or admin approves a user | Sends the `user-approved` template with a login link. |
 | `mailer/download-ready` | `download/create-archive` | Sends the `download-ready` template with a presigned link to the archive. |

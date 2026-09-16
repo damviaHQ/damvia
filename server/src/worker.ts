@@ -114,11 +114,11 @@ export const mailerLogInQueue = createQueue<{ userId: string }>({
 			.then(sendLogInEmail)
 })
 
-export const mailerResetPasswordQueue = createQueue<{ userId: string }>({
+export const mailerResetPasswordQueue = createQueue<{ userId: string, token: string }>({
 	name: 'mailer/password-reset',
 	processor: (data) =>
 		dataSource.getRepository(User).findOneBy({ id: data.userId })
-			.then(sendResetPasswordEmail)
+			.then((user) => sendResetPasswordEmail(user, data.token))
 })
 
 export const mailerRequestApprovalQueue = createQueue<{ requesterId: string }>({

@@ -28,8 +28,8 @@ server.register(fastifyTRPCPlugin, {
 		router: appRouter,
 		createContext,
 		onError(opts) {
-			const { error, type, path, input, ctx, req } = opts
-			logger.error('http.request', { error, path, input, userId: ctx.user?.id })
+			const { error, path, ctx, req } = opts
+			logger.error('http.request', { code: error.code, path, userId: ctx?.user?.id, requestId: req.id })
 		},
 	},
 })

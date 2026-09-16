@@ -18,14 +18,14 @@ The client has its own copy of the API location, `VITE_API_ENDPOINT`, which is `
 
 Auth tokens are JSON Web Tokens signed with `APP_SECRET` and valid for 180 days. The client stores the token in the `dam_token` cookie for 365 days. Consequences:
 
-- With the default value anyone can mint a valid token for any user id. Set a long random string (`openssl rand -hex 32`).
+- Set a randomly generated secret of at least 32 bytes (`openssl rand -hex 32`). Startup checks this requirement; there is no default.
 - Rotating the secret invalidates every token at once: every user is logged out and every unexpired invitation link stops working.
 
 ## Passwordless mode changes the login flow
 
 `ENABLE_PASSWORD_LESS_AUTH=true` switches the whole instance to email login: sign-up stores no password, the login form asks for an email only, and each login queues a `mailer/log-in` email with a link that carries a fresh token. With `false` (the default), users have passwords. The same email path is also used, regardless of the flag, when the login page is opened through a collection share link: the link carries an `auth_params` parameter with `magicLink: true` and the invited email, and the form then sends a login email instead of asking for a password.
 
-Passwords are stored as an unsalted SHA-512 hex digest (`hashPassword` in `server/src/services/user.ts`). Passwordless sign-up stores no password, but enabling the flag does not erase existing hashes or disable the password-reset API.
+Passwords use scrypt with a random salt (`hashPassword` in `server/src/services/credentials.ts`). Older hashes are upgraded on successful login. Passwordless sign-up stores no password, but enabling the flag does not erase existing hashes or disable the password-reset API.
 
 ## Worker on or off
 
@@ -61,6 +61,6 @@ Passwords are stored as an unsalted SHA-512 hex digest (`hashPassword` in `serve
 | `NODE_ENV` | `npm start` already sets `production`. |
 | `APP_NAME` | Shown as the browser tab title and in the public `env` query. |
 
-`APP_SECRET` must be non-empty. An absent variable uses the hard-coded default, while `APP_SECRET=` remains an empty string and can prevent JWT signing. See [Accounts and links](../administration/accounts-and-links.md) for token lifetime and revocation limits.
+The API, worker and CLI all require a valid `APP_SECRET` at startup. See [Accounts and links](../administration/accounts-and-links.md) for token lifetime and revocation limits.
 
 For `docker run --env-file`, use literal `KEY=value` lines without quotes or inline comments. The server template uses separate comment lines. Docker does not parse this file as dotenv or as a shell script.

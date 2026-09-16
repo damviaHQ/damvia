@@ -13,11 +13,12 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
+import { hashPassword, verifyPassword, hashResetToken } from '../../services/credentials'
 import { randomBytes } from "node:crypto"
 import { z } from 'zod'
 import { User, UserRole } from "../../entity/user"
 import { dataSource, passwordLessAuth } from "../../env"
-import { createUser, generateAuthToken, hashPassword, removeUser } from "../../services/user"
+import { createUser, generateAuthToken, removeUser } from "../../services/user"
 import {
 	mailerEmailVerificationQueue,
 	mailerLogInQueue,
@@ -104,12 +105,18 @@ export default router({
 		.mutation(async ({ input }) => {
 			const user = await dataSource.getRepository(User).findOneBy({ email: input.email })
 			const usePasswordAuthentication = !passwordLessAuth() && !input.magicLink
-			if (!user || (usePasswordAuthentication && user.password !== hashPassword(input.password))) {
+			if (!user || (usePasswordAuthentication && !await verifyPassword(input.password, user.password))) {
 				throw new TRPCError({
 					code: 'NOT_FOUND',
 					message: passwordLessAuth() ? 'User not found.' : 'Invalid email or password.',
 				})
 			} else if (usePasswordAuthentication) {
+				if (!user.password.startsWith('scrypt$')) {
+					await dataSource.getRepository(User).update(
+						{ id: user.id, password: user.password },
+						{ password: await hashPassword(input.password) },
+					)
+				}
 				return generateAuthToken(user)
 			}
 
@@ -120,33 +127,38 @@ export default router({
 		.input(z.string().email())
 		.mutation(async ({ input }) => {
 			const user = await dataSource.getRepository(User).findOneBy({ email: input })
-			if (!user) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found.' })
-			}
-
-			user.resetPasswordToken = randomBytes(8).toString('hex')
-			await dataSource.getRepository(User).save(user)
-			await mailerResetPasswordQueue.push({ userId: user.id })
+			if (!user) return
+			const token = randomBytes(32).toString('hex')
+			await dataSource.getRepository(User).update(user.id, {
+				resetPasswordToken: hashResetToken(token),
+				resetPasswordExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+			})
+			await mailerResetPasswordQueue.push({ userId: user.id, token })
 		}),
 	resetPassword: publicProcedure
 		.input(
 			z.object({
 				email: z.string().email(),
-				token: z.string(),
+				token: z.string().regex(/^[a-f0-9]{64}$/),
 				newPassword: z.string().min(6).max(100),
 			})
 		)
 		.mutation(async ({ input }) => {
-			const user = await dataSource.getRepository(User).findOneBy({ email: input.email })
-			if (!user) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found.' })
-			} else if (user.resetPasswordToken !== input.token) {
-				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid token.' })
-			}
-
-			user.resetPasswordToken = null
-			user.password = hashPassword(input.newPassword)
-			await dataSource.getRepository(User).save(user)
+			const tokenHash = hashResetToken(input.token)
+			const repository = dataSource.getRepository(User)
+			const user = await repository.createQueryBuilder('user')
+				.where('user.email = :email AND user.reset_password_token = :token AND user.reset_password_expires_at > now()',
+					{ email: input.email, token: tokenHash }).getOne()
+			if (!user) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid or expired reset link.' })
+			const result = await repository.createQueryBuilder().update(User).set({
+				password: await hashPassword(input.newPassword),
+				resetPasswordToken: null,
+				resetPasswordExpiresAt: null,
+				authVersion: () => 'auth_version + 1',
+			}).where('id = :id AND reset_password_token = :token AND reset_password_expires_at > now()',
+				{ id: user.id, token: tokenHash }).returning('auth_version').execute()
+			if (!result.affected) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid or expired reset link.' })
+			user.authVersion = result.raw[0].auth_version
 			return generateAuthToken(user)
 		}),
 	me: publicProcedure
@@ -186,7 +198,10 @@ export default router({
 			}
 
 			await dataSource.transaction(async (em) => {
-				await em.getRepository(User).save(user)
+				await em.getRepository(User).update(user.id, {
+					name: user.name, company: user.company, email: user.email,
+					emailVerified: user.emailVerified, emailVerificationCode: user.emailVerificationCode,
+				})
 				if (!user.emailVerified) {
 					await mailerEmailVerificationQueue.push({ userId: user.id })
 				}
@@ -226,6 +241,10 @@ export default router({
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found.' })
 			}
 
+			if (ctx.user.role !== UserRole.ADMIN && user.id !== ctx.user.id &&
+				[UserRole.ADMIN, UserRole.MANAGER].includes(user.role)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can change admin or manager accounts.' })
+			}
 			const isCurrentUserManager = ctx.user.role === UserRole.MANAGER && ctx.user.id === user.id
 			/* When managers edit their own profile, only name, email, and company are updated
 			 Allow updating name, email, and company for all users */
@@ -257,7 +276,11 @@ export default router({
 			}
 
 			await dataSource.transaction(async (em) => {
-				await em.getRepository(User).save(user)
+				await em.getRepository(User).update(user.id, {
+					name: user.name, company: user.company, email: user.email,
+					emailVerified: user.emailVerified, emailVerificationCode: user.emailVerificationCode,
+					...(shouldUpdateUserGroups ? { regionId: user.regionId, role: user.role } : {}),
+				})
 				if (shouldUpdateUserGroups) {
 					await em.getRepository(UserGroup).delete({userId: user.id})
 					user.userGroups = input.groupIds.map((groupId) => {
@@ -273,7 +296,7 @@ export default router({
 				}
 			})
 
-			return user
+			return formatPublicUser(user)
 		}),
 	verifyEmail: publicProcedure
 		.use(authMiddleware())
@@ -285,7 +308,11 @@ export default router({
 
 			ctx.user.emailVerified = true
 			ctx.user.emailVerificationCode = null
-			await dataSource.getRepository(User).save(ctx.user)
+			const verified = await dataSource.getRepository(User).update(
+				{ id: ctx.user.id, emailVerificationCode: input },
+				{ emailVerified: true, emailVerificationCode: null },
+			)
+			if (!verified.affected) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid verification code.' })
 			if (!ctx.user.approved) {
 				await mailerRequestApprovalQueue.push({ requesterId: ctx.user.id })
 			}
@@ -315,6 +342,8 @@ export default router({
 				)
 				if (!user) {
 					throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found.' })
+				} else if (ctx.user.role !== UserRole.ADMIN && [UserRole.ADMIN, UserRole.MANAGER].includes(user.role)) {
+					throw new TRPCError({ code: 'FORBIDDEN', message: 'Only admins can approve admin or manager accounts.' })
 				} else if (user.approved) {
 					throw new TRPCError({ code: 'BAD_REQUEST', message: 'User already approved.' })
 				}
@@ -322,7 +351,7 @@ export default router({
 				user.approved = true
 				await dataSource.transaction(async (em) => {
 					await mailerUserApprovedEmailQueue.push({ userId: user.id })
-					await em.getRepository(User).save(user)
+					await em.getRepository(User).update(user.id, { approved: true })
 				})
 			}),
 	remove:
@@ -335,8 +364,8 @@ export default router({
 				)
 				if (!user) {
 					throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found.' })
-				} else if (user.role === UserRole.ADMIN && ctx.user.role !== UserRole.ADMIN) {
-					throw new TRPCError({ code: 'FORBIDDEN', message: 'You do not have permission to delete an admin user.' })
+				} else if ([UserRole.ADMIN, UserRole.MANAGER].includes(user.role) && ctx.user.role !== UserRole.ADMIN) {
+					throw new TRPCError({ code: 'FORBIDDEN', message: 'You do not have permission to delete an admin or manager user.' })
 				}
 				await removeUser(user)
 			}),
@@ -354,8 +383,10 @@ export default router({
 				await removeUser(ctx.user)
 			}),
 	resendVerificationEmail: publicProcedure
-		.input(z.string())
-		.mutation(async ({ input }) => {
+		.use(authMiddleware())
+		.input(z.string().uuid())
+		.mutation(async ({ ctx, input }) => {
+			if (input !== ctx.user.id) throw new TRPCError({ code: 'FORBIDDEN' })
 			const user = await dataSource.getRepository(User).findOneBy({ id: input })
 			if (!user) {
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found.' })
@@ -366,7 +397,6 @@ export default router({
 
 			try {
 				await mailerEmailVerificationQueue.push({ userId: user.id })
-				return generateAuthToken(user)
 			} catch (error) {
 				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Could not verify email.' })
 			}

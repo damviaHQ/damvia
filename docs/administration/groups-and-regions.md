@@ -15,7 +15,7 @@ A region is a row of `regions` with a `name` and a mandatory `default_group_id`.
 | Field | Rule |
 | --- | --- |
 | `name` | 1 to 80 characters, required |
-| `defaultGroupId` | Required; the group every new user of this region joins |
+| `defaultGroupId` | Required; the group a member joins at sign-up |
 
 The initial migration creates one region named `Global` whose default group is the first group in the table.
 
@@ -50,8 +50,9 @@ The `default` flag on a group and the `default_group_id` on a region are two sep
 
 ## How a user gets their groups
 
-- At sign-up and when a guest is created for an invitation, the user joins `regions.default_group_id` of their region (`createUser` and `createGuestUser` in `server/src/services/user.ts`).
-- An admin can replace the full list of groups of any user from the Edit User dialog. A manager can do the same for other users of their region, but not for themselves.
+- At sign-up, a member joins their region’s default group.
+- A guest created for an invitation starts with no groups. An administrator or an authorised manager can explicitly assign groups later.
+- An admin can replace the full list of groups of any user from the Edit User dialog. A manager can do the same for members and guests of their region.
 - Group changes are applied by deleting the user's `user_groups` rows and inserting the new list in one transaction.
 
 ## Groups restrict collections
@@ -68,14 +69,14 @@ Every collection carries `limited_to_group_ids` (an array of group ids, empty by
 Two consequences follow directly from the SQL:
 
 - As soon as a collection has at least one group, it disappears from the generic public clause. Only members of those groups (or admins, the owner, or invited guests) still see it.
-- The group clause has no draft or license condition. A user in one of the allowed groups sees the collection even when it is a draft or its license does not cover their region.
+- Non-admin users must also pass the licence’s region and date checks. Drafts are visible only to the owner and admins; group membership and invitations do not make a draft visible.
 
-### Saving group restrictions updates existing sub-collections
+### Sub-collections inherit group restrictions
 
 When `collection.update` saves `limitedToGroupIds`, it copies the same array to every descendant collection and sets their `can_edit_limited_to_group_ids` to true only if the array is empty. An existing descendant updated this way cannot loosen or change the restriction: `update` ignores `limitedToGroupIds` on a collection whose flag is false. Clearing the groups on the parent re-enables editing on the children.
 
 Only the collection owner or an admin can call `update` (`Collection.canEdit` in `server/src/entity/collection.ts`). Public collections have no owner, so in practice only admins set group limits on them. Details on the rest of the collection model are in [Collections and sharing](./collections-and-sharing.md).
 
-New child collections created manually, through synchronisation or duplication do not consistently inherit group restrictions. Visibility is checked per collection, so a restricted parent does not protect an unrestricted child. Reapply the parent restriction and verify every descendant after creation; This manual check is needed each time; the parent's restriction alone does not protect a new child.
+New children inherit a restricted parent’s groups immediately, whether created manually, synchronised from a folder or copied from another collection. Database triggers enforce this rule and propagate later changes. The migration also applies the rule to existing descendants.
 
 `group.moveUsersAndRegions` does not rewrite collections' `limited_to_group_ids`. Before removing or merging a group, inventory those arrays and explicitly review the affected collection permissions.

@@ -18,5 +18,5 @@ Runtime configuration is read from environment variables and the mail templates.
 The exhaustive table with defaults is [Environment variables](../reference/environment-variables.md). Provider setup (Dropbox app, Azure registration, SMTP, buckets) is in [Integrations](../integrations/index.md).
 
 :::caution
-Two defaults are safe on a laptop and dangerous on a server: `APP_SECRET` (signs every session token) and the MinIO credentials in `MAIN_S3_URL` / `ASSETS_S3_URL`. Change both before exposing an instance.
+Generate `APP_SECRET` before starting the server. Replace the development MinIO credentials in `MAIN_S3_URL` / `ASSETS_S3_URL` with the credentials for your deployment.
 :::

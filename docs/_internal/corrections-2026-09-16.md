@@ -28,11 +28,11 @@ Les résultats structurés sont conservés dans [validation-apres-corrections.js
 
 ## Portée et suites applicatives
 
-Cette passe corrige la documentation et sa publication locale, pas les règles métier du serveur. Les défauts F04/F05/F06/F10/F11/F12/F18/F21/F24 et le runtime F17 sont désormais décrits sans garantie trompeuse dans les pages concernées et dans [les limites connues](../reference/known-limitations.md). Les corrections fonctionnelles, en particulier les défauts de contrôle d'accès, nécessitent leur propre modification du code et des tests de régression. Les règles effectives de licence, d'invitation et d'accès des invités sont décrites telles qu'elles existent.
+La documentation a été enregistrée séparément des corrections applicatives. Les contrôles d’accès, les identifiants et l’héritage des collections ont ensuite été mis à jour et vérifiés sur une base PostgreSQL isolée. Les descriptions des problèmes corrigés ont été retirées de la documentation. Les étapes nécessaires à la mise à niveau figurent dans [Upgrading](../deployment/upgrading.md).
 
-Aucune connexion aux intégrations réelles, synchronisation distante, migration de base, restauration, émission d'email ou publication n'a été effectuée. Les procédures de recette et de restauration sont à exécuter sur une instance isolée ; elles ne sont pas présentées comme des essais déjà réussis. Le build local du site réussit avec Node 22.14, mais npm signale que la dépendance `undici` exige au moins 22.19 ; la CI utilise la version 22 maintenue.
+Aucune connexion aux intégrations réelles, synchronisation distante, migration de base réelle, restauration, émission d'email ou publication n'a été effectuée. Les procédures de recette et de restauration sont à exécuter sur une instance isolée ; elles ne sont pas présentées comme des essais déjà réussis. Le build local du site réussit avec Node 22.14, mais npm signale que la dépendance `undici` exige au moins 22.19 ; la CI utilise la version 22 maintenue.
 
-Les modifications existent dans les deux dépôts. Le sous-module du site pointe encore sur sa version enregistrée : la publication des nouvelles pages demandera le commit des changements documentaires puis la mise à jour de cette référence. La copie de vérification a utilisé les documents actuels sans modifier ce sous-module. Aucun commit ni push n'a été créé par cette passe.
+Les modifications existent dans les deux dépôts. Le sous-module du site pointe encore sur sa version enregistrée : la publication des nouvelles pages demandera le commit des changements documentaires puis la mise à jour de cette référence. La copie de vérification a utilisé les documents actuels sans modifier ce sous-module. La documentation a été enregistrée dans le commit `6cab6b2`. Aucun push ni déploiement n’a été effectué.
 
 ## Relecture pour la lisibilité
 

@@ -87,4 +87,4 @@ ABC123-002,Example bag,Black,Accessories
 
 With `PRODUCT_MATCHING_REGEX=^(.{6}-\d{3})(?:\.(\d{2}))?`, `ABC123-001.00.jpg` links to the first product with view `00`. Set `PIM_PRODUCT_VIEW=00`; declare `colour` as facetable and `name` as searchable/viewable. On first comparison both records are `new`; after import, the same CSV should be `unchanged`. Change Blue to Green to exercise `changed`, and repeat a SKU to exercise `duplicate`.
 
-CSV is parsed into JSON before submission. The API body limit is 5 MiB, so the JSON request size, not only the CSV size, determines whether a large import fits. Split into batches while keeping the same key column. The admin UI restricts product editing, but `pim.updateProduct` currently has no authentication middleware; see [Known limitations](../reference/known-limitations.md).
+CSV is parsed into JSON before submission. The API body limit is 5 MiB, so the JSON request size, not only the CSV size, determines whether a large import fits. Split into batches while keeping the same key column. Product editing requires an approved, email-verified administrator, both in the interface and through `pim.updateProduct`.

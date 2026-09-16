@@ -12,6 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { hashResetToken } from './credentials'
 import { In } from "typeorm"
 import { URL } from "url"
 import { Liquid } from 'liquidjs'
@@ -52,11 +53,13 @@ export async function sendLogInEmail(user: User) {
 	})
 }
 
-export async function sendResetPasswordEmail(user: User) {
+export async function sendResetPasswordEmail(user: User, token: string) {
+	if (!user || !token || user.resetPasswordToken !== hashResetToken(token) ||
+		!user.resetPasswordExpiresAt || user.resetPasswordExpiresAt.getTime() <= Date.now()) return
 	const url = new URL(appURL())
 	url.pathname = 'password-update'
 	url.searchParams.set('email', user.email)
-	url.searchParams.set('token', user.resetPasswordToken)
+	url.searchParams.set('token', token)
 	const config = mailConfig()['reset-password']
 	await mailTransporter().sendMail({
 		from: config.from,

@@ -62,6 +62,12 @@ export class User {
 	@Column({ nullable: true })
 	resetPasswordToken: string
 
+	@Column({ type: 'timestamptz', nullable: true })
+	resetPasswordExpiresAt: Date | null
+
+	@Column({ default: 0 })
+	authVersion: number
+
 	@Column({ enum: UserRole, default: UserRole.GUEST })
 	role: UserRole
 

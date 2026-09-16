@@ -14,7 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import {FastifyRequest} from 'fastify'
 import {sign, verify} from "jsonwebtoken"
-import {createHash, randomBytes} from 'node:crypto'
+import {randomBytes} from 'node:crypto'
+import {hashPassword} from './credentials'
 import {EntityManager} from "typeorm"
 import {AuthorizedDomain} from "../entity/authorized-domain"
 import {Collection} from "../entity/collection"
@@ -51,7 +52,7 @@ export async function createUser(opts: CreateUserOptions) {
 	user.role = UserRole.MEMBER
 	user.emailVerificationCode = randomBytes(12).toString('hex')
 	if (!passwordLessAuth()) {
-		user.password = hashPassword(opts.password)
+		user.password = await hashPassword(opts.password)
 	}
 
 	const emailDomain = user.email.split('@').pop()
@@ -77,11 +78,7 @@ export async function createGuestUser(opts: CreateGuestUserOptions) {
 	user.region = await dataSource.getRepository(Region).findOne({
 		where: { id: opts.regionId },
 	})
-	if (user.region?.defaultGroupId) {
-		const userGroup = new UserGroup()
-		userGroup.groupId = user.region.defaultGroupId
-		user.userGroups = [userGroup]
-	}
+	user.userGroups = []
 	user.email = opts.email
 	user.approved = true
 	user.emailVerified = true
@@ -92,7 +89,7 @@ export async function createGuestUser(opts: CreateGuestUserOptions) {
 
 export function generateAuthToken(user: User) {
 	return new Promise<string>((resolve, reject) => {
-		sign({ userId: user.id }, secret(), { expiresIn: '180d' }, (err: Error | null, token: string) => {
+		sign({ userId: user.id, authVersion: user.authVersion }, secret(), { expiresIn: '180d' }, (err: Error | null, token: string) => {
 			if (err) {
 				return reject(err)
 			}
@@ -107,34 +104,17 @@ export async function getUserFromRequest(req: FastifyRequest): Promise<User | nu
 		return null
 	}
 
-	const userId = await new Promise<string | null>((resolve) => {
-		verify(authorization, secret(), (err: Error | null, data: { userId: string }) => {
-			if (err) {
-				return resolve(null)
-			}
-			resolve(data.userId)
+	try {
+		const payload = verify(authorization, secret(), { algorithms: ['HS256'] })
+		if (typeof payload === 'string' || typeof payload.userId !== 'string' ||
+			!Number.isInteger(payload.authVersion)) return null
+		return await dataSource.getRepository(User).findOne({
+			where: { id: payload.userId, authVersion: payload.authVersion },
+			relations: { userGroups: { group: true } },
 		})
-	})
-	if (!userId) {
+	} catch {
 		return null
 	}
-
-	return dataSource.getRepository(User).findOne({
-		where: {
-			id: userId,
-		},
-		relations: {
-			userGroups: {
-				group: true,
-			},
-		},
-	})
-}
-
-export function hashPassword(raw: string) {
-	const hash = createHash('sha512')
-	hash.update(raw)
-	return hash.digest().toString('hex')
 }
 
 export async function removeUser(user: User) {

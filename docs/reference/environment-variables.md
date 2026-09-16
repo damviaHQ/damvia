@@ -8,7 +8,7 @@ lastUpdated: 2026-09-16
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
 
-The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). There is no schema validation: an absent variable may take its default, or throw when first used. Empty strings are distinct from absent variables, notably for `APP_SECRET`.
+The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). `APP_SECRET` is validated at startup. Other variables may use a default or fail when first used; empty and absent values can behave differently.
 
 ## Server
 
@@ -19,7 +19,7 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). T
 | `APP_NAME` | `Damvia - Open Source Digital Asset Management` | Returned by the public `env` query; the client uses it as the document title. |
 | `APP_URL` | `http://localhost:5173` | Public URL of the client. Every link in an email is built from it, and expired download links redirect to `APP_URL/link-expired`. |
 | `API_URL` | `http://localhost:3000` | Public URL of this server. Download links are `API_URL/v1/downloads/{id}`. |
-| `APP_SECRET` | `Damvia App Secret` | Secret used to sign JWT auth tokens (180-day lifetime). An explicitly empty value stays empty and can prevent signing. **Change it**: with the default, anyone can forge a token. Changing it later logs every user out. |
+| `APP_SECRET` | required | Randomly generated signing secret of at least 32 bytes, for example `openssl rand -hex 32`. Checked at startup. JWTs last 180 days; changing the secret logs every user out. |
 | `PORT` | `3000` | HTTP port the server listens on (`0.0.0.0`). |
 | `NODE_ENV` | unset | `production` in deployments. `npm start` sets it. |
 | `ENABLE_WORKER` | unset (worker off) | `true` starts the pg-boss worker inside this process. `npm run dev` sets it. See [Worker and scaling](../deployment/worker-and-scaling.md). |

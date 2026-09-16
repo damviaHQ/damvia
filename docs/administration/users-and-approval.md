@@ -30,7 +30,7 @@ The verification email links to `APP_URL` with `?verificationCode=<code>`. `app.
 
 If the user is still unapproved at that moment, a job is pushed to `email/request-approval`. `sendRequestApprovalEmail` in `server/src/services/mailer.ts` sends one message to every user whose role is `manager` or `admin` **and** whose `region_id` equals the requester's. If that list is empty, no email is sent.
 
-The unverified screen offers to resend the verification email. That call, `user.resendVerificationEmail`, is a public procedure that takes the user id and returns a JWT for an unverified account. This is an authentication defect; see [Known limitations](../reference/known-limitations.md).
+A signed-in user can resend their own verification email. `user.resendVerificationEmail` queues the email and returns no login token.
 
 ## Approve a pending user
 
@@ -49,11 +49,12 @@ Every procedure in `server/src/trpc/router/user.ts` that lists or changes other 
 | Procedure | Admin | Manager |
 | --- | --- | --- |
 | `list` | All users | Users of own region |
-| `findById`, `approve`, `remove` | Any user | Only users of own region; otherwise `User not found.` |
+| `findById` | Any user | Users of own region |
+| `approve`, `remove` | Any user | Members and guests of own region |
 | `update` role | Any role | `member` or `guest` only; `admin` or `manager` fails with `Managers cannot set admin or manager roles.` |
-| `update` region and groups | Yes | Yes, for other users of the region |
+| `update` region and groups | Yes | Members and guests of own region |
 | `update` own profile | Name, company, email, region, role, groups | Name, company, email only |
-| `remove` an admin | Yes | Fails with `You do not have permission to delete an admin user.` |
+| Edit or remove an admin or another manager | Yes | Refused by the server |
 
 Changing a user's email through `update` resets `emailVerified` and sends a new verification email. In the Edit User dialog the Role select shows `Guest` and `Member` to everyone, and `Manager` and `Admin` only to admins.
 
@@ -81,7 +82,11 @@ In password mode the same email flow is used when the login request carries `mag
 
 ## Password-reset implementation
 
-`user.sendResetPasswordEmail` stores an 8-byte hex token in `reset_password_token` and pushes `mailer/password-reset`. The email links to `/password-update?email=<email>&token=<token>`. `user.resetPassword` checks the token, stores the new password (6 to 100 characters), clears the token and returns a JWT.
+A reset link expires after one hour and works once. Requesting another link replaces the previous one. The email links to `/password-update?email=<email>&token=<token>`.
+
+The server generates 32 random bytes and stores the token’s SHA-256 hash in `reset_password_token`, with its deadline in `reset_password_expires_at`. The email job carries the original token and sends it only while it is still current. A successful reset stores the new password (6 to 100 characters), clears the reset fields and returns a fresh session. It also invalidates the account’s earlier sessions and login links. Concurrent submissions cannot reuse the same reset link.
+
+The request returns the same empty response for an unknown email address.
 
 ## Removing an account
 
@@ -96,18 +101,12 @@ In password mode the same email flow is used when the login request carries `mag
 
 `/admin/authorized-domains` (admin only) lists rows of `authorized_domains` with a `Domain` and a `Description`. The dialog `Add new authorized domain` takes a domain such as `company.com` and an optional description. A sign-up whose email ends with a listed domain is approved at creation; it still has to verify its email address. Removing a domain does not change users already approved.
 
-## Security notes for self-hosters
+## Password storage and sessions
 
-:::caution
-Passwords are hashed with SHA-512 and no salt (`hashPassword` in `server/src/services/user.ts`): two users with the same password share the same hash, and precomputed tables apply. Consider enabling `ENABLE_PASSWORD_LESS_AUTH` if this does not fit your threat model.
-:::
+Passwords use scrypt with a separate random salt for each password. Existing password hashes are upgraded when the user next logs in successfully. See `server/src/services/credentials.ts`.
 
-:::caution
-Auth tokens are JWTs signed with `APP_SECRET` and valid for 180 days. The client stores the token in a `dam_token` cookie for 365 days. `APP_SECRET` falls back to a hard-coded default when unset, so always set it in production; see [Environment variables](../reference/environment-variables.md).
-:::
+Sessions are signed with the required `APP_SECRET` and last 180 days. The server also checks the account’s `auth_version`; a password reset increments it and ends earlier sessions. See [Accounts and links](./accounts-and-links.md).
 
-## Account removal and manager-edit limitations
+## Account removal
 
 `removeUser` does not remove or reassign private collections. Their owner foreign key can block the final user deletion. Resolve ownership or remove those collections through the application before attempting account removal. Earlier archive-object deletions are external effects and cannot be rolled back with the SQL transaction.
-
-The manager role check limits the new role but does not protect an existing administrator in the same region against demotion via `user.update`. That mutation also returns the saved entity directly. Until this is fixed, a manager account can change more than the intended role rules allow.

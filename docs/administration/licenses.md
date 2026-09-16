@@ -6,7 +6,7 @@ sidebar:
 lastUpdated: 2026-09-16
 ---
 
-A license describes under which terms, where and for how long a set of files may be used. Attaching a license affects the public access branch. Owner, admin, group and invitation access can bypass it. The client displays an acceptance checkbox; this is not a server-side record of acceptance.
+A license describes under which terms, where and for how long a set of files may be used. Licence dates and allowed regions apply to every non-admin user, including owners, group members and invitees. Admins are exempt. The client displays an acceptance checkbox; this is not a server-side record of acceptance.
 
 ## Fields of a license
 
@@ -36,35 +36,15 @@ There is no per-file license in the UI.
 
 ## How a license hides collections and files
 
-The rules live in `userCollectionsQuery` and `userCollectionFilesQuery` in `server/src/services/collection.ts`. For collections the license is read through the linked asset folder (`collection.asset_folder_id`, then `asset_folder.license_id`); for files it is the file's own `asset_file.license_id`. The check is part of the "public" clause only, which applies to users whose role is neither `admin` nor `guest`:
+The server checks two things before returning content: the user must have access to the collection, and every non-admin user must meet the licence’s conditions. Being an owner, joining an allowed group or receiving an invitation does not remove the licence requirement.
 
-```
-(collection.public IS TRUE AND collection.draft IS FALSE)
-AND coalesce(array_length(collection.limited_to_group_ids, 1), 0) = 0
-AND (
-  <license_id> IS NULL
-  OR (
-    :regionId = ANY(license.allowed_region_ids)
-    AND (license.usage_from IS NULL OR license.usage_from <= now())
-    AND (license.usage_to IS NULL OR license.usage_to >= now())
-  )
-)
-```
+1. Content without a licence remains subject to the collection’s ordinary access rules.
+2. Licensed content requires the user’s region in `allowed_region_ids`.
+3. Optional start and end dates are inclusive, using the PostgreSQL session’s current date. A licence ending today remains valid throughout today.
 
-Read line by line for a member or manager:
+`userCollectionsQuery` checks the linked asset folder’s licence. `userCollectionFilesQuery` checks each file’s licence. Search, favourites, copies and new downloads use these rules. Archive jobs check access again before preparing the files; a revoked or expired selection is not exported.
 
-1. A collection or file with no license is visible (subject to public, draft and group rules).
-2. With a license, the user's `region_id` must be one of `allowed_region_ids`.
-3. If `usage_from` is set, it is effective from midnight; `usage_to` must still compare greater than or equal to `now()`. Both are `date` columns: a final date of today does not include the day after midnight in the PostgreSQL session timezone.
-
-A user can also gain access through the other permission rules. In those cases the licence does not block access, even if it has expired or excludes the user's region. This happens when:
-
-- the user is an **admin** (every public collection is visible),
-- the user **owns** the collection,
-- the user belongs to a **group** listed in `limited_to_group_ids`,
-- the user holds a **live invitation** on the collection or one of its ancestors.
-
-Guests cannot use ordinary public access. They see collections they own, collections available to their groups and collections shared with them by invitation. These permissions do not check the licence.
+Admins retain access to licensed content within the collections they can manage. Guests need an invitation, ownership or an explicitly assigned group, and must meet the same licence conditions as other non-admin users.
 
 :::note
 A manual (non-synchronized) collection has no asset folder, so the collection itself always passes the license check. Its files are still filtered one by one through `asset_file.license_id`, which means a collection can be visible while some of the files copied into it are hidden.
