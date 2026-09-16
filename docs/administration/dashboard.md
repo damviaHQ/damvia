@@ -24,7 +24,7 @@ Everything else keeps working: users still browse, download archives, upload pag
 
 ## Alerts at 80, 90, 95 and 100 %
 
-When a measurement crosses one of these thresholds upwards, every admin designated in [Users](./users-and-approval.md) ("Receives storage and maintenance emails") receives the `storage-alert` email once, with `severity` `warning` at 80 %, `critical` at 90 and 95 %, and `full` at 100 %. The level is remembered, so a usage that stays at 93 % does not mail every half hour. It is lowered again, without mail, once usage drops more than 2 points under the remembered threshold, so the next crossing mails again. The template and its variables are in [Email templates](../configuration/email-templates.md).
+When a measurement crosses one of these thresholds upwards, every admin designated in [Users](./users-and-approval.md) ("Receives storage and maintenance emails") receives the `storage-alert` email once, with `severity` `warning` at 80 %, `critical` at 90 and 95 %, and `full` at 100 %. The level is remembered only once the email has gone out, so a usage that stays at 93 % does not mail every half hour, while an alert that could not be sent (no designated admin, missing template, SMTP error) is tried again at the next measurement. It is lowered again, without mail, once usage drops more than 2 points under the remembered threshold, so the next crossing mails again. The template and its variables are in [Email templates](../configuration/email-templates.md).
 
 From 80 %, the warning above the storage block also shows the `SERVER_ALERT_EMAILS` addresses as an email link, for the admin to ask the host for a larger plan. It is omitted when the variable is empty.
 

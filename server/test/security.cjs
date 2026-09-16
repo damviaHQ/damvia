@@ -548,8 +548,12 @@ test('storage alerts go to designated admins once per crossing and the level fal
             bucketObjects = [{ name: 'asset-file/a', size: 1000, lastModified: new Date() }]
             await storageService.measureStorageUsage()
             assert.equal(sentMails.length, 2)
-            assert.equal((await storageRow()).alertLevel, 100)
+            assert.equal((await storageRow()).alertLevel, 0)
         } finally { env.mailConfig = previousConfig }
+        await storageService.measureStorageUsage()
+        assert.equal(sentMails.length, 3)
+        assert.match(sentMails[2].subject, /full/)
+        assert.equal((await storageRow()).alertLevel, 100)
     } finally { env.storageQuota = () => null }
 })
 
@@ -686,7 +690,7 @@ test('the server disk is shown only to the hosting contact and its alerts go onl
     disk = { totalBytes: 10000, freeBytes: 500 }
     await storageService.measureStorageUsage()
     assert.equal(sentMails.length, 0)
-    assert.equal((await storageRow()).diskAlertLevel, 95)
+    assert.equal((await storageRow()).diskAlertLevel, 0)
     assert.equal((await caller(admin).dashboard.summary()).storage.disk, null)
     env.serverAlertEmails = () => ['host@example.test']
     try {
@@ -721,7 +725,7 @@ test('only admins can designate an admin as maintenance contact, and no designat
         bucketObjects = [{ name: 'asset-file/a', size: 850, lastModified: new Date() }]
         await storageService.measureStorageUsage()
         assert.equal(sentMails.length, 0)
-        assert.equal((await storageRow()).alertLevel, 80)
+        assert.equal((await storageRow()).alertLevel, 0)
         const target = await makeUser('member')
         await caller(manager).user.update({ ...target, groupIds: [], maintenanceContact: true })
         assert.equal((await db.getRepository(User).findOneByOrFail({ id: target.id })).maintenanceContact, false)
@@ -762,4 +766,41 @@ test('measure and retry are refused while their jobs are waiting or running, inc
             assert.equal(queued.filter(job => job.name === 'storageMeasureUsageQueue').length, queuedBefore + 1)
         } finally { worker.storageMeasureUsageQueue.push = originalPush }
     } finally { await db.query('DELETE FROM pgboss.job') }
+})
+
+test('an alert that could not be sent is sent again at the next measurement', async () => {
+    await resetStorageUsage()
+    await db.getRepository(User).update(admin.id, { maintenanceContact: true })
+    env.storageQuota = () => 1000
+    env.serverAlertEmails = () => ['host@example.test']
+    disk = { totalBytes: 10000, freeBytes: 500 }
+    const previousTransporter = env.mailTransporter
+    env.mailTransporter = () => ({ sendMail: async () => { throw new Error('Fixture SMTP outage') } })
+    try {
+        bucketObjects = [{ name: 'asset-file/a', size: 950, lastModified: new Date() }]
+        await assert.rejects(storageService.measureStorageUsage(), /Fixture SMTP outage/)
+        let row = await storageRow()
+        assert.equal(row.diskAlertLevel, 0)
+        assert.equal(row.alertLevel, 0)
+        env.mailTransporter = previousTransporter
+        await storageService.measureStorageUsage()
+        row = await storageRow()
+        assert.equal(row.diskAlertLevel, 95)
+        assert.equal(row.alertLevel, 95)
+        assert.deepEqual(sentMails.map(mail => mail.to.includes('host@example.test')), [true, false])
+        await db.getRepository(User).update({ maintenanceContact: true }, { maintenanceContact: false })
+        await resetStorageUsage()
+        bucketObjects = [{ name: 'asset-file/a', size: 950, lastModified: new Date() }]
+        await storageService.measureStorageUsage()
+        assert.equal((await storageRow()).alertLevel, 0)
+        await db.getRepository(User).update(admin.id, { maintenanceContact: true })
+        await storageService.measureStorageUsage()
+        assert.equal((await storageRow()).alertLevel, 95)
+        assert(sentMails.some(mail => mail.to.includes(admin.email) && /critical/.test(mail.subject)))
+    } finally {
+        env.mailTransporter = previousTransporter
+        env.serverAlertEmails = () => []
+        env.storageQuota = () => null
+        disk = { totalBytes: 10000, freeBytes: 9000 }
+    }
 })

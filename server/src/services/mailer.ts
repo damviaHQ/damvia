@@ -134,17 +134,17 @@ export async function sendInvitation(invitation: CollectionInvitation) {
 	})
 }
 
-export async function sendStorageAlert(level: number, usage: { usedBytes: number, quotaBytes: number, percent: number }) {
+export async function sendStorageAlert(level: number, usage: { usedBytes: number, quotaBytes: number, percent: number }): Promise<boolean> {
 	const admins = await dataSource.getRepository(User).findBy({ role: UserRole.ADMIN, approved: true, emailVerified: true, maintenanceContact: true })
 	if (!admins.length) {
 		logger.warn('storage.alert-no-recipient', { level })
-		return
+		return false
 	}
 
 	const config = mailConfig()['storage-alert']
 	if (!config) {
 		logger.warn('storage.alert-template-missing', { level })
-		return
+		return false
 	}
 
 	const url = new URL(appURL())
@@ -163,18 +163,19 @@ export async function sendStorageAlert(level: number, usage: { usedBytes: number
 		text: await renderTemplate(config.body, context),
 	})
 	logger.info('storage.alert-sent', { level, recipients: admins.length })
+	return true
 }
 
-export async function sendDiskAlert(level: number, disk: { totalBytes: number, freeBytes: number, percent: number }) {
+export async function sendDiskAlert(level: number, disk: { totalBytes: number, freeBytes: number, percent: number }): Promise<boolean> {
 	const recipients = serverAlertEmails()
 	if (!recipients.length) {
-		return
+		return false
 	}
 
 	const config = mailConfig()['disk-alert']
 	if (!config) {
 		logger.warn('storage.disk-alert-template-missing', { level })
-		return
+		return false
 	}
 
 	const context = {
@@ -191,4 +192,5 @@ export async function sendDiskAlert(level: number, disk: { totalBytes: number, f
 		text: await renderTemplate(config.body, context),
 	})
 	logger.info('storage.disk-alert-sent', { level, recipients: recipients.length })
+	return true
 }

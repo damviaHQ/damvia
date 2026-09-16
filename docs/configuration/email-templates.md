@@ -21,7 +21,7 @@ Every email Damvia sends is plain text rendered from a template with [LiquidJS](
 }
 ```
 
-Each key is a template name; each template has `from`, `subject` and `body`. Every `body` is a Liquid template. The `request-approval`, `storage-alert` and `disk-alert` subjects are rendered with Liquid; the other six subjects and every `from` are used literally. Bodies are plain text (`\n` for new lines), not HTML. All nine keys should be present: the sender reads `mailConfig()[name]` without a fallback and fails the job otherwise, except `storage-alert` and `disk-alert`, whose absence only skips the alert and logs `storage.alert-template-missing` or `storage.disk-alert-template-missing`.
+Each key is a template name; each template has `from`, `subject` and `body`. Every `body` is a Liquid template. The `request-approval`, `storage-alert` and `disk-alert` subjects are rendered with Liquid; the other six subjects and every `from` are used literally. Bodies are plain text (`\n` for new lines), not HTML. All nine keys should be present: the sender reads `mailConfig()[name]` without a fallback and fails the job otherwise, except `storage-alert` and `disk-alert`, whose absence skips the alert, logs `storage.alert-template-missing` or `storage.disk-alert-template-missing`, and tries again at the next measurement, every 30 minutes, until the template is added. When `MAILCONFIG` is set, `server/mailconfig.json` is not read at all, so new templates must be added to the variable.
 
 ## The nine templates
 

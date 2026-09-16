@@ -108,7 +108,13 @@ export async function measureStorageUsage(): Promise<{ usedBytes: number, retrie
 	if (diskLevel > previous.diskAlertLevel) {
 		const [, claimed] = await dataSource.query(`UPDATE storage_usage SET disk_alert_level = $1 WHERE id = 1 AND disk_alert_level < $1`, [diskLevel])
 		if (claimed) {
-			await sendDiskAlert(diskLevel, { ...disk, percent: diskPercent })
+			const sent = await sendDiskAlert(diskLevel, { ...disk, percent: diskPercent }).catch(async (error) => {
+				await dataSource.query(`UPDATE storage_usage SET disk_alert_level = $1 WHERE id = 1 AND disk_alert_level = $2`, [previous.diskAlertLevel, diskLevel])
+				throw error
+			})
+			if (!sent) {
+				await dataSource.query(`UPDATE storage_usage SET disk_alert_level = $1 WHERE id = 1 AND disk_alert_level = $2`, [previous.diskAlertLevel, diskLevel])
+			}
 		}
 	} else if (diskPercent < previous.diskAlertLevel - 2) {
 		await repository.update({ id: 1 }, { diskAlertLevel: diskLevel })
@@ -126,7 +132,13 @@ export async function measureStorageUsage(): Promise<{ usedBytes: number, retrie
 	if (level > previous.alertLevel) {
 		const [, claimed] = await dataSource.query(`UPDATE storage_usage SET alert_level = $1 WHERE id = 1 AND alert_level < $1`, [level])
 		if (claimed) {
-			await sendStorageAlert(level, { usedBytes, quotaBytes: quota, percent })
+			const sent = await sendStorageAlert(level, { usedBytes, quotaBytes: quota, percent }).catch(async (error) => {
+				await dataSource.query(`UPDATE storage_usage SET alert_level = $1 WHERE id = 1 AND alert_level = $2`, [previous.alertLevel, level])
+				throw error
+			})
+			if (!sent) {
+				await dataSource.query(`UPDATE storage_usage SET alert_level = $1 WHERE id = 1 AND alert_level = $2`, [previous.alertLevel, level])
+			}
 		}
 	} else if (percent < previous.alertLevel - 2) {
 		await repository.update({ id: 1 }, { alertLevel: level })
