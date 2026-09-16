@@ -14,7 +14,7 @@ A download is a request to package one or more visible files, optionally convert
 
 | Field | Values |
 | --- | --- |
-| `status` | `preparing`, `ready`, `expired` |
+| `status` | `preparing`, `ready`, `failed`, `expired` |
 | `type` | `direct`, `email` |
 | `image_format` | `original`, `png`, `jpg`, `webp` |
 | `image_resolution` | `high`, `medium`, `low` |
@@ -57,7 +57,9 @@ Conversions run only on files whose MIME type starts with `image/` or `video/` a
 | Video `webm` | ffmpeg with `libvpx` |
 | Video `high` / `medium` / `low` | Scaled to a width of 7680 / 1920 / 720 pixels, height kept proportional |
 
-The archive worker checks the requester’s current approval, collection access and file licences before preparing the export. If any selected file is no longer accessible, the job fails without producing an archive.
+The archive worker checks the requester’s current approval, collection access and file licences before preparing the export. If the account or selection no longer allows access, the download becomes `failed`, with no download link or ready email. The worker does not retry that export. Direct downloads return the error to the caller and roll back the new download record.
+
+Temporary storage and processing errors still use the queue’s normal retries. Duplicate jobs do not restart downloads that are already ready, failed or expired.
 
 Temporary files are written under the system temp directory and removed when the job ends. `ffmpeg` must be installed on the host; the `server/Dockerfile` provides it.
 
@@ -65,13 +67,13 @@ Temporary files are written under the system temp directory and removed when the
 
 The `download/process-expired` job runs every minute (`* * * * *`). It selects downloads whose `expires_at` is in the past and whose status is not `expired`, deletes the object `downloads/{id}` from the bucket, and sets the status to `expired`. Deleting a user removes their downloads and objects immediately.
 
-`download.list` returns the caller's `ready` and `preparing` downloads, plus `expired` ones updated within the last month, so expired entries remain visible for about 30 days.
+`download.list` returns the caller's `ready`, `preparing` and `failed` downloads, plus `expired` ones updated within the last month, so expired entries remain visible for about 30 days. Failed downloads follow the same seven-day expiry and cleanup schedule.
 
 ## The public download URL
 
 A `ready` download exposes `url` as `API_URL/v1/downloads/{id}`. The route in `server/src/server.ts`:
 
-1. Loads the download; if it does not exist or `expires_at` has passed, redirects to `APP_URL/link-expired`.
+1. Loads the download; if it does not exist, is not `ready`, or `expires_at` has passed, redirects to `APP_URL/link-expired`.
 2. Otherwise generates a presigned GET URL for `downloads/{id}` and redirects to it.
 
 The route carries no authentication, which is what makes the `Copy URL` action shareable. Anyone holding the link can fetch the object until expiry.
@@ -79,5 +81,7 @@ The route carries no authentication, which is what makes the `Copy URL` action s
 ## How download progress appears in the client
 
 `DialogMemberDownloads.vue` shows each download's creation date, expiry date, status and number of files. The `Download` and `Copy URL` buttons are enabled when a download link is available. A green `New` badge highlights email downloads that finished since the dialog was last viewed.
+
+A red `Failed` badge identifies an export that could not proceed because access changed. Its download and copy buttons stay disabled. Failed exports do not keep the progress checks running when no other email export is preparing.
 
 While an email download is still being prepared (`status = preparing`), `client/src/stores/downloadStore.ts` asks `download.list` for updates every 500 ms. This updates the status and badge without reloading the page. The checks stop once no email download is still being prepared. Queue names and schedules are listed in [Background jobs](../reference/background-jobs.md).

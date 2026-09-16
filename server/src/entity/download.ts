@@ -26,6 +26,7 @@ import { User } from "./user"
 export enum DownloadStatus {
 	PREPARING = 'preparing',
 	READY = 'ready',
+	FAILED = 'failed',
 	EXPIRED = 'expired',
 }
 

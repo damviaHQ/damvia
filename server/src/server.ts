@@ -17,7 +17,7 @@ import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify'
 import fastify from 'fastify'
 import { appRouter, createContext } from './trpc'
 import {appURL, assetsS3, assetsS3Bucket, dataSource, logger} from "./env"
-import {Download} from "./entity/download";
+import {Download, DownloadStatus} from "./entity/download";
 
 const server = fastify({ maxParamLength: 5000, logger: false, bodyLimit: 5242880 })
 
@@ -37,7 +37,7 @@ server.get<{ Params: { downloadId: string } }>(
 	'/v1/downloads/:downloadId',
 	async (req, res) => {
 		const download = await dataSource.getRepository(Download).findOneBy({ id: req.params.downloadId })
-		if (!download || download.expiresAt.getTime() < Date.now()) {
+		if (!download || download.status !== DownloadStatus.READY || download.expiresAt.getTime() < Date.now()) {
 			const expiresURL = new URL(appURL())
 			expiresURL.pathname = '/link-expired'
 			res.redirect(expiresURL.toString())

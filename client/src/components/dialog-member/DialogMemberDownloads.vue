@@ -78,7 +78,10 @@ async function copyUrlToClipboard(url: string) {
           :class="{ 'text-neutral-400': download.status === 'expired' }">
           <TableCell>{{ dayjs(download.createdAt).format("D MMMM YYYY") }}</TableCell>
           <TableCell>{{ dayjs(download.expiresAt).format("D MMMM YYYY") }}</TableCell>
-          <TableCell>{{ download.status }}</TableCell>
+          <TableCell>
+            <Badge v-if="download.status === 'failed'" variant="destructive">Failed</Badge>
+            <span v-else>{{ download.status }}</span>
+          </TableCell>
           <TableCell>{{ download.fileCount }}</TableCell>
           <TableCell>
             <div class="flex gap-2 items-center">

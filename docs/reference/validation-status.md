@@ -11,9 +11,9 @@ The documentation was reviewed against application commit `b860246` on 16 Septem
 | Component | Observed version | Verification |
 |---|---|---|
 | Local Node | 22.14.0 | Used for local checks. The website lockfile includes `undici` requiring Node >=22.19.0; local npm emitted an engine warning, so use an up-to-date Node 22 for CI/deployment. |
-| Server | Fastify 5, tRPC 11.1.0, TypeORM 0.3 | TypeScript compilation and 12 security regression tests passed against an isolated PostgreSQL instance, including real API calls and HTTP error handling. |
+| Server | Fastify 5, tRPC 11.1.0, TypeORM 0.3 | TypeScript compilation and 18 security regression tests passed against an isolated PostgreSQL instance, including fresh login tokens, API responses, direct exports and revoked-access exports. Storage and email are stubbed. |
 | Client | Vue 3, Vite 5, tRPC 10.45.0 | Vite build passed. `vue-tsc --noEmit` fails on the typed inline callback in `search.vue`; full cross-version router type compatibility is not established. |
-| Queue | pg-boss 10.2.0 | Source/defaults inspected; producer-before-start behaviour checked without a live queue. |
+| Queue | pg-boss 10.2.0 | Actual registered archive callbacks tested for access denial and a temporary failure followed by a successful retry. Queue registration and delivery are stubbed; no live scheduler test. |
 | PostgreSQL | 15 in development Compose | Migrations applied to an empty test database and the access migration checked against existing fixture rows. No production restore drill. |
 | Documentation | Astro 7.3.2, Starlight 0.42.1 | Built locally with current Markdown; generated internal routes and anchors checked. |
 | Docker image | `node:22-bookworm` base in the Dockerfile | The image was not rebuilt, and its media conversions were not tested during this review. |

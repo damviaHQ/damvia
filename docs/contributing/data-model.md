@@ -38,7 +38,7 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 | `UserGroup` (`user-group.ts`) | `user_groups` | `userId`, `groupId` | Join table; both sides cascade on delete |
 | `UserFavorite` (`user-favorite.ts`) | `user_favorites` | Composite primary key `userId` + `collectionFileId` | Both sides cascade on delete |
 | `AuthorizedDomain` (`authorized-domain.ts`) | `authorized_domains` | `domain`, `detail` | No relations declared |
-| `Download` (`download.ts`) | `downloads` | `userId`, `collectionFileIds` (`uuid[]`), `status`, `type`, `imageFormat`, `imageResolution`, `videoFormat`, `videoResolution`, `expiresAt` | `user`. Getter `storageKey` (`downloads/{id}`). Enums `DownloadStatus` (`preparing`, `ready`, `expired`), `DownloadType` (`direct`, `email`), `DownloadImageFormat` (`original`, `png`, `jpg`, `webp`), `DownloadImageResolution` and `DownloadVideoResolution` (`high`, `medium`, `low`), `DownloadVideoFormat` (`original`, `mp4`, `webm`) |
+| `Download` (`download.ts`) | `downloads` | `userId`, `collectionFileIds` (`uuid[]`), `status`, `type`, `imageFormat`, `imageResolution`, `videoFormat`, `videoResolution`, `expiresAt` | `user`. Getter `storageKey` (`downloads/{id}`). Enums `DownloadStatus` (`preparing`, `ready`, `failed`, `expired`), `DownloadType` (`direct`, `email`), `DownloadImageFormat` (`original`, `png`, `jpg`, `webp`), `DownloadImageResolution` and `DownloadVideoResolution` (`high`, `medium`, `low`), `DownloadVideoFormat` (`original`, `mp4`, `webm`) |
 
 ## Three trees use a materialized path
 

@@ -136,7 +136,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `license.create`, `update`, `remove` | mutation | `userAdmin` | CRUD |
 | `favorite.list` | query | `userApproved`, `userMember` | The caller's favourite collection files |
 | `favorite.add`, `favorite.remove` | mutation | `userApproved`, `userMember` | Toggle a favourite |
-| `download.list` | query | `userApproved` | The caller's `ready` and `preparing` downloads, plus those `expired` in the last month |
+| `download.list` | query | `userApproved` | The caller's `ready`, `preparing` and `failed` downloads, plus those `expired` in the last month |
 | `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` at or above 10,000,000,000 bytes); `email` type pushes `download/create-archive` |
 
 ### `pim` and `productAttribute`

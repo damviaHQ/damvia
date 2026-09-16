@@ -42,15 +42,23 @@ export type CreateDownloadArchiveOptions = {
 	download: Download
 }
 
+export class DownloadAccessError extends Error {
+	constructor() {
+		super('Download access is no longer available.')
+		this.name = 'DownloadAccessError'
+		Object.setPrototypeOf(this, DownloadAccessError.prototype)
+	}
+}
+
 export async function createDownloadArchive({ em, download }: CreateDownloadArchiveOptions) {
 	const user = await em.getRepository(User).findOneBy({ id: download.userId })
 	if (!user?.approved || !user.emailVerified || !download.collectionFileIds.length) {
-		throw new Error('Download access is no longer available.')
+		throw new DownloadAccessError()
 	}
 	const collectionFiles = await userCollectionFilesQuery(user, em)
 		.andWhere('collection_file.id IN (:...ids)', { ids: download.collectionFileIds }).getMany()
 	if (collectionFiles.length !== new Set(download.collectionFileIds).size) {
-		throw new Error('Download access is no longer available.')
+		throw new DownloadAccessError()
 	}
 
 	const workingDirectory = await mkdtemp(join(tmpdir(), `dam-asset-${randomUUID()}`))

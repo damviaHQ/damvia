@@ -25,7 +25,7 @@ All queues are declared in `server/src/worker.ts`. The push helpers set `retryBa
 |---|---|---|
 | `asset/update-content` | Cloud sync (`upsertFile`), integrity check | Downloads the file from Dropbox or OneDrive, detects its MIME type, uploads the original to `asset-file/{id}`, generates a WebP thumbnail, reads width and height, sets status `up_to_date`. Processes 10 jobs at a time (`batchSize: 10`). |
 | `collection/synchronization` | Linking a collection to an asset folder | Mirrors the folder's sub-tree into the collection tree. One job at a time. |
-| `download/create-archive` | `download.create` with type `email` | Checks current access, builds the file or zip archive, uploads it to `downloads/{id}`, then pushes `mailer/download-ready`. One job at a time. |
+| `download/create-archive` | `download.create` with type `email` | Checks current access, builds the file or zip archive, uploads it to `downloads/{id}`, then pushes `mailer/download-ready`. If access is no longer allowed, marks the download `failed` without retrying or sending a ready email. One job at a time. |
 | `mailer/email-verification` | Sign-up, "resend verification" | Sends the `email-verification` template with the `?verificationCode=` link. |
 | `mailer/log-in` | Login in passwordless mode or with the magic-link option | Sends the `login` template with a 180-day auth token. |
 | `mailer/password-reset` | "Forgot password" | Sends the `reset-password` template with the job’s token only if that reset request is still current and unexpired. |
@@ -43,6 +43,8 @@ The 5-minute loop that lists Dropbox or OneDrive and upserts folders and files r
 ## Reading job failures in the logs
 
 A failed job is logged by the worker as `job` with `status: failed`, the `queue` name, the `jobId` and the error message, then rethrown so pg-boss schedules the retry. pg-boss itself logs connection problems as `worker error`.
+
+An export denied by the access check is handled separately: the archive transaction rolls back, then the worker saves the download as `failed` and logs `download.access-denied`. The queue job finishes without a retry; the download dialog shows the failed result. Other archive errors still follow the normal retry policy. Jobs for downloads already ready, failed or expired do nothing.
 
 :::tip
 pg-boss keeps its tables in the `pgboss` schema of `DATABASE_URL`. `SELECT name, state, count(*) FROM pgboss.job GROUP BY 1, 2;` is the quickest way to see what is queued, active or failed.

@@ -61,7 +61,7 @@ export default router({
 				where: [
 					{
 						userId: ctx.user.id,
-						status: In([DownloadStatus.READY, DownloadStatus.PREPARING]),
+						status: In([DownloadStatus.READY, DownloadStatus.PREPARING, DownloadStatus.FAILED]),
 					},
 					{
 						userId: ctx.user.id,

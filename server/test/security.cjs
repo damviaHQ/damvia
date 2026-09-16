@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID, createHash } = require('node:crypto')
+const { writeFile } = require('node:fs/promises')
 const { sign } = require('jsonwebtoken')
 // This suite migrates and clears its database. Never fall back to the application's .env.
 const databaseURL = process.env.SECURITY_TEST_DATABASE_URL
@@ -29,7 +30,12 @@ const env = require('../dist/env')
 const { dataSource: db } = env
 // Storage calls return fixture URLs; the suite never contacts a bucket.
 env.mainS3 = () => ({ presignedGetObject: async () => 'https://example.test/fixture', removeObjects: async () => {} })
-env.assetsS3 = () => ({ presignedGetObject: async () => 'https://example.test/fixture' })
+const storage = {
+    presignedGetObject: async () => 'https://example.test/fixture',
+    fGetObject: async (_bucket, _key, path) => writeFile(path, 'fixture-original'),
+    fPutObject: async () => {},
+}
+env.assetsS3 = () => storage
 env.mainS3Bucket = () => 'fixture'
 env.assetsS3Bucket = () => 'fixture'
 const { User } = require('../dist/entity/user')
@@ -44,6 +50,7 @@ const { AssetFile } = require('../dist/entity/asset-file')
 const { License } = require('../dist/entity/license')
 const { Product } = require('../dist/entity/product')
 const { ProductAttribute } = require('../dist/entity/product-attribute')
+const { Download } = require('../dist/entity/download')
 const credentials = require('../dist/services/credentials')
 const users = require('../dist/services/user')
 const collections = require('../dist/services/collection')
@@ -52,6 +59,12 @@ const { appRouter } = require('../dist/trpc')
 const worker = require('../dist/worker')
 const server = require('../dist/server').default
 const queued = []
+const processors = new Map()
+// Register the real worker callbacks without starting pg-boss or a scheduler.
+worker.boss.start = async () => {}
+worker.boss.createQueue = async () => {}
+worker.boss.schedule = async () => {}
+worker.boss.work = async (name, _options, callback) => processors.set(name, callback)
 for (const [name, queue] of Object.entries(worker)) {
     if (!name.endsWith('Queue')) continue
     queue.push = async data => queued.push({ name, ...data })
@@ -68,6 +81,7 @@ const forbidden = promise => assert.rejects(promise, e => ['UNAUTHORIZED', 'FORB
 let group, region, admin, member, manager, guest, legacyChild
 before(async () => {
     await db.initialize()
+    await worker.startWorker()
     // Apply the upgrade to old rows, not just an empty schema.
     const applied = await db.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1')
     assert.equal(applied[0]?.name, 'SecureAccess1789516800000', 'Review the fixture upgrade setup when adding migrations')
@@ -296,4 +310,107 @@ test('concurrent child creation and parent restriction changes preserve inherita
             await first.release(); await second.release()
         }
     }
+})
+
+test('signup token is usable immediately after account creation', async () => {
+    const email = `${randomUUID()}@example.test`
+    const token = await caller(null).user.create({ name: 'Signup', company: 'Test', regionId: region.id, email, password: 'fixture-password' })
+    const authenticated = await users.getUserFromRequest({ headers: { authorization: token } })
+    assert.equal(authenticated?.email, email)
+    assert.equal(authenticated.authVersion, 0)
+})
+
+const downloadOptions = {
+    imageFormat: 'original', imageResolution: 'high',
+    videoFormat: 'original', videoResolution: 'high',
+}
+
+async function exportFixture() {
+    const user = await makeUser()
+    const license = await save(License, { name: 'Export licence', scopes: [], allowedRegionIds: [region.id] })
+    const folder = await save(AssetFolder, { name: 'Export folder', externalId: randomUUID(), status: 'up_to_date', licenseId: license.id })
+    const collection = await makeCollection({ assetFolderId: folder.id })
+    const asset = await save(AssetFile, {
+        name: 'fixture.png', externalId: randomUUID(), externalChecksum: 'fixture',
+        status: 'up_to_date', size: '16', mimeType: 'image/png', folderId: folder.id, licenseId: license.id,
+    })
+    const file = await save(CollectionFile, { collectionId: collection.id, assetFileId: asset.id })
+    return { user, license, file }
+}
+
+async function runExportJob(downloadId) {
+    return processors.get('download/create-archive')([
+        { id: randomUUID(), name: 'download/create-archive', data: { downloadId } },
+    ])
+}
+
+test('direct download runs as the requesting user and inaccessible requests roll back', async () => {
+    const { user, license, file } = await exportFixture()
+    const input = { ...downloadOptions, downloadType: 'direct', collectionFileIds: [file.id] }
+    const result = await caller(user).download.create(input)
+    assert.equal(result.status, 'ready')
+    assert.equal(result.fileCount, 1)
+    assert.equal((await db.getRepository(Download).findOneByOrFail({ id: result.id })).userId, user.id)
+    await db.getRepository(License).update(license.id, { usageTo: '2000-01-01' })
+    await assert.rejects(caller(user).download.create(input), /no longer available/)
+    assert.equal(await db.getRepository(Download).countBy({ userId: user.id }), 1)
+})
+
+test('guest token is usable immediately after invitation account creation', async () => {
+    const created = await users.createGuestUser({ em: db.manager, email: `${randomUUID()}@example.test`, regionId: region.id })
+    const token = await users.generateAuthToken(created)
+    const authenticated = await users.getUserFromRequest({ headers: { authorization: token } })
+    assert.equal(authenticated?.id, created.id)
+    assert.equal(authenticated.role, 'guest')
+    assert.equal(authenticated.authVersion, 0)
+})
+
+test('new collection responses contain inherited values for manual and synchronised children', async () => {
+    const parent = await makeCollection({ limitedToGroupIds: [group.id] })
+    const folder = await save(AssetFolder, { name: 'Source', status: 'up_to_date', externalId: randomUUID() })
+    const manual = await caller(admin).collection.create({ name: randomUUID(), parentId: parent.id })
+    const synchronised = await caller(admin).collection.createFromAsset({ assetFolderId: folder.id, parentId: parent.id })
+    for (const response of [manual, synchronised]) {
+        assert.deepEqual(response.limitedToGroupIds, [group.id])
+        assert.equal(response.canEditLimitedToGroupIds, false)
+    }
+})
+
+test('email export with revoked access ends in failed and remains visible without a link', async () => {
+    const { user, license, file } = await exportFixture()
+    const result = await caller(user).download.create({ ...downloadOptions, downloadType: 'email', collectionFileIds: [file.id] })
+    await db.getRepository(License).update(license.id, { usageTo: '2000-01-01' })
+    let rejected
+    await runExportJob(result.id).catch(error => { rejected = error })
+    const persisted = await db.getRepository(Download).findOneByOrFail({ id: result.id })
+    assert.equal(persisted.status, 'failed')
+    assert.equal(rejected, undefined, 'A permanent access failure must finish without scheduling a retry')
+    const listed = (await caller(user).download.list()).find(download => download.id === result.id)
+    assert.equal(listed?.status, 'failed')
+    assert.equal(listed.url, null)
+    const response = await server.inject({ method: 'GET', url: `/v1/downloads/${result.id}` })
+    assert.equal(response.statusCode, 302)
+    assert.match(response.headers.location, /\/link-expired$/)
+    assert(!queued.some(job => job.name === 'mailerDownloadReadyQueue' && job.downloadId === result.id))
+    assert(!(await caller(member).download.list()).some(download => download.id === result.id))
+    // An already failed export must not be revived by duplicate delivery of the job.
+    await db.getRepository(License).update(license.id, { usageTo: null })
+    await runExportJob(result.id)
+    assert.equal((await db.getRepository(Download).findOneByOrFail({ id: result.id })).status, 'failed')
+    assert(!queued.some(job => job.name === 'mailerDownloadReadyQueue' && job.downloadId === result.id))
+})
+
+test('temporary export failures stay retryable and a successful retry sends the ready notification', async () => {
+    const { user, file } = await exportFixture()
+    const result = await caller(user).download.create({ ...downloadOptions, downloadType: 'email', collectionFileIds: [file.id] })
+    const originalGet = storage.fGetObject
+    storage.fGetObject = async () => { throw new Error('Temporary fixture storage failure') }
+    try {
+        await assert.rejects(runExportJob(result.id), /Temporary fixture storage failure/)
+        assert.equal((await db.getRepository(Download).findOneByOrFail({ id: result.id })).status, 'preparing')
+        assert(!queued.some(job => job.name === 'mailerDownloadReadyQueue' && job.downloadId === result.id))
+    } finally { storage.fGetObject = originalGet }
+    await runExportJob(result.id)
+    assert.equal((await db.getRepository(Download).findOneByOrFail({ id: result.id })).status, 'ready')
+    assert.equal(queued.filter(job => job.name === 'mailerDownloadReadyQueue' && job.downloadId === result.id).length, 1)
 })

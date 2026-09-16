@@ -15,13 +15,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import PgBoss from "pg-boss"
 import { AssetFile } from "./entity/asset-file"
 import { CollectionInvitation } from "./entity/collection-invitation"
-import { Download } from "./entity/download"
+import { Download, DownloadStatus } from "./entity/download"
 import { User } from "./entity/user"
 import {dataSource, logger} from "./env"
 import { assignProductsToAssetFiles, processDeletion, updateFileContent } from "./services/asset"
 import { synchronizeCollection } from "./services/collection"
 import { integrityCheck as systemIntegrityCheck } from "./services/system"
-import { createDownloadArchive, processExpiredDownloads } from "./services/download"
+import { createDownloadArchive, DownloadAccessError, processExpiredDownloads } from "./services/download"
 import {
 	sendDownloadReady,
 	sendEmailVerificationEmail,
@@ -184,12 +184,24 @@ export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({
 	name: 'download/create-archive',
 	processor: (data) => dataSource.transaction(async (em) => {
 		const download = await em.getRepository(Download).findOneBy({ id: data.downloadId })
-		if (!download) {
+		if (!download || download.status !== DownloadStatus.PREPARING) {
 			return
 		}
 
 		await createDownloadArchive({ em, download })
 		await mailerDownloadReadyQueue.push({ downloadId: download.id })
+	}).catch(async (error) => {
+		if (!(error instanceof DownloadAccessError)) {
+			throw error
+		}
+		// Persist the terminal state after the archive transaction has rolled back.
+		const result = await dataSource.getRepository(Download).update(
+			{ id: data.downloadId, status: DownloadStatus.PREPARING },
+			{ status: DownloadStatus.FAILED },
+		)
+		if (result.affected) {
+			logger.warn('download.access-denied', { downloadId: data.downloadId, status: DownloadStatus.FAILED })
+		}
 	}),
 	workerOptions: { batchSize: 1 },
 })
