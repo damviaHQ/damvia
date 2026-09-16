@@ -69,7 +69,7 @@ curl -fsS http://localhost:3000/trpc/env
 
 ## Temp space
 
-File contents are downloaded to the system temp directory before upload, download archives are assembled there, and LibreOffice and ffmpeg write intermediate files there. Size `/tmp` for concurrent source downloads, conversion outputs and the completed archive together. Ten asset jobs and up to 25 files within an archive can run concurrently. A tmpfs consumes memory; measure representative workloads before selecting it.
+File contents are downloaded to the system temp directory before upload, download archives are assembled there, and LibreOffice and ffmpeg write intermediate files there. Size `/tmp` for concurrent source downloads, conversion outputs and the completed archive together. Ten asset jobs and up to 25 files within an archive can run concurrently. A tmpfs consumes memory; measure representative workloads before selecting it. Directories named `dam-asset*` left by a crash are removed at the next start when older than 6 hours.
 
 ## Logs
 

@@ -1,6 +1,7 @@
 import {AssetFile, AssetFileStatus } from "../entity/asset-file";
 import {assetsS3, assetsS3Bucket, dataSource} from "../env";
 import {assetUpdateContentQueue} from "../worker";
+import {removeOrphanObjects} from "./storage";
 
 export async function integrityCheck() {
 	const assetFiles = await dataSource.getRepository(AssetFile).find()
@@ -48,4 +49,6 @@ export async function integrityCheck() {
 				) AS subquery
 	 		), ARRAY[]::uuid[])
 		`)
+
+	await removeOrphanObjects()
 }

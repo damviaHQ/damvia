@@ -14,6 +14,7 @@ The integrity check is the repair tool for the assets bucket. It runs every day 
 2. Keeps an asset file as healthy only if its object exists, the object's size equals the `size` recorded from the cloud storage listing, **and** the row's status is `up_to_date`.
 3. Sets every other asset file to `outdated`, saves them, and pushes one `asset/update-content` job per file. The worker downloads the content from Dropbox or OneDrive again, uploads it, rebuilds the WebP thumbnail and sets `up_to_date`.
 4. Recomputes `sample_file_ids` for every collection: the first four collection files with a thumbnail, prioritising files in the collection itself, then descendant files by creation date. These are the four images in a collection's thumbnail mosaic.
+5. Lists `asset-file/` and `downloads/` again and deletes orphan objects: an original or thumbnail whose asset file row no longer exists, and an archive whose download row is gone, `expired` or `failed`. Only objects last modified more than 24 hours ago are deleted, so a file whose upload is in progress is never touched. The count and the bytes freed are logged as `storage.orphans-removed` and shown on the [dashboard](../administration/dashboard.md).
 
 The console prints `N assets files found to sync` and `Syncing folder thumbnails`. The CLI exits when the queueing is done, not when the downloads are: watch the worker for the actual work.
 
@@ -29,13 +30,13 @@ The console prints `N assets files found to sync` and `Syncing folder thumbnails
 ## What it does not do
 
 - It does not compare the database with the cloud storage; that is the 5-minute sync loop.
-- It does not delete orphan objects in the bucket (objects with no row). They stay until removed by hand.
+- It does not delete objects modified in the last 24 hours, whatever their row says, and it does not touch keys that are not `asset-file/{uuid}`, `asset-file/{uuid}-thumbnail` or `downloads/{uuid}`.
 - It does not touch the main bucket.
 - It does not verify checksums, only sizes.
 
 ## Cost
 
-The check lists the whole `asset-file/` prefix once and queries all asset file rows, with memory and database cost proportional to library size. The expensive part is the re-download of whatever it flags, which runs through the worker at 10 files at a time and consumes cloud storage bandwidth.
+The check lists the whole `asset-file/` prefix twice (once for the comparison, once for orphans) and `downloads/` once, and queries all asset file rows, with memory and database cost proportional to library size. The expensive part is the re-download of whatever it flags, which runs through the worker at 10 files at a time and consumes cloud storage bandwidth.
 
 ## Targeted refresh of a stale original or missing preview
 

@@ -17,13 +17,14 @@ All queues are declared in `server/src/worker.ts`. The push helpers set `retryBa
 | `asset/process-deletion` | `* * * * *` (every minute) | Deletes asset files and folders whose status is `pending_deletion`: removes the original and thumbnail from the assets bucket and the database rows. |
 | `download/process-expired` | `* * * * *` (every minute) | Marks downloads past their `expiresAt` as `expired` and deletes the archive from the assets bucket. |
 | `asset/assign-products-to-asset-files` | `*/5 * * * *` (every 5 minutes) | Matches every asset file name against `PRODUCT_MATCHING_REGEX` and links it to the product with the captured key. See [Products and PIM](../administration/products-and-pim.md). |
-| `system/integrity-check` | `0 5 * * *` (daily at 05:00 UTC) | Compares the database with the assets bucket, re-queues files whose object is missing or has a different size, and recomputes each collection's four sample thumbnails. Same code as the [`check-integrity` CLI command](./cli.md). |
+| `system/integrity-check` | `0 5 * * *` (daily at 05:00 UTC) | Compares the database with the assets bucket, re-queues files whose object is missing or has a different size, recomputes each collection's four sample thumbnails, then deletes orphan objects older than 24 hours: originals and thumbnails without an asset file row, and archives of downloads that are gone, `expired` or `failed`. Same code as the [`check-integrity` CLI command](./cli.md). |
+| `storage/measure-usage` | `*/30 * * * *` (every 30 minutes) | Lists every object of both buckets and stores the total in `storage_usage`. Reservations held by running `asset/update-content` jobs are kept; when no such job is active in `pgboss.job`, leftover reservations from a crashed process are cleared. With `STORAGE_QUOTA` set, it sends the `storage-alert` email when usage crosses 80, 90, 95 or 100 %, and once space has been freed after the sync was paused it queues `asset/update-content` for every `creating` or `outdated` file. It also reads the free space of `STORAGE_DISK_PATH` and sends `disk-alert` to `SERVER_ALERT_EMAILS` when the disk crosses the same thresholds. Also pushed by "Measure now" on the [dashboard](../administration/dashboard.md). |
 
 ## On-demand jobs
 
 | Queue | Pushed by | What it does |
 |---|---|---|
-| `asset/update-content` | Cloud sync (`upsertFile`), integrity check | Downloads the file from Dropbox or OneDrive, detects its MIME type, uploads the original to `asset-file/{id}`, generates a WebP thumbnail, reads width and height, sets status `up_to_date`. Processes 10 jobs at a time (`batchSize: 10`). |
+| `asset/update-content` | Cloud sync (`upsertFile`), integrity check, `storage/measure-usage`, "Retry pending files" on the dashboard | Does nothing unless the file is `creating` or `outdated`, so duplicate jobs are harmless. With `STORAGE_QUOTA` set, reserves the file's size against the plan first; a file that does not fit ends the job without a retry and is logged as `storage.quota-exceeded`. Otherwise downloads the file from Dropbox or OneDrive, detects its MIME type, uploads the original to `asset-file/{id}`, generates a WebP thumbnail, reads width and height, sets status `up_to_date` and adds the size to `storage_usage`. An S3 upload failure fails the job, so it is retried and the file keeps its status. Processes 10 jobs at a time (`batchSize: 10`). |
 | `collection/synchronization` | Linking a collection to an asset folder | Mirrors the folder's sub-tree into the collection tree. One job at a time. |
 | `download/create-archive` | `download.create` with type `email` | Checks current access, builds the file or zip archive, uploads it to `downloads/{id}`, then pushes `mailer/download-ready`. If access is no longer allowed, marks the download `failed` without retrying or sending a ready email. One job at a time. |
 | `mailer/email-verification` | Sign-up, "resend verification" | Sends the `email-verification` template with the `?verificationCode=` link. |
@@ -43,6 +44,8 @@ The 5-minute loop that lists Dropbox or OneDrive and upserts folders and files r
 ## Reading job failures in the logs
 
 A failed job is logged by the worker as `job` with `status: failed`, the `queue` name, the `jobId` and the error message, then rethrown so pg-boss schedules the retry. pg-boss itself logs connection problems as `worker error`.
+
+A file blocked by the storage plan is logged as `storage.quota-exceeded` with the asset file id and size, and the job finishes without a retry. The sync queues `creating` files again every 5 minutes, so the log line repeats until space is freed or the plan is raised; `outdated` files are queued again by `storage/measure-usage` once usage has dropped, or by the dashboard.
 
 An export denied by the access check is handled separately: the archive transaction rolls back, then the worker saves the download as `failed` and logs `download.access-denied`. The queue job finishes without a retry; the download dialog shows the failed result. Other archive errors still follow the normal retry policy. Jobs for downloads already ready, failed or expired do nothing.
 

@@ -12,7 +12,7 @@ Runtime configuration is read from environment variables and the mail templates.
 |---|---|
 | [Server configuration](./server-env.md) | The server's `.env`, group by group: application URLs and secret, database, storage, mail, cloud sync, PIM. |
 | [Client configuration](./client-env.md) | The client's build-time variables: API endpoint and brand colours. |
-| [Email templates](./email-templates.md) | The `mailconfig.json` format, the seven templates and the variables each can use. |
+| [Email templates](./email-templates.md) | The `mailconfig.json` format, the nine templates and the variables each can use. |
 | [Branding](./branding.md) | Everything that changes the look: app name, colours, login background, logo and favicon. |
 
 The exhaustive table with defaults is [Environment variables](../reference/environment-variables.md). Provider setup (Dropbox app, Azure registration, SMTP, buckets) is in [Integrations](../integrations/index.md).

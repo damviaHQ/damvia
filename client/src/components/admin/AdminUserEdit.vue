@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   FormControl,
   FormField,
@@ -50,6 +51,7 @@ const props = defineProps<{
     regionId: string
     role: UserRole
     groupIds: string[]
+    maintenanceContact?: boolean
   }
 }>()
 const emit = defineEmits<{ updated: []; close: [] }>()
@@ -72,6 +74,7 @@ const formSchema = toTypedSchema(
     regionId: z.string().min(1),
     role: z.enum(["guest", "member", "manager", "admin"] as const),
     groupIds: z.string().uuid("Invalid group").array(),
+    maintenanceContact: z.boolean(),
   })
 )
 const { handleSubmit, values, setValues } = useForm({
@@ -98,6 +101,7 @@ watch(
         email: user.email,
         role: user.role,
         groupIds: user.groups?.map((group) => group.id) ?? [],
+        maintenanceContact: user.maintenanceContact ?? false,
       })
     }
   },
@@ -208,6 +212,15 @@ const onSubmit = handleSubmit(async (formValues) => {
           </Select>
         </FormControl>
         <FormMessage />
+      </FormItem>
+    </FormField>
+    <FormField v-if="globalStore.user?.role === 'admin' && values.role === 'admin'" v-slot="{ value, handleChange }"
+      name="maintenanceContact">
+      <FormItem class="flex items-center space-x-2">
+        <FormControl>
+          <Checkbox :checked="value" @update:checked="handleChange" />
+        </FormControl>
+        <FormLabel class="!mt-0">Receives storage and maintenance emails</FormLabel>
       </FormItem>
     </FormField>
     <FormField v-if="!isCurrentUserManager" v-slot="{ componentField }" name="groupIds">

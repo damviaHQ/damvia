@@ -12,7 +12,7 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 
 - `dataSource` in `server/src/env.ts` uses `SnakeNamingStrategy` from `typeorm-naming-strategies`: a property `assetTypeId` is the column `asset_type_id`, the entity `CollectionFile` mapped with `@Entity('collection_files')` keeps that explicit table name.
 - `synchronize: false` and `migrationsRun: true`: TypeORM never alters the schema from the entities; every schema change is a migration, applied at startup before Fastify listens.
-- Every entity except `UserFavorite` has a `uuid` primary key `id` (declared with `@PrimaryColumn()` and `@PrimaryGeneratedColumn("uuid")`, defaulting to `uuid_generate_v4()` in SQL). All have a `createdAt`; all but `UserGroup` also have an `updatedAt`.
+- Every entity except `UserFavorite` and `StorageUsage` has a `uuid` primary key `id` (declared with `@PrimaryColumn()` and `@PrimaryGeneratedColumn("uuid")`, defaulting to `uuid_generate_v4()` in SQL). All but `StorageUsage` have a `createdAt`; all but `UserGroup` and `StorageUsage` also have an `updatedAt`.
 - Enums are TypeScript string enums stored as plain `character varying` columns (`@Column({ enum: ... })`), not Postgres enum types.
 - Relations are declared with both the foreign-key column (`folderId`) and the object (`folder`), so a query can filter on the id without a join.
 
@@ -34,10 +34,11 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 | `ProductAttribute` (`product-attribute.ts`) | `product_attributes` | `name` (unique), `displayName`, `facetable`, `searchable` (indexed), `viewable` | No relations declared |
 | `Region` (`region.ts`) | `regions` | `name`, `defaultGroupId` | `defaultGroup`, `users` |
 | `Group` (`group.ts`) | `groups` | `name`, `default` | `userGroups` |
-| `User` (`user.ts`) | `users` | `name`, `company`, `email` (unique), `emailVerified`, `emailVerificationCode`, `password`, `resetPasswordToken` (hash), `resetPasswordExpiresAt` (`timestamptz`), `authVersion`, `role`, `approved`, `regionId` | `region`, `userGroups` (cascade insert), `favorites`, `invitations`. Enum `UserRole`: `admin`, `manager`, `member`, `guest` (default) |
+| `User` (`user.ts`) | `users` | `name`, `company`, `email` (unique), `emailVerified`, `emailVerificationCode`, `password`, `resetPasswordToken` (hash), `resetPasswordExpiresAt` (`timestamptz`), `authVersion`, `role`, `approved`, `maintenanceContact`, `regionId` | `region`, `userGroups` (cascade insert), `favorites`, `invitations`. Enum `UserRole`: `admin`, `manager`, `member`, `guest` (default) |
 | `UserGroup` (`user-group.ts`) | `user_groups` | `userId`, `groupId` | Join table; both sides cascade on delete |
 | `UserFavorite` (`user-favorite.ts`) | `user_favorites` | Composite primary key `userId` + `collectionFileId` | Both sides cascade on delete |
 | `AuthorizedDomain` (`authorized-domain.ts`) | `authorized_domains` | `domain`, `detail` | No relations declared |
+| `StorageUsage` (`storage-usage.ts`) | `storage_usage` | Single row, `id` = 1: `usedBytes`, `reservedBytes` (`bigint`, read as strings), `measuredAt`, `alertLevel`, `diskAlertLevel`, `quotaReachedAt`, `orphanObjects`, `orphanBytes`, `orphansRemovedAt` | No relations. Written by `services/storage.ts` only: the measure job rewrites `usedBytes` and clears `reservedBytes` only when `pgboss.job` has no active `asset/update-content` job (pg-boss must therefore share `DATABASE_URL`), `asset/update-content` reserves and commits sizes with conditional `UPDATE` statements |
 | `Download` (`download.ts`) | `downloads` | `userId`, `collectionFileIds` (`uuid[]`), `status`, `type`, `imageFormat`, `imageResolution`, `videoFormat`, `videoResolution`, `expiresAt` | `user`. Getter `storageKey` (`downloads/{id}`). Enums `DownloadStatus` (`preparing`, `ready`, `failed`, `expired`), `DownloadType` (`direct`, `email`), `DownloadImageFormat` (`original`, `png`, `jpg`, `webp`), `DownloadImageResolution` and `DownloadVideoResolution` (`high`, `medium`, `low`), `DownloadVideoFormat` (`original`, `mp4`, `webm`) |
 
 ## Three trees use a materialized path

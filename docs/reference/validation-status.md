@@ -6,12 +6,12 @@ sidebar:
 lastUpdated: 2026-09-16
 ---
 
-The documentation was reviewed against application commit `b860246` on 16 September 2026, then updated for `f8eb687`, which adds hexadecimal brand colours without `#`. It now includes the access and credential changes tested on an isolated PostgreSQL database. The table distinguishes those tests from integrations still requiring a staging instance.
+The documentation was reviewed against application commit `b860246` on 16 September 2026, then updated for `f8eb687`, which adds hexadecimal brand colours without `#`, and for the storage plan, dashboard and orphan cleanup change. It now includes the access, credential and storage changes tested on an isolated PostgreSQL database. The table distinguishes those tests from integrations still requiring a staging instance.
 
 | Component | Observed version | Verification |
 |---|---|---|
 | Local Node | 22.14.0 | Used for local checks. The website lockfile includes `undici` requiring Node >=22.19.0; local npm emitted an engine warning, so use an up-to-date Node 22 for CI/deployment. |
-| Server | Fastify 5, tRPC 11.1.0, TypeORM 0.3 | TypeScript compilation and 18 security regression tests passed against an isolated PostgreSQL instance, including fresh login tokens, API responses, direct exports and revoked-access exports. Storage and email are stubbed. |
+| Server | Fastify 5, tRPC 11.1.0, TypeORM 0.3 | TypeScript compilation and 31 security regression tests passed against an isolated PostgreSQL instance, including fresh login tokens, API responses, direct exports, revoked-access exports, the storage plan reservation, plan and disk alert emails, orphan cleanup and the dashboard access rules including the hosting-contact-only disk figure. Buckets, cloud storage and email transport are stubbed; the real `asset/update-content` and archive callbacks run. |
 | Client | Vue 3, Vite 5, tRPC 10.45.0 | Vite build passed. `vue-tsc --noEmit` fails on the typed inline callback in `search.vue`; full cross-version router type compatibility is not established. |
 | Queue | pg-boss 10.2.0 | Actual registered archive callbacks tested for access denial and a temporary failure followed by a successful retry. Queue registration and delivery are stubbed; no live scheduler test. |
 | PostgreSQL | 15 in development Compose | Migrations applied to an empty test database and the access migration checked against existing fixture rows. No production restore drill. |

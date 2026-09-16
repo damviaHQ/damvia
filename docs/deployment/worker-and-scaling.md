@@ -10,7 +10,7 @@ The server process has three roles: the HTTP API, the pg-boss worker, and the cl
 
 ## ENABLE_WORKER starts pg-boss in the API process
 
-With `ENABLE_WORKER=true`, after the HTTP server is listening, `startWorker()` connects pg-boss to `DATABASE_URL`, creates every queue, registers the cron schedules and starts polling. Everything asynchronous runs here: emails, `asset/update-content` (downloads and thumbnails), archives, deletions, product assignment, the integrity check. The full list is in [Background jobs](../reference/background-jobs.md).
+With `ENABLE_WORKER=true`, after the HTTP server is listening, `startWorker()` connects pg-boss to `DATABASE_URL`, creates every queue, registers the cron schedules and starts polling. Everything asynchronous runs here: emails, `asset/update-content` (downloads and thumbnails), archives, deletions, product assignment, the integrity check, the storage measurement. The full list is in [Background jobs](../reference/background-jobs.md).
 
 `npm run dev` sets the flag. `npm start` and the Docker `CMD` do not: set it yourself on the container that should do the work.
 

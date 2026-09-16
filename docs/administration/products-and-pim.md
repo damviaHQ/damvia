@@ -2,7 +2,7 @@
 title: Products and PIM
 description: Import a product catalogue from CSV, link files to products by file name, and turn product columns into search facets.
 sidebar:
-  order: 9
+  order: 10
 lastUpdated: 2026-09-16
 ---
 

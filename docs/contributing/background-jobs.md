@@ -62,6 +62,12 @@ error: job {"status":"failed","queue":"<name>","jobId":"<uuid>","error":"<messag
 
 then rethrown so pg-boss marks the job failed and schedules the retry. The wrapper reads `error.stacktrace`, a property `Error` does not define, so no stack trace reaches the log; log with `logger` from `env.ts` inside the processor when you need more than the message. Anything the processor resolves with is ignored.
 
+## Two errors end a job without a retry
+
+The wrapper retries everything that rejects. A job that must stop for good instead catches a dedicated error class and resolves: `download/create-archive` catches `DownloadAccessError` and saves the download as `failed`; `asset/update-content` catches `StorageQuotaExceededError` from `services/storage.ts`, logs `storage.quota-exceeded` and leaves the file `creating` or `outdated`. Both classes call `Object.setPrototypeOf` in their constructor so `instanceof` works with the ES5 target. Any other error is rethrown and retried.
+
+`asset/update-content` also returns early when the file is no longer `creating` or `outdated`. The sync pushes a job for every `creating` file on every 5-minute pass, so the same file is queued many times; the early return makes the extra jobs cheap and keeps `storage_usage` from counting the same upload twice.
+
 ## Use a transaction when a job writes several rows
 
 Processors that touch more than one table run inside `dataSource.transaction(async (em) => ...)` and pass `em` down to the service (`synchronizeCollection(em, id)`, `createDownloadArchive({ em, download })`). The services accept an `EntityManager` for that reason; follow the same signature in a new service so the job can pass its transaction. Processors that do a single repository write (`mailer/*`, `asset/update-content`) use `dataSource.getRepository` directly.
@@ -70,7 +76,7 @@ Because the transaction spans the whole processor, an exception rolls back every
 
 ## Cron jobs receive no payload
 
-A scheduled queue is `createQueue<void>` with `processor: () => someService()`. pg-boss stores the schedule and enqueues a job at each tick; the same processor also runs for jobs pushed by hand with `queue.push(undefined)`. The four crons in the code are listed in [Background jobs](../reference/background-jobs.md).
+A scheduled queue is `createQueue<void>` with `processor: () => someService()`. pg-boss stores the schedule and enqueues a job at each tick; the same processor also runs for jobs pushed by hand with `queue.push(undefined)`. The five crons in the code are listed in [Background jobs](../reference/background-jobs.md).
 
 ## Running a job by hand
 

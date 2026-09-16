@@ -43,7 +43,7 @@ export function formatPublicUser(user: User) {
 	}
 }
 
-export function formatPublicUserForAdmin(user: User) {
+export function formatPublicUserForAdmin(user: User, viewer: User) {
 	return {
 		id: user.id,
 		name: user.name,
@@ -54,6 +54,7 @@ export function formatPublicUserForAdmin(user: User) {
 		role: user.role,
 		emailVerified: user.emailVerified,
 		approved: user.approved,
+		maintenanceContact: viewer.role === UserRole.ADMIN ? user.maintenanceContact : undefined,
 		createdAt: user.createdAt,
 		updatedAt: user.updatedAt,
 		groups: user.userGroups.map((userGroup) => ({
@@ -232,6 +233,7 @@ export default router({
 			email: z.string().email(),
 			role: z.nativeEnum(UserRole),
 			groupIds: z.string().uuid('Invalid group').array(),
+			maintenanceContact: z.boolean().optional(),
 		}))
 		.mutation(async ({ ctx, input }) => {
 			const user = await dataSource.getRepository(User).findOneBy(
@@ -261,6 +263,7 @@ export default router({
 			if (ctx.user.role === UserRole.ADMIN) {
 				user.regionId = input.regionId
 				user.role = input.role
+				user.maintenanceContact = input.role === UserRole.ADMIN && (input.maintenanceContact ?? false)
 				shouldUpdateUserGroups = true
 			} else if (ctx.user.role === UserRole.MANAGER) {
 				if (!isCurrentUserManager) {
@@ -280,6 +283,7 @@ export default router({
 					name: user.name, company: user.company, email: user.email,
 					emailVerified: user.emailVerified, emailVerificationCode: user.emailVerificationCode,
 					...(shouldUpdateUserGroups ? { regionId: user.regionId, role: user.role } : {}),
+					...(ctx.user.role === UserRole.ADMIN ? { maintenanceContact: user.maintenanceContact } : {}),
 				})
 				if (shouldUpdateUserGroups) {
 					await em.getRepository(UserGroup).delete({userId: user.id})
@@ -330,7 +334,7 @@ export default router({
 						},
 					},
 				})
-				return users.map(formatPublicUserForAdmin)
+				return users.map((user) => formatPublicUserForAdmin(user, ctx.user))
 			}),
 	approve:
 		publicProcedure

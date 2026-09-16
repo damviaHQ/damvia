@@ -74,6 +74,9 @@ export class User {
 	@Column({ default: false })
 	approved: boolean
 
+	@Column({ default: false })
+	maintenanceContact: boolean
+
 	@OneToMany(() => UserGroup, userGroup => userGroup.user, {cascade: true})
 	userGroups: UserGroup[];
 

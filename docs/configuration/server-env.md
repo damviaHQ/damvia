@@ -39,6 +39,18 @@ Passwords use scrypt with a random salt (`hashPassword` in `server/src/services/
 
 `MAIN_S3_URL` and `ASSETS_S3_URL` pack endpoint, credentials and bucket into one URL: `https://ACCESS_KEY:SECRET_KEY@s3.example.com/bucket`. The scheme decides TLS, the port defaults to 443 or 80. The two buckets have different lifecycles: the assets bucket can be rebuilt from the cloud storage, the main bucket cannot. [Object storage](../integrations/object-storage.md) covers bucket policies and MinIO versus AWS.
 
+## STORAGE_QUOTA is the plan, not the disk
+
+`STORAGE_QUOTA` is the storage the customer pays for, written in decimal units such as `1500GB` or `1.5TB` (1.5 TB is 1 500 000 000 000 bytes, the way disks and hosting plans are sold). Every 30 minutes the worker adds up every object of the two buckets and compares the total with it. A file listed in the cloud storage is only downloaded when it still fits under the plan; the others wait, and their download resumes on its own once space has been freed. Archives, thumbnails and page media are never blocked, so keep the plan below the disk that holds MinIO: on a 2 TB disk, `STORAGE_QUOTA=1.5TB` leaves 500 GB for exports, previews, Postgres and temporary files.
+
+Leave it empty for no limit: the dashboard still shows the used space, but no alert is sent and nothing is blocked. The value is parsed at startup; `abc` or `0` stops the server with `STORAGE_QUOTA must be a size such as 1500GB or 1.5TB.` The alerts and the recovery steps are described in [Dashboard](../administration/dashboard.md).
+
+## SERVER_ALERT_EMAILS separates the host from the customer
+
+When one server hosts several Damvia instances, each customer's admins must see their own plan and nothing about the machine. `SERVER_ALERT_EMAILS` names the people who run the server and must hear about a critical server problem. They receive the `disk-alert` emails when the disk itself passes 80, 90, 95 or 100 %, whatever fills it, and they see a "Server disk" block on the dashboard when they log in to an instance with one of these addresses. Nothing about the day-to-day administration of the DAM goes to these addresses. They are, however, shown to the instance's admins as the contact to raise the plan, in the storage warning of the dashboard, so list an address you are happy for customers to write to. Every other admin only sees the plan. The disk is read with `statfs` on `STORAGE_DISK_PATH` (default `/`), so nothing else has to be installed or mounted on a single-disk server.
+
+Leave `SERVER_ALERT_EMAILS` empty and the server never sends nor shows a disk figure.
+
 ## Mail
 
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` configure Nodemailer. Authentication is only sent when both user and password are set, so leave both empty for an unauthenticated relay such as MailHog. The server adds the header `X-PM-Message-Stream: outbound` to every email, which Postmark uses to pick the message stream and other providers ignore.

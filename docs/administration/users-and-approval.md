@@ -2,7 +2,7 @@
 title: Users and approval
 description: How a visitor becomes a user, how approval and roles work, and what managers can and cannot do.
 sidebar:
-  order: 2
+  order: 3
 lastUpdated: 2026-09-16
 ---
 
@@ -53,10 +53,15 @@ Every procedure in `server/src/trpc/router/user.ts` that lists or changes other 
 | `approve`, `remove` | Any user | Members and guests of own region |
 | `update` role | Any role | `member` or `guest` only; `admin` or `manager` fails with `Managers cannot set admin or manager roles.` |
 | `update` region and groups | Yes | Members and guests of own region |
+| `update` `maintenanceContact` | Admin profiles only | Ignored |
 | `update` own profile | Name, company, email, region, role, groups | Name, company, email only |
 | Edit or remove an admin or another manager | Yes | Refused by the server |
 
 Changing a user's email through `update` resets `emailVerified` and sends a new verification email. In the Edit User dialog the Role select shows `Guest` and `Member` to everyone, and `Manager` and `Admin` only to admins.
+
+## Designated admins receive the storage and maintenance emails
+
+The `storage-alert` email sent when the plan passes 80, 90, 95 or 100 % goes only to admins whose profile has "Receives storage and maintenance emails" ticked (`maintenanceContact` on `users`). Only an admin sees the box, and only on a profile whose role is `admin`; the flag is cleared when the account is demoted, and a manager cannot set it. When no admin is designated, the worker logs `storage.alert-no-recipient`, sends nothing, and the [dashboard](./dashboard.md) shows a warning. The server disk alerts do not use this flag: they go to `SERVER_ALERT_EMAILS`, see [Server configuration](../configuration/server-env.md).
 
 ## What each role can do
 

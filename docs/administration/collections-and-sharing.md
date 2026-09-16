@@ -2,7 +2,7 @@
 title: Collections and sharing
 description: How collections are built, synchronized with folders, kept up to date by triggers, and shared with guests.
 sidebar:
-  order: 7
+  order: 8
 lastUpdated: 2026-09-16
 ---
 

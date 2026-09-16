@@ -16,6 +16,9 @@ const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID, createHash } = require('node:crypto')
 const { writeFile } = require('node:fs/promises')
+const { tmpdir } = require('node:os')
+const { join } = require('node:path')
+const { Readable } = require('node:stream')
 const { sign } = require('jsonwebtoken')
 // This suite migrates and clears its database. Never fall back to the application's .env.
 const databaseURL = process.env.SECURITY_TEST_DATABASE_URL
@@ -29,15 +32,34 @@ process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../dist/env')
 const { dataSource: db } = env
 // Storage calls return fixture URLs; the suite never contacts a bucket.
-env.mainS3 = () => ({ presignedGetObject: async () => 'https://example.test/fixture', removeObjects: async () => {} })
+env.mainS3 = () => ({ presignedGetObject: async () => 'https://example.test/fixture', removeObjects: async () => {}, listObjects: () => Readable.from([]) })
+let bucketObjects = []
+const removedKeys = []
 const storage = {
     presignedGetObject: async () => 'https://example.test/fixture',
     fGetObject: async (_bucket, _key, path) => writeFile(path, 'fixture-original'),
     fPutObject: async () => {},
+    listObjects: (_bucket, prefix) => Readable.from(bucketObjects.filter(object => object.name.startsWith(prefix))),
+    removeObjects: async (_bucket, keys) => { removedKeys.push(...keys) },
 }
 env.assetsS3 = () => storage
 env.mainS3Bucket = () => 'fixture'
 env.assetsS3Bucket = () => 'fixture'
+const fetchedFiles = []
+env.assetUpdater = () => ({
+    fetchFileContent: async file => {
+        fetchedFiles.push(file.id)
+        const path = join(tmpdir(), `security-test-${randomUUID()}`)
+        await writeFile(path, 'fixture-content')
+        return path
+    },
+})
+const sentMails = []
+env.mailTransporter = () => ({ sendMail: async mail => { sentMails.push(mail) } })
+env.storageQuota = () => null
+let disk = { totalBytes: 10000, freeBytes: 9000 }
+env.diskUsage = async () => disk
+env.serverAlertEmails = () => []
 const { User } = require('../dist/entity/user')
 const { Region } = require('../dist/entity/region')
 const { Group } = require('../dist/entity/group')
@@ -68,7 +90,7 @@ worker.boss.work = async (name, _options, callback) => processors.set(name, call
 for (const [name, queue] of Object.entries(worker)) {
     if (!name.endsWith('Queue')) continue
     queue.push = async data => queued.push({ name, ...data })
-    queue.bulkPush = async () => {}
+    queue.bulkPush = async jobs => jobs.forEach(job => queued.push({ name, ...job.data }))
 }
 const save = (entity, values) => db.getRepository(entity).save(db.getRepository(entity).create(values))
 const caller = user => appRouter.createCaller({ user, req: {}, res: {} })
@@ -84,9 +106,11 @@ before(async () => {
     await worker.startWorker()
     // Apply the upgrade to old rows, not just an empty schema.
     const applied = await db.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1')
-    assert.equal(applied[0]?.name, 'SecureAccess1789516800000', 'Review the fixture upgrade setup when adding migrations')
+    assert.equal(applied[0]?.name, 'StorageUsage1789603200000', 'Review the fixture upgrade setup when adding migrations')
+    await db.undoLastMigration()
     await db.undoLastMigration()
     await db.query('TRUNCATE users, collections, asset_folders, groups, regions, licenses, products, product_attributes CASCADE')
+    await db.query('DROP SCHEMA IF EXISTS pgboss CASCADE; CREATE SCHEMA pgboss; CREATE TABLE pgboss.job (name text, state text)')
     group = await save(Group, { name: 'Default' })
     region = await save(Region, { name: 'Test', defaultGroupId: group.id })
     const guestId = randomUUID()
@@ -413,4 +437,304 @@ test('temporary export failures stay retryable and a successful retry sends the 
     await runExportJob(result.id)
     assert.equal((await db.getRepository(Download).findOneByOrFail({ id: result.id })).status, 'ready')
     assert.equal(queued.filter(job => job.name === 'mailerDownloadReadyQueue' && job.downloadId === result.id).length, 1)
+})
+
+const { StorageUsage } = require('../dist/entity/storage-usage')
+const assets = require('../dist/services/asset')
+const storageService = require('../dist/services/storage')
+
+async function resetStorageUsage(values = {}) {
+    await db.getRepository(StorageUsage).update({ id: 1 }, { usedBytes: '0', reservedBytes: '0', alertLevel: 0, diskAlertLevel: 0, quotaReachedAt: null, ...values })
+    bucketObjects = []
+    removedKeys.length = 0
+    sentMails.length = 0
+    return db.getRepository(StorageUsage).findOneByOrFail({ id: 1 })
+}
+
+async function pendingAsset(status = 'creating', size = '16') {
+    const folder = await save(AssetFolder, { name: 'Quota folder', externalId: randomUUID(), status: 'up_to_date' })
+    return save(AssetFile, { name: 'fixture.bin', externalId: randomUUID(), externalChecksum: 'fixture', status, size, mimeType: 'application/octet-stream', folderId: folder.id })
+}
+
+async function runUpdateJob(assetFileId) {
+    return processors.get('asset/update-content')([{ id: randomUUID(), name: 'asset/update-content', data: { assetFileId } }])
+}
+
+const storageRow = () => db.getRepository(StorageUsage).findOneByOrFail({ id: 1 })
+
+test('a file that does not fit in the quota is left pending without a retry, a download or a reservation', async () => {
+    await resetStorageUsage({ usedBytes: '90' })
+    env.storageQuota = () => 100
+    try {
+        const asset = await pendingAsset()
+        const fetchedBefore = fetchedFiles.length
+        await runUpdateJob(asset.id)
+        assert.equal((await db.getRepository(AssetFile).findOneByOrFail({ id: asset.id })).status, 'creating')
+        assert.equal(fetchedFiles.length, fetchedBefore)
+        const row = await storageRow()
+        assert.equal(row.reservedBytes, '0')
+        assert.equal(row.usedBytes, '90')
+        assert(row.quotaReachedAt instanceof Date)
+    } finally { env.storageQuota = () => null }
+})
+
+test('a file that fits is uploaded once, counted once, and a duplicate job does nothing', async () => {
+    await resetStorageUsage()
+    env.storageQuota = () => 1000
+    try {
+        const asset = await pendingAsset()
+        const fetchedBefore = fetchedFiles.length
+        await runUpdateJob(asset.id)
+        assert.equal((await db.getRepository(AssetFile).findOneByOrFail({ id: asset.id })).status, 'up_to_date')
+        assert.equal(fetchedFiles.length, fetchedBefore + 1)
+        let row = await storageRow()
+        assert.equal(row.usedBytes, '16')
+        assert.equal(row.reservedBytes, '0')
+        await runUpdateJob(asset.id)
+        row = await storageRow()
+        assert.equal(fetchedFiles.length, fetchedBefore + 1)
+        assert.equal(row.usedBytes, '16')
+    } finally { env.storageQuota = () => null }
+})
+
+test('an upload failure keeps the file pending, releases the reservation and stays retryable', async () => {
+    await resetStorageUsage()
+    env.storageQuota = () => 1000
+    const originalPut = storage.fPutObject
+    storage.fPutObject = async () => { throw new Error('Fixture disk full') }
+    try {
+        const asset = await pendingAsset()
+        await assert.rejects(runUpdateJob(asset.id), /Fixture disk full/)
+        assert.equal((await db.getRepository(AssetFile).findOneByOrFail({ id: asset.id })).status, 'creating')
+        const row = await storageRow()
+        assert.equal(row.reservedBytes, '0')
+        assert.equal(row.usedBytes, '0')
+    } finally { storage.fPutObject = originalPut; env.storageQuota = () => null }
+})
+
+test('storage alerts go to designated admins once per crossing and the level falls back without mail', async () => {
+    await resetStorageUsage()
+    env.storageQuota = () => 1000
+    const silentAdmin = await makeUser('admin')
+    await db.getRepository(User).update(admin.id, { maintenanceContact: true })
+    try {
+        bucketObjects = [{ name: 'asset-file/a', size: 850, lastModified: new Date() }]
+        await storageService.measureStorageUsage()
+        assert.equal(sentMails.length, 1)
+        assert(sentMails[0].to.includes(admin.email))
+        assert(!sentMails[0].to.includes(silentAdmin.email))
+        assert(!sentMails[0].to.includes(manager.email))
+        assert(!sentMails[0].to.includes(member.email))
+        assert.match(sentMails[0].subject, /warning/)
+        assert.match(sentMails[0].text, /85%/)
+        assert.equal((await storageRow()).alertLevel, 80)
+        await storageService.measureStorageUsage()
+        assert.equal(sentMails.length, 1)
+        bucketObjects = [{ name: 'asset-file/a', size: 960, lastModified: new Date() }]
+        await storageService.measureStorageUsage()
+        assert.equal(sentMails.length, 2)
+        assert.match(sentMails[1].subject, /critical/)
+        assert.equal((await storageRow()).alertLevel, 95)
+        bucketObjects = [{ name: 'asset-file/a', size: 700, lastModified: new Date() }]
+        await storageService.measureStorageUsage()
+        assert.equal(sentMails.length, 2)
+        const row = await storageRow()
+        assert.equal(row.alertLevel, 0)
+        assert.equal(row.usedBytes, '700')
+        assert(row.measuredAt instanceof Date)
+        const previousConfig = env.mailConfig
+        env.mailConfig = () => ({})
+        try {
+            bucketObjects = [{ name: 'asset-file/a', size: 1000, lastModified: new Date() }]
+            await storageService.measureStorageUsage()
+            assert.equal(sentMails.length, 2)
+            assert.equal((await storageRow()).alertLevel, 100)
+        } finally { env.mailConfig = previousConfig }
+    } finally { env.storageQuota = () => null }
+})
+
+test('freed space after a blocked sync queues every pending file again', async () => {
+    await resetStorageUsage({ usedBytes: '900', quotaReachedAt: new Date() })
+    env.storageQuota = () => 1000
+    try {
+        const outdated = await pendingAsset('outdated')
+        const healthy = await pendingAsset('up_to_date')
+        bucketObjects = [{ name: 'asset-file/a', size: 500, lastModified: new Date() }]
+        const result = await storageService.measureStorageUsage()
+        assert(result.retriedAssets >= 1)
+        assert(queued.some(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === outdated.id))
+        assert(!queued.some(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === healthy.id))
+        assert.equal((await storageRow()).quotaReachedAt, null)
+    } finally { env.storageQuota = () => null }
+})
+
+test('the dashboard and its actions are admin only and expose numbers, not strings', async () => {
+    for (const user of [null, guest, member, manager, { ...admin, approved: false }]) {
+        await forbidden(caller(user).dashboard.summary())
+        await forbidden(caller(user).dashboard.retryPendingAssets())
+        await forbidden(caller(user).dashboard.measureStorage())
+    }
+    const summary = await caller(admin).dashboard.summary()
+    assert.equal(typeof summary.storage.usedBytes, 'number')
+    assert.equal(summary.storage.quotaBytes, null)
+    assert.equal(summary.storage.disk, null)
+    assert.deepEqual(summary.storage.serverContactEmails, [])
+    assert.equal(summary.storage.percent, null)
+    assert.equal(typeof summary.assets.byStatus.up_to_date, 'number')
+    assert.equal(typeof summary.users.total, 'number')
+    assert.equal(typeof summary.users.maintenanceContacts, 'number')
+    assert.equal(typeof summary.users.byRole.admin, 'number')
+    const queuedBefore = queued.length
+    const retry = await caller(admin).dashboard.retryPendingAssets()
+    assert.equal(typeof retry.queued, 'number')
+    assert.equal(queued.length - queuedBefore, retry.queued)
+    await caller(admin).dashboard.measureStorage()
+    assert.equal(queued.at(-1).name, 'storageMeasureUsageQueue')
+    const response = await server.inject({ method: 'GET', url: '/trpc/dashboard.summary' })
+    assert.equal(response.statusCode, 401)
+    const publicEnv = await caller(null).env()
+    assert(!('storage' in publicEnv))
+})
+
+test('the integrity check removes only old orphan objects and archives of finished downloads', async () => {
+    await resetStorageUsage()
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+    const owned = await pendingAsset('up_to_date')
+    const { user, file } = await exportFixture()
+    const expired = await save(Download, { userId: user.id, collectionFileIds: [file.id], status: 'expired', type: 'email', ...downloadOptions, expiresAt: twoDaysAgo })
+    const preparing = await save(Download, { userId: user.id, collectionFileIds: [file.id], status: 'preparing', type: 'email', ...downloadOptions, expiresAt: new Date(Date.now() + 86400000) })
+    const oldOrphan = `asset-file/${randomUUID()}`
+    const youngOrphan = `asset-file/${randomUUID()}`
+    bucketObjects = [
+        { name: oldOrphan, size: 10, lastModified: twoDaysAgo },
+        { name: `${oldOrphan}-thumbnail`, size: 1, lastModified: twoDaysAgo },
+        { name: youngOrphan, size: 10, lastModified: new Date() },
+        { name: `asset-file/${owned.id}`, size: 16, lastModified: twoDaysAgo },
+        { name: 'asset-file/not-a-uuid', size: 5, lastModified: twoDaysAgo },
+        { name: `downloads/${expired.id}`, size: 100, lastModified: twoDaysAgo },
+        { name: `downloads/${preparing.id}`, size: 100, lastModified: twoDaysAgo },
+    ]
+    const result = await storageService.removeOrphanObjects()
+    assert.deepEqual(removedKeys.sort(), [oldOrphan, `${oldOrphan}-thumbnail`, `downloads/${expired.id}`].sort())
+    assert.equal(result.count, 3)
+    assert.equal(result.bytes, 111)
+    const row = await storageRow()
+    assert.equal(row.orphanObjects, 3)
+    assert.equal(row.orphanBytes, '111')
+    assert(row.orphansRemovedAt instanceof Date)
+})
+
+test('a changed cloud checksum marks the file outdated and queues exactly one refresh', async () => {
+    const folder = await save(AssetFolder, { name: 'Sync folder', externalId: randomUUID(), status: 'up_to_date' })
+    const options = { externalId: randomUUID(), externalChecksum: 'v1', folderExternalId: folder.externalId, name: 'fixture.bin', size: 16, mimeType: 'application/octet-stream' }
+    const created = await assets.upsertFile(options)
+    assert.equal(created.status, 'creating')
+    assert.equal(queued.filter(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === created.id).length, 1)
+    await db.getRepository(AssetFile).update(created.id, { status: 'up_to_date' })
+    const unchanged = await assets.upsertFile(options)
+    assert.equal(unchanged.status, 'up_to_date')
+    assert.equal(queued.filter(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === created.id).length, 1)
+    const changed = await assets.upsertFile({ ...options, externalChecksum: 'v2' })
+    assert.equal(changed.status, 'outdated')
+    assert.equal(changed.externalChecksum, 'v2')
+    assert.equal(queued.filter(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === created.id).length, 2)
+})
+
+test('STORAGE_QUOTA accepts decimal sizes and rejects anything else', () => {
+    assert.equal(env.parseStorageQuota('1.5TB'), 1500000000000)
+    assert.equal(env.parseStorageQuota('1500GB'), 1500000000000)
+    assert.equal(env.parseStorageQuota('1500 gb'), 1500000000000)
+    assert.equal(env.parseStorageQuota('2000000000000'), 2000000000000)
+    assert.equal(env.parseStorageQuota(''), null)
+    assert.equal(env.parseStorageQuota(undefined), null)
+    for (const value of ['abc', '-5GB', '0', '1.5 TiB', '10GB extra']) assert.throws(() => env.parseStorageQuota(value), /STORAGE_QUOTA/)
+})
+
+test('two measurements at the same time send one alert and queue the recovery once', async () => {
+    await resetStorageUsage({ usedBytes: '900', quotaReachedAt: new Date() })
+    env.storageQuota = () => 1000
+    try {
+        const outdated = await pendingAsset('outdated')
+        bucketObjects = [{ name: 'asset-file/a', size: 850, lastModified: new Date() }]
+        const queuedBefore = queued.filter(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === outdated.id).length
+        await Promise.all([storageService.measureStorageUsage(), storageService.measureStorageUsage()])
+        assert.equal(sentMails.length, 1)
+        assert.equal(queued.filter(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === outdated.id).length, queuedBefore + 1)
+        assert.equal((await storageRow()).alertLevel, 80)
+    } finally { env.storageQuota = () => null }
+})
+
+test('a measurement keeps reservations while downloads are active and clears them once none is', async () => {
+    await resetStorageUsage({ reservedBytes: '40' })
+    env.storageQuota = () => 1000
+    try {
+        bucketObjects = [{ name: 'asset-file/a', size: 100, lastModified: new Date() }]
+        await db.query(`INSERT INTO pgboss.job(name, state) VALUES('asset/update-content', 'active')`)
+        await storageService.measureStorageUsage()
+        let row = await storageRow()
+        assert.equal(row.usedBytes, '100')
+        assert.equal(row.reservedBytes, '40')
+        await db.query(`UPDATE pgboss.job SET state = 'completed'`)
+        await storageService.measureStorageUsage()
+        row = await storageRow()
+        assert.equal(row.reservedBytes, '0')
+    } finally { await db.query('DELETE FROM pgboss.job'); env.storageQuota = () => null }
+})
+
+test('the server disk is shown only to the hosting contact and its alerts go only to that contact', async () => {
+    await resetStorageUsage()
+    disk = { totalBytes: 10000, freeBytes: 500 }
+    await storageService.measureStorageUsage()
+    assert.equal(sentMails.length, 0)
+    assert.equal((await storageRow()).diskAlertLevel, 95)
+    assert.equal((await caller(admin).dashboard.summary()).storage.disk, null)
+    env.serverAlertEmails = () => ['host@example.test']
+    try {
+        await resetStorageUsage()
+        await storageService.measureStorageUsage()
+        assert.equal(sentMails.length, 1)
+        assert.equal(sentMails[0].to, 'host@example.test')
+        assert(!sentMails[0].to.includes(admin.email))
+        assert.match(sentMails[0].subject, /critical/)
+        assert.match(sentMails[0].text, /95%/)
+        await storageService.measureStorageUsage()
+        assert.equal(sentMails.length, 1)
+        assert.equal((await caller(admin).dashboard.summary()).storage.disk, null)
+        const host = await makeUser('admin', { email: 'Host@Example.test' })
+        const hostDisk = (await caller(host).dashboard.summary()).storage.disk
+        assert.equal(hostDisk.totalBytes, 10000)
+        assert.equal(hostDisk.freeBytes, 500)
+        assert.equal(typeof hostDisk.orphanObjects, 'number')
+        assert.equal(typeof hostDisk.blockedFiles, 'number')
+        const customerStorage = (await caller(admin).dashboard.summary()).storage
+        assert.deepEqual(customerStorage.serverContactEmails, ['host@example.test'])
+        for (const key of ['orphanObjects', 'orphanBytes', 'orphansRemovedAt', 'blockedFiles']) assert(!(key in customerStorage))
+        assert.equal((await caller({ ...host, role: 'manager' }).dashboard.summary().catch(e => e.code)), 'UNAUTHORIZED')
+    } finally { env.serverAlertEmails = () => []; disk = { totalBytes: 10000, freeBytes: 9000 } }
+})
+
+test('only admins can designate an admin as maintenance contact, and no designated admin means no mail', async () => {
+    await resetStorageUsage()
+    env.storageQuota = () => 1000
+    await db.getRepository(User).update({ maintenanceContact: true }, { maintenanceContact: false })
+    try {
+        bucketObjects = [{ name: 'asset-file/a', size: 850, lastModified: new Date() }]
+        await storageService.measureStorageUsage()
+        assert.equal(sentMails.length, 0)
+        assert.equal((await storageRow()).alertLevel, 80)
+        const target = await makeUser('member')
+        await caller(manager).user.update({ ...target, groupIds: [], maintenanceContact: true })
+        assert.equal((await db.getRepository(User).findOneByOrFail({ id: target.id })).maintenanceContact, false)
+        await caller(admin).user.update({ ...target, groupIds: [], maintenanceContact: true })
+        assert.equal((await db.getRepository(User).findOneByOrFail({ id: target.id })).maintenanceContact, false)
+        await caller(admin).user.update({ ...target, role: 'admin', groupIds: [], maintenanceContact: true })
+        assert.equal((await db.getRepository(User).findOneByOrFail({ id: target.id })).maintenanceContact, true)
+        const listed = (await caller(admin).user.list()).find(user => user.id === target.id)
+        assert.equal(listed.maintenanceContact, true)
+        const seenByManager = (await caller(manager).user.list()).find(user => user.id === target.id)
+        assert.equal(seenByManager.maintenanceContact, undefined)
+        assert.equal((await caller(admin).dashboard.summary()).users.maintenanceContacts, 1)
+        await caller(admin).user.update({ ...target, role: 'member', groupIds: [] })
+        assert.equal((await db.getRepository(User).findOneByOrFail({ id: target.id })).maintenanceContact, false)
+    } finally { env.storageQuota = () => null }
 })

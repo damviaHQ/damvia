@@ -73,4 +73,4 @@ A download records the `collectionFileIds` requested, the chosen `imageFormat` (
 
 ## Two S3 buckets
 
-The main bucket (`MAIN_S3_URL`) holds what users upload in the app: collection thumbnails at `collections/{id}-thumbnail`, page block media at `blocks/{pageId}/{uuid}` and the login background at `settings/auth-background.webp`. The assets bucket (`ASSETS_S3_URL`) is a cache of the cloud storage: originals at `asset-file/{id}`, WebP thumbnails at `asset-file/{id}-thumbnail` and download archives at `downloads/{id}`.
+The main bucket (`MAIN_S3_URL`) holds what users upload in the app: collection thumbnails at `collections/{id}-thumbnail`, page block media at `blocks/{pageId}/{uuid}` and the login background at `settings/auth-background.webp`. The assets bucket (`ASSETS_S3_URL`) is a cache of the cloud storage: originals at `asset-file/{id}`, WebP thumbnails at `asset-file/{id}-thumbnail` and download archives at `downloads/{id}`. The worker keeps the total size of both buckets in the single-row `storage_usage` table for the admin [dashboard](../administration/dashboard.md) and the `STORAGE_QUOTA` plan.

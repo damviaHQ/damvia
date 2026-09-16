@@ -31,6 +31,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -320,6 +321,7 @@ function openEditDialog(user: User) {
           </TableCell>
           <TableCell>
             {{ user.role }}
+            <Badge v-if="user.maintenanceContact && globalStore.user?.role === 'admin'" variant="outline" class="ml-1">alerts</Badge>
           </TableCell>
           <TableCell class="max-w-[100px]">
             <TooltipProvider>

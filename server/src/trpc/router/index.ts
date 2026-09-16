@@ -19,6 +19,7 @@ import assetRouter from "./asset"
 import assetTypeRouter from "./asset-type"
 import authorizedDomainRouter from "./authorized-domain"
 import collectionRouter from "./collection"
+import dashboardRouter from "./dashboard"
 import downloadRouter from "./download"
 import favoriteRouter from "./favorite"
 import groupRouter from "./group"
@@ -47,6 +48,7 @@ const appRouter = router({
 	menuItem: menuItemRouter,
 	page: pageRouter,
 	settings: settingsRouter,
+	dashboard: dashboardRouter,
 	env: publicProcedure.query(async () => {
 		const regions = await dataSource.getRepository(Region).find()
 		return {

@@ -29,6 +29,15 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
    then copy `client/dist/` to the static host. Deploy the client **after** the server, since the client is built against the server's tRPC types and may call procedures the old server does not have.
 5. Check `docs/reference/environment-variables.md` of the new version (or the diff of `server/.env.template`) for new variables.
 
+## Storage plan in this upgrade
+
+- The migration creates the `storage_usage` table with its single row. The first measurement runs at the next half hour; open the [dashboard](../administration/dashboard.md) and click "Measure now" to fill it right away.
+- Set `STORAGE_QUOTA` to the customer's plan, below the disk size, to enable the alerts and the pause of the cloud sync. See [Server configuration](../configuration/server-env.md).
+- Add the `storage-alert` and `disk-alert` templates to `mailconfig.json` or to the `MAILCONFIG` variable; the samples are in `server/mailconfig.json`. Until they are added, the alerts are skipped and the worker logs `storage.alert-template-missing` or `storage.disk-alert-template-missing`.
+- Designate at least one admin for the `storage-alert` emails: tick "Receives storage and maintenance emails" on their profile in Users. Nobody receives them until then.
+- Set `SERVER_ALERT_EMAILS` to the hosting contact to receive disk alerts and see the server disk on the dashboard. Customer admins never see it.
+- The daily integrity check now deletes orphan objects older than 24 hours. Objects left behind by earlier crashes disappear at the next 05:00 UTC run or with `npm run cli -- check-integrity`.
+
 Downtime includes maintenance, migrations and verification. Measure it on a restored copy; no duration is guaranteed.
 
 ## Account and access changes in this upgrade
@@ -56,6 +65,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1751012487660-add-trigger-to-sample-files` | Trigger refreshing collection sample thumbnails |
 | `1751187976556-update-asset-file-trigger` | Same trigger, also fired on `asset_files` updates |
 | `1789516800000-secure-access` | Reset deadlines, account session versions, collection group inheritance and guest membership updates |
+| `1789603200000-storage-usage` | `storage_usage` table: measured and reserved bytes, plan and disk alert levels, sync pause and orphan cleanup timestamps; `maintenance_contact` flag on `users` |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.
 

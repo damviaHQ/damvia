@@ -13,13 +13,14 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import PgBoss from "pg-boss"
-import { AssetFile } from "./entity/asset-file"
+import { AssetFile, AssetFileStatus } from "./entity/asset-file"
 import { CollectionInvitation } from "./entity/collection-invitation"
 import { Download, DownloadStatus } from "./entity/download"
 import { User } from "./entity/user"
 import {dataSource, logger} from "./env"
 import { assignProductsToAssetFiles, processDeletion, updateFileContent } from "./services/asset"
 import { synchronizeCollection } from "./services/collection"
+import { measureStorageUsage, StorageQuotaExceededError } from "./services/storage"
 import { integrityCheck as systemIntegrityCheck } from "./services/system"
 import { createDownloadArchive, DownloadAccessError, processExpiredDownloads } from "./services/download"
 import {
@@ -155,9 +156,16 @@ export const assetUpdateContentQueue = createQueue<{ assetFileId: string }>({
 	processor: (data) =>
 		dataSource.getRepository(AssetFile).findOneBy({ id: data.assetFileId })
 			.then(async (content) => {
-				if (content) {
-					await updateFileContent(content)
+				if (!content || ![AssetFileStatus.CREATING, AssetFileStatus.OUTDATED].includes(content.status)) {
+					return
 				}
+				await updateFileContent(content)
+			})
+			.catch((error) => {
+				if (!(error instanceof StorageQuotaExceededError)) {
+					throw error
+				}
+				logger.warn('storage.quota-exceeded', { assetFileId: error.assetFileId, size: error.size })
 			}),
 	workerOptions: { batchSize: 10 },
 })
@@ -216,4 +224,10 @@ export const systemIntegrityCheckQueue = createQueue<void>({
 	name: 'system/integrity-check',
 	processor: systemIntegrityCheck,
 	cron: '0 5 * * *',
+})
+
+export const storageMeasureUsageQueue = createQueue<void>({
+	name: 'storage/measure-usage',
+	processor: () => measureStorageUsage(),
+	cron: '*/30 * * * *',
 })

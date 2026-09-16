@@ -79,8 +79,8 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `verifyEmail` | mutation | login | Consumes `?verificationCode=` |
 | `removeAccount` | mutation | login | Deletes own account (`FORBIDDEN` for any other id) |
 | `findById` | query | `userManagerOrAdmin` | One user (managers: own region) |
-| `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user |
-| `list` | query | `userManagerOrAdmin` | Users (managers: own region) |
+| `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user; `maintenanceContact` is applied by admins on admin profiles only |
+| `list` | query | `userManagerOrAdmin` | Users (managers: own region); `maintenanceContact` is only returned to admins |
 | `approve` | mutation | `userManagerOrAdmin` | Approves and pushes `email/user-approved` |
 | `remove` | mutation | `userManagerOrAdmin` | Deletes a user; managers can delete only members and guests in their region |
 
@@ -173,5 +173,13 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `settings.getAuthBackgroundUploadUrl` | query | `userAdmin` | Presigned PUT for the temporary background |
 | `settings.processAuthBackgroundImage` | mutation | `userAdmin` | Converts the temporary upload to WebP (quality 80) at `settings/auth-background.webp` |
 | `settings.removeAuthBackgroundImage` | mutation | `userAdmin` | Deletes the background |
+
+### `dashboard`
+
+| Procedure | Kind | Auth | Purpose |
+|---|---|---|---|
+| `summary` | query | `userAdmin` | `storage` (used and quota bytes, percent, `measuredAt`, `alertLevel`, `quotaReachedAt`, `serverContactEmails` (the `SERVER_ALERT_EMAILS` list, shown as the contact to raise the plan), and `disk` only when the caller's email is in `SERVER_ALERT_EMAILS`, else `null`: total and free bytes, `blockedFiles`, orphan figures), asset files by status, users (total, `pendingApproval`, `maintenanceContacts`, by role), downloads of the last 7 days by status |
+| `retryPendingAssets` | mutation | `userAdmin` | Queues `asset/update-content` for every `creating` or `outdated` file; returns `{ queued }` |
+| `measureStorage` | mutation | `userAdmin` | Pushes one `storage/measure-usage` job |
 
 Uncaught database, storage or service exceptions can also surface as `INTERNAL_SERVER_ERROR`.

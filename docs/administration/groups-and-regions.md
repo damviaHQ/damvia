@@ -2,7 +2,7 @@
 title: Groups and regions
 description: What regions and groups are for, how users get them, and how groups restrict collections.
 sidebar:
-  order: 3
+  order: 4
 lastUpdated: 2026-09-16
 ---
 

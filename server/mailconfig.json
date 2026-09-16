@@ -33,5 +33,15 @@
     "from": "\"mycompany\" <hello@mycompany>",
     "subject": "You are invited to join a collection!",
     "body": "Hello,\n\nYou have been invited to join this a collection!\n\nPlease click the link below to accept your invitation and get started:\n{{ url }}\n\nIf you did not expect to receive this invitation, please ignore this email or reach out to our support team for assistance."
+  },
+  "storage-alert": {
+    "from": "\"mycompany\" <support@mycompany>",
+    "subject": "Storage {{ severity }}: {{ percent }}% of the plan is used",
+    "body": "Hello,\n\nThe DAM storage is at {{ percent }}% of its plan: {{ used }} used out of {{ quota }}.\n\nAt 100% the synchronisation of new files from the cloud storage pauses until space is freed or the plan is raised. Remove unused folders from the cloud storage or contact your provider to extend the plan.\n\nStorage dashboard:\n{{ url }}"
+  },
+  "disk-alert": {
+    "from": "\"mycompany\" <support@mycompany>",
+    "subject": "Server disk {{ severity }}: {{ percent }}% used on {{ appUrl }}",
+    "body": "Hello,\n\nThe disk hosting {{ appUrl }} is {{ percent }}% full: {{ free }} free out of {{ total }}.\n\nCheck orphan objects, expired archives, temporary files and database size before the disk is full, or extend the volume."
   }
 }

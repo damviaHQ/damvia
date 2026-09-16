@@ -19,7 +19,8 @@ import { Liquid } from 'liquidjs'
 import { CollectionInvitation } from "../entity/collection-invitation"
 import { Download } from "../entity/download"
 import { User, UserRole } from "../entity/user"
-import { appURL, assetsS3, assetsS3Bucket, dataSource, mailTransporter, mailConfig } from "../env"
+import { appURL, assetsS3, assetsS3Bucket, dataSource, logger, mailTransporter, mailConfig, serverAlertEmails } from "../env"
+import { formatBytes } from "./storage"
 import { generateAuthToken } from "./user"
 
 const engine = new Liquid()
@@ -131,4 +132,63 @@ export async function sendInvitation(invitation: CollectionInvitation) {
 		subject: config.subject,
 		text: await renderTemplate(config.body, { url: url.toString() })
 	})
+}
+
+export async function sendStorageAlert(level: number, usage: { usedBytes: number, quotaBytes: number, percent: number }) {
+	const admins = await dataSource.getRepository(User).findBy({ role: UserRole.ADMIN, approved: true, emailVerified: true, maintenanceContact: true })
+	if (!admins.length) {
+		logger.warn('storage.alert-no-recipient', { level })
+		return
+	}
+
+	const config = mailConfig()['storage-alert']
+	if (!config) {
+		logger.warn('storage.alert-template-missing', { level })
+		return
+	}
+
+	const url = new URL(appURL())
+	url.pathname = '/admin'
+	const context = {
+		severity: level >= 100 ? 'full' : level >= 90 ? 'critical' : 'warning',
+		percent: Math.round(usage.percent),
+		used: formatBytes(usage.usedBytes),
+		quota: formatBytes(usage.quotaBytes),
+		url: url.toString(),
+	}
+	await mailTransporter().sendMail({
+		from: config.from,
+		to: admins.map((admin) => admin.email).join(', '),
+		subject: await renderTemplate(config.subject, context),
+		text: await renderTemplate(config.body, context),
+	})
+	logger.info('storage.alert-sent', { level, recipients: admins.length })
+}
+
+export async function sendDiskAlert(level: number, disk: { totalBytes: number, freeBytes: number, percent: number }) {
+	const recipients = serverAlertEmails()
+	if (!recipients.length) {
+		return
+	}
+
+	const config = mailConfig()['disk-alert']
+	if (!config) {
+		logger.warn('storage.disk-alert-template-missing', { level })
+		return
+	}
+
+	const context = {
+		severity: level >= 100 ? 'full' : level >= 90 ? 'critical' : 'warning',
+		percent: Math.round(disk.percent),
+		free: formatBytes(disk.freeBytes),
+		total: formatBytes(disk.totalBytes),
+		appUrl: appURL(),
+	}
+	await mailTransporter().sendMail({
+		from: config.from,
+		to: recipients.join(', '),
+		subject: await renderTemplate(config.subject, context),
+		text: await renderTemplate(config.body, context),
+	})
+	logger.info('storage.disk-alert-sent', { level, recipients: recipients.length })
 }

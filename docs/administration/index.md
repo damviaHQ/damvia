@@ -6,7 +6,7 @@ sidebar:
 lastUpdated: 2026-09-16
 ---
 
-The administration area lives under `/admin/...` in the client and is reached from the main layout. It groups everything a self-hoster or an administrator changes after the instance is running: who can log in, how assets are typed and licensed, what the menu and pages look like, and how the product catalogue is wired to files.
+The administration area lives under `/admin/...` in the client and is reached from the account menu of the main layout ("Administration" opens the dashboard, "Manage Users" the user list). It groups everything a self-hoster or an administrator changes after the instance is running: who can log in, how assets are typed and licensed, what the menu and pages look like, and how the product catalogue is wired to files.
 
 ## Every admin route
 
@@ -14,6 +14,7 @@ The routes below are declared in `client/src/router/index.ts`. The sidebar label
 
 | Route | Sidebar label | Section | What it manages | Who sees it |
 | --- | --- | --- | --- | --- |
+| `/admin` | Dashboard | (top level) | Storage used against the plan, sync health, users waiting for approval, downloads of the last 7 days | admin |
 | `/admin/settings` | Global Settings | (top level) | Instance-wide settings screen | admin |
 | `/admin/menu-items` | Menu | Content Management | The navigation tree shown to users: collections, pages, text links, dividers, home item | admin |
 | `/admin/collections` | Collections | Content Management | The public collection tree: create, edit, delete | admin |
@@ -30,6 +31,7 @@ The routes below are declared in `client/src/router/index.ts`. The sidebar label
 
 Each screen is documented on its own page:
 
+- [Dashboard](./dashboard.md)
 - [Users and approval](./users-and-approval.md)
 - [Groups and regions](./groups-and-regions.md)
 - [Licenses](./licenses.md)
@@ -42,7 +44,7 @@ Each screen is documented on its own page:
 
 ## Managers only see the Users screen
 
-The sidebar renders the whole User Management section for the roles `admin` and `manager`, but inside it only the Users link is shown to managers. Groups, Regions and Authorized Domains are wrapped in an `admin` check. Every other section (Global Settings, Content Management, Asset Management, PIM) is rendered only for `admin`.
+The sidebar renders the whole User Management section for the roles `admin` and `manager`, but inside it only the Users link is shown to managers. Groups, Regions and Authorized Domains are wrapped in an `admin` check. Every other section (Dashboard, Global Settings, Content Management, Asset Management, PIM) is rendered only for `admin`, and so is the storage banner above the admin pages.
 
 A manager who opens `/admin/users` is further limited to the users of their own region. The rules are detailed in [Users and approval](./users-and-approval.md).
 

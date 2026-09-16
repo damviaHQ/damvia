@@ -10,11 +10,11 @@ This page tracks operational limitations that remain in the application. For ins
 
 ## Synchronisation and storage
 
-- `upsertFile` overwrites the previous checksum before comparing it, so content changes are not detected there. Same-size replacements require [targeted refresh](../deployment/integrity-check.md#targeted-refresh-of-a-stale-original-or-missing-preview).
+- The sync queues every `creating` file again on each 5-minute pass, including a file whose first download is still running, so a very large file can be downloaded and uploaded twice. The second job skips the file once the first has marked it `up_to_date`.
 - Reappearing rows can retain `pending_deletion`. A file move removes its existing `collection_files` associations, including curated copies, before adding synchronised associations at the new location.
 - Dropbox ignores a completely empty listing. If saving an individual file or folder fails, however, it can continue without adding that item to the list of assets to keep. The deletion step can then mark it for removal. Repeated authentication failures (HTTP 401) have no fixed retry limit.
 - OneDrive has no empty-listing guard and relies on feed order for parent resolution. Use the full-drive `root` recipe; Business subfolder delta has not been validated.
-- Original S3 upload errors and preview errors can be swallowed before a file is marked `up_to_date`. Integrity checks validate original size/presence, not preview health.
+- Preview errors are swallowed before a file is marked `up_to_date`; only original upload errors fail the job. Integrity checks validate original size/presence, not preview health.
 - S3 credentials in URL username/password fields are not percent-decoded before being passed to MinIO. Use URL-safe credentials until this parser is fixed.
 
 ## Deployment and recovery

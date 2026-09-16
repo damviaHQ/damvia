@@ -2,7 +2,7 @@
 title: Assets tree
 description: Browse the folder tree synced from cloud storage, tag folders with types and licenses, and understand file statuses and thumbnails.
 sidebar:
-  order: 6
+  order: 7
 lastUpdated: 2026-09-16
 ---
 

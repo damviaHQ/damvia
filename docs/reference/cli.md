@@ -28,7 +28,7 @@ docker exec -it <container> npm run cli -- check-integrity
 
 | Command | What it does |
 |---|---|
-| `check-integrity` | Runs the same integrity check as the daily `system/integrity-check` job, then exits. See [Integrity check](../deployment/integrity-check.md) for what it compares and repairs. |
+| `check-integrity` | Runs the same integrity check as the daily `system/integrity-check` job, including the deletion of orphan objects older than 24 hours, then exits. See [Integrity check](../deployment/integrity-check.md) for what it compares and repairs. |
 
 `npm run cli -- --help` prints the command list, and `--version` prints `1.0.0`.
 

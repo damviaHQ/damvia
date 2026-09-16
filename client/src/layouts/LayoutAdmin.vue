@@ -13,8 +13,10 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { RouterOutput } from "@/services/server.ts"
+import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
+import { formatStorage } from "@/utils/fileSize"
+import { useQuery } from "@tanstack/vue-query"
 import {
   AtSign,
   Blocks,
@@ -23,16 +25,29 @@ import {
   FileCog,
   FilePenLine,
   Folders,
+  HardDrive,
   KeyRound,
+  LayoutDashboard,
   Menu,
   Package,
   Settings,
   SquareChevronLeft,
   Users,
 } from "lucide-vue-next"
+import { computed } from "vue"
 export type Asset = RouterOutput["asset"]["tree"][number]
 
 const globalStore = useGlobalStore()
+const isAdmin = computed(() => globalStore.user?.role === 'admin')
+const { data: summary } = useQuery({
+  queryKey: ['dashboard'],
+  queryFn: () => trpc.dashboard.summary.query(),
+  enabled: isAdmin,
+  refetchInterval: 5 * 60 * 1000,
+})
+const storage = computed(() => summary.value?.storage)
+const storagePercent = computed(() => Math.round(storage.value?.percent ?? 0))
+const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent != null && storage.value.percent >= 80)
 </script>
 
 <template>
@@ -44,6 +59,11 @@ const globalStore = useGlobalStore()
       <div class="flex-1 overflow-y-auto">
         <div class="flex flex-col gap-1.5 mb-4 mt-5">
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
+            <router-link :to="{ name: 'admin-dashboard' }" class="menu-item" active-class=""
+              exact-active-class="router-link-active">
+              <LayoutDashboard class="w-4 h-4 mr-2" />
+              Dashboard
+            </router-link>
             <router-link :to="{ name: 'admin-settings' }" class="menu-item">
               <Settings class="w-4 h-4 mr-2" />
               Global Settings
@@ -123,6 +143,17 @@ const globalStore = useGlobalStore()
       </div>
     </div>
     <div class="flex-1 overflow-y-auto">
+      <router-link v-if="showStorageBanner && storage" :to="{ name: 'admin-dashboard' }" active-class=""
+        exact-active-class="" class="flex items-center gap-2 px-8 py-2 text-sm"
+        :class="storagePercent >= 90 ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'">
+        <HardDrive class="w-4 h-4" />
+        <span>
+          Storage at {{ storagePercent }}% of the plan
+          ({{ formatStorage(storage.usedBytes) }} of {{ formatStorage(storage.quotaBytes ?? 0) }}).
+          <template v-if="storage.quotaReachedAt">Cloud synchronisation is paused.</template>
+          <template v-else>Free space before the plan is full.</template>
+        </span>
+      </router-link>
       <slot></slot>
     </div>
   </div>

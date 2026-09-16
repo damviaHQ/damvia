@@ -2,7 +2,7 @@
 title: Menu and pages
 description: Build the navigation menu and compose pages out of blocks, for the home screen and for collections.
 sidebar:
-  order: 8
+  order: 9
 lastUpdated: 2026-09-16
 ---
 

@@ -12,24 +12,37 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-export const formatFileSize = (sizeInBytes: number) => {
-  if (sizeInBytes < 1024) {
-    return `${sizeInBytes} B`
-  } else if (sizeInBytes < 1024 ** 2) {
-    return `${(sizeInBytes / 1024).toFixed(0)} KB`
-  } else if (sizeInBytes < 1024 ** 3) {
-    return `${(sizeInBytes / (1024 ** 2)).toFixed(0)} MB`
-  }
-  return `${(sizeInBytes / (1024 ** 3)).toFixed(0)} GB`
-}
+import { Column, Entity, PrimaryColumn } from "typeorm"
 
-export const formatStorage = (bytes: number) => {
-  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1000 && unit < units.length - 1) {
-    value /= 1000
-    unit += 1
-  }
-  return `${unit === 0 ? value : value.toFixed(1)} ${units[unit]}`
+@Entity('storage_usage')
+export class StorageUsage {
+	@PrimaryColumn()
+	id: number
+
+	@Column({ type: 'bigint' })
+	usedBytes: string
+
+	@Column({ type: 'bigint' })
+	reservedBytes: string
+
+	@Column({ type: 'timestamptz', nullable: true })
+	measuredAt: Date | null
+
+	@Column()
+	alertLevel: number
+
+	@Column()
+	diskAlertLevel: number
+
+	@Column({ type: 'timestamptz', nullable: true })
+	quotaReachedAt: Date | null
+
+	@Column()
+	orphanObjects: number
+
+	@Column({ type: 'bigint' })
+	orphanBytes: string
+
+	@Column({ type: 'timestamptz', nullable: true })
+	orphansRemovedAt: Date | null
 }

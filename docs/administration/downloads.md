@@ -2,7 +2,7 @@
 title: Downloads
 description: How download requests become files or archives, the formats and limits, and when links expire.
 sidebar:
-  order: 10
+  order: 11
 lastUpdated: 2026-09-16
 ---
 

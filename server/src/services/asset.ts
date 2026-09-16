@@ -15,7 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import {loadEsm} from 'load-esm';
 import ffmpeg from "fluent-ffmpeg"
 import {exec} from "node:child_process"
-import {mkdtemp, rm} from "node:fs/promises"
+import {mkdir, mkdtemp, rm} from "node:fs/promises"
 import {tmpdir} from "node:os"
 import {join} from "node:path"
 import sharp from "sharp"
@@ -27,6 +27,7 @@ import {CollectionFile} from "../entity/collection-file"
 import {Product} from "../entity/product"
 import {assetsS3, assetsS3Bucket, assetUpdater, dataSource, logger} from "../env"
 import {assetUpdateContentQueue, collectionSynchronizationQueue} from "../worker"
+import {commitStorage, releaseStorage, reserveStorage, StorageQuotaExceededError} from "./storage"
 import {
 	convertOfficeToPng,
 	convertVectorToPng,
@@ -57,10 +58,25 @@ export async function tmpDir() {
 }
 
 export async function tmpFile() {
-	return join(await tmpDir(), uuid())
+	const dir = await tmpDir()
+	await mkdir(dir, { recursive: true })
+	return join(dir, uuid())
 }
 
 export async function updateFileContent(file: AssetFile): Promise<void> {
+	const size = parseInt(file.size, 10) || 0
+	if (!(await reserveStorage(size))) {
+		throw new StorageQuotaExceededError(file.id, size)
+	}
+	try {
+		await uploadFileContent(file, size)
+	} catch (error) {
+		await releaseStorage(size)
+		throw error
+	}
+}
+
+async function uploadFileContent(file: AssetFile, size: number): Promise<void> {
 	const contentPath = await assetUpdater().fetchFileContent(file).catch((error) => {
 		throw new Error(`Failed to fetch file content (asset file id: ${file.id}): ${error.message}`)
 	})
@@ -74,8 +90,6 @@ export async function updateFileContent(file: AssetFile): Promise<void> {
 
 		await assetsS3().fPutObject(assetsS3Bucket(), file.originalStorageKey, contentPath, {
 			'Content-Type': file.mimeType,
-		}).catch((error) => {
-			logger.error(`Failed to upload file to S3 (asset file id: ${file.id}): ${error.message}`)
 		})
 
 		let thumbnailPath = null
@@ -106,6 +120,7 @@ export async function updateFileContent(file: AssetFile): Promise<void> {
 
 		file.status = AssetFileStatus.UP_TO_DATE
 		await dataSource.getRepository(AssetFile).save(file)
+		await commitStorage(size)
 
 		if (thumbnailPath) {
 			rm(thumbnailPath).catch(
@@ -350,13 +365,14 @@ export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
 	file.licenseId = file.folder?.licenseId
 	file.assetTypeId = file.folder?.assetTypeId
 	file.mimeType = opts.mimeType
+	const checksumChanged = file.externalChecksum !== opts.externalChecksum
 	file.externalChecksum = opts.externalChecksum
-	if (file.externalChecksum !== opts.externalChecksum && file.status !== AssetFileStatus.CREATING) {
+	if (checksumChanged && file.status === AssetFileStatus.UP_TO_DATE) {
 		file.status = AssetFileStatus.OUTDATED
 	}
 	await dataSource.getRepository(AssetFile).save(file)
 
-	if (file.externalChecksum !== opts.externalChecksum || file.status === AssetFileStatus.CREATING) {
+	if (checksumChanged || file.status === AssetFileStatus.CREATING) {
 		await assetUpdateContentQueue.push({ assetFileId: file.id })
 	}
 

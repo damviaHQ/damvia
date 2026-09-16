@@ -15,7 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import 'dotenv/config'
 import "reflect-metadata"
 import { Client as MinioClient } from 'minio'
-import { readFile } from "node:fs/promises"
+import { readFile, statfs } from "node:fs/promises"
 import { join } from "node:path"
 import { createTransport, Transporter } from 'nodemailer'
 import { DataSource } from "typeorm"
@@ -29,6 +29,39 @@ import OneDriveAssetUpdater from "./asset-updater/one-drive"
 import { validateAppSecret } from './services/credentials'
 
 const appSecret = validateAppSecret(process.env.APP_SECRET)
+
+const storageUnits = { B: 1, KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12, PB: 1e15 }
+
+export function parseStorageQuota(raw: string | undefined): number | null {
+  if (!raw || !raw.trim()) {
+    return null
+  }
+  const match = raw.trim().match(/^(\d+(?:\.\d+)?)\s*([KMGTP]?B)?$/i)
+  if (!match) {
+    throw new Error('STORAGE_QUOTA must be a size such as 1500GB or 1.5TB.')
+  }
+  const unit = (match[2] ?? 'B').toUpperCase() as keyof typeof storageUnits
+  const bytes = Math.round(parseFloat(match[1]) * storageUnits[unit])
+  if (bytes <= 0) {
+    throw new Error('STORAGE_QUOTA must be a size such as 1500GB or 1.5TB.')
+  }
+  return bytes
+}
+
+const configuredStorageQuota = parseStorageQuota(process.env.STORAGE_QUOTA)
+
+export function storageQuota(): number | null {
+  return configuredStorageQuota
+}
+
+export function serverAlertEmails(): string[] {
+  return (process.env.SERVER_ALERT_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean)
+}
+
+export async function diskUsage(): Promise<{ totalBytes: number, freeBytes: number }> {
+  const disk = await statfs(process.env.STORAGE_DISK_PATH || '/')
+  return { totalBytes: disk.blocks * disk.bsize, freeBytes: disk.bavail * disk.bsize }
+}
 
 export const logger = createLogger({
   format: format.combine(

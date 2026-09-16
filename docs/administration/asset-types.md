@@ -2,8 +2,8 @@
 title: Asset types
 description: Categorize files with asset types and control their default display, search inclusion and product linkage.
 sidebar:
-  order: 5
-lastUpdated: 2026-09-15
+  order: 6
+lastUpdated: 2026-09-16
 ---
 
 An asset type labels a family of files (product packshots, marketing visuals, documents) and carries defaults that the client applies whenever a set of files shares that type: grid or list view, which columns the list shows, whether the type is searched by default, and whether its files can be linked to products.

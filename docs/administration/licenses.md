@@ -2,7 +2,7 @@
 title: Licenses
 description: Define usage licenses, attach them to folders, and understand how access checks and download terms work.
 sidebar:
-  order: 4
+  order: 5
 lastUpdated: 2026-09-16
 ---
 

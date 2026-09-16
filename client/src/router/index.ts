@@ -28,6 +28,7 @@ const router = createRouter({
 		{ name: 'collection-404', path: '/collections/:id/404', component: () => import('@/views/collection-404.vue'), meta: { layout: 'main' } },
 		{ name: 'search', path: '/search', component: () => import('@/views/search.vue'), meta: { layout: 'main' } },
 		{ name: 'favorites', path: '/favorites', component: () => import('@/views/favorites.vue'), meta: { layout: 'main' } },
+		{ name: 'admin-dashboard', path: '/admin', component: () => import('@/views/admin/admin-dashboard.vue'), meta: { layout: 'admin' } },
 		{ name: 'admin-groups', path: '/admin/groups', component: () => import('@/views/admin/admin-groups.vue'), meta: { layout: 'admin' } },
 		{ name: 'admin-regions', path: '/admin/regions', component: () => import('@/views/admin/admin-regions.vue'), meta: { layout: 'admin' } },
 		{ name: 'admin-authorized-domains', path: '/admin/authorized-domains', component: () => import('@/views/admin/admin-authorized-domains.vue'), meta: { layout: 'admin' } },

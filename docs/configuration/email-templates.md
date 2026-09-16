@@ -1,6 +1,6 @@
 ---
 title: Email templates
-description: The seven transactional emails, the JSON that defines them, and the variables each template can use.
+description: The nine transactional emails, the JSON that defines them, and the variables each template can use.
 sidebar:
   order: 4
 lastUpdated: 2026-09-16
@@ -21,9 +21,9 @@ Every email Damvia sends is plain text rendered from a template with [LiquidJS](
 }
 ```
 
-Each key is a template name; each template has `from`, `subject` and `body`. Every `body` is a Liquid template. Only the `request-approval` subject is rendered with Liquid; the other six subjects and every `from` are used literally. Bodies are plain text (`\n` for new lines), not HTML. All seven keys must be present: the sender reads `mailConfig()[name]` without a fallback and would fail the job otherwise.
+Each key is a template name; each template has `from`, `subject` and `body`. Every `body` is a Liquid template. The `request-approval`, `storage-alert` and `disk-alert` subjects are rendered with Liquid; the other six subjects and every `from` are used literally. Bodies are plain text (`\n` for new lines), not HTML. All nine keys should be present: the sender reads `mailConfig()[name]` without a fallback and fails the job otherwise, except `storage-alert` and `disk-alert`, whose absence only skips the alert and logs `storage.alert-template-missing` or `storage.disk-alert-template-missing`.
 
-## The seven templates
+## The nine templates
 
 | Key | Sent when | Recipient | Variables |
 |---|---|---|---|
@@ -34,6 +34,8 @@ Each key is a template name; each template has `from`, `subject` and `body`. Eve
 | `user-approved` | An admin or manager approves the user | The user | `user.name`; `url`: `APP_URL/login?token=...` |
 | `download-ready` | An "email" download's archive is built | The requesting user | `link`: a presigned S3 URL to the archive (not the `/v1/downloads/` link) |
 | `invitation` | A guest is invited to a collection | The invited email | `url`: `APP_URL/collections/{id}?dam_token=...` (logs the guest in) |
+| `storage-alert` | Storage usage crosses 80, 90, 95 or 100 % of `STORAGE_QUOTA` (once per crossing) | The admins designated with "Receives storage and maintenance emails", in one message; nothing is sent and `storage.alert-no-recipient` is logged when none is designated | `severity`: `warning` (80), `critical` (90, 95) or `full` (100); `percent`: integer; `used` and `quota`: sizes such as `1.2 TB`; `url`: `APP_URL/admin`. All are also available in `subject`. |
+| `disk-alert` | The server disk crosses 80, 90, 95 or 100 % (once per crossing) | `SERVER_ALERT_EMAILS`, in one message; nothing is sent when unset | `severity`, `percent`, `free` and `total` (sizes), `appUrl`: `APP_URL`, to tell instances apart. All are also available in `subject`. |
 
 Only the variables listed are available; any other `{{ name }}` renders empty.
 

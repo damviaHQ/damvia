@@ -2,7 +2,7 @@
 title: Accounts and links
 description: Session lifetime, account removal and the actual scope of link revocation for administrators.
 sidebar:
-  order: 11
+  order: 12
 lastUpdated: 2026-09-16
 ---
 

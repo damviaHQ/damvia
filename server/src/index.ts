@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { assetUpdater, dataSource, logger } from "./env"
+import { cleanStaleTempDirectories } from "./services/storage"
 import { startWorker } from "./worker"
 import server from "./server"
 
@@ -41,6 +42,7 @@ async function run() {
 		process.exit(1)
 	})
 
+	await cleanStaleTempDirectories()
 	await dataSource.initialize()
 	const addr = await server.listen({
 		host: '0.0.0.0',
