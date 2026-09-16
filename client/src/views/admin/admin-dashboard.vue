@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
-import { trpc } from "@/services/server.ts"
+import { extractErrors, trpc } from "@/services/server.ts"
 import { formatStorage } from "@/utils/fileSize"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { computed, ref } from "vue"
@@ -82,8 +82,8 @@ const measureStorage = async () => {
       }
     }
     toast.info("The measurement is taking longer than usual. The figures will update on their own.")
-  } catch {
-    toast.error("Failed to measure the storage")
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
   } finally {
     isWorking.value = false
     isMeasuring.value = false
@@ -98,8 +98,8 @@ const retryPendingAssets = async () => {
       ? "No file is waiting for download"
       : `${result.queued} file${result.queued === 1 ? '' : 's'} will be downloaded again from the cloud storage`)
     await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-  } catch {
-    toast.error("Failed to retry the pending files")
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
   } finally {
     isWorking.value = false
   }
@@ -166,10 +166,12 @@ const retryPendingAssets = async () => {
             </p>
           </div>
           <div class="flex gap-2">
-            <Button variant="outline" :disabled="isWorking" @click="measureStorage">
+            <Button variant="outline" :disabled="isWorking || data.jobs.measuring" @click="measureStorage">
               {{ isMeasuring ? 'Measuring…' : 'Measure now' }}
             </Button>
-            <Button variant="outline" :disabled="isWorking" @click="retryPendingAssets">Retry pending files</Button>
+            <Button variant="outline" :disabled="isWorking || data.jobs.downloading > 0" @click="retryPendingAssets">
+              {{ data.jobs.downloading > 0 ? `Downloading ${data.jobs.downloading} file${data.jobs.downloading === 1 ? '' : 's'}…` : 'Retry pending files' }}
+            </Button>
           </div>
         </div>
 

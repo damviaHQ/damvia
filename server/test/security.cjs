@@ -738,3 +738,28 @@ test('only admins can designate an admin as maintenance contact, and no designat
         assert.equal((await db.getRepository(User).findOneByOrFail({ id: target.id })).maintenanceContact, false)
     } finally { env.storageQuota = () => null }
 })
+
+test('measure and retry are refused while their jobs are waiting or running, including two clicks at once', async () => {
+    await db.query('DELETE FROM pgboss.job')
+    try {
+        await db.query(`INSERT INTO pgboss.job(name, state) VALUES('storage/measure-usage', 'created'), ('asset/update-content', 'active')`)
+        await assert.rejects(caller(admin).dashboard.measureStorage(), e => e.code === 'BAD_REQUEST')
+        await assert.rejects(caller(admin).dashboard.retryPendingAssets(), e => e.code === 'BAD_REQUEST')
+        const summary = await caller(admin).dashboard.summary()
+        assert.equal(summary.jobs.measuring, true)
+        assert.equal(summary.jobs.downloading, 1)
+        await db.query(`UPDATE pgboss.job SET state = 'completed'`)
+        assert.deepEqual((await caller(admin).dashboard.summary()).jobs, { measuring: false, downloading: 0 })
+        const originalPush = worker.storageMeasureUsageQueue.push
+        worker.storageMeasureUsageQueue.push = async data => {
+            await new Promise(resolve => setTimeout(resolve, 200))
+            return originalPush(data)
+        }
+        try {
+            const queuedBefore = queued.filter(job => job.name === 'storageMeasureUsageQueue').length
+            const attempts = await Promise.allSettled([caller(admin).dashboard.measureStorage(), caller(admin).dashboard.measureStorage()])
+            assert.equal(attempts.filter(attempt => attempt.status === 'fulfilled').length, 1)
+            assert.equal(queued.filter(job => job.name === 'storageMeasureUsageQueue').length, queuedBefore + 1)
+        } finally { worker.storageMeasureUsageQueue.push = originalPush }
+    } finally { await db.query('DELETE FROM pgboss.job') }
+})

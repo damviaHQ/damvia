@@ -178,8 +178,8 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `summary` | query | `userAdmin` | `storage` (used and quota bytes, percent, `measuredAt`, `alertLevel`, `quotaReachedAt`, `serverContactEmails` (the `SERVER_ALERT_EMAILS` list, shown as the contact to raise the plan), and `disk` only when the caller's email is in `SERVER_ALERT_EMAILS`, else `null`: total and free bytes, `blockedFiles`, orphan figures), asset files by status, users (total, `pendingApproval`, `maintenanceContacts`, by role), downloads of the last 7 days by status |
-| `retryPendingAssets` | mutation | `userAdmin` | Queues `asset/update-content` for every `creating` or `outdated` file; returns `{ queued }` |
-| `measureStorage` | mutation | `userAdmin` | Pushes one `storage/measure-usage` job |
+| `summary` | query | `userAdmin` | `storage` (used and quota bytes, percent, `measuredAt`, `alertLevel`, `quotaReachedAt`, `serverContactEmails` (the `SERVER_ALERT_EMAILS` list, shown as the contact to raise the plan), and `disk` only when the caller's email is in `SERVER_ALERT_EMAILS`, else `null`: total and free bytes, `blockedFiles`, orphan figures), asset files by status, users (total, `pendingApproval`, `maintenanceContacts`, by role), `jobs` (`measuring`, `downloading` count, read from `pgboss.job`), downloads of the last 7 days by status |
+| `retryPendingAssets` | mutation | `userAdmin` | Queues `asset/update-content` for every `creating` or `outdated` file; returns `{ queued }`. `BAD_REQUEST` while an `asset/update-content` job is `created`, `retry` or `active` in `pgboss.job`; an advisory lock serialises concurrent calls |
+| `measureStorage` | mutation | `userAdmin` | Pushes one `storage/measure-usage` job. `BAD_REQUEST` while one is `created`, `retry` or `active`; an advisory lock serialises concurrent calls |
 
 Uncaught database, storage or service exceptions can also surface as `INTERNAL_SERVER_ERROR`.

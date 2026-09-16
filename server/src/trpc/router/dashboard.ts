@@ -12,6 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { TRPCError } from "@trpc/server"
 import { AssetFile } from "../../entity/asset-file"
 import { Download } from "../../entity/download"
 import { User, UserRole } from "../../entity/user"
@@ -24,7 +25,7 @@ export default router({
 	summary: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.query(async ({ ctx }) => {
-			const [storage, assetRows, userRows, pendingApproval, maintenanceContacts, downloadRows] = await Promise.all([
+			const [storage, assetRows, userRows, pendingApproval, maintenanceContacts, downloadRows, jobRows] = await Promise.all([
 				getStorageStatus(ctx.user.email),
 				dataSource.getRepository(AssetFile).createQueryBuilder('asset_file')
 					.select('asset_file.status', 'status').addSelect('COUNT(*)', 'count')
@@ -41,6 +42,11 @@ export default router({
 					.where('download.created_at >= :since', { since: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) })
 					.groupBy('download.status')
 					.getRawMany<{ status: string, count: string }>(),
+				dataSource.query(`
+					SELECT name, count(*) AS count FROM pgboss.job
+					WHERE name IN ('storage/measure-usage', 'asset/update-content') AND state IN ('created', 'retry', 'active')
+					GROUP BY name
+				`) as Promise<{ name: string, count: string }[]>,
 			])
 			const byRole = Object.fromEntries(userRows.map((row) => [row.role, Number(row.count)]))
 			return {
@@ -53,14 +59,36 @@ export default router({
 					byRole,
 				},
 				downloads: { last7DaysByStatus: Object.fromEntries(downloadRows.map((row) => [row.status, Number(row.count)])) },
+				jobs: {
+					measuring: jobRows.some((row) => row.name === 'storage/measure-usage'),
+					downloading: Number(jobRows.find((row) => row.name === 'asset/update-content')?.count ?? 0),
+				},
 			}
 		}),
 	retryPendingAssets: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.mutation(async () => ({ queued: await retryPendingAssets() })),
+		.mutation(() => dataSource.transaction(async (em) => {
+			const [{ locked }] = await em.query(`SELECT pg_try_advisory_xact_lock(hashtext('asset/update-content')) AS locked`)
+			const [{ running }] = await em.query(`
+				SELECT count(*) > 0 AS running FROM pgboss.job
+				WHERE name = 'asset/update-content' AND state IN ('created', 'retry', 'active')
+			`)
+			if (!locked || running) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Files are already being downloaded. Try again once they are done.' })
+			}
+			return { queued: await retryPendingAssets() }
+		})),
 	measureStorage: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.mutation(async () => {
+		.mutation(() => dataSource.transaction(async (em) => {
+			const [{ locked }] = await em.query(`SELECT pg_try_advisory_xact_lock(hashtext('storage/measure-usage')) AS locked`)
+			const [{ running }] = await em.query(`
+				SELECT count(*) > 0 AS running FROM pgboss.job
+				WHERE name = 'storage/measure-usage' AND state IN ('created', 'retry', 'active')
+			`)
+			if (!locked || running) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'The storage is already being measured.' })
+			}
 			await storageMeasureUsageQueue.push(undefined)
-		}),
+		})),
 })
