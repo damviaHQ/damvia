@@ -20,6 +20,7 @@ import { User } from "./entity/user"
 import {dataSource, logger} from "./env"
 import { assignProductsToAssetFiles, processDeletion, updateFileContent } from "./services/asset"
 import { synchronizeCollection } from "./services/collection"
+import { pruneActivityEvents } from "./services/analytics"
 import { measureStorageUsage, StorageQuotaExceededError } from "./services/storage"
 import { integrityCheck as systemIntegrityCheck } from "./services/system"
 import { createDownloadArchive, DownloadAccessError, processExpiredDownloads } from "./services/download"
@@ -234,4 +235,10 @@ export const storageMeasureUsageQueue = createQueue<void>({
 	name: 'storage/measure-usage',
 	processor: () => measureStorageUsage(),
 	cron: '*/30 * * * *',
+})
+
+export const activityPruneEventsQueue = createQueue<void>({
+	name: 'activity/prune-events',
+	processor: () => pruneActivityEvents(),
+	cron: '30 4 * * *',
 })

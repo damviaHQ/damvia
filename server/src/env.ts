@@ -106,6 +106,11 @@ export function mailTransporter(): Transporter {
   return _mailTransporter
 }
 
+export function analyticsRetentionDays(): number | null {
+  const days = parseInt(process.env.ANALYTICS_RETENTION_DAYS ?? '365', 10)
+  return days > 0 ? days : null
+}
+
 export function passwordLessAuth() {
   return process.env.ENABLE_PASSWORD_LESS_AUTH === 'true'
 }
