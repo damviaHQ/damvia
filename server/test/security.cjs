@@ -103,7 +103,7 @@ const forbidden = promise => assert.rejects(promise, e => ['UNAUTHORIZED', 'FORB
 let group, region, admin, member, manager, guest, legacyChild
 before(async () => {
     await db.initialize()
-    await worker.startWorker()
+    await worker.startQueues({ enableWorker: true })
     // Apply the upgrade to old rows, not just an empty schema.
     const applied = await db.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1')
     assert.equal(applied[0]?.name, 'StorageUsage1789603200000', 'Review the fixture upgrade setup when adding migrations')
