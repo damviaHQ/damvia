@@ -1,0 +1,99 @@
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2026 Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>. */
+.dv-theme { color: var(--dv-text-primary); font-family: var(--dv-font-body); font-size: var(--dv-size-body); line-height: 1.5; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+.dv-theme *, .dv-theme *::before, .dv-theme *::after { box-sizing: border-box; }
+.dv-theme ::selection { background: var(--dv-color-sky); color: var(--dv-color-midnight); }
+.dv-theme :focus-visible { outline: 2px solid var(--dv-action-primary); outline-offset: 4px; }
+.dv-theme button, .dv-theme input, .dv-theme select { font: inherit; }
+.dv-theme :is(a[href], button:not(:disabled), select:not(:disabled), summary, label, [role=button]:not([aria-disabled=true]), [role=link]:not([aria-disabled=true]), input:not(:disabled)[type=button], input:not(:disabled)[type=submit], input:not(:disabled)[type=reset], input:not(:disabled)[type=checkbox], input:not(:disabled)[type=radio], input:not(:disabled)[type=file], input:not(:disabled)[type=range], input:not(:disabled)[type=color]) { cursor: pointer; }
+.dv-theme :is(button, select, input):disabled, .dv-theme [aria-disabled=true] { cursor: not-allowed; }
+.dv-theme button:disabled { opacity: .45; }
+.dv-theme a { color: inherit; text-underline-offset: 4px; }
+.dv-theme svg { width: 18px; height: 18px; stroke-width: 1.7; flex-shrink: 0; }
+.dv-theme h1, .dv-theme h2, .dv-theme h3, .dv-theme p { margin: 0; }
+.dv-theme h1, .dv-theme h2, .dv-theme h3 { text-wrap: balance; }
+.dv-theme h1 { font-size: var(--dv-size-heading); line-height: 1.2; font-weight: 650; letter-spacing: -.035em; }
+.dv-theme h2 { font-size: var(--dv-size-section); line-height: 1.4; font-weight: 650; letter-spacing: -.02em; }
+.dv-theme h3 { font-size: 14px; font-weight: 650; }
+.dv-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--dv-space-2); padding: 9px 14px; min-height: 38px; border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-button); background: var(--dv-surface-panel); color: var(--dv-text-primary); font-weight: 550 !important; font-size: 13px !important; text-decoration: none; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+.dv-button:hover:not(:disabled) { background: var(--dv-surface-canvas); border-color: var(--dv-text-secondary); }
+.dv-theme .dv-button--primary { background: var(--dv-action-primary); color: var(--dv-text-on-dark); border-color: var(--dv-action-primary); }
+.dv-theme .dv-button--primary:hover:not(:disabled) { background: var(--dv-action-hover); border-color: var(--dv-action-hover); }
+.dv-theme .dv-button:disabled { opacity: 1; background: var(--dv-surface-canvas); color: var(--dv-text-secondary); border-color: var(--dv-color-line); }
+.dv-button--quiet { background: transparent; border-color: transparent; }
+.dv-button--small { min-height: 32px; padding: 5px 10px; font-size: 12px !important; }
+.dv-button--icon { width: 36px; height: 36px; padding: 8px; }
+.dv-input, .dv-select { border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-field); background: var(--dv-surface-panel); color: var(--dv-text-primary); min-height: 38px; padding: 8px 12px; caret-color: var(--dv-action-primary); }
+.dv-input::placeholder { color: var(--dv-text-secondary); opacity: 1; }
+.dv-input { width: 100%; }
+.dv-select { max-width: 100%; }
+.dv-label { display: grid; gap: 7px; font-weight: 550; font-size: 13px; }
+.dv-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--dv-radius-data); padding: 3px 8px; white-space: nowrap; font-size: 11px; font-weight: 550; line-height: 1.4; background: var(--dv-surface-canvas); color: var(--dv-text-secondary); }
+.dv-badge svg { width: 12px; height: 12px; }
+.dv-badge--success { color: var(--dv-color-success); background: var(--dv-color-success-soft); }
+.dv-badge--warning { color: var(--dv-color-warning); background: var(--dv-color-warning-soft); }
+.dv-badge--danger { color: var(--dv-color-danger); background: var(--dv-color-danger-soft); }
+.dv-badge--blue { color: var(--dv-action-primary); background: var(--dv-action-soft); }
+.dv-panel { background: var(--dv-surface-panel); border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-surface); }
+.dv-toast { display: flex; align-items: center; gap: var(--dv-space-3); min-height: 58px; max-width: min(380px, calc(100vw - 32px)); padding: 13px 16px; border: 1px solid rgb(255 255 255 / .14); border-radius: var(--dv-radius-data); background: var(--dv-color-midnight); color: var(--dv-text-on-dark); box-shadow: 0 16px 42px rgb(0 5 47 / .22); }
+/* Compact status icons sit directly on the toast surface. */
+.dv-toast .dv-toast__icon { width:18px; height:18px; padding:0; color:var(--dv-action-primary); }
+.dv-toast--success .dv-toast__icon { color:var(--dv-color-success); }
+.dv-toast--danger .dv-toast__icon { color:var(--dv-color-danger); }
+.dv-toast--warning .dv-toast__icon { color:var(--dv-color-warning); }
+.dv-toast__title { color: var(--dv-text-on-dark); font-size: 13px; font-weight: 600; line-height: 1.4; letter-spacing: -.01em; }
+.dv-toast__description { color: var(--dv-text-on-dark-secondary); font-size: 11px; line-height: 1.5; }
+.dv-toast__action, .dv-toast__cancel { min-height: 32px; margin-left: auto; border: 1px solid rgb(255 255 255 / .24); border-radius: var(--dv-radius-button); padding: 0 11px; font-size: 11px; font-weight: 550; }
+.dv-theme .dv-toast__action { display:inline-flex; align-items:center; justify-content:center; background:var(--dv-action-primary); color:var(--dv-text-on-dark); border:1px solid var(--dv-action-primary); font-family:var(--dv-font-body); font-size:12px; font-weight:550; line-height:1.5; padding:5px 10px; }
+.dv-theme .dv-toast__action:hover { background:var(--dv-action-hover); border-color:var(--dv-action-hover); }
+.dv-toast__cancel { background: transparent; color: var(--dv-text-on-dark-secondary); }
+.dv-toast__close { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; margin-left: auto; padding: 0; border: 0; border-radius: var(--dv-radius-button); background: transparent; color: var(--dv-text-on-dark-secondary); }
+.dv-table-wrap { position: relative; overflow-x: auto; }
+.dv-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.dv-table th { background: var(--dv-surface-canvas); color: var(--dv-text-secondary); font-weight: 500; font-size: 11px; padding: 11px 20px; white-space: nowrap; }
+.dv-table td { border-top: 1px solid var(--dv-color-line); padding: 16px 20px; }
+.dv-table tbody tr:hover { background: var(--dv-surface-canvas); }
+.dv-table input[type=checkbox], .dv-theme input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--dv-action-primary); cursor: pointer; }
+.dv-table th button { display: flex; align-items: center; gap: 7px; color: inherit; border: 0; background: transparent; padding: 0; }
+.dv-table th button svg { width: 13px; height: 13px; }
+.dv-breadcrumb { min-width: 0; }
+/* Resolve shared primitive colours at the breadcrumb boundary, above utility classes. */
+.dv-breadcrumb .dv-breadcrumb__list { color: var(--dv-text-secondary, hsl(var(--muted-foreground))); }
+.dv-breadcrumb .dv-breadcrumb__current { color: var(--dv-text-primary, hsl(var(--foreground))); }
+.dv-breadcrumb .dv-breadcrumb__separator { color: inherit; }
+.dv-breadcrumb__list { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--dv-space-2, 8px); min-width: 0; margin: 0; padding: 0; overflow: hidden; list-style: none; color: var(--dv-text-secondary, inherit); font-size: 12px; }
+.dv-breadcrumb__item { display: inline-flex; align-items: center; min-width: 0; flex: 0 1 auto; }
+.dv-breadcrumb__link, .dv-breadcrumb__current { display: inline-flex; align-items: center; min-width: 0; padding: 4px 0; border: 0; border-radius: var(--dv-radius-control, 0); background: transparent; color: inherit; font: inherit; line-height: 1.4; text-decoration: none; }
+.dv-breadcrumb__link { cursor: pointer; }
+.dv-breadcrumb__link:hover { color: var(--dv-text-primary, currentColor); }
+.dv-breadcrumb__current { color: var(--dv-text-primary, currentColor); font-weight: 600; }
+.dv-breadcrumb__link:focus-visible, .dv-breadcrumb__current:focus-visible, .dv-breadcrumb__ellipsis:focus-visible { outline: 2px solid var(--dv-action-primary, #0044f4); outline-offset: 3px; }
+.dv-breadcrumb__label { display: block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-breadcrumb__separator { display: inline-flex; flex: 0 0 auto; color: var(--dv-color-muted, currentColor); }
+.dv-breadcrumb__separator svg { width: 13px; height: 13px; }
+.dv-breadcrumb__ellipsis { display: grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--dv-radius-control, 0); background: transparent; color: inherit; cursor: pointer; }
+.dv-breadcrumb__ellipsis:hover { background: var(--dv-surface-canvas, rgb(0 0 0 / .05)); color: var(--dv-text-primary, currentColor); }
+.dv-breadcrumb__ellipsis > span { width: 28px; height: 28px; }
+.dv-breadcrumb__menu-link { display: block; width: 100%; max-width: 320px; overflow: hidden; padding: 4px 2px; color: inherit; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.dv-breadcrumb__tooltip { max-width: 320px; border: 1px solid rgb(255 255 255 / .14); border-radius: var(--dv-radius-surface); background: var(--dv-color-midnight); color: var(--dv-text-on-dark); font-size: 11px; overflow-wrap: anywhere; }
+.dv-breadcrumb__menu--dark { border-color: #4b5563; border-radius: var(--dv-radius-surface); background: #374151; color: #e5e7eb; }
+.dv-breadcrumb__menu--dark .dropdown-item { color: #e5e7eb; }
+.dv-breadcrumb__menu--dark .dropdown-item[data-highlighted] { background: #4b5563; color: white; }
+.dv-breadcrumb[data-tone=dark] .dv-breadcrumb__list { color: var(--dv-text-on-dark-secondary, #c2cbe8); }
+.dv-breadcrumb[data-tone=dark] .dv-breadcrumb__link:hover, .dv-breadcrumb[data-tone=dark] .dv-breadcrumb__current { color: white; }
+.dv-breadcrumb[data-tone=dark] .dv-breadcrumb__ellipsis:hover { background: rgb(255 255 255 / .1); color: white; }
+@media (max-width: 640px) { .dv-breadcrumb__label { max-width: 96px; } }
+.dv-theme .dv-muted { color: var(--dv-text-secondary); }
+.dv-theme .dv-mono { font-family: var(--dv-font-mono); font-size: 12px; }
+.dv-theme .dv-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) { .dv-theme *, .dv-theme *::before, .dv-theme *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

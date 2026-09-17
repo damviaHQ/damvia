@@ -6,19 +6,20 @@ sidebar:
 lastUpdated: 2026-09-16
 ---
 
-This page is the entry point for developers who want to change or extend Damvia. It covers the two packages, their scripts and checks, and what a pull request must contain. The other pages of this group describe the code itself: [Architecture](./architecture.md), [Data model](./data-model.md), [tRPC API](./api.md), [Writing a background job](./background-jobs.md) and [Storage drivers](./storage-drivers.md).
+This page is the entry point for developers who want to change or extend Damvia. It covers the application packages, their scripts and checks, and what a pull request must contain. The other pages of this group describe the code itself: [Architecture](./architecture.md), [Data model](./data-model.md), [tRPC API](./api.md), [Writing a background job](./background-jobs.md) [Storage drivers](./storage-drivers.md) and the proposed [Design system](./design-system.md).
 
 ## The development environment is the local setup
 
 Follow [Local setup](../getting-started/local-setup.md): `docker-compose up -d` in `server/` for Postgres, MailHog and MinIO, then `npm run dev` in `server/` and in `client/`. Security regression tests use their own disposable PostgreSQL database; keep it separate from development data.
 
-## Two packages, linked by a file dependency
+## Application packages and shared foundations
 
-The repository holds two npm packages with their own `package.json` and `node_modules`:
+The two application packages have their own `package.json` and `node_modules`. A separate foundation package holds the proposed shared design tokens and styles:
 
 | Package | Stack |
 |---|---|
 | `server/` | Node, Fastify 5, tRPC 11, TypeORM 0.3, pg-boss 10, MinIO client, winston, zod |
+| `packages/design-system/` | Framework-independent design tokens, CSS and self-hosted font; proposal only |
 | `client/` | Vue 3, Vite 5, TypeScript, Tailwind 3, shadcn-vue (`components/ui/`), Pinia, TanStack Vue Query, tRPC 10 client |
 
 `client/package.json` declares `"server": "file:../server"`, which makes `client/node_modules/server` a symlink to `../../server`. The client uses it for router types and also some runtime enums: `client/src/services/server.ts` imports `type { AppRouter } from "server/src/trpc"`, and `client/src/stores/downloadStore.ts` imports the `DownloadStatus` and `DownloadType` enums from `server/src/entity/download`. Install both packages before running either type check, or the client's imports do not resolve.
@@ -36,6 +37,9 @@ The repository holds two npm packages with their own `package.json` and `node_mo
 | `client/` | `npm run dev` | `vite`, on port 5173 |
 | `client/` | `npm run build` | `vite build` into `client/dist/` |
 | `client/` | `npm run preview` | `vite preview` of the built bundle |
+| `client/` | `npm run design:dev` | Isolated design proposal on port 5174 at `/design-system.html` |
+| `client/` | `npm run design:check` | Strict type check of the isolated design proposal |
+| `client/` | `npm run design:build` | Token freshness check and standalone static preview build |
 
 ## Automated checks and current failures
 
@@ -84,3 +88,5 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 ## Documentation changes ship in the same pull request
 
 `docs/` is the source of the public documentation site. When a change alters behaviour that a page describes, update that page in the same pull request and set its `lastUpdated` to the day you checked it. The contract for the pages (frontmatter, style, folder layout) and the list of triggers that always require a doc edit are in the `docs/README.md` file in the repository; `docs/_internal/page-map.md` maps code areas to pages. Adding an environment variable means touching the code, `server/.env.template` or `client/.env.template`, and [Environment variables](../reference/environment-variables.md); adding a queue means updating [Background jobs](../reference/background-jobs.md). `scripts/check-docs.sh` catches the forgotten ones.
+
+The focused Users UI logic checks run with `node --test client/test/admin-users.test.cjs` from the repository root. They cover combined filtering, role/region action permissions, status classification and CSV formula escaping.

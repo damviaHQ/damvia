@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/design-preview/**/*.ts", "src/design-preview/**/*.vue", "src/vite-env.d.ts"],
+  "exclude": ["node_modules", "../server"],
+  "references": []
+}

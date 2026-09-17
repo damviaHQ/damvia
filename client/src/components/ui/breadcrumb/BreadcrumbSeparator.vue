@@ -11,7 +11,7 @@ const props = defineProps<{
 <template>
   <li role="presentation" aria-hidden="true" :class="cn(props.class)">
     <slot>
-      <ChevronRight class="h-4 w-4 text-neutral-500" />
+      <ChevronRight class="h-4 w-4" />
     </slot>
   </li>
 </template>

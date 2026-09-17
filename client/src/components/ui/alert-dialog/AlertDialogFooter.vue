@@ -8,7 +8,7 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div
+  <div data-dialog-footer
     :class="
       cn(
         'flex flex-col-reverse sm:flex-row sm:justify-end sm:gap-x-2',

@@ -1,0 +1,93 @@
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2026 Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>. */
+/* Generated from tokens.json. Run npm run build in packages/design-system. */
+.dv-theme {
+  --dv-color-blue: rgb(0 68 244 / 1);
+  --dv-color-blue-hover: rgb(0 54 196 / 1);
+  --dv-color-midnight: rgb(0 5 47 / 1);
+  --dv-color-sky: rgb(223 233 255 / 1);
+  --dv-color-white: rgb(255 255 255 / 1);
+  --dv-color-canvas: rgb(246 248 252 / 1);
+  --dv-color-ink: rgb(23 35 67 / 1);
+  --dv-color-muted: rgb(100 113 138 / 1);
+  --dv-color-line: rgb(227 232 240 / 1);
+  --dv-color-success: rgb(24 116 84 / 1);
+  --dv-color-success-soft: rgb(234 245 239 / 1);
+  --dv-color-warning: rgb(148 98 26 / 1);
+  --dv-color-warning-soft: rgb(255 245 229 / 1);
+  --dv-color-danger: rgb(189 53 69 / 1);
+  --dv-color-danger-soft: rgb(255 240 242 / 1);
+  --dv-surface-canvas: var(--dv-color-canvas);
+  --dv-surface-panel: var(--dv-color-white);
+  --dv-surface-subtle: var(--dv-color-sky);
+  --dv-surface-nav: var(--dv-color-midnight);
+  --dv-text-primary: var(--dv-color-ink);
+  --dv-text-secondary: var(--dv-color-muted);
+  --dv-text-on-dark: var(--dv-color-white);
+  --dv-text-on-dark-secondary: rgb(194 203 232 / 1);
+  --dv-text-on-dark-muted: rgb(155 169 203 / 1);
+  --dv-action-primary: var(--dv-color-blue);
+  --dv-action-hover: var(--dv-color-blue-hover);
+  --dv-action-soft: var(--dv-color-sky);
+  --dv-space-1: 4px;
+  --dv-space-2: 8px;
+  --dv-space-3: 12px;
+  --dv-space-4: 16px;
+  --dv-space-5: 20px;
+  --dv-space-6: 24px;
+  --dv-space-8: 32px;
+  --dv-space-10: 40px;
+  --dv-space-12: 48px;
+  --dv-space-16: 64px;
+  --dv-radius-control: 0px;
+  --dv-radius-data: 0px;
+  --dv-radius-graphic: 8px;
+  --dv-radius-surface: 12px;
+  --dv-radius-sm: 6px;
+  --dv-radius-md: 8px;
+  --dv-radius-lg: 12px;
+  --dv-radius-xl: 16px;
+  --dv-radius-pill: 999px;
+  --dv-radius-button: var(--dv-radius-control);
+  --dv-radius-field: var(--dv-radius-control);
+  --dv-font-body: "Mona Sans", Inter, system-ui, sans-serif;
+  --dv-font-mono: SFMono-Regular, Consolas, monospace;
+  --dv-size-caption: 12px;
+  --dv-size-body: 14px;
+  --dv-size-section: 17px;
+  --dv-size-heading: 32px;
+  --dv-size-display: 56px;
+}
+
+/* Admin-only bridge for shared shadcn controls and teleported overlays. */
+.dv-admin {
+  --background: 0.0000 0.0000% 100.0000%;
+  --foreground: 223.6363 48.8889% 17.6471%;
+  --muted: 220.0000 49.9989% 97.6471%;
+  --muted-foreground: 219.4738 15.9663% 46.6666%;
+  --popover: 0.0000 0.0000% 100.0000%;
+  --popover-foreground: 223.6363 48.8889% 17.6471%;
+  --card: 0.0000 0.0000% 100.0000%;
+  --card-foreground: 223.6363 48.8889% 17.6471%;
+  --border: 216.9227 30.2322% 91.5686%;
+  --input: 216.9227 30.2322% 91.5686%;
+  --primary: 223.2787 100.0000% 47.8432%;
+  --primary-foreground: 0.0000 0.0000% 100.0000%;
+  --secondary: 220.0000 49.9989% 97.6471%;
+  --secondary-foreground: 223.6363 48.8889% 17.6471%;
+  --accent: 220.0000 49.9989% 97.6471%;
+  --accent-foreground: 223.6363 48.8889% 17.6471%;
+  --destructive: 352.9412 56.1983% 47.4509%;
+  --destructive-foreground: 0.0000 0.0000% 100.0000%;
+  --ring: 223.2787 100.0000% 47.8432%;
+}

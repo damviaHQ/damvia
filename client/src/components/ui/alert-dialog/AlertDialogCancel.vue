@@ -14,7 +14,7 @@ const delegatedProps = computed(() => {
 </script>
 
 <template>
-  <AlertDialogCancel
+  <AlertDialogCancel data-admin-button="outline"
     v-bind="delegatedProps"
     :class="cn(buttonVariants({ variant: 'outline' }), 'sm:mt-0', props.class)"
   >

@@ -4,8 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "design:dev": "vite --config vite.design-system.config.ts --host 127.0.0.1 --port 5174",
+    "design:build": "node ../packages/design-system/scripts/build-tokens.mjs --check && vite build --config vite.design-system.config.ts",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "design:check": "vue-tsc --noEmit -p tsconfig.design-system.json"
   },
   "dependencies": {
     "@heroicons/vue": "^2.0.18",

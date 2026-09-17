@@ -1,0 +1,23 @@
+{
+  "name": "@damvia/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "description": "Shared Damvia design tokens and framework-independent component styles.",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./tokens.json": "./src/tokens.json",
+    "./tokens.css": "./src/tokens.css",
+    "./components.css": "./src/components.css",
+    "./fonts.css": "./src/fonts.css"
+  },
+  "scripts": {
+    "build": "node scripts/build-tokens.mjs",
+    "check": "node scripts/build-tokens.mjs --check"
+  }
+}
