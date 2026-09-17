@@ -3,7 +3,7 @@ title: Known limitations
 description: Operational limitations affecting synchronisation, recovery and deployment.
 sidebar:
   order: 7
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 This page tracks operational limitations that remain in the application. For installation checks, see [Validation status](./validation-status.md) and [Acceptance checklist](../deployment/acceptance-checklist.md).
@@ -15,6 +15,7 @@ This page tracks operational limitations that remain in the application. For ins
 - Dropbox ignores a completely empty listing. If saving an individual file or folder fails, however, it can continue without adding that item to the list of assets to keep. The deletion step can then mark it for removal. Repeated authentication failures (HTTP 401) have no fixed retry limit.
 - OneDrive has no empty-listing guard and relies on feed order for parent resolution. Use the full-drive `root` recipe; Business subfolder delta has not been validated.
 - Preview errors are swallowed before a file is marked `up_to_date`; only original upload errors fail the job. Integrity checks validate original size/presence, not preview health.
+- Until the first storage measurement after the `storage_usage` migration, stored usage is 0. The quota check then only counts files downloaded since startup, so up to one plan's worth of files can download on top of what is already stored. The first measurement runs within 30 minutes; clicking "Measure now" closes the window immediately.
 - S3 credentials in URL username/password fields are not percent-decoded before being passed to MinIO. Use URL-safe credentials until this parser is fixed.
 
 ## Deployment and recovery

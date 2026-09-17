@@ -3,7 +3,7 @@ title: Upgrading
 description: Pull, build, restart; migrations run on their own at startup.
 sidebar:
   order: 6
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 To upgrade an instance, rebuild the server image and client files, then deploy them together. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
@@ -33,6 +33,8 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
 
 - The migration creates the `storage_usage` table with its single row. The first measurement runs at the next half hour; open the [dashboard](../administration/dashboard.md) and click "Measure now" to fill it right away.
 - Set `STORAGE_QUOTA` to the customer's plan, below the disk size, to enable the alerts and the pause of the cloud sync. See [Server configuration](../configuration/server-env.md).
+- Click "Measure now" on the dashboard as soon as the upgraded server is running with `STORAGE_QUOTA`. Until the first measurement the stored usage is 0, so up to one plan's worth of files can still download on top of what the buckets already hold.
+- Files stored before the upgrade stay. If they already exceed the plan, the dashboard shows more than 100 % and new downloads wait until space is freed or the plan is raised.
 - Add the `storage-alert` and `disk-alert` templates to `mailconfig.json` or to the `MAILCONFIG` variable; the samples are in `server/mailconfig.json`. Until they are added, the alerts are skipped, the worker logs `storage.alert-template-missing` or `storage.disk-alert-template-missing` every 30 minutes, and the alert is sent at the first measurement after the template is added and the server restarted.
 - Designate at least one admin for the `storage-alert` emails: tick "Receives storage and maintenance emails" on their profile in Users. Nobody receives them until then.
 - Set `SERVER_ALERT_EMAILS` to the hosting contact to receive disk alerts and see the server disk on the dashboard. Customer admins never see it.
