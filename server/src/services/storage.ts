@@ -121,10 +121,19 @@ export async function measureStorageUsage(): Promise<{ usedBytes: number, retrie
 	}
 
 	const quota = storageQuota()
+	let retriedAssets = 0
+	if (previous.quotaReachedAt && (quota === null || usedBytes < quota)) {
+		const [, resumed] = await dataSource.query(`UPDATE storage_usage SET quota_reached_at = NULL WHERE id = 1 AND quota_reached_at IS NOT NULL`)
+		if (resumed) {
+			retriedAssets = await retryPendingAssets()
+			logger.info('storage.quota-recovered', { usedBytes, quotaBytes: quota, retriedAssets })
+		}
+	}
+
 	if (quota === null) {
-		await repository.update({ id: 1 }, { alertLevel: 0, quotaReachedAt: null })
+		await repository.update({ id: 1 }, { alertLevel: 0 })
 		logger.info('storage.measured', { usedBytes, diskFreeBytes: disk.freeBytes, diskTotalBytes: disk.totalBytes })
-		return { usedBytes, retriedAssets: 0 }
+		return { usedBytes, retriedAssets }
 	}
 
 	const percent = usedBytes / quota * 100
@@ -144,14 +153,6 @@ export async function measureStorageUsage(): Promise<{ usedBytes: number, retrie
 		await repository.update({ id: 1 }, { alertLevel: level })
 	}
 
-	let retriedAssets = 0
-	if (previous.quotaReachedAt && usedBytes < Number(previous.usedBytes)) {
-		const [, resumed] = await dataSource.query(`UPDATE storage_usage SET quota_reached_at = NULL WHERE id = 1 AND quota_reached_at IS NOT NULL`)
-		if (resumed) {
-			retriedAssets = await retryPendingAssets()
-			logger.info('storage.quota-recovered', { usedBytes, quotaBytes: quota, retriedAssets })
-		}
-	}
 	logger.info('storage.measured', { usedBytes, quotaBytes: quota, percent: Math.round(percent), diskFreeBytes: disk.freeBytes, diskTotalBytes: disk.totalBytes })
 	return { usedBytes, retriedAssets }
 }
