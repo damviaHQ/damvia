@@ -15,7 +15,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -31,12 +30,8 @@ import { Bar, Line } from "vue-chartjs"
 
 Chart.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend)
 
-const brandProbe = document.createElement('span')
-brandProbe.className = 'text-brand'
-document.body.appendChild(brandProbe)
-const brandColor = getComputedStyle(brandProbe).color
-brandProbe.remove()
-const colors = [brandColor, '#f59e0b', '#10b981', '#8b5cf6', '#ef4444']
+const tokens = getComputedStyle(document.querySelector('.dv-theme') ?? document.documentElement)
+const colors = ['--dv-action-primary', '--dv-color-warning', '--dv-color-success', '--dv-color-danger'].map((token) => tokens.getPropertyValue(token).trim())
 
 const presets = [7, 30, 90, 365]
 const days = ref(30)
@@ -146,28 +141,22 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
 </script>
 
 <template>
-  <div class="flex flex-col p-8">
-    <div class="flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Insights</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+  <div class="admin-page">
+    <div class="admin-heading">
+      <div><h1>Insights</h1><p>Views, downloads, active users and searches over a period.</p></div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <Button v-for="preset in presets" :key="preset" size="sm" class="dv-button"
+                :class="{ 'dv-button--primary': !customFrom && !customTo && days === preset }"
+                :variant="!customFrom && !customTo && days === preset ? 'default' : 'outline'" @click="selectPreset(preset)">
+          {{ preset === 365 ? '12 months' : `${preset} days` }}
+        </Button>
+        <Input v-model="customFrom" type="date" class="w-40 ml-2" aria-label="From" />
+        <span class="text-sm text-neutral-500">to</span>
+        <Input v-model="customTo" type="date" class="w-40" aria-label="To" />
+      </div>
     </div>
 
-    <div class="flex items-center gap-2 flex-wrap mt-4">
-      <Button v-for="preset in presets" :key="preset" size="sm"
-              :variant="!customFrom && !customTo && days === preset ? 'default' : 'outline'" @click="selectPreset(preset)">
-        {{ preset === 365 ? '12 months' : `${preset} days` }}
-      </Button>
-      <Input v-model="customFrom" type="date" class="w-40 ml-4" aria-label="From" />
-      <span class="text-sm text-neutral-500">to</span>
-      <Input v-model="customTo" type="date" class="w-40" aria-label="To" />
-    </div>
-
-    <div class="flex flex-col gap-6 mt-6">
+    <div class="flex flex-col gap-6">
       <Loader v-if="overview.status.value === 'pending'" :text="true" />
       <Alert v-else-if="overview.status.value === 'error'" variant="destructive">
         <AlertTitle>Failed to load the insights</AlertTitle>
@@ -175,12 +164,12 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
       </Alert>
       <template v-else-if="overview.data.value">
         <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <section v-for="total in totals" :key="total.label" class="rounded-lg border p-4">
+          <section v-for="total in totals" :key="total.label" class="dv-panel p-4">
             <p class="text-sm text-neutral-500">{{ total.label }}</p>
             <p class="text-2xl font-bold mt-1">{{ total.value.toLocaleString() }}</p>
           </section>
         </div>
-        <section class="rounded-lg border p-6">
+        <section class="dv-panel p-6">
           <h2 class="text-lg font-semibold mb-4">Activity over time</h2>
           <div class="h-64"><Line :data="activityChart" :options="chartOptions" /></div>
         </section>
@@ -194,7 +183,7 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
       </Alert>
       <template v-else-if="assets.data.value">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">Most downloaded</h3>
               <Button variant="ghost" size="sm" @click="exportCsv('most-downloaded', assets.data.value.topDownloaded)"><Download class="w-4 h-4" /></Button>
@@ -218,7 +207,7 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
               </TableBody>
             </Table>
           </section>
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">Most viewed</h3>
               <Button variant="ghost" size="sm" @click="exportCsv('most-viewed', assets.data.value.topViewed)"><Download class="w-4 h-4" /></Button>
@@ -242,15 +231,15 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
               </TableBody>
             </Table>
           </section>
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <h3 class="text-lg font-semibold mb-4">By asset type</h3>
             <div class="h-64"><Bar :data="typeChart" :options="chartOptions" /></div>
           </section>
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <h3 class="text-lg font-semibold mb-4">Library growth</h3>
             <div class="h-64"><Line :data="growthChart" :options="chartOptions" /></div>
           </section>
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">By collection</h3>
               <Button variant="ghost" size="sm" @click="exportCsv('by-collection', assets.data.value.byCollection)"><Download class="w-4 h-4" /></Button>
@@ -272,7 +261,7 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
               </TableBody>
             </Table>
           </section>
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">Storage by asset type</h3>
               <Button variant="ghost" size="sm" @click="exportCsv('storage-by-type', assets.data.value.storageByType)"><Download class="w-4 h-4" /></Button>
@@ -295,7 +284,7 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
             </Table>
           </section>
         </div>
-        <section class="rounded-lg border p-6">
+        <section class="dv-panel p-6">
           <div class="flex items-center justify-between mb-1">
             <h3 class="text-lg font-semibold">Never downloaded</h3>
             <Button variant="ghost" size="sm" @click="exportCsv('never-downloaded', assets.data.value.neverDownloaded.files)"><Download class="w-4 h-4" /></Button>
@@ -330,16 +319,16 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
       </Alert>
       <template v-else-if="users.data.value">
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <h3 class="text-lg font-semibold mb-4">User activity</h3>
             <div class="h-64"><Line :data="usersChart" :options="chartOptions" /></div>
           </section>
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <h3 class="text-lg font-semibold mb-4">By role</h3>
             <div class="h-64"><Bar :data="roleChart" :options="chartOptions" /></div>
           </section>
         </div>
-        <section class="rounded-lg border p-6">
+        <section class="dv-panel p-6">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold">Top downloaders</h3>
             <Button variant="ghost" size="sm" @click="exportCsv('top-downloaders', users.data.value.topDownloaders)"><Download class="w-4 h-4" /></Button>
@@ -371,7 +360,7 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
         </section>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <section v-for="breakdown in [{ title: 'By region', name: 'by-region', rows: users.data.value.byRegion }, { title: 'By group', name: 'by-group', rows: users.data.value.byGroup }]"
-                   :key="breakdown.name" class="rounded-lg border p-6">
+                   :key="breakdown.name" class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">{{ breakdown.title }}</h3>
               <Button variant="ghost" size="sm" @click="exportCsv(breakdown.name, breakdown.rows)"><Download class="w-4 h-4" /></Button>
@@ -405,12 +394,12 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
         <AlertDescription>{{ searches.error.value?.message }}</AlertDescription>
       </Alert>
       <template v-else-if="searches.data.value">
-        <section class="rounded-lg border p-6">
+        <section class="dv-panel p-6">
           <h3 class="text-lg font-semibold mb-4">Search volume</h3>
           <div class="h-64"><Line :data="searchChart" :options="chartOptions" /></div>
         </section>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">Top search terms</h3>
               <Button variant="ghost" size="sm" @click="exportCsv('search-terms', searches.data.value.topTerms)"><Download class="w-4 h-4" /></Button>
@@ -432,7 +421,7 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
               </TableBody>
             </Table>
           </section>
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">Searches without result</h3>
               <Button variant="ghost" size="sm" @click="exportCsv('searches-without-result', searches.data.value.zeroResultTerms)"><Download class="w-4 h-4" /></Button>
@@ -462,12 +451,12 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
         <AlertDescription>{{ collections.error.value?.message }}</AlertDescription>
       </Alert>
       <template v-else-if="collections.data.value">
-        <section class="rounded-lg border p-6">
+        <section class="dv-panel p-6">
           <h3 class="text-lg font-semibold mb-4">Collections and invitations</h3>
           <div class="h-64"><Line :data="collectionsChart" :options="chartOptions" /></div>
         </section>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">Most shared</h3>
               <Button variant="ghost" size="sm" @click="exportCsv('most-shared', collections.data.value.mostShared)"><Download class="w-4 h-4" /></Button>
@@ -487,7 +476,7 @@ const exportCsv = (name: string, rows: Record<string, unknown>[]) => {
               </TableBody>
             </Table>
           </section>
-          <section class="rounded-lg border p-6">
+          <section class="dv-panel p-6">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold">Most active</h3>
               <Button variant="ghost" size="sm" @click="exportCsv('most-active-collections', collections.data.value.mostActive)"><Download class="w-4 h-4" /></Button>
