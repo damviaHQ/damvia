@@ -294,6 +294,17 @@ export default router({
 			const perPage = 300
 			const [results, total] = await query.skip(Math.max((input.page - 1) * perPage, 0)).take(perPage).getManyAndCount()
 			const totalPages = Math.ceil(total / perPage)
+			const searchTerm = input.query?.trim().toLowerCase()
+			if (searchTerm && input.page === 1) {
+				await dataSource.query(`
+					INSERT INTO activity_events (user_id, type, collection_id, metadata)
+					SELECT $1, 'search', $2, $3::jsonb
+					WHERE NOT EXISTS (
+						SELECT 1 FROM activity_events
+						WHERE user_id = $1 AND type = 'search' AND metadata ->> 'query' = $4 AND created_at > now() - interval '1 minute'
+					)
+				`, [ctx.user.id, ['current', 'current_with_sub'].includes(input.searchScope) ? input.collectionId : null, JSON.stringify({ query: searchTerm, total }), searchTerm])
+			}
 			const productAttributes = await dataSource.getRepository(ProductAttribute).find()
 
 			return {

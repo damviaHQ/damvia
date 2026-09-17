@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { userCollectionFilesQuery } from '../../services/collection'
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
+import { ActivityEvent, ActivityEventType } from "../../entity/activity-event"
 import { ProductAttribute } from "../../entity/product-attribute"
 import { UserFavorite } from "../../entity/user-favorite"
 import { dataSource } from "../../env"
@@ -48,6 +49,7 @@ export default router({
 			favorite.user = ctx.user
 			favorite.collectionFile = collectionFile
 			await dataSource.getRepository(UserFavorite).save(favorite)
+			await dataSource.getRepository(ActivityEvent).insert({ userId: ctx.user.id, type: ActivityEventType.FAVORITE, assetFileId: collectionFile.assetFileId, collectionId: collectionFile.collectionId })
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userApproved, userMember))

@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Region } from "../../entity/region"
 import { dataSource, passwordLessAuth } from "../../env"
 import { publicProcedure, router } from "../index"
+import analyticsRouter from "./analytics"
 import assetRouter from "./asset"
 import assetTypeRouter from "./asset-type"
 import authorizedDomainRouter from "./authorized-domain"
@@ -34,6 +35,7 @@ import userRouter from "./user"
 
 const appRouter = router({
 	user: userRouter,
+	analytics: analyticsRouter,
 	group: groupRouter,
 	authorizedDomain: authorizedDomainRouter,
 	region: regionRouter,

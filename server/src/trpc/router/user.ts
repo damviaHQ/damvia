@@ -16,6 +16,7 @@ import { TRPCError } from "@trpc/server"
 import { hashPassword, verifyPassword, hashResetToken } from '../../services/credentials'
 import { randomBytes } from "node:crypto"
 import { z } from 'zod'
+import { ActivityEvent, ActivityEventType } from "../../entity/activity-event"
 import { User, UserRole } from "../../entity/user"
 import { dataSource, passwordLessAuth } from "../../env"
 import { createUser, generateAuthToken, removeUser } from "../../services/user"
@@ -57,6 +58,7 @@ export function formatPublicUserForAdmin(user: User, viewer: User) {
 		maintenanceContact: viewer.role === UserRole.ADMIN ? user.maintenanceContact : undefined,
 		createdAt: user.createdAt,
 		updatedAt: user.updatedAt,
+		lastLoginAt: user.lastLoginAt,
 		groups: user.userGroups.map((userGroup) => ({
 			id: userGroup.group.id,
 			name: userGroup.group.name,
@@ -165,6 +167,13 @@ export default router({
 	me: publicProcedure
 		.use(authMiddleware())
 		.query(async ({ ctx }) => {
+			const [, loggedIn] = await dataSource.query(`
+				UPDATE users SET last_login_at = now()
+				WHERE id = $1 AND (last_login_at IS NULL OR last_login_at < now() - interval '30 minutes')
+			`, [ctx.user.id])
+			if (loggedIn) {
+				await dataSource.getRepository(ActivityEvent).insert({ userId: ctx.user.id, type: ActivityEventType.LOGIN })
+			}
 			return {
 				id: ctx.user.id,
 				name: ctx.user.name,

@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
 import { Brackets } from "typeorm"
 import { z } from "zod"
+import { ActivityEvent, ActivityEventType } from "../../../entity/activity-event"
 import { CollectionInvitation } from "../../../entity/collection-invitation"
 import { User, UserRole } from "../../../entity/user"
 import { dataSource } from "../../../env"
@@ -65,6 +66,7 @@ export default router({
 					invitation.user = await createGuestUser({ em, email: input.email, regionId: ctx.user.regionId })
 				}
 				await em.save(invitation)
+				await em.getRepository(ActivityEvent).insert({ userId: ctx.user.id, type: ActivityEventType.COLLECTION_SHARE, collectionId: collection.id, metadata: { invitationId: invitation.id } })
 				if (input.sendEmail) {
 					await mailerInvitationQueue.push({ invitationId: invitation.id })
 				}

@@ -106,7 +106,8 @@ before(async () => {
     await worker.startQueues({ enableWorker: true })
     // Apply the upgrade to old rows, not just an empty schema.
     const applied = await db.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1')
-    assert.equal(applied[0]?.name, 'TrackInvitationCreator1789862400000', 'Review the fixture upgrade setup when adding migrations')
+    assert.equal(applied[0]?.name, 'ActivityEvents1789948800000', 'Review the fixture upgrade setup when adding migrations')
+    await db.undoLastMigration() // activity events
     await db.undoLastMigration() // invitation creator
     await db.undoLastMigration() // host-controlled branding
     await db.undoLastMigration() // admin branding
@@ -608,6 +609,60 @@ test('the dashboard and its actions are admin only and expose numbers, not strin
     assert.equal(response.statusCode, 401)
     const publicEnv = await caller(null).env()
     assert(!('storage' in publicEnv))
+})
+
+test('insights are admin only; each action is recorded once and survives the removal of its user', async () => {
+    const { ActivityEvent } = require('../dist/entity/activity-event')
+    const { pruneActivityEvents } = require('../dist/services/analytics')
+    const range = { from: new Date(Date.now() - 86400000), to: new Date(Date.now() + 86400000) }
+    for (const user of [null, guest, member, manager, { ...admin, approved: false }]) {
+        for (const section of ['overview', 'assets', 'users', 'searches', 'collections']) await forbidden(caller(user).analytics[section](range))
+    }
+    const { user, license, file } = await exportFixture()
+    const events = type => db.getRepository(ActivityEvent).countBy({ userId: user.id, type })
+    await caller(user).user.me()
+    await caller(user).user.me()
+    assert.equal(await events('login'), 1)
+    assert.notEqual((await db.getRepository(User).findOneByOrFail({ id: user.id })).lastLoginAt, null)
+    await forbidden(caller(null).analytics.trackView({ collectionFileId: file.id }))
+    await caller(user).analytics.trackView({ collectionFileId: file.id })
+    await caller(user).collection.search({ query: ' Fixture ' })
+    await caller(user).collection.search({ query: 'fixture', attributes: {} })
+    await caller(user).collection.search({ query: 'fixture', page: 2 })
+    await caller(user).collection.search({ query: 'no-such-file' })
+    await caller(user).download.create({ ...downloadOptions, downloadType: 'direct', collectionFileIds: [file.id] })
+    await caller(user).favorite.add({ collectionFileId: file.id })
+    await caller(admin).collection.invitation.create({ collectionId: file.collectionId, email: user.email, expiresAt: '2099-01-01' })
+    assert.deepEqual(await Promise.all(['asset_view', 'search', 'asset_download', 'favorite'].map(events)), [1, 2, 1, 1])
+    await db.getRepository(License).update(license.id, { usageTo: '2000-01-01' })
+    await assert.rejects(caller(user).analytics.trackView({ collectionFileId: file.id }), e => e.code === 'NOT_FOUND')
+    await assert.rejects(caller(user).download.create({ ...downloadOptions, downloadType: 'direct', collectionFileIds: [file.id] }), /no longer available/)
+    assert.equal(await events('asset_download'), 1)
+    const overview = await caller(admin).analytics.overview(range)
+    assert.equal(typeof overview.totals.downloads, 'number')
+    assert(overview.totals.views >= 1 && overview.totals.downloadRequests >= 1 && overview.totals.shares >= 1 && overview.totals.activeUsers >= 1)
+    assert(overview.series.some(day => day.downloads >= 1 && day.activeUsers >= 1))
+    const assets = await caller(admin).analytics.assets(range)
+    assert.deepEqual(assets.topDownloaded.find(row => row.id === file.assetFileId), { id: file.assetFileId, name: 'fixture.png', mimeType: 'image/png', assetType: null, downloads: 1, views: 1 })
+    assert(!assets.neverDownloaded.files.some(row => row.id === file.assetFileId))
+    assert.equal(typeof assets.storageByType[0].bytes, 'number')
+    const people = await caller(admin).analytics.users(range)
+    assert.equal(people.topDownloaders.find(row => row.id === user.id).downloads, 1)
+    assert(people.byRole.some(row => row.name === 'member' && row.activeUsers >= 1))
+    const searches = await caller(admin).analytics.searches(range)
+    assert.equal(searches.topTerms.find(row => row.term === 'fixture').searches, 1)
+    assert.deepEqual(searches.zeroResultTerms.find(row => row.term === 'no-such-file'), { term: 'no-such-file', searches: 1 })
+    const shared = await caller(admin).analytics.collections(range)
+    assert.equal(shared.mostShared.find(row => row.id === file.collectionId).shares, 1)
+    assert((await caller(admin).user.list()).some(row => row.id === user.id && row.lastLoginAt))
+    const recorded = await db.getRepository(ActivityEvent).countBy({ userId: user.id })
+    await users.removeUser(await db.getRepository(User).findOneByOrFail({ id: user.id }))
+    assert.equal(await db.getRepository(ActivityEvent).countBy({ userId: user.id }), 0)
+    assert((await caller(admin).analytics.overview(range)).totals.downloads >= 1)
+    await db.query(`UPDATE activity_events SET created_at = now() - interval '400 days' WHERE type = 'favorite'`)
+    assert(await pruneActivityEvents() >= 1)
+    assert.equal(await db.getRepository(ActivityEvent).countBy({ type: 'favorite' }), 0)
+    assert(await db.getRepository(ActivityEvent).count() >= recorded - 1)
 })
 
 test('the integrity check removes only old orphan objects and archives of finished downloads', async () => {

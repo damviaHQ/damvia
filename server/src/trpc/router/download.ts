@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
 import { In, MoreThanOrEqual } from "typeorm"
 import { z } from "zod"
+import { ActivityEvent, ActivityEventType } from "../../entity/activity-event"
 import {
 	Download,
 	DownloadImageFormat,
@@ -106,11 +107,17 @@ export default router({
 			download.videoResolution = input.videoResolution
 			download.expiresAt = new Date(Date.now() + (1000 * 60 * 60 * 24 * 7))
 			await dataSource.transaction(async (em) => {
+				await em.getRepository(Download).save(download)
+				await em.getRepository(ActivityEvent).insert(collectionFiles.map((file) => ({
+					userId: ctx.user.id,
+					type: ActivityEventType.ASSET_DOWNLOAD,
+					assetFileId: file.assetFileId,
+					collectionId: file.collectionId,
+					metadata: { downloadId: download.id, downloadType: download.type },
+				})))
 				if (download.type === DownloadType.DIRECT) {
-					await em.getRepository(Download).save(download)
 					return createDownloadArchive({ em, download })
 				}
-				await em.getRepository(Download).save(download)
 				return downloadCreateArchiveQueue.push({ downloadId: download.id })
 			})
 			return formatDownload(download)
