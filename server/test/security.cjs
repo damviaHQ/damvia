@@ -106,7 +106,8 @@ before(async () => {
     await worker.startWorker()
     // Apply the upgrade to old rows, not just an empty schema.
     const applied = await db.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1')
-    assert.equal(applied[0]?.name, 'HostControlledBranding1789776000000', 'Review the fixture upgrade setup when adding migrations')
+    assert.equal(applied[0]?.name, 'TrackInvitationCreator1789862400000', 'Review the fixture upgrade setup when adding migrations')
+    await db.undoLastMigration() // invitation creator
     await db.undoLastMigration() // host-controlled branding
     await db.undoLastMigration() // admin branding
     await db.undoLastMigration() // storage usage

@@ -45,6 +45,12 @@ export class CollectionInvitation {
 	@ManyToOne(() => User, (user) => user.invitations, { onDelete: 'CASCADE' })
 	user: User
 
+	@Column({ nullable: true })
+	invitedById: string | null
+
+	@ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+	invitedBy: User | null
+
 	@Column({ type: 'date' })
 	expiresAt: Date
 

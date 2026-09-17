@@ -70,6 +70,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1789603200000-storage-usage` | `storage_usage` table: measured and reserved bytes, plan and disk alert levels, sync pause and orphan cleanup timestamps; `maintenance_contact` flag on `users` |
 | `1789689600000-admin-branding` | `admin_branding` single-row table choosing the logo of the admin area |
 | `1789776000000-host-controlled-branding` | Drops `admin_branding`: the host decides with `ADMIN_CLIENT_LOGO` instead |
+| `1789862400000-track-invitation-creator` | `invited_by_id` on `collection_invitations`, filled with the collection owner for existing invitations |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.
 

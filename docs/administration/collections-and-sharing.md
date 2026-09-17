@@ -3,7 +3,7 @@ title: Collections and sharing
 description: How collections are built, synchronized with folders, kept up to date by triggers, and shared with guests.
 sidebar:
   order: 8
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 A collection is the unit users browse: a named node in a tree that holds files and child collections. Public collections make up the catalogue and are managed by admins; private collections belong to one user. Either kind can be synchronized with a folder of the assets tree, or assembled by hand.
@@ -80,7 +80,7 @@ The sharing dialog (`CollectionDialogShare.vue`) is available to the collection 
 - `Send Invite` creates the invitation with `sendEmail: true`. A job on `mailer/invitation` sends a link to `/collections/{id}?dam_token=<jwt>`; the client stores that token in the `dam_token` cookie, so the guest is logged in on arrival.
 - `Copy Link` creates the invitation silently and copies a URL carrying `auth_params` (base64 of the email, `magicLink: true` and the collection). Opening it pre-fills the login form and sends a login email.
 
-On the server, `collection.invitation.create` looks up a user with that email. If none exists, `createGuestUser` creates one with `name` and `company` set to `NA`, role `guest`, `approved` and `emailVerified` true, the inviter's region and no group memberships. The invitation stores `collection_id`, `email`, `user_id` and `expires_at`.
+On the server, `collection.invitation.create` looks up a user with that email. If none exists, `createGuestUser` creates one with `name` and `company` set to `NA`, role `guest`, `approved` and `emailVerified` true, the inviter's region and no group memberships. The invitation stores `collection_id`, `email`, `user_id`, `invited_by_id` and `expires_at`. The creator is retained for the admin activity feed; deleting that account sets `invited_by_id` to null without revoking the guest's invitation.
 
 For revocation, `collection.invitation.remove` deletes the row. `collection.invitation.getUserInvitations` feeds the member links dialog with invitations on the caller's collections (and, for admins, on all public ones). Deleting a user deletes the invitations sent to their email.
 
@@ -101,3 +101,9 @@ Every non-admin user must also meet the licence’s region and date conditions, 
 ## Operational limits
 
 New children and copies inherit their destination parent’s group restrictions. See [Groups and regions](./groups-and-regions.md). Preview triggers do not cover `collection_files` deletions; the integrity check repairs stale mosaics. Invitation expiry is the start of the selected date in PostgreSQL's session timezone; it does not include the entire day. Already issued storage URLs are independent of invitation revocation.
+
+## Admin interface
+
+The Collections screen uses the shared admin controls and a full-width tree with square row backgrounds. An empty library offers an explicit empty state. Editing refreshes the same collection tree query used by this screen.
+
+Collection creation uses keyboard-operable buttons for Custom and Synchronized choices. The collection editor groups its heading, wraps thumbnail controls on small screens and uses the shared action footer.

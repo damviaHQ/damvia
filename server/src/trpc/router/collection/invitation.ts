@@ -29,7 +29,7 @@ export function formatInvitation(invitation: CollectionInvitation) {
 		collectionId: invitation.collectionId,
 		email: invitation.email,
 		expiresAt: invitation.expiresAt,
-		createdAt: invitation.expiresAt,
+		createdAt: invitation.createdAt,
 	}
 }
 
@@ -56,6 +56,7 @@ export default router({
 
 			const invitation = new CollectionInvitation()
 			invitation.collection = collection
+			invitation.invitedBy = ctx.user
 			invitation.email = input.email
 			invitation.expiresAt = new Date(input.expiresAt)
 			invitation.user = await dataSource.getRepository(User).findOneBy({ email: input.email })
