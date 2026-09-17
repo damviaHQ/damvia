@@ -588,6 +588,13 @@ test('the dashboard and its actions are admin only and expose numbers, not strin
     assert.deepEqual(summary.storage.serverContactEmails, [])
     assert.equal(summary.storage.percent, null)
     assert.equal(typeof summary.assets.byStatus.up_to_date, 'number')
+    assert.equal(summary.collections.total, await db.getRepository(Collection).count())
+    assert.equal(summary.folders.total, await db.getRepository(AssetFolder).count())
+    assert(summary.recentFiles.length <= 3)
+    for (const [index, file] of summary.recentFiles.entries()) {
+        assert.deepEqual(Object.keys(file).sort(), ['folderId', 'id', 'name', 'size', 'status', 'updatedAt'])
+        if (index) assert(summary.recentFiles[index - 1].updatedAt >= file.updatedAt)
+    }
     assert.equal(typeof summary.users.total, 'number')
     assert.equal(typeof summary.users.maintenanceContacts, 'number')
     assert.equal(typeof summary.users.byRole.admin, 'number')

@@ -13,6 +13,9 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
+import { AssetFolder } from "../../entity/asset-folder"
+import { Collection } from "../../entity/collection"
+import { CollectionInvitation } from "../../entity/collection-invitation"
 import { AssetFile } from "../../entity/asset-file"
 import { Download } from "../../entity/download"
 import { User, UserRole } from "../../entity/user"
@@ -25,7 +28,7 @@ export default router({
 	summary: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.query(async ({ ctx }) => {
-			const [storage, assetRows, userRows, pendingApproval, maintenanceContacts, downloadRows, jobRows] = await Promise.all([
+			const [storage, assetRows, userRows, pendingApproval, maintenanceContacts, downloadRows, jobRows, collectionCount, folderCount, recentFiles, recentUsers, recentInvitations, recentDownloads] = await Promise.all([
 				getStorageStatus(ctx.user.email),
 				dataSource.getRepository(AssetFile).createQueryBuilder('asset_file')
 					.select('asset_file.status', 'status').addSelect('COUNT(*)', 'count')
@@ -47,10 +50,58 @@ export default router({
 					WHERE name IN ('storage/measure-usage', 'asset/update-content') AND state IN ('created', 'retry', 'active')
 					GROUP BY name
 				`) as Promise<{ name: string, count: string }[]>,
+                dataSource.getRepository(Collection).count(),
+                dataSource.getRepository(AssetFolder).count(),
+                dataSource.getRepository(AssetFile).find({
+                    select: { id: true, name: true, folderId: true, size: true, updatedAt: true, status: true },
+                    order: { updatedAt: 'DESC', id: 'ASC' }, take: 3,
+                }),
+				dataSource.getRepository(User).find({
+					select: { id: true, name: true, email: true, company: true, role: true, emailVerified: true, approved: true, createdAt: true, updatedAt: true },
+					order: { updatedAt: 'DESC', id: 'ASC' }, take: 3,
+				}),
+				dataSource.getRepository(CollectionInvitation).find({
+					relations: { collection: true, invitedBy: true },
+					order: { createdAt: 'DESC', id: 'ASC' }, take: 3,
+				}),
+				dataSource.getRepository(Download).find({
+					relations: { user: true },
+					order: { createdAt: 'DESC', id: 'ASC' }, take: 3,
+				}),
 			])
 			const byRole = Object.fromEntries(userRows.map((row) => [row.role, Number(row.count)]))
 			return {
 				storage,
+                collections: { total: collectionCount },
+                folders: { total: folderCount },
+                recentFiles,
+					recentUsers: recentUsers.map((user) => ({
+					id: user.id,
+					name: user.name,
+					email: user.email,
+					company: user.company,
+					role: user.role,
+					emailVerified: user.emailVerified,
+					approved: user.approved,
+					createdAt: user.createdAt,
+					updatedAt: user.updatedAt,
+				})),
+				recentInvitations: recentInvitations.map((invitation) => ({
+					id: invitation.id,
+					email: invitation.email,
+					createdAt: invitation.createdAt,
+					expiresAt: invitation.expiresAt,
+					collection: { id: invitation.collection.id, name: invitation.collection.name },
+					invitedBy: invitation.invitedBy ? { id: invitation.invitedBy.id, name: invitation.invitedBy.name } : null,
+				})),
+				recentDownloads: recentDownloads.map((download) => ({
+					id: download.id,
+					status: download.status,
+					fileCount: download.collectionFileIds.length,
+					createdAt: download.createdAt,
+					updatedAt: download.updatedAt,
+					user: { id: download.user.id, name: download.user.name },
+				})),
 				assets: { byStatus: Object.fromEntries(assetRows.map((row) => [row.status, Number(row.count)])) },
 				users: {
 					total: userRows.reduce((total, row) => total + Number(row.count), 0),

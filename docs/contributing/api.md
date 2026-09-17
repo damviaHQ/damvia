@@ -169,6 +169,11 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `page.remove` | mutation | `userApproved` | Deletes a page the caller can edit |
 | `page.addBlock`, `removeBlock`, `updateLayout`, `updateBlockData` | mutation | `userApproved` | Block editing, checked with `page.canEdit(user)` |
 | `page.presignedUploadUrl` | query | `userApproved` | Presigned PUT (24 h) for a block's `data.s3key` in the main bucket |
+| `settings.getAdminBranding` | query | `userManagerOrAdmin` | Read-only host policy `{ useClientLogo }` |
+| `settings.getClientLogo` | query | public | Presigned URL of processed client logo, or `{ exists: false, imageUrl: null }` |
+| `settings.getClientLogoUpload` | mutation | `userAdmin` | Ten-minute presigned POST with scoped key, SVG/PNG/WebP MIME type and 5 MB limit |
+| `settings.processClientLogo` | mutation | `userAdmin` | Validates/processes caller-owned staged `uploadId` and replaces the permanent WebP logo |
+| `settings.removeClientLogo` | mutation | `userAdmin` | Removes the uploaded client logo; layouts fall back to Damvia |
 | `settings.getAuthBackgroundImage` | query | public | Presigned URL of `settings/auth-background.webp`, if present |
 | `settings.getAuthBackgroundUploadUrl` | query | `userAdmin` | Presigned PUT for the temporary background |
 | `settings.processAuthBackgroundImage` | mutation | `userAdmin` | Converts the temporary upload to WebP (quality 80) at `settings/auth-background.webp` |
@@ -176,9 +181,11 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 
 ### `dashboard`
 
+`summary` also returns total collections and folders, the three most recently updated asset files, the three most recently changed users, the three newest guest invitations with their creator and collection, and the three newest download requests with their requester. All remain admin-only.
+
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `summary` | query | `userAdmin` | `storage` (used and quota bytes, percent, `measuredAt`, `alertLevel`, `quotaReachedAt`, `serverContactEmails` (the `SERVER_ALERT_EMAILS` list, shown as the contact to raise the plan), and `disk` only when the caller's email is in `SERVER_ALERT_EMAILS`, else `null`: total and free bytes, `blockedFiles`, orphan figures), asset files by status, users (total, `pendingApproval`, `maintenanceContacts`, by role), `jobs` (`measuring`, `downloading` count, read from `pgboss.job`), downloads of the last 7 days by status |
+| `summary` | query | `userAdmin` | `storage` (used and quota bytes, percent, `measuredAt`, `alertLevel`, `quotaReachedAt`, `serverContactEmails` (the `SERVER_ALERT_EMAILS` list, shown as the contact to raise the plan), and `disk` only when the caller's email is in `SERVER_ALERT_EMAILS`, else `null`: total and free bytes, `blockedFiles`, orphan figures), asset files by status, users (total, `pendingApproval`, `maintenanceContacts`, by role), `recentUsers`, `recentInvitations`, `recentFiles`, `recentDownloads`, `jobs` (`measuring`, `downloading` count, read from `pgboss.job`), downloads of the last 7 days by status |
 | `retryPendingAssets` | mutation | `userAdmin` | Queues `asset/update-content` for every `creating` or `outdated` file; returns `{ queued }`. `BAD_REQUEST` while an `asset/update-content` job is `created`, `retry` or `active` in `pgboss.job`; an advisory lock serialises concurrent calls |
 | `measureStorage` | mutation | `userAdmin` | Pushes one `storage/measure-usage` job. `BAD_REQUEST` while one is `created`, `retry` or `active`; an advisory lock serialises concurrent calls |
 
