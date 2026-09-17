@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { DialogClose } from "@/components/ui/dialog"
+import AdminList from "@/components/admin/AdminList.vue"
 import Loader from "@/components/Loader.vue"
 import {
   AlertDialog,
@@ -25,12 +27,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -80,10 +76,10 @@ function openEditModal(page: Page) {
   modalState.value = "editing"
 }
 
-async function onModalSubmit(event: Event) {
+async function submitChanges(event: Event) {
   event.preventDefault();
 
-  ((modalState.value === "creating" ? trpc.page.create : trpc.page.update) as any)
+  return ((modalState.value === "creating" ? trpc.page.create : trpc.page.update) as any)
     .mutate(form.value)
     .then(() => queryClient.invalidateQueries({ queryKey: ["pages"] }))
     .then(() => {
@@ -98,30 +94,32 @@ async function remove(pageId: string) {
   await queryClient.invalidateQueries({ queryKey: ["pages"] })
   toast.success("Page removed!")
 }
+const saving = ref(false)
+async function onModalSubmit(event: Event) {
+  event.preventDefault()
+  if (saving.value) return
+  saving.value = true
+  try { await submitChanges(event) } finally { saving.value = false }
+}
 </script>
 
 <template>
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="flex flex-col p-8">
-    <div class="pages__top flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage> Pages </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Button type="button" variant="link" @click="openCreateModal"
-        class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
+    <div class="admin-heading">
+      <div><h1>Pages</h1><p>Create and edit pages for your asset library.</p></div>
+      <Button type="button" variant="default" @click="openCreateModal"
+        class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
-        Add new page
+        Add page
       </Button>
     </div>
+    <AdminList :items="data" :fields="['name']" label="Pages" v-slot="{ items }">
     <Table>
       <TableHeader>
         <TableRow>
@@ -130,7 +128,7 @@ async function remove(pageId: string) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="page in data" :key="page.id">
+        <TableRow v-for="page in items" :key="page.id">
           <TableCell>{{ page.name }}</TableCell>
           <TableCell>
             <div class="flex space-x-2">
@@ -145,7 +143,7 @@ async function remove(pageId: string) {
                 Rename
               </Button>
               <AlertDialog>
-                <AlertDialogTrigger>
+                <AlertDialogTrigger as-child>
                   <Button variant="ghost" size="sm">
                     <Trash2 class="w-4 h-4 mr-2" />
                     Remove
@@ -172,11 +170,12 @@ async function remove(pageId: string) {
         </TableRow>
       </TableBody>
     </Table>
+    </AdminList>
   </div>
 
-  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && (modalState = 'closed')">
-    <DialogContent class="sm:max-w-[425px]">
-      <form @submit="onModalSubmit">
+  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && !saving && (modalState = 'closed')">
+    <DialogContent class="admin-dialog--compact">
+      <form :aria-busy="saving" @submit="onModalSubmit">
         <DialogHeader>
           <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} page</DialogTitle>
           <DialogDescription>
@@ -190,9 +189,9 @@ async function remove(pageId: string) {
             <Input id="name" v-model="form.name" placeholder="Page name" />
           </div>
         </div>
-        <DialogFooter class="sm:justify-between items-center">
-          <div class="text-sm text-gray-500">* Required</div>
-          <Button type="submit" :disabled="!form.name">
+        <DialogFooter class="items-center">
+          <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
+          <Button type="submit" :disabled="saving || (!form.name)">
             {{ modalState === "creating" ? "Create" : "Edit" }}
           </Button>
         </DialogFooter>

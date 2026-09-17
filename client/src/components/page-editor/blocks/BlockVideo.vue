@@ -93,8 +93,8 @@ function updateExternalUrl() {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed #929292;
-  color: #929292;
+  border: 1px dashed var(--dv-color-line, #929292);
+  color: var(--dv-text-secondary, #929292);
   height: 60px;
   width: 100%;
 }

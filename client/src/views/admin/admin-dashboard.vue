@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
+import { ArrowRight, ArrowUpRight, Users, FolderOpen, Layers, Cloud, HardDrive, RefreshCw, ArrowDownToLine, Bell, AlertCircle, Check, FileArchive, UserCheck, UserPlus, MailPlus } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
@@ -29,9 +29,14 @@ const queryClient = useQueryClient()
 const { status, data, error, refetch } = useQuery({
   queryKey: ['dashboard'],
   queryFn: () => trpc.dashboard.summary.query(),
+  refetchInterval: 30_000,
 })
+const assetTotal = computed(() => Object.values(data.value?.assets.byStatus ?? {}).reduce((sum, count) => sum + count, 0))
+const downloadTotal = computed(() => Object.values(data.value?.downloads.last7DaysByStatus ?? {}).reduce((sum, count) => sum + count, 0))
+const number = (value: number) => value.toLocaleString()
 const isWorking = ref(false)
 const isMeasuring = ref(false)
+const busyUserId = ref<string | null>(null)
 
 const storage = computed(() => data.value?.storage)
 const percent = computed(() => storage.value?.percent == null ? null : Math.round(storage.value.percent))
@@ -47,6 +52,8 @@ const diskPercent = computed(() => disk.value ? Math.round((disk.value.totalByte
 const diskBarColor = computed(() => diskPercent.value >= 90 ? 'bg-red-500' : diskPercent.value >= 80 ? 'bg-amber-500' : 'bg-brand')
 const formatDate = (value: string | Date | null | undefined) =>
   value ? new Date(value).toLocaleString() : 'never'
+const initials = (name: string) => name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()
+const downloadStatusLabels: Record<string, string> = { ready: 'Ready', preparing: 'Preparing', failed: 'Failed', expired: 'Expired' }
 
 const assetStatuses = [
   { key: 'up_to_date', label: 'Up to date' },
@@ -54,18 +61,22 @@ const assetStatuses = [
   { key: 'outdated', label: 'Outdated' },
   { key: 'pending_deletion', label: 'Pending deletion' },
 ]
-const downloadStatuses = [
-  { key: 'ready', label: 'Ready' },
-  { key: 'preparing', label: 'Preparing' },
-  { key: 'failed', label: 'Failed' },
-  { key: 'expired', label: 'Expired' },
-]
-const roles = [
-  { key: 'admin', label: 'Admins' },
-  { key: 'manager', label: 'Managers' },
-  { key: 'member', label: 'Members' },
-  { key: 'guest', label: 'Guests' },
-]
+const pendingFiles = computed(() => (data.value?.assets.byStatus.creating ?? 0) + (data.value?.assets.byStatus.outdated ?? 0))
+const canRetryFiles = computed(() => pendingFiles.value > 0 && !storage.value?.quotaReachedAt && data.value?.jobs.downloading === 0)
+const failedExports = computed(() => data.value?.downloads.last7DaysByStatus.failed ?? 0)
+const missingAlertContact = computed(() => !!storage.value?.quotaBytes && data.value?.users.maintenanceContacts === 0)
+const attentionCount = computed(() => [!!data.value?.users.pendingApproval, canRetryFiles.value, failedExports.value > 0, missingAlertContact.value].filter(Boolean).length)
+const latestUserActivity = computed(() => {
+  if (!data.value) return []
+  const invitedEmails = new Set(data.value.recentInvitations.map((invitation) => invitation.email.toLocaleLowerCase()))
+  return [
+    ...data.value.recentUsers
+      .filter((user) => !invitedEmails.has(user.email.toLocaleLowerCase()))
+      .map((user) => ({ kind: 'user' as const, occurredAt: user.approved ? user.updatedAt : user.createdAt, user })),
+    ...data.value.recentInvitations
+      .map((invitation) => ({ kind: 'invitation' as const, occurredAt: invitation.createdAt, invitation })),
+  ].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()).slice(0, 3)
+})
 
 const measureStorage = async () => {
   isWorking.value = true
@@ -104,107 +115,95 @@ const retryPendingAssets = async () => {
     isWorking.value = false
   }
 }
+
+const approveUser = async (user: { id: string, name: string }) => {
+  if (busyUserId.value) return
+  busyUserId.value = user.id
+  try {
+    await trpc.user.approve.mutate(user.id)
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      queryClient.invalidateQueries({ queryKey: ['users'] }),
+    ])
+    toast.success(`${user.name} approved`)
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
+  } finally {
+    busyUserId.value = null
+  }
+}
 </script>
 
 <template>
-  <div class="flex flex-col p-8">
-    <div class="flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Dashboard</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-    </div>
-
-    <Loader v-if="status === 'pending'" :text="true" />
-    <Alert v-else-if="status === 'error'" variant="destructive">
-      <AlertTitle>Failed to load the dashboard</AlertTitle>
-      <AlertDescription>{{ error?.message }}</AlertDescription>
-    </Alert>
-
-    <div v-else-if="data && storage" class="flex flex-col gap-6 mt-4">
-      <Alert v-if="percent !== null && percent >= 80" :variant="percent >= 90 ? 'destructive' : 'default'">
-        <AlertTitle>
-          <template v-if="percent >= 100">Storage plan is full</template>
-          <template v-else-if="percent >= 90">Storage plan almost full</template>
-          <template v-else>Storage plan is filling up</template>
-        </AlertTitle>
-        <AlertDescription>
-          {{ formatStorage(storage.usedBytes) }} of {{ formatStorage(storage.quotaBytes ?? 0) }} is used ({{ percent }}%).
-          <template v-if="storage.quotaReachedAt">
-            New files from the cloud storage are not downloaded until space is freed or the plan is raised.
-          </template>
-          <template v-else>
-            Remove unused folders from the cloud storage or raise the plan before the synchronisation pauses.
-          </template>
-          <template v-if="storage.serverContactEmails.length">
-            Please contact
-            <a :href="`mailto:${storage.serverContactEmails.join(',')}`" class="underline">{{ storage.serverContactEmails.join(', ') }}</a>.
-          </template>
-        </AlertDescription>
-      </Alert>
-
-      <Alert v-if="storage.quotaBytes && data.users.maintenanceContacts === 0">
-        <AlertTitle>Nobody receives the storage alerts</AlertTitle>
-        <AlertDescription>
-          Open an admin's profile in <router-link :to="{ name: 'admin-users' }" class="underline">Users</router-link>
-          and tick "Receives storage and maintenance emails".
-        </AlertDescription>
-      </Alert>
-
-      <section class="rounded-lg border p-6">
-        <div class="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h2 class="text-lg font-semibold">Storage</h2>
-            <p class="text-3xl font-bold mt-2">
-              {{ formatStorage(storage.usedBytes) }}
-              <span v-if="storage.quotaBytes" class="text-neutral-400 font-normal text-xl">
-                / {{ formatStorage(storage.quotaBytes) }}
-              </span>
-            </p>
-          </div>
-          <div class="flex gap-2">
-            <Button variant="outline" :disabled="isWorking || data.jobs.measuring" @click="measureStorage">
-              {{ isMeasuring ? 'Measuring…' : 'Measure now' }}
-            </Button>
-            <Button variant="outline" :disabled="isWorking || data.jobs.downloading > 0" @click="retryPendingAssets">
-              {{ data.jobs.downloading > 0 ? `Downloading ${data.jobs.downloading} file${data.jobs.downloading === 1 ? '' : 's'}…` : 'Retry pending files' }}
-            </Button>
-          </div>
-        </div>
-
-        <div v-if="storage.quotaBytes" class="mt-4">
-          <div class="h-2 rounded-full bg-neutral-200 overflow-hidden">
-            <div class="h-2 rounded-full transition-all" :class="barColor" :style="{ width: barWidth }"></div>
-          </div>
-          <p class="text-sm text-neutral-500 mt-2">{{ percent }}% of the plan is used</p>
-        </div>
-        <p v-else class="text-sm text-neutral-500 mt-4">
-          No storage plan is configured. Set <code>STORAGE_QUOTA</code> on the server to show the plan and receive alerts.
-        </p>
-
-        <p class="text-sm text-neutral-500 mt-6">Last measured {{ formatDate(storage.measuredAt) }}</p>
-      </section>
-
-      <section v-if="disk" class="rounded-lg border p-6">
+ <div class="admin-dashboard page">
+  <div class="page-heading"><div><h1>Dashboard</h1></div><Button as-child variant="outline" class="dv-button"><router-link :to="{ name: 'admin-users' }"><Users />Manage users<ArrowUpRight /></router-link></Button></div>
+  <Loader v-if="status === 'pending'" :text="true" />
+  <Alert v-else-if="status === 'error'" variant="destructive"><AlertTitle>Failed to load the dashboard</AlertTitle><AlertDescription>{{ error?.message }}<Button variant="outline" class="dv-button" @click="refetch()">Try again</Button></AlertDescription></Alert>
+  <template v-else-if="data && storage">
+   <div class="overview-stats">
+    <div class="stat"><div class="stat-label"><FolderOpen />Total assets</div><strong>{{ number(assetTotal) }}</strong><span class="stat-foot">Across {{ number(data.folders?.total ?? 0) }} folders</span></div>
+    <div class="stat"><div class="stat-label"><Users />Workspace users</div><strong>{{ number(data.users.total) }}</strong><router-link class="stat-link" :to="{ name: 'admin-users', query: { needsApproval: 'true' } }">{{ data.users.pendingApproval }} awaiting approval <ArrowRight /></router-link></div>
+    <div class="stat"><div class="stat-label"><Layers />Collections</div><strong>{{ number(data.collections?.total ?? 0) }}</strong><router-link class="stat-link" :to="{ name: 'admin-collections' }">Organise your content <ArrowRight /></router-link></div>
+    <div class="stat"><div class="stat-label"><ArrowDownToLine />Downloads</div><strong>{{ number(downloadTotal) }}<span class="stat-period">last 7 days</span></strong><span class="stat-foot">{{ data.downloads.last7DaysByStatus.ready ?? 0 }} ready to download</span></div>
+   </div>
+   <div class="dashboard-grid">
+    <div class="dashboard-main">
+     <section v-if="attentionCount" class="dv-panel task-panel" aria-labelledby="attention-heading">
+      <div class="task-heading"><h2 id="attention-heading">Needs attention</h2><span>{{ attentionCount }} {{ attentionCount === 1 ? 'item' : 'items' }}</span></div>
+      <div v-if="data.users.pendingApproval" class="task-row">
+       <span class="task-icon"><Users /></span>
+       <div class="task-copy"><h3>{{ number(data.users.pendingApproval) }} {{ data.users.pendingApproval === 1 ? 'person is' : 'people are' }} waiting for access</h3><p>Review their details and decide who can join your workspace.</p></div>
+       <Button as-child variant="outline" class="dv-button"><router-link :to="{ name: 'admin-users', query: { needsApproval: 'true' } }">Review requests <ArrowRight /></router-link></Button>
+      </div>
+      <div v-if="canRetryFiles" class="task-row">
+       <span class="task-icon"><RefreshCw /></span>
+       <div class="task-copy"><h3>{{ number(pendingFiles) }} {{ pendingFiles === 1 ? 'file is' : 'files are' }} waiting to sync</h3><p>No file downloads are running. Retry to bring these files into the library.</p></div>
+       <Button variant="outline" class="dv-button" :disabled="isWorking" @click="retryPendingAssets">Retry files <ArrowRight /></Button>
+      </div>
+      <div v-if="failedExports" class="task-row">
+       <span class="task-icon task-icon--warning"><AlertCircle /></span>
+       <div class="task-copy"><h3>{{ number(failedExports) }} {{ failedExports === 1 ? 'export failed' : 'exports failed' }} in the last 7 days</h3><p>Some download archives could not be prepared. Ask your hosting provider to investigate.</p></div>
+       <Button v-if="storage.serverContactEmails.length" as-child variant="outline" class="dv-button"><a :href="`mailto:${storage.serverContactEmails.join(',')}`">Contact support <ArrowUpRight /></a></Button>
+      </div>
+      <div v-if="missingAlertContact" class="task-row">
+       <span class="task-icon"><Bell /></span>
+       <div class="task-copy"><h3>Choose who receives storage alerts</h3><p>Enable maintenance emails on an administrator’s profile so storage warnings reach your team.</p></div>
+       <Button as-child variant="outline" class="dv-button"><router-link :to="{ name: 'admin-users' }">Choose recipient <ArrowRight /></router-link></Button>
+      </div>
+     </section>
+     <section class="dv-panel user-activity-panel"><div class="section-heading"><div><h2>Latest user activity</h2><p>Recent registrations and access decisions.</p></div><router-link :to="{ name: 'admin-users' }" class="stat-link">View users <ArrowRight /></router-link></div>
+      <div v-for="activity in latestUserActivity" :key="`${activity.kind}-${activity.kind === 'user' ? activity.user.id : activity.invitation.id}`" class="user-activity-row">
+       <template v-if="activity.kind === 'user'">
+        <span class="user-avatar">{{ initials(activity.user.name) }}</span>
+        <div class="user-activity-copy"><strong>{{ activity.user.name }}</strong><span>{{ activity.user.approved ? 'Access approved' : activity.user.emailVerified ? 'Requested access' : 'Registered · email unverified' }}</span><small>{{ activity.user.company }} · {{ formatDate(activity.occurredAt) }}</small></div>
+        <Button v-if="activity.user.emailVerified && !activity.user.approved" class="dv-button dv-button--primary approve-button" :disabled="!!busyUserId" :aria-label="`Approve ${activity.user.name}`" @click="approveUser(activity.user)"><Check />{{ busyUserId === activity.user.id ? 'Approving…' : 'Approve' }}</Button>
+        <span v-else class="activity-state" :class="{ 'activity-state--approved': activity.user.approved }"><UserCheck v-if="activity.user.approved" /><UserPlus v-else />{{ activity.user.approved ? 'Approved' : 'Registered' }}</span>
+       </template>
+       <template v-else>
+        <span class="user-avatar user-avatar--invitation"><MailPlus /></span>
+        <div class="user-activity-copy"><strong>{{ activity.invitation.invitedBy?.name ?? 'A workspace user' }} invited a guest</strong><span>{{ activity.invitation.email }}</span><small>{{ activity.invitation.collection.name }} · {{ formatDate(activity.occurredAt) }}</small></div>
+        <span class="activity-state"><MailPlus />Guest invited</span>
+       </template>
+      </div>
+      <p v-if="!latestUserActivity.length" class="empty-state">No user activity yet.</p>
+     </section>
+           <section v-if="disk" class="dv-panel detail-panel">
         <h2 class="text-lg font-semibold">Server disk</h2>
-        <p class="text-sm text-neutral-500">Visible to the hosting contact only</p>
+        <p class="text-sm admin-text-secondary">Visible to the hosting contact only</p>
         <p class="text-3xl font-bold mt-2">
           {{ formatStorage(disk.totalBytes - disk.freeBytes) }}
-          <span class="text-neutral-400 font-normal text-xl">/ {{ formatStorage(disk.totalBytes) }}</span>
+          <span class="admin-text-secondary font-normal text-xl">/ {{ formatStorage(disk.totalBytes) }}</span>
         </p>
         <div class="mt-4">
-          <div class="h-2 rounded-full bg-neutral-200 overflow-hidden">
-            <div class="h-2 rounded-full transition-all" :class="diskBarColor" :style="{ width: `${Math.min(100, diskPercent)}%` }"></div>
+          <div class="h-2 bg-neutral-200 overflow-hidden" role="progressbar" aria-label="Server disk used" :aria-valuenow="Math.min(100, diskPercent)">
+            <div class="h-2 transition-all" :class="diskBarColor" :style="{ width: `${Math.min(100, diskPercent)}%` }"></div>
           </div>
-          <p class="text-sm text-neutral-500 mt-2">{{ diskPercent }}% used, {{ formatStorage(disk.freeBytes) }} free</p>
+          <p class="text-sm admin-text-secondary mt-2">{{ diskPercent }}% used, {{ formatStorage(disk.freeBytes) }} free</p>
         </div>
 
         <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 text-sm">
           <div>
-            <dt class="text-neutral-500">Cloud synchronisation</dt>
+            <dt class="admin-text-secondary">Cloud synchronisation</dt>
             <dd class="font-medium">
               <template v-if="storage.quotaReachedAt">
                 <Badge variant="destructive">Paused</Badge>
@@ -214,7 +213,7 @@ const retryPendingAssets = async () => {
             </dd>
           </div>
           <div>
-            <dt class="text-neutral-500">Last orphan cleanup</dt>
+            <dt class="admin-text-secondary">Last orphan cleanup</dt>
             <dd class="font-medium">
               <template v-if="disk.orphansRemovedAt">
                 {{ disk.orphanObjects }} object{{ disk.orphanObjects === 1 ? '' : 's' }},
@@ -226,55 +225,186 @@ const retryPendingAssets = async () => {
         </dl>
       </section>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <section class="rounded-lg border p-6">
-          <h2 class="text-lg font-semibold mb-4">Asset files</h2>
-          <ul class="flex flex-col gap-2 text-sm">
-            <li v-for="item in assetStatuses" :key="item.key" class="flex items-center justify-between">
-              <span>{{ item.label }}</span>
-              <Badge :variant="item.key === 'up_to_date' ? 'secondary' : 'outline'">
-                {{ data.assets.byStatus[item.key] ?? 0 }}
-              </Badge>
-            </li>
-          </ul>
-        </section>
 
-        <section class="rounded-lg border p-6">
-          <h2 class="text-lg font-semibold mb-4">Users</h2>
-          <ul class="flex flex-col gap-2 text-sm">
-            <li class="flex items-center justify-between">
-              <span>Total</span>
-              <Badge variant="secondary">{{ data.users.total }}</Badge>
-            </li>
-            <li class="flex items-center justify-between">
-              <span>Receive storage alerts</span>
-              <Badge :variant="data.users.maintenanceContacts === 0 ? 'destructive' : 'outline'">{{ data.users.maintenanceContacts }}</Badge>
-            </li>
-            <li class="flex items-center justify-between">
-              <span>Waiting for approval</span>
-              <Badge :variant="data.users.pendingApproval > 0 ? 'destructive' : 'outline'">
-                {{ data.users.pendingApproval }}
-              </Badge>
-            </li>
-            <li v-for="role in roles" :key="role.key" class="flex items-center justify-between">
-              <span>{{ role.label }}</span>
-              <Badge variant="outline">{{ data.users.byRole[role.key] ?? 0 }}</Badge>
-            </li>
-          </ul>
-        </section>
-
-        <section class="rounded-lg border p-6">
-          <h2 class="text-lg font-semibold mb-4">Downloads, last 7 days</h2>
-          <ul class="flex flex-col gap-2 text-sm">
-            <li v-for="item in downloadStatuses" :key="item.key" class="flex items-center justify-between">
-              <span>{{ item.label }}</span>
-              <Badge :variant="item.key === 'failed' && (data.downloads.last7DaysByStatus[item.key] ?? 0) > 0 ? 'destructive' : 'outline'">
-                {{ data.downloads.last7DaysByStatus[item.key] ?? 0 }}
-              </Badge>
-            </li>
-          </ul>
-        </section>
-      </div>
     </div>
-  </div>
+    <aside class="dashboard-aside" aria-label="Workspace health">
+     <section class="dv-panel health-panel"><div class="section-heading"><h2>Cloud synchronisation</h2><Cloud /></div><div class="cloud-service"><div class="cloud-icon"><Cloud /></div><div><strong>{{ storage.quotaReachedAt ? 'Paused · storage full' : data.jobs.downloading ? 'Files are downloading' : 'Your asset library' }}</strong><span>{{ number(data.assets.byStatus.up_to_date ?? 0) }} files up to date</span></div></div><dl class="health-list"><div><dt>Up to date</dt><dd>{{ number(data.assets.byStatus.up_to_date ?? 0) }} / {{ number(assetTotal) }}</dd></div><div><dt>Waiting for download</dt><dd>{{ data.assets.byStatus.creating ?? 0 }}</dd></div><div><dt>Outdated</dt><dd>{{ data.assets.byStatus.outdated ?? 0 }}</dd></div><div><dt>Download jobs</dt><dd>{{ data.jobs.downloading }}</dd></div></dl><Button variant="outline" class="dv-button full-width" :disabled="isWorking || data.jobs.downloading > 0" @click="retryPendingAssets"><RefreshCw />{{ data.jobs.downloading > 0 ? 'Downloading…' : 'Retry pending files' }}</Button><p class="small-note">Retries files waiting to download from your cloud storage.</p></section>
+     <section class="dv-panel capacity-panel"><div class="section-heading"><h2>{{ percent !== null && percent >= 80 ? 'Storage needs attention' : 'Storage' }}</h2><HardDrive /></div><div class="capacity-number">{{ formatStorage(storage.usedBytes) }}<span v-if="storage.quotaBytes"> / {{ formatStorage(storage.quotaBytes) }}</span></div><template v-if="storage.quotaBytes"><div class="storage-track" role="progressbar" aria-label="Storage used" :aria-valuenow="Math.min(100, Math.max(0, percent ?? 0))" :aria-valuetext="`${percent}% of storage plan used`"><div :style="{ width: barWidth }" :class="barColor"></div></div><p class="small-note">{{ percent }}% used · {{ formatStorage(Math.max(0, storage.quotaBytes - storage.usedBytes)) }} available</p></template><p v-else class="small-note">No storage limit configured.</p><Button variant="outline" class="dv-button full-width measure-button" :disabled="isWorking || data.jobs.measuring" @click="measureStorage"><HardDrive />{{ isMeasuring || data.jobs.measuring ? 'Measuring…' : 'Measure now' }}</Button><p class="small-note">Last measured {{ formatDate(storage.measuredAt) }}</p><details class="storage-details"><summary>What counts towards storage?</summary><p>Original files and generated previews count towards your usage. A hosting administrator can configure the plan with STORAGE_QUOTA.</p></details></section>
+    </aside>
+   </div>
+   <section class="workspace-activity" aria-labelledby="workspace-activity-heading">
+    <div class="workspace-activity-heading"><div><h2 id="workspace-activity-heading">Workspace activity</h2><p>Latest file updates and download requests.</p></div></div>
+    <div class="activity-columns">
+     <section class="activity-feed" aria-labelledby="recently-updated-heading">
+      <div class="activity-feed-heading"><h3 id="recently-updated-heading">Recently updated</h3><router-link :to="{ name: 'admin-assets' }" class="stat-link">View assets <ArrowRight /></router-link></div>
+      <router-link v-for="file in data.recentFiles" :key="file.id" :to="{ name: 'admin-assets', params: { id: file.folderId } }" class="activity-row"><span class="activity-icon"><FolderOpen /></span><span class="activity-row-copy"><strong>{{ file.name }}</strong><small>{{ assetStatuses.find(item => item.key === file.status)?.label ?? file.status }} · {{ formatStorage(Number(file.size)) }}</small></span><time>{{ formatDate(file.updatedAt) }}</time></router-link>
+      <p v-if="!data.recentFiles?.length" class="activity-empty">No files have been updated yet.</p>
+     </section>
+     <section class="activity-feed" aria-labelledby="recently-downloaded-heading">
+      <div class="activity-feed-heading"><h3 id="recently-downloaded-heading">Recently downloaded</h3><span>{{ data.recentDownloads?.length ?? 0 }} recent</span></div>
+      <div v-for="download in data.recentDownloads" :key="download.id" class="activity-row"><span class="activity-icon"><FileArchive /></span><span class="activity-row-copy"><strong>{{ download.fileCount }} {{ download.fileCount === 1 ? 'file' : 'files' }}</strong><small>{{ download.user.name }} · {{ downloadStatusLabels[download.status] ?? download.status }}</small></span><time>{{ formatDate(download.updatedAt) }}</time></div>
+      <p v-if="!data.recentDownloads?.length" class="activity-empty">No recent downloads.</p>
+     </section>
+    </div>
+   </section>
+  </template>
+ </div>
 </template>
+
+<style scoped>
+.page { container-type:inline-size; padding: 39px 36px 32px; max-width: 1540px; margin: auto; }
+.page-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 30px; }
+.page-heading h1 { font-size: clamp(25px, 2.25vw, 34px); }
+.page-heading p { color: var(--dv-text-secondary); font-size: 12px; margin-top: 10px; }
+.page-heading .dv-button { flex-shrink: 0; }
+.overview-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); background: white; border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-surface); padding: 25px 0; margin-bottom: 28px; }
+.stat { padding: 0 25px; border-right: 1px solid var(--dv-color-line); }
+.stat:last-child { border: 0; }
+.stat-label { font-size: 11px; display: flex; align-items: center; gap: 8px; color: var(--dv-text-secondary); }
+.stat-label svg { width: 15px; height: 15px; }
+.stat > strong { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 30px; font-weight: 600; letter-spacing: -.035em; margin: 12px 0 7px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.stat-trend { font-size: 9px; color: var(--dv-color-success); background: var(--dv-color-success-soft); padding: 4px 6px; border-radius: var(--dv-radius-data); letter-spacing: 0; font-weight: 500; }
+.stat-foot { font-size: 10px; color: var(--dv-text-secondary); }
+.stat-period { font-size: 10px; color: var(--dv-text-secondary); font-weight: 400; letter-spacing: 0; align-self: flex-end; margin-bottom: 5px; }
+.stat-link { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0; font-size: 10px !important; color: var(--dv-action-primary); }
+.stat-link svg { width: 12px; height: 12px; }
+.tiny-stack { display: flex; padding-left: 5px; }
+.tiny-stack i { font-size: 8px; font-style: normal; letter-spacing: 0; display: grid; place-items: center; width: 25px; height: 25px; border-radius: 50%; background: #dce6f4; color: var(--dv-text-primary); border: 2px solid white; margin-left: -5px; }
+.tiny-stack i:nth-child(2) { background: #e8dece; }
+.tiny-stack i:last-child { background: #f0f2f7; }
+.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1fr) 285px; gap: 26px; }
+.dashboard-main, .dashboard-aside { display: flex; flex-direction: column; gap: 25px; min-width: 0; }
+.section-heading { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+.section-heading h2 { font-size: 14px; }
+.section-heading p { margin-top: 5px; color: var(--dv-text-secondary); font-size: 11px; }
+.user-activity-panel { overflow:hidden; }
+.user-activity-panel .section-heading { padding:23px 23px 18px; }
+.user-activity-row { display:flex; align-items:center; gap:13px; min-height:78px; padding:14px 23px; border-top:1px solid var(--dv-color-line); }
+.user-avatar { display:grid; place-items:center; flex:0 0 38px; width:38px; height:38px; border-radius:50%; background:#e5eaf5; color:var(--dv-text-primary); font-size:10px; font-weight:650; letter-spacing:.02em; }
+.user-avatar--invitation { background:#edf3ff; color:var(--dv-action-primary); }
+.user-avatar--invitation svg { width:17px; height:17px; }
+.user-activity-copy { display:flex; flex:1; min-width:0; flex-direction:column; }
+.user-activity-copy strong { overflow:hidden; font-size:12px; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+.user-activity-copy span { margin-top:3px; color:var(--dv-text-primary); font-size:10px; }
+.user-activity-copy small { overflow:hidden; margin-top:3px; color:var(--dv-text-secondary); font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.approve-button { flex-shrink:0; font-size:10px !important; }
+.activity-state { display:flex; align-items:center; gap:5px; flex-shrink:0; color:var(--dv-text-secondary); font-size:9px; }
+.activity-state svg { width:13px; height:13px; }
+.activity-state--approved { color:var(--dv-color-success); }
+.recent-panel { overflow: hidden; }
+.recent-panel .section-heading { padding: 23px 23px 18px; }
+.recent-asset { display: flex; align-items: center; gap: 14px; padding: 17px 23px; border-top: 1px solid var(--dv-color-line); }
+.asset-cover { width: 51px; height: 53px; border-radius: var(--dv-radius-graphic); display: grid; place-items: center; flex-shrink: 0; font-size: 12px; font-weight: 650; letter-spacing: -.035em; }
+.asset-cover--campaign { background: var(--dv-color-midnight); color: #acccff; }
+.asset-cover--document { background: #e5eaf5; color: #42577b; font-size: 26px; font-weight: 500; }
+.asset-cover--product { background: #e3e8dd; color: #58614a; }
+.asset-name { min-width: 0; }
+.asset-name h3 { font-size: 12px; font-weight: 550; }
+.asset-name > span { display: block; color: var(--dv-text-secondary); font-size: 10px; margin-top: 4px; }
+.asset-meta { margin-left: auto; text-align: right; white-space: nowrap; font-size: 10px; }
+.asset-meta strong { font-weight: 450; }
+.asset-meta span { display: block; color: var(--dv-text-secondary); margin-top: 4px; }
+.panel-foot { display: flex; justify-content: space-between; gap: 10px; background: #fbfcfe; border-top: 1px solid var(--dv-color-line); padding: 13px 23px; font-size: 9px; color: var(--dv-text-secondary); }
+.panel-foot > span:first-child { display: flex; align-items: center; gap: 6px; }
+.panel-foot svg { width: 12px; height: 12px; }
+.health-panel, .capacity-panel { padding: 23px; }
+.health-panel .section-heading h2 { font-size: 13px; }
+.cloud-service { display: flex; align-items: center; gap: 10px; margin: 23px 0; }
+.cloud-icon { display: grid; place-items: center; width: 37px; height: 37px; color: var(--dv-action-primary); background: #edf3ff; border-radius: var(--dv-radius-graphic); }
+.cloud-icon svg { width: 22px; height: 22px; }
+.cloud-service strong { font-size: 12px; display: block; font-weight: 550; }
+.cloud-service span { font-size: 9px; display: block; color: var(--dv-text-secondary); margin-top: 3px; }
+.cloud-service > svg { margin-left: auto; width: 15px; color: var(--dv-color-success); }
+.health-list { margin: 0 0 21px; font-size: 10px; }
+.health-list div { display: flex; justify-content: space-between; padding: 6px 0; }
+.health-list dt { color: var(--dv-text-secondary); }
+.health-list dd { margin: 0; }
+.positive { color: var(--dv-color-success); }
+.full-width { width: 100%; }
+.small-note { color: var(--dv-text-secondary); font-size: 10px; margin-top: 9px !important; }
+.health-panel > .small-note { text-align: center; font-size: 9px; }
+.capacity-panel .section-heading > svg { width: 16px; color: var(--dv-text-secondary); }
+.capacity-number { margin: 19px 0 16px; font-size: 27px; font-weight: 600; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.capacity-number span { font-size: 12px; color: var(--dv-text-secondary); font-weight: 400; letter-spacing: 0; }
+.storage-segments { display: flex; height: 7px; gap: 3px; border-radius: var(--dv-radius-data); overflow: hidden; }
+.storage-segments span:first-child { background: var(--dv-action-primary); width: 51%; }
+.storage-segments span:nth-child(2) { background: #aac3ff; width: 17%; }
+.storage-segments span:last-child { background: #e9edf5; width: 32%; }
+.storage-legend { display: grid; gap: 8px; margin: 18px 0; font-size: 10px; color: var(--dv-text-secondary); }
+.storage-legend > span { display: flex; gap: 7px; align-items: center; }
+.storage-legend i { width: 6px; height: 6px; border-radius: var(--dv-radius-data); background: var(--dv-action-primary); }
+.storage-legend > span:nth-child(2) i { background: #aac3ff; }
+.storage-legend > span:last-child i { background: #e9edf5; }
+.storage-legend b { margin-left: auto; font-weight: 400; color: var(--dv-text-primary); }
+.storage-details { border-top: 1px solid var(--dv-color-line); padding-top: 14px; font-size: 10px; }
+.storage-details summary { display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: var(--dv-text-secondary); list-style: none; }
+.storage-details summary::-webkit-details-marker { display: none; }
+.storage-details svg { width: 12px; }
+.storage-details[open] svg { transform: rotate(90deg); }
+.storage-details p { color: var(--dv-text-secondary); padding-top: 10px; line-height: 1.7; }
+.quiet-note { display: flex; align-items: flex-start; gap: 10px; padding: 0 8px; }
+.quiet-note > svg { color: var(--dv-text-secondary); width: 16px; }
+.quiet-note strong { font-size: 10px; font-weight: 550; }
+.quiet-note p { margin-top: 4px; font-size: 10px; line-height: 1.65; color: var(--dv-text-secondary); }
+
+.admin-dashboard :deep(.dv-button) { height:auto; box-shadow:none; padding:9px 14px; border-radius:0; }
+.admin-dashboard :deep(.dv-button svg) { width:15px; height:15px; }
+.admin-dashboard h1 { font-weight:550; letter-spacing:-.035em; line-height:1.2; }
+.admin-dashboard h2 { font-weight:600; }
+.task-panel { overflow:hidden; }
+.task-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 23px; }
+.task-heading h2 { font-size:14px; }
+.task-heading > span { font-size:11px; color:var(--dv-text-secondary); }
+.task-row { display:flex; align-items:center; gap:14px; padding:20px 23px; border-top:1px solid var(--dv-color-line); }
+.task-icon { display:grid; place-items:center; flex-shrink:0; width:36px; height:36px; border-radius:var(--dv-radius-graphic); color:var(--dv-action-primary); background:var(--dv-surface-canvas); }
+.task-icon--warning { color:var(--dv-color-warning); background:var(--dv-color-warning-soft); }
+.task-copy { flex:1; min-width:0; }
+.task-copy h3 { font-size:13px; font-weight:550; line-height:1.5; }
+.task-copy p { margin-top:4px; font-size:12px; color:var(--dv-text-secondary); line-height:1.6; }
+.task-row :deep(.dv-button) { flex-shrink:0; font-size:11px !important; }
+@media(max-width:1200px) { .task-row { flex-wrap:wrap; } .task-copy { flex-basis:calc(100% - 50px); } .task-row :deep(.dv-button) { margin-left:50px; } }
+@media(max-width:600px) { .task-heading, .task-row { padding:18px; } }
+.detail-panel { padding:20px; }
+.detail-panel h2 { font-size:13px; }
+.recent-asset:hover { background:var(--dv-surface-canvas); }
+.asset-name h3 { overflow-wrap:anywhere; }
+.asset-meta { white-space:normal; flex-shrink:0; max-width:40%; }
+.empty-state { padding:24px; font-size:12px; color:var(--dv-text-secondary); }
+.storage-track { height:6px; border-radius:var(--dv-radius-data); overflow:hidden; background:var(--dv-color-line); margin-top:20px; }
+.storage-track > div { height:100%; background:var(--dv-action-primary); }
+.storage-track > .bg-red-500 { background:#ef4444; }
+.storage-track > .bg-amber-500 { background:#f59e0b; }
+.measure-button { margin-top:20px; }
+.workspace-activity { margin-top:35px; }
+.workspace-activity-heading { display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:17px; }
+.workspace-activity-heading h2 { font-size:17px; }
+.workspace-activity-heading p { margin-top:5px; color:var(--dv-text-secondary); font-size:11px; }
+.activity-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:34px; }
+.activity-feed { min-width:0; }
+.activity-feed-heading { display:flex; align-items:center; justify-content:space-between; gap:15px; min-height:39px; border-bottom:1px solid var(--dv-color-line); }
+.activity-feed-heading h3 { font-size:12px; font-weight:600; }
+.activity-feed-heading > span { color:var(--dv-text-secondary); font-size:9px; }
+.activity-row { display:flex; align-items:center; gap:11px; min-height:67px; padding:12px 0; border-bottom:1px solid var(--dv-color-line); }
+.activity-row:hover { background:rgb(255 255 255 / .55); }
+.activity-icon { display:grid; place-items:center; flex:0 0 34px; width:34px; height:34px; border-radius:var(--dv-radius-graphic); background:#e5eaf5; color:var(--dv-text-secondary); }
+.activity-icon svg { width:17px; height:17px; }
+.activity-row-copy { display:flex; flex:1; min-width:0; flex-direction:column; }
+.activity-row-copy strong { overflow:hidden; font-size:11px; font-weight:550; text-overflow:ellipsis; white-space:nowrap; }
+.activity-row-copy small { overflow:hidden; margin-top:4px; color:var(--dv-text-secondary); font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.activity-row time { flex:0 0 auto; max-width:38%; color:var(--dv-text-secondary); font-size:9px; text-align:right; }
+.activity-empty { padding:21px 0; border-bottom:1px solid var(--dv-color-line); color:var(--dv-text-secondary); font-size:11px; }
+@media(max-width:1200px) { .dashboard-grid { grid-template-columns:minmax(0,1fr) 270px; gap:18px; } .stat { padding:0 18px; } }
+@media(max-width:1000px) { .dashboard-grid { grid-template-columns:1fr; } .dashboard-aside { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .overview-stats { grid-template-columns:repeat(2,minmax(0,1fr)); row-gap:24px; } .stat:nth-child(2) { border:0; } .page-heading { align-items:flex-start; } .activity-columns { grid-template-columns:1fr; } }
+@media(max-width:600px) { .page { padding:28px 20px; } .page-heading { flex-direction:column; } .dashboard-aside { display:flex; } .stat { padding:0 14px; } .stat > strong { font-size:26px; } .user-activity-panel .section-heading, .user-activity-row { padding-left:16px; padding-right:16px; } .user-activity-row { flex-wrap:wrap; } .approve-button, .activity-state { margin-left:51px; } .recent-asset { padding:16px; flex-wrap:wrap; } .asset-meta { margin-left:65px; text-align:left; max-width:100%; } .asset-name { flex:1; } .panel-foot { flex-wrap:wrap; } .activity-row time { display:none; } }
+
+/* Use the available dashboard width, including the space taken by navigation. */
+@container (min-width:1120px) {
+ .dashboard-grid { grid-template-columns:minmax(0,1.6fr) repeat(2,minmax(0,1fr)); gap:24px; align-items:stretch; }
+ .dashboard-main, .dashboard-aside { display:contents; }
+ .task-panel, .detail-panel { grid-column:1 / -1; }
+ .user-activity-panel { grid-column:1; }
+ .health-panel { grid-column:2; }
+ .capacity-panel { grid-column:3; }
+ .user-activity-panel, .health-panel, .capacity-panel { height:100%; }
+}
+</style>

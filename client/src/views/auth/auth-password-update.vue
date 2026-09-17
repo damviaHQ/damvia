@@ -15,13 +15,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { toast } from "vue3-toastify"
+import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "../../services/server.ts"
 import { useGlobalStore } from "../../stores/globalStore.ts"
 
 const router = useRouter()
 const route = useRoute()
 const globalStore = useGlobalStore()
+const toast = useGlobalToast()
 const form = ref({ password: '' })
 const formRootError = ref<string | null>(null)
 

@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { DialogClose } from "@/components/ui/dialog"
+import AdminList from "@/components/admin/AdminList.vue"
 import Loader from "@/components/Loader.vue"
 import {
   AlertDialog,
@@ -25,12 +27,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -96,7 +92,7 @@ function openEditModal(region: RouterOutput["region"]["list"][number]) {
   modalState.value = "editing"
 }
 
-async function onModalSubmit(event: Event) {
+async function submitChanges(event: Event) {
   event.preventDefault()
   const action =
     modalState.value === "creating" ? trpc.region.create : trpc.region.update
@@ -149,31 +145,33 @@ async function moveUsersAndRemoveRegion() {
     toast.error((error as Error).message)
   }
 }
+const saving = ref(false)
+async function onModalSubmit(event: Event) {
+  event.preventDefault()
+  if (saving.value) return
+  saving.value = true
+  try { await submitChanges(event) } finally { saving.value = false }
+}
 </script>
 
 <template>
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="flex flex-col p-8">
-    <div class="regions__top flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Regions</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Button type="button" variant="link" @click="openCreateModal"
-        class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
+    <div class="admin-heading">
+      <div><h1>Regions</h1><p>Organize users by region and set their default group.</p></div>
+      <Button type="button" variant="default" @click="openCreateModal"
+        class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
-        Add new Region
+        Add region
       </Button>
     </div>
 
+    <AdminList :items="data" :fields="['name']" label="Regions" v-slot="{ items }">
     <Table>
       <TableHeader>
         <TableRow>
@@ -185,7 +183,7 @@ async function moveUsersAndRemoveRegion() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="region in data" :key="region.id">
+        <TableRow v-for="region in items" :key="region.id">
           <TableCell>{{ region.name }}</TableCell>
           <TableCell>{{
             groups?.find((g) => g.id === region.defaultGroupId)?.name || "N/A"
@@ -199,7 +197,7 @@ async function moveUsersAndRemoveRegion() {
                 Edit
               </Button>
               <AlertDialog>
-                <AlertDialogTrigger>
+                <AlertDialogTrigger as-child>
                   <Button variant="ghost" size="sm">
                     <Trash2 class="w-4 h-4 mr-2" />
                     Remove
@@ -236,10 +234,11 @@ async function moveUsersAndRemoveRegion() {
         </TableRow>
       </TableBody>
     </Table>
+    </AdminList>
   </div>
-  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && (modalState = 'closed')">
-    <DialogContent class="sm:max-w-[425px]">
-      <form @submit.prevent="onModalSubmit">
+  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && !saving && (modalState = 'closed')">
+    <DialogContent class="admin-dialog--compact">
+      <form :aria-busy="saving" @submit.prevent="onModalSubmit">
         <DialogHeader>
           <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} region</DialogTitle>
           <DialogDescription>
@@ -266,9 +265,9 @@ async function moveUsersAndRemoveRegion() {
             </Select>
           </div>
         </div>
-        <DialogFooter class="sm:justify-between items-center">
-          <div class="text-sm text-gray-500">* Required</div>
-          <Button type="submit" :disabled="!form.name || !form.defaultGroupId">
+        <DialogFooter class="items-center">
+          <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
+          <Button type="submit" :disabled="saving || (!form.name || !form.defaultGroupId)">
             {{ modalState === "creating" ? "Create" : "Edit" }}
           </Button>
         </DialogFooter>

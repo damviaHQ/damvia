@@ -13,14 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { DialogClose } from "@/components/ui/dialog"
+import AdminList from "@/components/admin/AdminList.vue"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -117,7 +111,7 @@ async function remove(productAttribute: ProductAttribute) {
   toast.success("Product attribute removed!")
 }
 
-function onModalSubmit(event: Event) {
+function submitChanges(event: Event) {
   event.preventDefault()
 
   if (!form.value.name) {
@@ -129,7 +123,7 @@ function onModalSubmit(event: Event) {
     modalState.value === "creating"
       ? trpc.productAttribute.create
       : trpc.productAttribute.update
-  action
+  return action
     .mutate(form.value)
     .then(() => queryClient.invalidateQueries({ queryKey: ["products", "attributes"] }))
     .then(() => {
@@ -142,33 +136,31 @@ function onModalSubmit(event: Event) {
     })
     .catch((error: Error) => toast.error(error.message))
 }
+const saving = ref(false)
+async function onModalSubmit(event: Event) {
+  event.preventDefault()
+  if (saving.value) return
+  saving.value = true
+  try { await submitChanges(event) } finally { saving.value = false }
+}
 </script>
 
 <template>
-  <div class="flex flex-col p-8">
-    <div class="flex flex-col gap-5 mb-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/admin/products"> Products </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage> Attributes </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Button variant="link" @click="openCreateModal" class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+  <div class="admin-page admin-resource-page">
+    <div class="admin-heading">
+      <div><h1>Product attributes</h1><p>Choose which product fields appear in lists, filters and search.</p></div>
+      <Button variant="default" @click="openCreateModal" class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
-        Add new attribute
+        Add attribute
       </Button>
     </div>
-    <div v-if="productAttributes && !productAttributes.length" class="text-gray-500 flex items-center gap-2">
+    <div v-if="productAttributes && !productAttributes.length" class="admin-text-secondary flex items-center gap-2">
       You must first <router-link :to="{ name: 'admin-product-import' }" class="underline flex items-center gap-2">
         <FileUp class="w-4 h-4" />import products data
       </router-link> to use attributes.
     </div>
-    <Table v-else>
+    <AdminList v-else :items="productAttributes" :fields="['name', 'displayName']" label="Product attributes" v-slot="{ items }">
+    <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Attribute Key</TableHead>
@@ -180,7 +172,7 @@ function onModalSubmit(event: Event) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="attribute in productAttributes" :key="attribute.id">
+        <TableRow v-for="attribute in items" :key="attribute.id">
           <TableCell>{{ attribute.name }}</TableCell>
           <TableCell>{{ attribute.displayName }}</TableCell>
           <TableCell>{{ attribute.facetable ? "Yes" : "No" }}</TableCell>
@@ -201,12 +193,13 @@ function onModalSubmit(event: Event) {
         </TableRow>
       </TableBody>
     </Table>
+    </AdminList>
 
-    <Dialog :open="modalState !== 'closed'" @update:open="modalState = 'closed'">
-      <DialogContent class="sm:max-w-[425px]">
+    <Dialog :open="modalState !== 'closed'" @update:open="open => { if (!open && !saving) modalState = 'closed' }">
+      <DialogContent class="admin-dialog--compact">
         <DialogHeader>
           <DialogTitle>
-            {{ modalState === "creating" ? "Add" : "Edit" }} Product Attribute
+            {{ modalState === "creating" ? "Add" : "Edit" }} product attribute
           </DialogTitle>
           <DialogDescription>
             Attributes are characteristics of your products. Define an attribute to let
@@ -214,12 +207,12 @@ function onModalSubmit(event: Event) {
             Product List View.
           </DialogDescription>
         </DialogHeader>
-        <form @submit="onModalSubmit">
+        <form :aria-busy="saving" @submit="onModalSubmit">
           <div class="flex flex-col gap-6 py-4">
             <div class="flex flex-col gap-2">
               <Label for="name">Select an Attribute *</Label>
               <Select v-model="form.name!" :disabled="modalState === 'editing'" class="w-full">
-                <SelectTrigger class="w-full">
+                <SelectTrigger id="name" class="w-full">
                   <SelectValue placeholder="Available Attributes..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -248,9 +241,9 @@ function onModalSubmit(event: Event) {
               <Label for="searchable">Searchable</Label>
             </div>
           </div>
-          <DialogFooter class="sm:justify-between items-center">
-            <div class="text-sm text-gray-500">* Required</div>
-            <Button type="submit" :disabled="!form.name">
+          <DialogFooter class="items-center">
+            <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
+            <Button type="submit" :disabled="saving || (!form.name)">
               {{ modalState === "creating" ? "Create" : "Save changes" }}
             </Button>
           </DialogFooter>

@@ -92,7 +92,7 @@ function openDialog(type: "add" | "edit") {
 
 <template>
   <div v-if="props.item">
-    <div class="items-tree__item flex w-full items-center border border-gray-200 rounded-md p-2 mb-2 justify-between">
+    <div class="items-tree__item flex w-full items-center border border-gray-200 p-2 mb-2 justify-between">
       <div class="items-tree__grab">
         <GripVertical class="h-4 w-4 cursor-grab" />
       </div>
@@ -102,7 +102,7 @@ function openDialog(type: "add" | "edit") {
           <BetweenHorizontalStart v-if="item.type === 'divider'" class="w-4 h-4" />
           <FilePenLine v-if="item.type === 'page'" class="w-4 h-4" />
           <LetterText v-if="item.type === 'text'" class="w-4 h-4" />
-          <Folder v-if="item.type === 'collection' && !item.synchronized" class="w-4 h-4 text-neutral-600" />
+          <Folder v-if="item.type === 'collection' && !item.synchronized" class="w-4 h-4 admin-text-secondary" />
           <IconCloudSync v-if="item.type === 'collection' && item.synchronized" class="!w-8 !h-8 text-brand-strong" />
         </div>
       </div>
@@ -134,7 +134,7 @@ function openDialog(type: "add" | "edit") {
       </div>
       <DropdownMenu v-model:open="dropdownOpen">
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Menu item actions">
             <Ellipsis class="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>

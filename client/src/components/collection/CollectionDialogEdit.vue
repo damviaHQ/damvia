@@ -15,7 +15,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogHeader, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
@@ -158,11 +158,13 @@ async function clearCustomLayout() {
 
 <template>
   <Dialog :open="modelValue" @update:open="emit('update:modelValue', $event)">
-    <DialogContent class="sm:max-w-[525px]">
+    <DialogContent class="sm:max-w-[640px] collection-edit-dialog">
+      <DialogHeader>
       <DialogTitle>Edit collection</DialogTitle>
       <DialogDescription>
         You can customize the collection name, description, thumbnail and layout.
       </DialogDescription>
+      </DialogHeader>
       <div v-if="!collection.synchronized">
         <Label for="name" class="text-sm font-medium">Name</Label>
         <Input id="name" v-model="form.name" placeholder="Name" />
@@ -191,9 +193,9 @@ async function clearCustomLayout() {
       </div>
       <div class="flex flex-col space-y-4">
         <Label for="thumbnail" class="text-sm font-medium">Custom Thumbnail</Label>
-        <div class="flex items-center space-x-4">
-          <div class="w-[15rem] h-[11.5rem] rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-            <img v-if="form.thumbnailURL" :src="form.thumbnailURL" class="object-cover w-full h-full" />
+        <div class="collection-thumbnail-controls flex items-center gap-4">
+          <div class="w-[180px] h-[135px] shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
+            <img alt="Collection thumbnail" v-if="form.thumbnailURL" :src="form.thumbnailURL" class="object-cover w-full h-full" />
             <span v-else class="text-gray-500 text-sm">No Image</span>
           </div>
           <div class="flex flex-col space-y-2">
@@ -212,7 +214,7 @@ async function clearCustomLayout() {
             </div>
           </div>
         </div>
-        <input ref="upload" type="file" accept="image/*" class="hidden" @change="handleFileUploaded">
+
       </div>
       <div class="flex flex-col gap-2">
         <Label class="text-sm font-medium">Layout</Label>
@@ -227,7 +229,7 @@ async function clearCustomLayout() {
           <Button v-else @click="setupCustomLayout" variant="outline"> Switch to custom layout </Button>
         </div>
       </div>
-      <div class="flex items-center justify-between gap-2 pt-10">
+      <div class="admin-form-footer flex items-center justify-between gap-2">
         <Button v-if="!collection.parent?.synchronized" variant="link" @click="deleteCollection"
           class="text-red-500 hover:text-red-500 hover:bg-red-100">
           <Trash class="w-4 h-4 mr-2" />
@@ -235,7 +237,7 @@ async function clearCustomLayout() {
         </Button>
         <div></div>
         <div class="flex items-center gap-2">
-          <Button variant="link" @click="emit('update:modelValue', false)">Cancel</Button>
+          <Button variant="outline" @click="emit('update:modelValue', false)">Cancel</Button>
           <Button @click="onSubmit">Update</Button>
         </div>
       </div>

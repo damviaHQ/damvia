@@ -15,19 +15,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -249,33 +242,23 @@ function handleOverrideAll(value: boolean) {
 </script>
 
 <template>
-  <div class="flex flex-col p-8 mx-auto">
+  <div class="admin-page admin-resource-page">
     <div class="flex flex-col gap-5 mb-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/admin/products"> Products </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage> Import Data </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+      <div class="admin-heading"><h1>Import products</h1></div>
     </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-sm">
-      <h1 class="text-2xl font-bold mb-6">Import Products from CSV file</h1>
+    <div class="dv-panel p-6">
+      <h2 class="text-lg font-medium mb-6">Upload a CSV file</h2>
 
       <div class="mb-8">
         <div class="flex items-center gap-4">
           <Button as="label" for="file-upload" variant="outline" class="flex items-center gap-2 cursor-pointer">
             <Upload />
-            Select a CSV File
+            Choose CSV file
             <input id="file-upload" type="file" @change="handleFileUpload" class="hidden" accept=".csv" />
           </Button>
           <span v-if="parsedData.length > 0" class="text-sm text-green-600">
-            File uploaded successfully
+            CSV ready for review
           </span>
         </div>
         <Alert v-if="parsedData.length === 0" variant="default" class="mt-2">
@@ -313,7 +296,7 @@ function handleOverrideAll(value: boolean) {
       <div v-if="columns.length > 0" class="flex flex-col gap-8">
         <div class="flex flex-col space-y-2">
           <h3 class="text-lg font-semibold mb-2">1. Select Primary Key Column</h3>
-          <p class="text-sm text-gray-600">
+          <p class="text-sm admin-text-secondary">
             This column will be used to identify your product reference.
           </p>
 
@@ -330,7 +313,7 @@ function handleOverrideAll(value: boolean) {
               </SelectContent>
             </Select>
           </div>
-          <p class="text-sm text-gray-600">
+          <p class="text-sm admin-text-secondary">
             The primary key is a unique identifier for each row in your data.
           </p>
         </div>
@@ -346,7 +329,7 @@ function handleOverrideAll(value: boolean) {
         </div>
         <div class="flex flex-col gap-2">
           <h3 class="text-lg font-semibold">3. Compare with existing data:</h3>
-          <p class="text-sm text-gray-600">
+          <p class="text-sm admin-text-secondary">
             Before saving compare your data with the existing product database.
           </p>
           <Button v-if="columns.length > 0 && parsedData.length > 0" :disabled="primaryKeyName === ''" type="button"
@@ -356,9 +339,10 @@ function handleOverrideAll(value: boolean) {
         </div>
 
         <Dialog v-model:open="showComparisonDialog">
-          <DialogContent class="w-[95%] h-[95%] max-w-none flex flex-col bg-neutral-100">
+          <DialogContent class="admin-dialog--large flex flex-col">
             <DialogHeader>
-              <DialogTitle>Comparison Results</DialogTitle>
+              <DialogTitle>Review product changes</DialogTitle>
+              <DialogDescription>Choose which changed values to replace before importing.</DialogDescription>
             </DialogHeader>
             <div v-if="isComparing" class="flex-grow flex items-center justify-center">
               <Loader :text="true" />
@@ -423,7 +407,7 @@ function handleOverrideAll(value: boolean) {
               </Table>
             </div>
             <DialogFooter class="mt-4">
-              <Button @click="closeComparisonDialog">Cancel</Button>
+              <Button variant="outline" :disabled="isImporting" @click="closeComparisonDialog">Cancel</Button>
               <Button @click="handleCsvImport" variant="default" :disabled="isImporting">
                 <Loader v-if="isImporting" />
                 {{ isImporting ? "Importing..." : "Import" }}
@@ -450,11 +434,11 @@ function handleOverrideAll(value: boolean) {
 }
 
 .existing-value {
-  @apply text-gray-500;
+  color: var(--dv-text-secondary);
 }
 
 .new-value {
-  @apply text-black;
+  color: var(--dv-text-primary);
 }
 
 .highlight {

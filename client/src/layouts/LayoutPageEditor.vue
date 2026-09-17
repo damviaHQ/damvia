@@ -268,6 +268,7 @@ function handleColDrop(event: DragEvent, row: number, column: number) {
     </template>
     <div class="mx-9">
       <button type="button"
+        aria-label="Add content block"
         class="editor__plus-button flex items-center justify-center w-full border border-dashed border-neutral-400 rounded-md cursor-pointer p-1"
         @click="isBlockSelectorOpen = true">
         <Plus class="w-6 h-6 text-neutral-400" />

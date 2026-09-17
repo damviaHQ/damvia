@@ -13,13 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import Loader from "@/components/Loader.vue"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -59,6 +54,8 @@ const currentPage = ref(1)
 const pageSize = ref(200)
 const queryClient = useQueryClient()
 const isDeleting = ref(false)
+const showDeleteDialog = ref(false)
+const deleteError = ref('')
 const activeCell = ref<{ rowIndex: number; columnId: string } | null>(null)
 const editingValue = ref<string>("")
 const columnFilters = ref<{ [key: string]: string }>({})
@@ -324,18 +321,16 @@ function clearFilters() {
 
 // Mutation to remove all products
 const removeAllProducts = useMutation({
-  mutationFn: () => {
-    if (confirm("Are you sure you want to remove all products?")) {
-      return trpc.pim.removeAllProducts.mutate()
-    }
-    return Promise.reject(new Error("Operation cancelled by user."))
-  },
+  mutationFn: () => trpc.pim.removeAllProducts.mutate(),
+  onError: (error: Error) => { deleteError.value = error.message },
   onMutate: () => {
     isDeleting.value = true
+    deleteError.value = ''
   },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ["products"] })
     toast.success("All products removed successfully")
+    showDeleteDialog.value = false
   },
   onSettled: () => {
     isDeleting.value = false
@@ -476,54 +471,34 @@ onUnmounted(() => {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="h-full overflow-auto flex flex-col">
-    <div class="pages__top flex items-center justify-between gap-5 px-8 pt-6 pb-2">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page admin-products">
+    <div class="admin-product-toolbar">
       <div class="flex items-center gap-5">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbPage> Products </BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        <router-link :to="{ name: 'admin-product-attributes' }">
-          <Button type="button" variant="link" class="flex px-0 gap-2 text-neutral-600 hover:text-neutral-900">
-            <Blocks class="w-5 h-5" />
-            Manage Attributes
-          </Button>
-        </router-link>
-        <Button variant="link" type="button" @click="toggleFilters"
-          class="flex px-0 gap-2 text-neutral-600 hover:text-neutral-900">
+        <div class="admin-heading"><h1>Products</h1></div>
+        <Button as-child variant="outline"><router-link :to="{ name: 'admin-product-attributes' }"><Blocks class="w-4 h-4 mr-2" />Attributes</router-link></Button>
+        <Button v-if="data.products.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
+          class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
           <Filter class="w-5 h-5" />
           {{ showFilters ? "Hide Filters" : "Show Filters" }}
         </Button>
         <Button v-if="Object.keys(columnFilters).length > 0" variant="link" type="button" @click="clearFilters"
-          class="flex px-0 gap-2 text-neutral-600 hover:text-neutral-900">
+          class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
           <FilterX class="w-5 h-5" />
           Clear Filters
         </Button>
-        <router-link :to="{ name: 'admin-product-import' }">
-          <Button type="button" variant="link" class="flex px-0 gap-2 text-neutral-600 hover:text-neutral-900">
-            <FileUp class="w-5 h-5" />
-            Import Products from CSV
-          </Button>
-        </router-link>
+        <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-product-import' }"><FileUp />Import CSV</router-link></Button>
         <DropdownMenu v-model:open="isDropdownOpen">
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Product actions">
               <EllipsisVertical class="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem>
-              <Button variant="link" class="flex px-0 gap-2 text-red-500 hover:text-red-600"
-                @click="removeAllProducts.mutate">
-                <PackageX class="mr-2 h-4 w-4" />
-                <span>Remove All Products</span>
-              </Button>
+            <DropdownMenuItem :disabled="!data.products.length" @select="deleteError = ''; showDeleteDialog = true">
+              <PackageX class="mr-2 h-4 w-4" /><span>Remove all products</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -549,7 +524,13 @@ onUnmounted(() => {
       </Pagination>
     </div>
     
-    <div class="w-full overflow-x-auto flex-grow">
+    <section v-if="!data.products.length" class="dv-panel admin-empty">
+      <h2>{{ Object.keys(columnFilters).length ? 'No matching products' : 'No products yet' }}</h2>
+      <p>{{ Object.keys(columnFilters).length ? 'Clear the filters to see your product list.' : 'Import a CSV file to add your product catalog.' }}</p>
+      <Button v-if="Object.keys(columnFilters).length" variant="outline" @click="clearFilters">Clear filters</Button>
+      <Button v-else as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-product-import' }"><FileUp />Import CSV</router-link></Button>
+    </section>
+    <div v-else class="dv-panel w-full overflow-x-auto flex-grow">
       <div class="data-grid">
         <table class="spreadsheet-table">
           <thead>
@@ -570,6 +551,7 @@ onUnmounted(() => {
                   v-if="column.id !== 'thumbnailURL'" 
                   type="text" 
                   :placeholder="`Filter`"
+                  :aria-label="`Filter ${column.column.columnDef.header}`"
                   v-model="columnFilters[column.id || '']"
                   @input="(e) => e.target instanceof HTMLInputElement && applyColumnFilter(column.id || '', e.target.value)"
                   @keydown="(e) => handleFilterKeydown(e, column.id || '')"
@@ -580,7 +562,7 @@ onUnmounted(() => {
           </thead>
           <tbody>
             <tr v-if="!data || !data.products.length">
-              <td colspan="100%" class="text-neutral-500 text-center p-4">
+              <td colspan="100%" class="admin-text-secondary text-center p-4">
                 No Product database found. Import a CSV file to get started.
               </td>
             </tr>
@@ -669,6 +651,13 @@ onUnmounted(() => {
       <img :src="enlargedImage.src" alt="Enlarged product image" />
     </div>
   </Teleport>
+  <AlertDialog :open="showDeleteDialog" @update:open="open => { if (!isDeleting) showDeleteDialog = open }">
+    <AlertDialogContent @escape-key-down="event => { if (isDeleting) event.preventDefault() }">
+      <AlertDialogHeader><AlertDialogTitle>Remove all products?</AlertDialogTitle><AlertDialogDescription>This removes the entire product catalog, including products outside the current filters. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+      <p v-if="deleteError" role="alert" class="admin-form-error">{{ deleteError }}</p>
+      <AlertDialogFooter><AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel><Button variant="destructive" :disabled="isDeleting" @click="removeAllProducts.mutate()">{{ isDeleting ? 'Removing…' : 'Remove all products' }}</Button></AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>
 
 <style scoped lang="scss">
@@ -690,27 +679,27 @@ onUnmounted(() => {
     position: sticky;
     top: 0;
     z-index: 10;
-    background-color: #f9fafb;
+    background-color: var(--dv-surface-canvas);
     
     tr:first-child th {
       height: 36px;
-      border-bottom: 1px solid #e5e7eb;
-      @apply bg-neutral-100;
+      border-bottom: 1px solid var(--dv-color-line);
+      background: var(--dv-surface-canvas);
       padding: 0 8px;
       font-weight: 500;
-      color: #4b5563;
+      color: var(--dv-text-secondary);
       text-align: left;
       
       &.sortable {
         cursor: pointer;
         
         &:hover {
-          background-color: #f3f4f6;
+          background-color: var(--dv-surface-canvas);
         }
       }
       
       .sort-icon {
-        color: #9ca3af;
+        color: var(--dv-text-secondary);
         opacity: 0.5;
         
         &:hover {
@@ -721,19 +710,19 @@ onUnmounted(() => {
     
     tr:nth-child(2) th {
       padding: 4px 8px;
-      background-color: #f9fafb;
-      border-bottom: 1px solid #e5e7eb;
+      background-color: var(--dv-surface-canvas);
+      border-bottom: 1px solid var(--dv-color-line);
       
       .filter-input {
         width: 100%;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
+        border: 1px solid var(--dv-color-line);
+        border-radius: 0;
         padding: 4px 8px;
         font-size: 12px;
         
         &:focus {
           outline: none;
-          border-color: #2563eb;
+          border-color: var(--dv-action-primary);
           box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
         }
       }
@@ -747,16 +736,16 @@ onUnmounted(() => {
       transition: background-color 0.1s ease;
       
       &:hover {
-        background-color: #f9fafb;
+        background-color: var(--dv-surface-canvas);
       }
       
       &.row-active {
-        background-color: #f3f4f6;
+        background-color: var(--dv-surface-canvas);
       }
     }
     
     td {
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--dv-color-line);
       position: relative;
       padding: 0;
       overflow: hidden;
@@ -773,7 +762,7 @@ onUnmounted(() => {
       }
       
       &.cell-active {
-        border: 2px solid #2563eb;
+        border: 2px solid var(--dv-action-primary);
         padding: 0;
         z-index: 1;
       }
@@ -836,7 +825,7 @@ onUnmounted(() => {
   background-color: white;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--dv-radius-graphic);
   transition: all 0.3s ease;
   transform: translate(25%, 0);
 
@@ -854,8 +843,8 @@ onUnmounted(() => {
   z-index: 100;
   background-color: white;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border: 2px solid #2563eb;
-  border-radius: 2px;
+  border: 2px solid var(--dv-action-primary);
+  border-radius: 0;
   overflow: visible;
   
   .floating-cell-input {
@@ -887,9 +876,8 @@ onUnmounted(() => {
     
     &::-webkit-scrollbar-thumb {
       background: #ccc;
-      border-radius: 3px;
+      border-radius: 0;
     }
   }
 }
 </style>
-

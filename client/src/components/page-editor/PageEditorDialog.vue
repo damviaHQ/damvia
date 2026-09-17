@@ -20,7 +20,7 @@ import BlockLastFiles from '@/components/page-editor/blocks/BlockLastFiles.vue'
 import BlockText from '@/components/page-editor/blocks/BlockText.vue'
 import BlockVideo from '@/components/page-editor/blocks/BlockVideo.vue'
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import type { Block, BlockType, Collection, Page } from "@/layouts/LayoutPageEditor.vue"
 import { trpc } from "@/services/server.ts"
@@ -200,37 +200,38 @@ async function save() {
 
 <template>
   <Dialog :open="modelValue" @update:open="emit('update:modelValue', $event)">
-    <DialogContent class="sm:max-w-[900px] p-0 flex flex-col max-h-[90vh]">
-      <div class="flex flex-grow min-h-0">
+    <DialogContent class="admin-dialog--wide block-editor-dialog flex flex-col">
+      <DialogHeader><DialogTitle>{{ props.block ? 'Edit content block' : 'Add content block' }}</DialogTitle><DialogDescription>Choose the content type and configure what appears on the page.</DialogDescription></DialogHeader>
+      <div class="block-editor-grid">
         <!-- Sidebar with block types -->
-        <div class="w-1/3 border-r overflow-y-auto">
-          <h2 class="text-lg font-semibold p-4 border-b">Choose a block type</h2>
+        <div class="block-editor-types">
+          <h3 class="mb-3">Content type</h3>
           <div class="p-2">
             <button v-for="block in blockList" :key="block.type" type="button"
-              class="w-full flex items-center p-2 rounded-lg transition-colors mb-2" :class="{
-                'bg-gray-100': form.type === block.type,
-                'hover:bg-gray-100': !props.block,
+              class="block-type-option" :aria-pressed="form.type === block.type" :class="{
+                'bg-muted': form.type === block.type,
+                'hover:bg-muted': !props.block,
                 'opacity-50 cursor-not-allowed': !!props.block
               }" @click="selectBlock(block.type)" :disabled="!!props.block">
               <component :is="block.icon" class="w-6 h-6 mr-3 text-primary" />
               <div class="text-left">
                 <h3 class="font-medium text-sm">{{ block.name }}</h3>
-                <p class="text-xs text-gray-500">{{ block.description }}</p>
+                <p class="text-xs text-muted-foreground">{{ block.description }}</p>
               </div>
             </button>
           </div>
         </div>
 
         <!-- Selected block content -->
-        <div class="w-2/3 flex flex-col min-h-0">
-          <form @submit.prevent="save" class="flex flex-col h-full">
+        <div class="min-w-0 flex flex-col">
+          <form @submit.prevent="save" class="admin-form">
             <div v-if="!form.type" class="flex flex-col items-center justify-center flex-grow">
               <h2 class="text-lg font-medium">Select a block type</h2>
-              <p class="text-gray-500">Select the type of content you want to add from the left sidebar to begin.</p>
+              <p class="text-muted-foreground">Choose a content type to see its settings.</p>
             </div>
 
             <template v-else>
-              <div class="flex-grow overflow-auto p-6">
+              <div class="block-editor-fields">
                 <BlockCollections v-if="form.type === 'collections'" :data="form.data" @update="updateFormData"
                   class="max-h-full" />
                 <BlockFiles v-else-if="form.type === 'files'" :data="form.data" @update="updateFormData"
@@ -245,7 +246,7 @@ async function save() {
                   class="max-h-full" />
               </div>
 
-              <div class="flex justify-end p-4">
+              <div class="admin-form-footer">
                 <Button type="button" variant="outline" class="mr-2" @click="emit('update:modelValue', false)">
                   Cancel
                 </Button>
@@ -266,8 +267,8 @@ async function save() {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed #929292;
-  color: #929292;
+  border: 1px dashed var(--dv-color-line, #929292);
+  color: var(--dv-text-secondary, #929292);
   height: 60px;
   width: 100%;
 }

@@ -26,12 +26,13 @@ import {
 } from "@/components/ui/select"
 import { computed, ref } from "vue"
 import { useRouter } from "vue-router"
-import { toast } from "vue3-toastify"
+import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "../../services/server.ts"
 import { useGlobalStore } from "../../stores/globalStore.ts"
 
 const router = useRouter()
 const globalStore = useGlobalStore()
+const toast = useGlobalToast()
 const acceptedPolicies = ref(false)
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const form = ref({ name: "", company: "", regionId: "", email: "", password: "" })

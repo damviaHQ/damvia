@@ -14,14 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import Loader from "@/components/Loader.vue"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 import LayoutPageEditor from "@/layouts/LayoutPageEditor.vue"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
@@ -39,22 +31,12 @@ const { status, data: page, error } = useQuery({
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="page" class="p-8">
+  <div v-else-if="page" class="admin-page admin-resource-page">
     <div class="admin-layout__top flex items-center mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/admin/pages"> Pages </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage v-if="page"> Editing page "{{ page.name }}" </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+      <div class="admin-heading"><div><router-link :to="{ name: 'admin-pages' }" class="admin-back-link">← Pages</router-link><h1>{{ page.name }}</h1></div></div>
     </div>
     <LayoutPageEditor :page="page" />
   </div>

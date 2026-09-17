@@ -18,22 +18,8 @@ import CollectionDialogEdit from "@/components/collection/CollectionDialogEdit.v
 import CollectionDialogShare from "@/components/collection/CollectionDialogShare.vue"
 import CollectionRenderLayout from "@/components/collection/CollectionRenderLayout.vue"
 import Loader from "@/components/Loader.vue"
-import {
-  Breadcrumb,
-  BreadcrumbEllipsis,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import LayoutDialogMember from "@/layouts/LayoutDialogMember.vue"
 import LayoutPageEditor from "@/layouts/LayoutPageEditor.vue"
 import { trpc } from "@/services/server.ts"
@@ -62,7 +48,6 @@ const isEditing = ref(false)
 const isEditCollectionModalOpen = ref(false)
 const isShareModalOpen = ref(false)
 const isMemberDialogOpen = ref(false)
-const itemsToDisplay = 3
 
 const { status, data: collection, error } = useQuery({
   queryKey: computed(() => ["collection", route.params.id]),
@@ -121,18 +106,11 @@ const collectionPath = computed(() => {
   }
   return path.reverse()
 })
-const dropdownItems = computed(() => {
-  if (collectionPath.value.length <= itemsToDisplay) return []
-  return collectionPath.value.slice(1, -2)
-})
-const visibleItems = computed(() => {
-  if (collectionPath.value.length <= itemsToDisplay) return collectionPath.value
-  return [
-    collectionPath.value[0],
-    { id: "ellipsis", name: "...", isEllipsis: true },
-    ...collectionPath.value.slice(-2),
-  ]
-})
+const breadcrumbItems = computed<PathBreadcrumbItem[]>(() => collectionPath.value.map(item => ({
+  id: item.id,
+  label: item.name,
+  to: { name: 'collection', params: { id: item.id } },
+})))
 
 watch(
   () => route.params.id,
@@ -245,41 +223,7 @@ function openMemberDialog() {
           (collection.children?.length || collection.files?.length)
         " class="h-4 w-4 text-neutral-500 mx-2" />
         <div v-if="!isEditing && (collection.children?.length || collection.files?.length)" class="collection__path">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <template v-for="(item, index) in visibleItems" :key="item.id">
-                <BreadcrumbItem class="text-neutral-500 hover:text-neutral-800">
-                  <template v-if="item.isEllipsis">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger class="flex items-center gap-1 hover:bg-transparent"
-                        aria-label="Toggle menu">
-                        <BreadcrumbEllipsis class="h-4 w-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        <DropdownMenuItem v-for="dropItem in dropdownItems" :key="dropItem.id">
-                          <router-link :to="{ name: 'collection', params: { id: dropItem.id } }">
-                            {{ dropItem.name }}
-                          </router-link>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </template>
-                  <template v-else>
-                    <BreadcrumbLink v-if="index < visibleItems.length - 1" as-child>
-                      <router-link :to="{ name: 'collection', params: { id: item.id } }"
-                        class="max-w-20 truncate md:max-w-none">
-                        {{ item.name }}
-                      </router-link>
-                    </BreadcrumbLink>
-                    <BreadcrumbPage v-else class="max-w-20 truncate md:max-w-none font-medium text-neutral-800">
-                      {{ item.name }}
-                    </BreadcrumbPage>
-                  </template>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator v-if="index < visibleItems.length - 1" />
-              </template>
-            </BreadcrumbList>
-          </Breadcrumb>
+          <PathBreadcrumb :items="breadcrumbItems" />
         </div>
       </div>
       <div class="collection__header-actions flex items-center gap-0.5">
@@ -326,15 +270,6 @@ function openMemberDialog() {
   align-items: center;
 }
 
-.collection__path-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  color: var(--primary-color50);
-  font-weight: 500;
-  text-decoration: none;
-}
-
 .collection__selection-container {
   @apply flex items-center text-neutral-500;
 }
@@ -356,7 +291,4 @@ function openMemberDialog() {
   display: flex;
 }
 
-.collection__path-item--ellipsis:hover .tooltip {
-  display: block;
-}
 </style>

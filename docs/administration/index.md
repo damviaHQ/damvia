@@ -3,7 +3,7 @@ title: Administration
 description: Map of every admin screen, what it manages, and which role can open it.
 sidebar:
   order: 1
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 The administration area lives under `/admin/...` in the client and is reached from the account menu of the main layout ("Administration" opens the dashboard, "Manage Users" the user list). It groups everything a self-hoster or an administrator changes after the instance is running: who can log in, how assets are typed and licensed, what the menu and pages look like, and how the product catalogue is wired to files.
@@ -14,15 +14,15 @@ The routes below are declared in `client/src/router/index.ts`. The sidebar label
 
 | Route | Sidebar label | Section | What it manages | Who sees it |
 | --- | --- | --- | --- | --- |
-| `/admin` | Dashboard | (top level) | Storage used against the plan, sync health, users waiting for approval, downloads of the last 7 days | admin |
-| `/admin/settings` | Global Settings | (top level) | Instance-wide settings screen | admin |
+| `/admin` | Dashboard | (top level) | Workspace totals, recent files, actionable access/sync/export issues, storage and cloud health | admin |
+| `/admin/settings` | Global Settings | (top level) | Brand Logo upload and login background image | admin |
 | `/admin/menu-items` | Menu | Content Management | The navigation tree shown to users: collections, pages, text links, dividers, home item | admin |
 | `/admin/collections` | Collections | Content Management | The public collection tree: create, edit, delete | admin |
 | `/admin/pages` and `/admin/pages/:id` | Pages | Content Management | Standalone pages and their block layout | admin |
 | `/admin/assets/:id?` | Assets | Asset Management | The folder tree synced from cloud storage; assign asset type and license per folder | admin |
 | `/admin/asset-types` | Asset Types | Asset Management | Categories of files with display and search defaults | admin |
 | `/admin/licenses` | Licenses | Asset Management | Usage licenses with dates, scopes and allowed regions | admin |
-| `/admin/users` | Users | User Management | Sign-ups, approval, roles, groups, removal | admin, manager |
+| `/admin/users` | Users | User Management | Search, filters, CSV export, approval and user details with roles, groups and removal | admin, manager |
 | `/admin/groups` | Groups | User Management | Groups used to restrict collections | admin |
 | `/admin/regions` | Regions | User Management | Regions with a default group each | admin |
 | `/admin/authorized-domains` | Authorized Domains | User Management | Email domains whose sign-ups are approved automatically | admin |
@@ -72,3 +72,17 @@ A user who is authenticated but not yet verified and approved never reaches the 
 All admin screens talk to the tRPC API under `server/src/trpc/router/`. Most of the work described in these pages is done synchronously in the request, but a few actions push jobs to pg-boss queues (collection synchronization, archive creation, emails). Those queues and their crons are listed in [Background jobs](../reference/background-jobs.md), and the variables that shape them in [Environment variables](../reference/environment-variables.md).
 
 [Accounts and links](./accounts-and-links.md) covers session lifetime, expiry and revocation for operators. This documentation targets administrators and developers; end-user workflows will be maintained separately.
+
+## Admin interface
+
+Admin pages share square buttons, inputs and navigation states, with rounded panels and dialogs. The configuration lists include local search, result counts and pagination. Settings names the uploaded image **Brand Logo**. Portaled dialogs, dropdowns and selectors inherit the admin theme; portal pages retain their own styling.
+
+The sidebar keeps branding, storage usage and the account footer visible while its compact navigation scrolls independently.
+
+Admin dialogs use a common header, square form controls, a visible close button and a separated action footer. Compact forms, wide editors and CSV comparisons have distinct widths. Long forms scroll inside the dialog; actions remain visible. Destructive confirmations use a red primary action.
+
+Users awaiting approval have an **Approve** button in place of their status badge in the user list. It approves the account immediately without opening a modal, and refreshes the list and counts. It is shown only for verified accounts the current administrator or manager is permitted to approve.
+
+User Management appears above Asset Management in the sidebar. The logo links back to the DAM home page; there is no separate back-link row.
+
+The dashboard places latest user activity, cloud synchronisation and storage side by side when its content area has sufficient width. Recent file updates and downloads appear together below as workspace activity.

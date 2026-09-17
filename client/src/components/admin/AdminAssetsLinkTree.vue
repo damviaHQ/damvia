@@ -20,7 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { Asset } from "@/layouts/LayoutAdmin.vue"
-import { ChevronDown, ChevronRight } from "lucide-vue-next"
+import { ChevronDown, ChevronRight, Folder, FolderOpen } from "lucide-vue-next"
 import { ref, watch } from "vue"
 
 const props = defineProps<{ asset: Asset; openItems: string[] }>()
@@ -62,6 +62,8 @@ function handleLinkClick(event: MouseEvent) {
         <ChevronRight v-else class="w-4 h-4" />
       </button>
       <div v-else class="w-4 h-4" />
+      <FolderOpen v-if="open" class="layout-link-tree__folder" />
+      <Folder v-else class="layout-link-tree__folder" />
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -86,9 +88,19 @@ function handleLinkClick(event: MouseEvent) {
 }
 
 .layout-link-tree__link {
-  @apply flex items-center text-neutral-600 py-2 text-sm cursor-pointer no-underline hover:text-neutral-800 hover:bg-neutral-200;
+  display: flex;
+  align-items: center;
   width: 100%;
+  min-height: 38px;
+  padding: 6px 8px;
+  color: var(--dv-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .15s ease, color .15s ease;
 }
+
+.layout-link-tree__link:hover { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
 
 .layout-link-tree__link--disabled {
   pointer-events: none;
@@ -97,11 +109,19 @@ function handleLinkClick(event: MouseEvent) {
 .layout-link-tree__icon-wrapper {
   cursor: pointer;
   border: none;
-  background: initial;
+  background: transparent;
   display: flex;
-  width: fit-content;
-  margin-right: 0.5rem;
+  align-items:center;
+  justify-content:center;
+  width: 24px;
+  height: 24px;
+  padding:0;
+  margin-right: 2px;
+  color:var(--dv-text-secondary);
 }
+
+.layout-link-tree__icon-wrapper:hover { color:var(--dv-action-primary); }
+.layout-link-tree__icon-wrapper svg { width:14px; height:14px; }
 
 .layout-link-tree__icon {
   width: 1rem;
@@ -111,8 +131,12 @@ function handleLinkClick(event: MouseEvent) {
 }
 
 .layout-link-tree__children {
-  padding-left: 1rem;
+  margin-left: 19px;
+  padding-left: 7px;
+  border-left:1px solid var(--dv-color-line);
 }
+
+.layout-link-tree__folder { width:15px; height:15px; margin-right:8px; color:var(--dv-text-secondary); }
 
 .layout-link-tree__name {
   @apply overflow-hidden whitespace-nowrap text-ellipsis;
@@ -121,6 +145,10 @@ function handleLinkClick(event: MouseEvent) {
 }
 
 .layout-link-tree__link--active .layout-link-tree__name {
-  @apply font-bold text-neutral-800;
+  color:var(--dv-color-midnight);
+  font-weight:650;
 }
+
+.layout-link-tree__link--active { background:var(--dv-action-soft); color:var(--dv-action-primary); }
+.layout-link-tree__link--active .layout-link-tree__folder { color:var(--dv-action-primary); }
 </style>

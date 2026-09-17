@@ -3,7 +3,7 @@ title: Users and approval
 description: How a visitor becomes a user, how approval and roles work, and what managers can and cannot do.
 sidebar:
   order: 3
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 Users sign up themselves, verify their email address, and then wait for an administrator or a manager of their region to approve them, unless their email domain is on the authorized list. This page follows that path and the rules around roles, magic links, password resets and account removal.
@@ -34,7 +34,7 @@ A signed-in user can resend their own verification email. `user.resendVerificati
 
 ## Approve a pending user
 
-On `/admin/users`, a user who has verified their email but is not approved shows an `Approve User` button in the Approval Status column. Approval:
+On `/admin/users`, a user who has verified their email but is not approved shows an `Approve` action in the table and an `Approve user` action in their details modal. Approval:
 
 1. Sets `approved` to true.
 2. Pushes a job to `email/user-approved`.
@@ -115,3 +115,27 @@ Sessions are signed with the required `APP_SECRET` and last 180 days. The server
 ## Account removal
 
 `removeUser` does not remove or reassign private collections. Their owner foreign key can block the final user deletion. Resolve ownership or remove those collections through the application before attempting account removal. Earlier archive-object deletions are external effects and cannot be rolled back with the SQL transaction.
+
+The dashboard’s pending-approval links open this screen with the needs-approval filter selected (`?needsApproval=true`). Clear that filter to see the other users.
+
+## Search, filter and export
+
+The user directory uses mutually exclusive All users, Needs approval, Active and Unverified views. Active means both approved and email-verified. Search matches name, email or company, and additional filters narrow by role, region and group. Managers still receive only their region’s users from the API.
+
+Click User or Joined to change the sort order. The default is newest registrations first. Choose 10, 20 or 50 rows per page. The header checkbox selects the current page; selection can span pages. Changing filters or page size clears selection, and refreshed data removes selections that no longer match.
+
+Export users downloads every matching record, or the selected matching records when a selection exists, across all pages. CSV includes name, email, company, role, region, group names, status and registration date. Fields are quoted and spreadsheet formula prefixes are neutralised. Copy emails uses the same selection/filter scope but includes only verified addresses.
+
+## User details
+
+Click a user’s name to open the keyboard-accessible details modal. It contains profile fields, role, region, group membership and the storage-alert setting when applicable. Managers can inspect elevated accounts but only administrators can edit them. Managers can edit their own name, email and company; their access controls remain managed by an administrator. Self-role changes and self-deletion are unavailable in this directory.
+
+Save failures remain visible in the form. Changing an email explains the re-verification requirement before saving. Deletion requires confirmation, and a failed deletion keeps the confirmation open with its error. Escape dismisses idle dialogs and focus returns to the opening control (or search if that row no longer exists).
+
+## Admin interface
+
+The Authorized domains screen has search by domain or description, a result count, and pagination at 20 rows. Its removal confirmation explains that future accounts need manual approval; existing accounts are unaffected.
+
+User-detail and authorized-domain dialogs inherit the shared modal header, control and footer styling.
+
+Users awaiting approval have an **Approve** button in place of their status badge in the user list. It approves the account immediately without opening a modal, and refreshes the list and counts. It is shown only for verified accounts the current administrator or manager is permitted to approve.

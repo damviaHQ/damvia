@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { DialogClose } from "@/components/ui/dialog"
+import AdminList from "@/components/admin/AdminList.vue"
 import Loader from "@/components/Loader.vue"
 import {
   AlertDialog,
@@ -23,13 +25,8 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -84,10 +81,10 @@ function openEditModal(group: RouterOutput["group"]["list"][number]) {
   modalState.value = "editing"
 }
 
-async function onModalSubmit(event: Event) {
+async function submitChanges(event: Event) {
   event.preventDefault()
   const action = modalState.value === "creating" ? trpc.group.create : trpc.group.update
-  action
+  return action
     .mutate(form.value as any)
     .then(() => queryClient.invalidateQueries({ queryKey: ["groups"] }))
     .then(() => {
@@ -100,9 +97,11 @@ async function onModalSubmit(event: Event) {
 }
 
 async function setDefault(groupId: string) {
-  await trpc.group.setDefault.mutate(groupId)
-  await queryClient.invalidateQueries({ queryKey: ["groups"] })
-  toast.success("Group set as default!")
+  try {
+    await trpc.group.setDefault.mutate(groupId)
+    await queryClient.invalidateQueries({ queryKey: ["groups"] })
+    toast.success("Default group updated")
+  } catch (error) { toast.error((error as Error).message) }
 }
 
 async function remove(id: string) {
@@ -139,31 +138,33 @@ async function moveUsersAndRemoveGroup() {
     toast.error((error as Error).message)
   }
 }
+const saving = ref(false)
+async function onModalSubmit(event: Event) {
+  event.preventDefault()
+  if (saving.value) return
+  saving.value = true
+  try { await submitChanges(event) } finally { saving.value = false }
+}
 </script>
 
 <template>
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="flex flex-col p-8">
-    <div class="pages__top flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Groups</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Button type="button" variant="link" @click="openCreateModal"
-        class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
+    <div class="admin-heading">
+      <div><h1>Groups</h1><p>Control which collections people can access.</p></div>
+      <Button type="button" variant="default" @click="openCreateModal"
+        class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
-        Add new Group
+        Add group
       </Button>
     </div>
 
+    <AdminList :items="data" :fields="['name']" label="Groups" v-slot="{ items }">
     <Table>
       <TableHeader>
         <TableRow>
@@ -172,10 +173,10 @@ async function moveUsersAndRemoveGroup() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="group in data" :key="group.id">
+        <TableRow v-for="group in items" :key="group.id">
           <TableCell>
             {{ group.name }}
-            <span v-if="group.isDefault" class="ml-2 text-sm text-green-600">(Default)</span>
+            <span v-if="group.isDefault" class="dv-badge ml-2">Default</span>
           </TableCell>
           <TableCell>
             <div class="flex space-x-2">
@@ -183,10 +184,10 @@ async function moveUsersAndRemoveGroup() {
                 <PencilLine class="w-4 h-4 mr-2" />
                 Edit
               </Button>
-              <Button variant="ghost" size="sm" @click="remove(group.id)" :disabled="group.isDefault">
-                <Trash2 class="w-4 h-4 mr-2" />
-                Remove
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger as-child><Button variant="ghost" size="sm" :disabled="group.isDefault"><Trash2 class="w-4 h-4 mr-2" />Remove</Button></AlertDialogTrigger>
+                <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove {{ group.name }}?</AlertDialogTitle><AlertDialogDescription>If this group has users or is a region default, you will be asked to choose a replacement group.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="remove(group.id)">Remove group</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+              </AlertDialog>
               <Button v-if="!group.isDefault" variant="ghost" size="sm" @click="setDefault(group.id)">
                 <Flag class="w-4 h-4 mr-2" />
                 Set as Default
@@ -196,11 +197,12 @@ async function moveUsersAndRemoveGroup() {
         </TableRow>
       </TableBody>
     </Table>
+    </AdminList>
   </div>
 
-  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && (modalState = 'closed')">
-    <DialogContent class="sm:max-w-[425px]">
-      <form @submit.prevent="onModalSubmit">
+  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && !saving && (modalState = 'closed')">
+    <DialogContent class="admin-dialog--compact">
+      <form :aria-busy="saving" @submit.prevent="onModalSubmit">
         <DialogHeader>
           <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} group</DialogTitle>
           <DialogDescription>
@@ -214,9 +216,9 @@ async function moveUsersAndRemoveGroup() {
             <Input id="name" v-model="form.name" placeholder="Group name" />
           </div>
         </div>
-        <DialogFooter class="sm:justify-between items-center">
-          <div class="text-sm text-gray-500">* Required</div>
-          <Button type="submit" :disabled="!form.name">
+        <DialogFooter class="items-center">
+          <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
+          <Button type="submit" :disabled="saving || (!form.name)">
             {{ modalState === "creating" ? "Create" : "Edit" }}
           </Button>
         </DialogFooter>

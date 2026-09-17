@@ -3,10 +3,10 @@ title: Dashboard
 description: The admin recap at /admin with storage used against the plan, the paused-sync state, orphan cleanup, sync health, pending approvals and recent downloads.
 sidebar:
   order: 2
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
-The dashboard is the first admin screen, at `/admin`, and the page every admin lands on from the "Administration" entry of the account menu. It answers one question before anything else: how full is the storage, and is the cloud sync still bringing files in.
+The dashboard is the first admin screen, at `/admin`, and the page every admin lands on from the "Administration" entry of the account menu. It combines workspace totals, user activity, file and download activity, access requests and storage health in the shared Damvia admin design.
 
 ## What the storage block shows
 
@@ -14,7 +14,7 @@ The worker adds up every object of the two buckets every 30 minutes (`storage/me
 
 Between two measurements the total is kept current by adding the size of each file the worker uploads, so the figure never lags more than half an hour and never under-counts for long. Sizes reserved by downloads still running survive a measurement; they are only cleared when no `asset/update-content` job is active, which is how a reservation left by a crashed process disappears. "Last measured" gives the time of the last full listing.
 
-When a file from Dropbox or OneDrive no longer fits under the plan, the alert above the block says that new files are not downloaded until space is freed.
+When a file from Dropbox or OneDrive no longer fits under the plan, the shared banner says that new files are not downloaded until space is freed.
 
 ## The plan pauses the sync, not the DAM
 
@@ -22,13 +22,19 @@ With `STORAGE_QUOTA` set, each `asset/update-content` job reserves the file's si
 
 Everything else keeps working: users still browse, download archives, upload page media and collection thumbnails, and thumbnails of files already downloaded are still generated. That is why the plan must be smaller than the disk: on a 2 TB disk, a 1.5 TB plan leaves room for archives, previews, Postgres and temporary files.
 
+## Usage can be above the plan
+
+The plan stops new downloads; it never deletes what is already stored. An instance that held 4.9 GB before `STORAGE_QUOTA=2GB` was set shows `4.9 GB / 2.0 GB`, `246% used · 0 B available`, and "Storage needs attention". "Available" never goes below zero. Archives, previews and page media, which the plan does not block, can also push usage past it.
+
+Usage goes back under the plan in two ways: raise `STORAGE_QUOTA` and restart the server, or remove folders from the cloud storage and let the deletion job remove their objects. Then click "Measure now".
+
 ## Alerts at 80, 90, 95 and 100 %
 
 When a measurement crosses one of these thresholds upwards, every admin designated in [Users](./users-and-approval.md) ("Receives storage and maintenance emails") receives the `storage-alert` email once, with `severity` `warning` at 80 %, `critical` at 90 and 95 %, and `full` at 100 %. The level is remembered only once the email has gone out, so a usage that stays at 93 % does not mail every half hour, while an alert that could not be sent (no designated admin, missing template, SMTP error) is tried again at the next measurement. It is lowered again, without mail, once usage drops more than 2 points under the remembered threshold, so the next crossing mails again. The template and its variables are in [Email templates](../configuration/email-templates.md).
 
-From 80 %, the warning above the storage block also shows the `SERVER_ALERT_EMAILS` addresses as an email link, for the admin to ask the host for a larger plan. It is omitted when the variable is empty.
+From 80 %, the shared admin banner also shows the `SERVER_ALERT_EMAILS` addresses as an email link, for the admin to ask the host for a larger plan. It is omitted when the variable is empty.
 
-The same thresholds drive the banner shown above every admin page: amber from 80 %, red from 90 %, with the paused state when the sync stopped.
+The banner is shown once above every admin page: amber from 80 %, red from 90 %, with the paused state and hosting contact link when configured. The dashboard does not repeat the same warning in a second alert. Storage usage sits near the top of the navigation sidebar.
 
 ## The server disk is for the host, not the customer
 
@@ -42,12 +48,25 @@ An admin whose address is listed in `SERVER_ALERT_EMAILS` sees one more block, "
 
 Files still too large for the remaining space are blocked again at their turn and logged; the rest downloads in order.
 
-## The other blocks
+## Needs attention
 
-| Block | Figures | What to look at |
-|---|---|---|
-| Asset files | Counts of `up_to_date`, `creating` (waiting for download), `outdated`, `pending_deletion` | `creating` should fall to zero after an import; a stable non-zero count means blocked or failing downloads, see [Operations](../deployment/operations.md) |
-| Users | Total, admins receiving storage alerts, waiting for approval, count per role | Both counts are red when they need attention: designate an alert recipient, approve pending users, on [Users and approval](./users-and-approval.md) |
-| Downloads, last 7 days | `ready`, `preparing`, `failed`, `expired` created in the last 7 days | Failed counts turn red; the causes are in [Downloads](./downloads.md) |
+A compact panel appears above recent files only when there is something to act on:
+
+- **Access requests:** opens Users with the needs-approval filter.
+- **Files waiting to sync:** offers Retry files when pending or outdated files exist and no file downloads are running. When storage has paused synchronisation, the shared storage banner explains the blocker instead.
+- **Failed exports:** shows failures from the past seven days and offers a hosting-contact email link when configured.
+- **Missing storage-alert recipient:** opens Users to designate an administrator who receives maintenance emails.
+
+The panel disappears when none of these conditions apply. Role breakdowns, zero-count file states and expired/preparing download totals are not repeated as dashboard cards. Storage and cloud health remain in the sidebar panels; host-only disk diagnostics retain their existing visibility restriction.
 
 All figures come from one admin-only procedure, `dashboard.summary`; managers never see the dashboard or the banner.
+
+## Workspace overview and activity
+
+The top row shows all asset files, folder and collection counts, workspace users, and downloads created in the last seven days. The equal-height operational row contains Latest user activity, Cloud synchronisation and Storage. Latest user activity combines the most recent registrations, approvals and guest invitations. Invitation entries name the person who created the shared link, the guest email and the collection. A verified account waiting for access has a one-click **Approve** action; unverified and approved accounts retain a compact state label.
+
+Workspace activity sits below those cards without an enclosing white panel. Recently updated lists the three latest asset-file records and opens each file’s containing folder. Recently downloaded lists the three newest download requests with their file count, requester, status and update time. These timestamps describe current records rather than an immutable audit log. The pending-approval link opens Users with its existing needs-approval filter selected.
+
+The midnight navigation and Mona Sans typography are shared with the design-system preview. Buttons have square corners and panels retain rounded corners. On narrow screens, Open navigation expands the menu above the content; choosing a destination closes it. The tenant-facing DAM keeps its existing branding.
+
+When the dashboard content area is at least 1120 px wide, Latest user activity, Cloud synchronisation and Storage share one row with equal-height panels. Needs attention and server diagnostics remain full-width rows when present. The two workspace activity feeds share a row below. Smaller layouts retain stacked panels with natural heights to keep names and controls readable.

@@ -3,7 +3,7 @@ title: Asset types
 description: Categorize files with asset types and control their default display, search inclusion and product linkage.
 sidebar:
   order: 6
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 An asset type labels a family of files (product packshots, marketing visuals, documents) and carries defaults that the client applies whenever a set of files shares that type: grid or list view, which columns the list shows, whether the type is searched by default, and whether its files can be linked to products.
@@ -62,3 +62,9 @@ Page blocks of type `files` use the shared type's name as their default title wh
 :::tip
 Give product-related types `Related to products` and add the product attributes you want as list columns. Keep purely decorative types out of the default search by leaving `Search by default` unchecked so that searches return product files first.
 :::
+
+## Admin interface
+
+The Asset types screen searches names and descriptions and shows 20 results per page. Editing retains product linking, default search inclusion, display mode and column ordering in the themed dialog.
+
+The asset-type modal separates configuration from list columns on desktop and stacks them on mobile. Add/remove column buttons have explicit accessible names, and Cancel is available beside the submit action.

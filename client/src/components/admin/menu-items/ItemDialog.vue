@@ -27,15 +27,7 @@ import {
 import { Slider } from "@/components/ui/slider"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import {
-  DialogContent,
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogRoot,
-  DialogTitle,
-  DialogTrigger,
-} from "radix-vue"
+import { Dialog as DialogRoot, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogFooter } from '@/components/ui/dialog'
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
 
@@ -135,7 +127,7 @@ function handleSliderChange(key: "spacingTop" | "spacingBottom", value: number[]
   form.value.data[key] = value
 }
 
-async function handleSubmit() {
+async function submitChanges() {
   error.value = ''
   if (form.value.type === 'page' && !form.value.pageId) {
     error.value = 'Page is required.'
@@ -151,6 +143,12 @@ async function handleSubmit() {
   isDialogOpen.value = false
   emit("update:open", false)
 }
+const saving = ref(false)
+async function handleSubmit() {
+  if (saving.value) return
+  saving.value = true
+  try { await submitChanges() } catch (cause) { error.value = (cause as Error).message } finally { saving.value = false }
+}
 </script>
 
 <template>
@@ -158,25 +156,24 @@ async function handleSubmit() {
     <dialog-trigger as-child>
       <slot />
     </dialog-trigger>
-    <dialog-portal>
-      <dialog-overlay class="item-dialog__overlay" />
-      <dialog-content class="item-dialog__content">
+    <DialogContent>
+      <DialogHeader>
         <DialogTitle>
           {{ item ? "Edit item" : "Add item to menu" }}
         </DialogTitle>
-        <DialogDescription class="text-sm text-neutral-400 mb-4">
-          You can add an existing collection, a page, a custom text or a divider to the menu from the selector
-          below, then fill in the relevant fields.
+        <DialogDescription class="text-sm admin-text-secondary mb-4">
+          Choose a collection, page, link or divider for your navigation.
         </DialogDescription>
 
+      </DialogHeader>
         <form @submit.prevent="handleSubmit" class="flex flex-col gap-3">
-          <div v-if="error" class="bg-red-100 text-red-600 p-4 text-sm">
+          <div v-if="error" role="alert" class="admin-form-error">
             {{ error }}
           </div>
           <div class="form-field">
             <Label class="form" for="type">Type</Label>
             <Select v-model="form.type" :disabled="!!item">
-              <SelectTrigger class="w-full">
+              <SelectTrigger id="type" class="w-full">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
@@ -253,35 +250,13 @@ async function handleSubmit() {
               </Label>
             </div>
           </template>
-          <Button type="submit" class="mt-4">Save</Button>
+          <DialogFooter><Button type="button" variant="outline" :disabled="saving" @click="isDialogOpen = false">Cancel</Button><Button type="submit" :disabled="saving">{{ saving ? 'Saving…' : 'Save menu item' }}</Button></DialogFooter>
         </form>
-      </dialog-content>
-    </dialog-portal>
+    </DialogContent>
   </dialog-root>
 </template>
 
 <style scoped>
-label {
-  @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
-}
-
-.item-dialog__overlay {
-  position: fixed;
-  z-index: 1;
-  background: rgba(0, 0, 0, 0.8);
-  inset: 0;
-}
-
-.item-dialog__content {
-  @apply flex flex-col gap-2 bg-neutral-50;
-  position: fixed;
-  z-index: 2;
-  top: 50%;
-  left: 50%;
-  max-height: 85vh;
-  width: 90vw;
-  max-width: 450px;
-  padding: 25px;
-  transform: translate(-50%, -50%);
-}
+.form-field { display:flex; flex-direction:column; gap:8px; }
+.form-field.space-x-2 { flex-direction:row; }
 </style>

@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { DialogClose } from "@/components/ui/dialog"
+import AdminList from "@/components/admin/AdminList.vue"
 import DisplaySelector from "@/components/DisplaySelector.vue"
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -27,17 +29,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -132,7 +129,7 @@ function openEditModal(assetType: RouterOutput["assetType"]["list"][number]) {
   modalState.value = "editing"
 }
 
-async function onModalSubmit(event: Event) {
+async function submitChanges(event: Event) {
   event.preventDefault()
 
   const action =
@@ -189,30 +186,32 @@ function toggleAttribute(value: string, event: Event) {
 function updateDefaultDisplay(value: "grid" | "list") {
   form.value.defaultDisplay = value
 }
+const saving = ref(false)
+async function onModalSubmit(event: Event) {
+  event.preventDefault()
+  if (saving.value) return
+  saving.value = true
+  try { await submitChanges(event) } finally { saving.value = false }
+}
 </script>
 
 <template>
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="flex flex-col p-8">
-    <div class="pages__top flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage> Asset Types </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Button type="button" variant="link" @click="openCreateModal"
-        class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
+    <div class="admin-heading">
+      <div><h1>Asset types</h1><p>Configure search defaults and file information for each asset type.</p></div>
+      <Button type="button" variant="default" @click="openCreateModal"
+        class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
-        Add new Asset Type
+        Add asset type
       </Button>
     </div>
+    <AdminList :items="data" :fields="['name', 'description']" label="Asset types" v-slot="{ items }">
     <Table>
       <TableHeader>
         <TableRow>
@@ -224,7 +223,7 @@ function updateDefaultDisplay(value: "grid" | "list") {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="assetType in data" :key="assetType.id">
+        <TableRow v-for="assetType in items" :key="assetType.id">
           <TableCell>{{ assetType.name }}</TableCell>
           <TableCell>{{ assetType.description }}</TableCell>
           <TableCell>{{ assetType.isRelatedToProducts ? "Yes" : "No" }}</TableCell>
@@ -236,7 +235,7 @@ function updateDefaultDisplay(value: "grid" | "list") {
                 Edit
               </Button>
               <AlertDialog>
-                <AlertDialogTrigger>
+                <AlertDialogTrigger as-child>
                   <Button variant="ghost" size="sm">
                     <Trash2 class="w-4 h-4 mr-2" />
                     Remove
@@ -258,15 +257,17 @@ function updateDefaultDisplay(value: "grid" | "list") {
         </TableRow>
       </TableBody>
     </Table>
+    </AdminList>
   </div>
-  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && (modalState = 'closed')">
-    <DialogContent class="sm:max-w-[800px] h-[90vh] flex flex-col">
-      <form @submit.prevent="onModalSubmit" class="flex flex-col h-full">
+  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && !saving && (modalState = 'closed')">
+    <DialogContent class="admin-dialog--wide flex flex-col">
+      <form :aria-busy="saving" @submit.prevent="onModalSubmit" class="admin-form">
         <DialogHeader>
-          <DialogTitle class="text-xl mb-4">{{ modalState === "creating" ? "Create" : "Edit" }} Asset Type</DialogTitle>
+          <DialogTitle >{{ modalState === "creating" ? "Create" : "Edit" }} asset type</DialogTitle>
+          <DialogDescription>Set search defaults, product linking and list columns.</DialogDescription>
         </DialogHeader>
-        <div class="flex gap-10 py-4 flex-grow overflow-hidden">
-          <div class="flex-1 flex flex-col gap-5 overflow-y-auto pr-4">
+        <div class="modal-editor-grid">
+          <div class="flex flex-col gap-5 min-w-0">
             <div class="flex flex-col gap-2">
               <Label for="name">Name *</Label>
               <Input id="name" v-model="form.name" placeholder="Name" />
@@ -287,32 +288,22 @@ function updateDefaultDisplay(value: "grid" | "list") {
               <Label for="defaultDisplay">Default Display</Label>
               <DisplaySelector v-model="form.defaultDisplay" @update:model-value="updateDefaultDisplay" />
             </div>
-            <Alert class="my-8">
-              <InfoIcon class="h-4 w-4" />
-              <AlertTitle>Asset Types</AlertTitle>
-              <AlertDescription>
-                Asset types help categorize your digital assets in the collections. They
-                allow you to define if those asset are Marketing purpose, or are Product
-                views for example. You can also define the default display settings, and
-                search preferences for different types of files, and add attributes from
-                the PIM to link them to your products.
-              </AlertDescription>
-            </Alert>
+
           </div>
-          <div class="flex-1 flex flex-col gap-4 overflow-hidden">
-            <div class="flex flex-col gap-2 h-full overflow-hidden">
-              <Label>PIM attributes displayed in List view</Label>
-              <p class="text-sm text-neutral-500">
+          <div class="flex flex-col gap-4 min-w-0">
+            <div class="flex flex-col gap-2">
+              <Label>List columns</Label>
+              <p class="text-sm admin-text-secondary">
                 Add attributes, drag and drop to reorder or click the trash icon to
                 remove.
               </p>
-              <div class="flex-grow overflow-y-auto pr-4">
+              <div class="modal-attribute-list">
                 <Draggable v-model="form.listDisplayItems" item-key="value" class="space-y-2">
                   <template #item="{ element }">
                     <div
                       class="flex items-center justify-between p-1 border border-neutral-300 hover:border-neutral-800 cursor-grab">
                       <div class="flex items-center gap-2">
-                        <GripVertical class="h-4 w-4 text-neutral-400" />
+                        <GripVertical class="h-4 w-4 admin-text-secondary" />
                         {{
                           listItems.find((item) => item.value === element)?.name ??
                           element
@@ -320,8 +311,8 @@ function updateDefaultDisplay(value: "grid" | "list") {
                       </div>
                       <Button type="button" variant="ghost" size="sm"
                         @click="(event) => toggleAttribute(element, event)"
-                        class="hover:text-neutral-200 hover:bg-neutral-200">
-                        <Trash2 class="h-4 w-4 text-neutral-500 hover:text-neutral-800" />
+                        :aria-label="`Remove ${listItems.find(item => item.value === element)?.name ?? element}`">
+                        <Trash2 class="h-4 w-4 admin-text-secondary admin-text-primary-hover" />
                       </Button>
                     </div>
                   </template>
@@ -332,7 +323,7 @@ function updateDefaultDisplay(value: "grid" | "list") {
                     <span>{{ item.name }}</span>
                     <Button type="button" variant="ghost" size="sm"
                       @click="(event) => toggleAttribute(item.value, event)"
-                      class="hover:text-green-600 hover:bg-green-50">
+                      :aria-label="`Add ${item.name}`">
                       <CirclePlus class="h-4 w-4 hover:text-green-600" />
                     </Button>
                   </div>
@@ -341,9 +332,9 @@ function updateDefaultDisplay(value: "grid" | "list") {
             </div>
           </div>
         </div>
-        <DialogFooter class="sm:justify-between items-center">
-          <div class="text-sm text-gray-500">* Required</div>
-          <Button type="submit" :disabled="form.name === ''">
+        <DialogFooter class="items-center">
+          <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
+          <Button type="submit" :disabled="saving || (form.name === '')">
             {{ modalState === "creating" ? "Create" : "Save" }}
           </Button>
         </DialogFooter>

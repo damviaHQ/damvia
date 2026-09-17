@@ -3,7 +3,7 @@ title: Products and PIM
 description: Import a product catalogue from CSV, link files to products by file name, and turn product columns into search facets.
 sidebar:
   order: 10
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 The PIM section stores a flat product catalogue and links asset files to it by parsing file names. Once linked, product columns can be searched, offered as filters and displayed next to files.
@@ -88,3 +88,11 @@ ABC123-002,Example bag,Black,Accessories
 With `PRODUCT_MATCHING_REGEX=^(.{6}-\d{3})(?:\.(\d{2}))?`, `ABC123-001.00.jpg` links to the first product with view `00`. Set `PIM_PRODUCT_VIEW=00`; declare `colour` as facetable and `name` as searchable/viewable. On first comparison both records are `new`; after import, the same CSV should be `unchanged`. Change Blue to Green to exercise `changed`, and repeat a SKU to exercise `duplicate`.
 
 CSV is parsed into JSON before submission. The API body limit is 5 MiB, so the JSON request size, not only the CSV size, determines whether a large import fits. Split into batches while keeping the same key column. Product editing requires an approved, email-verified administrator, both in the interface and through `pim.updateProduct`.
+
+## Admin interface
+
+Products, CSV import and Product attributes use the shared admin controls and themed dialogs. Attribute search matches keys and display names, with 20 rows per page. The CSV comparison and override workflow is unchanged; choosing a file is labeled as ready for review rather than already imported.
+
+An empty catalog offers an Import CSV action; an empty filtered result offers Clear filters. Removing all products uses an in-app confirmation that explicitly includes products outside the current filters. The dialog stays open on failure and prevents repeated removal requests.
+
+Product-attribute editing and CSV comparison use the shared modal system. CSV comparison has an explicit review heading and keeps cancellation disabled during import.

@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
+import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Button } from "@/components/ui/button/index.js"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -24,20 +25,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-  Breadcrumb,
-  BreadcrumbEllipsis,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
@@ -60,7 +47,6 @@ import {Dialog, DialogContent, DialogTrigger} from "@/components/ui/dialog";
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
 type Collection = RouterOutput["collection"]["findById"]
-type CollectionWithPath = Collection & { isEllipsis?: boolean }
 
 type Props = {
   files?: File[]
@@ -240,24 +226,11 @@ const isExcel = computed(() => {
          currentFile.value.mimeType === 'application/vnd.oasis.opendocument.spreadsheet'
 })
 
-const itemsToDisplay = 5
-
-const dropdownItems = computed<Collection[]>(() => {
-  const path = collectionPath.value
-  if (path.length <= itemsToDisplay) return []
-  return path.slice(2, -3)
-})
-
-const visibleItems = computed<CollectionWithPath[]>(() => {
-  const path = collectionPath.value
-  if (path.length <= itemsToDisplay) return path
-  return [
-    path[0],
-    path[1],
-    { id: "ellipsis", name: "...", isEllipsis: true } as CollectionWithPath,
-    ...path.slice(-3),
-  ]
-})
+const breadcrumbItems = computed<PathBreadcrumbItem[]>(() => collectionPath.value.map(item => ({
+  id: item.id,
+  label: item.name,
+  to: { name: 'collection', params: { id: item.id } },
+})))
 
 const hasCollectionPath = computed(() => {
   const path = collectionPath.value
@@ -464,47 +437,8 @@ watch(() => props.modelValue, (newValue) => {
 
       <div class="flex items-center gap-2">
         <div v-if="hasCollectionPath" class="gallery-modal__breadcrumb">
-          <Breadcrumb>
-            <BreadcrumbList class="text-neutral-400">
-              <template v-for="(item, index) in visibleItems" :key="item.id">
-                <BreadcrumbItem class="text-neutral-400 hover:text-neutral-200">
-                  <template v-if="item.isEllipsis">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger class="flex items-center gap-1 hover:bg-transparent"
-                        aria-label="Toggle menu">
-                        <BreadcrumbEllipsis class="h-4 w-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" class="bg-neutral-700 text-neutral-200 border-neutral-600">
-                        <DropdownMenuItem v-for="dropItem in dropdownItems" :key="dropItem.id" class="dropdown-item-override">
-                          <router-link :to="{ name: 'collection', params: { id: dropItem.id } }" class="text-neutral-200"
-                            @click="$emit('update:modelValue', null)">
-                            {{ dropItem.name }}
-                          </router-link>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </template>
-                  <template v-else>
-                    <BreadcrumbLink v-if="index < visibleItems.length - 1" as-child>
-                      <router-link :to="{ name: 'collection', params: { id: item.id } }"
-                        class="max-w-20 truncate md:max-w-none text-neutral-400 hover:text-neutral-200"
-                        @click="$emit('update:modelValue', null)">
-                        {{ item.name }}
-                      </router-link>
-                    </BreadcrumbLink>
-                    <BreadcrumbLink v-else as-child>
-                      <router-link :to="{ name: 'collection', params: { id: item.id } }"
-                        class="max-w-20 truncate md:max-w-none font-medium text-neutral-200 hover:text-neutral-300"
-                        @click="$emit('update:modelValue', null)">
-                        {{ item.name }}
-                      </router-link>
-                    </BreadcrumbLink>
-                  </template>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator v-if="index < visibleItems.length - 1" class="text-neutral-500" />
-              </template>
-            </BreadcrumbList>
-          </Breadcrumb>
+          <PathBreadcrumb :items="breadcrumbItems" :head-items="2" :tail-items="3" tone="dark"
+            @navigate="$emit('update:modelValue', null)" />
         </div>
 
         <Button variant="ghost" size="icon" type="button"
@@ -1090,20 +1024,5 @@ watch(() => props.modelValue, (newValue) => {
   align-items: center;
 }
 
-.gallery-modal__breadcrumb :deep(.breadcrumb-list) {
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.gallery-modal__breadcrumb :deep(.breadcrumb-item) {
-  display: flex;
-  align-items: center;
-  height: 1.5rem;
-}
-
-.gallery-modal__breadcrumb:before {
-  margin-right: 0.5rem;
-  color: #9ca3af;
-  white-space: nowrap;
-}
+.gallery-modal__breadcrumb :deep(.dv-breadcrumb) { min-width:0; max-width:100%; }
 </style>

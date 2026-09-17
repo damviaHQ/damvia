@@ -119,7 +119,7 @@ async function onSubmit() {
 
 <template>
   <Dialog :open="modelValue" @update:open="emit('update:modelValue', $event)">
-    <DialogContent class="sm:max-w-[425px]">
+    <DialogContent class="admin-dialog--compact">
       <form @submit.prevent="onSubmit">
         <DialogHeader>
           <DialogTitle>Create new collection</DialogTitle>
@@ -130,22 +130,22 @@ async function onSubmit() {
 
         <div class="grid gap-6 py-4">
           <div v-if="globalStore.user?.role === 'admin'" class="create-collection-modal__type-container mb-075">
-            <div @click="form.synchronized = false" :class="[
+            <button type="button" :aria-pressed="!form.synchronized" @click="form.synchronized = false" :class="[
               'create-collection-modal__type',
               { 'create-collection-modal__type--active': !form.synchronized },
             ]">
               <FolderPen class="w-4 h-4" />
               <div class="font-medium">Custom</div>
               <Check v-if="!form.synchronized" class="w-4 h-4 text-primary ml-auto" />
-            </div>
-            <div @click="form.synchronized = true" :class="[
+            </button>
+            <button type="button" :aria-pressed="form.synchronized" @click="form.synchronized = true" :class="[
               'create-collection-modal__type',
               { 'create-collection-modal__type--active': form.synchronized },
             ]">
               <FolderSync class="w-4 h-4" />
               <div class="font-medium">Synchronized</div>
               <Check v-if="form.synchronized" class="w-4 h-4 text-primary ml-auto" />
-            </div>
+            </button>
           </div>
           <div v-if="form.synchronized" class="flex flex-col gap-2">
             <Label>Select a folder from your cloud storage *</Label>
@@ -154,7 +154,7 @@ async function onSubmit() {
           </div>
           <div v-if="!form.synchronized" class="flex flex-col gap-2">
             <Label for="name">Name *</Label>
-            <Input type="text" v-model="form.name" placeholder="Name" class="form-input mb-075" />
+            <Input id="name" type="text" v-model="form.name" placeholder="Name" class="form-input mb-075" />
           </div>
           <div v-if="collectionOptions?.length" class="flex flex-col gap-2">
             <Label for="collectionId">Select a parent collection</Label>
@@ -170,11 +170,11 @@ async function onSubmit() {
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="link" @click="emit('update:modelValue', false)">
+          <Button type="button" variant="outline" @click="emit('update:modelValue', false)">
             Cancel
           </Button>
-          <Button v-if="!form.synchronized" type="submit" :disabled="!form.name">Create Custom collection</Button>
-          <Button v-else type="submit" :disabled="!form.assetFolderId">Create Synchronized collection</Button>
+          <Button v-if="!form.synchronized" type="submit" :disabled="!form.name">Create collection</Button>
+          <Button v-else type="submit" :disabled="!form.assetFolderId">Create collection</Button>
         </DialogFooter>
       </form>
     </DialogContent>
@@ -196,17 +196,17 @@ async function onSubmit() {
   cursor: pointer;
   padding: 0.75rem;
   border: 1px solid transparent;
-  border-radius: 0.25rem;
+  border-radius: 0;
   transition: all 0.2s ease-in-out;
 }
 
 .create-collection-modal__type--active {
-  border-color: var(--primary-color);
-  background-color: var(--primary-color-light);
+  border-color: var(--dv-action-primary);
+  background-color: var(--dv-surface-canvas);
 }
 
 .create-collection-modal__type:hover {
-  background-color: var(--hover-color);
+  background-color: var(--dv-surface-canvas);
 }
 
 .create-collection-modal__type svg {

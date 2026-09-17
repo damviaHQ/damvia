@@ -17,12 +17,6 @@ import AdminDialogCreateCollection from "@/components/admin/AdminDialogCreateCol
 import ItemDialog from "@/components/admin/menu-items/ItemDialog.vue"
 import ItemsTree from "@/components/admin/menu-items/ItemsTree.vue"
 import Loader from "@/components/Loader.vue"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
@@ -40,29 +34,26 @@ const { data: menuItems, status, error } = useQuery({
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="flex flex-col p-8">
-    <div class="menu-items__top flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage> Menu </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <div class="flex items-center gap-4 mb-4">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
+    <div class="admin-menu-content">
+      <div class="admin-heading"><h1>Menu</h1>
+      <div class="admin-actions">
         <ItemDialog>
-          <Button type="button" variant="link" class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+          <Button type="button" variant="default" class="dv-button dv-button--primary">
             <CirclePlus class="w-4 h-4 max-w-4 max-h-4" />
-            Add a new item
+            Add menu item
           </Button>
         </ItemDialog>
         <AdminDialogCreateCollection :modelValue="isAdminDialogCreateCollectionOpen"
           @update:modelValue="isAdminDialogCreateCollectionOpen = $event" />
       </div>
-      <div class="flex items-center gap-4 mb-4">
+      </div>
+      <div class="dv-panel admin-menu-tree">
+        <p class="admin-form-note">Drag items to change their order. Open an item’s menu to edit it or set the home page.</p>
+        <div v-if="!menuItems?.length" class="admin-empty"><h2>No menu items yet</h2><p>Add a collection, page or link to your navigation.</p></div>
         <items-tree :items="menuItems" />
       </div>
     </div>

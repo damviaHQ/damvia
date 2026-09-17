@@ -13,11 +13,51 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
-import { trpc } from "@/services/server.ts"
+import { extractErrors, trpc } from "@/services/server.ts"
 import { onMounted, ref } from 'vue'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
+const queryClient = useQueryClient()
+const { data: logo, status: logoStatus, refetch: refetchLogo } = useQuery({ queryKey: ['client-logo'], queryFn: () => trpc.settings.getClientLogo.query() })
+const logoInput = ref<HTMLInputElement | null>(null)
+const isSavingLogo = ref(false)
+async function uploadLogo(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  isSavingLogo.value = true
+  try {
+    const contentType = file.type as 'image/svg+xml' | 'image/png' | 'image/webp'
+    if (!['image/svg+xml', 'image/png', 'image/webp'].includes(contentType) || file.size > 5 * 1024 * 1024 || !file.size) {
+      throw new Error('Choose an SVG, PNG or WebP logo up to 5 MB.')
+    }
+    const upload = await trpc.settings.getClientLogoUpload.mutate({ contentType })
+    const form = new FormData()
+    for (const [key, value] of Object.entries(upload.fields)) form.append(key, value)
+    form.append('file', file)
+    const response = await fetch(upload.url, { method: 'POST', body: form })
+    if (!response.ok) throw new Error('The logo upload failed. Please try again.')
+    await trpc.settings.processClientLogo.mutate({ uploadId: upload.uploadId })
+    await queryClient.invalidateQueries({ queryKey: ['client-logo'] })
+    toast.success('Brand Logo updated')
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
+  } finally {
+    isSavingLogo.value = false
+    input.value = ''
+  }
+}
+async function removeLogo() {
+  isSavingLogo.value = true
+  try {
+    await trpc.settings.removeClientLogo.mutate()
+    await queryClient.invalidateQueries({ queryKey: ['client-logo'] })
+    toast.success('Brand Logo removed')
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
+  } finally { isSavingLogo.value = false }
+}
 
 const toast = useGlobalToast()
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -81,33 +121,57 @@ const removeBackgroundImage = async () => {
 </script>
 
 <template>
-  <div class="flex flex-col p-8">
-    <div class="flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Global Settings</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+  <div class="admin-page admin-resource-page">
+    <div class="settings-sections">
+      <div class="admin-heading"><h1>Settings</h1></div>
 
-      <div class="mt-6">
-        <h2 class="text-2xl font-bold mb-4">Auth Background Image</h2>
+      <section class="dv-panel branding-settings">
+        <h2>Brand Logo</h2>
+        <p>Your logo appears in the client portal and on login pages. Your hosting provider controls whether it also appears in the admin sidebar.</p>
+        <p v-if="logoStatus === 'pending'" role="status">Loading brand logo…</p>
+        <div v-else-if="logoStatus === 'error'" role="alert">The logo could not be loaded. <Button class="dv-button" variant="outline" @click="refetchLogo()">Try again</Button></div>
+        <template v-else>
+          <div v-if="logo?.imageUrl" class="logo-preview"><img :src="logo.imageUrl" alt="Current brand logo" /></div>
+          <p class="branding-note">SVG, PNG or WebP · up to 5 MB. Uploading a new logo replaces the previous one.</p>
+          <input ref="logoInput" type="file" accept="image/svg+xml,image/png,image/webp" class="hidden" aria-label="Choose brand logo" @change="uploadLogo" />
+          <div class="flex flex-wrap gap-3">
+            <Button class="dv-button dv-button--primary" :disabled="isSavingLogo" @click="logoInput?.click()">{{ isSavingLogo ? 'Updating…' : logo?.exists ? 'Replace logo' : 'Upload logo' }}</Button>
+            <Button v-if="logo?.exists" class="dv-button" variant="outline" :disabled="isSavingLogo" @click="removeLogo">Remove logo</Button>
+          </div>
+        </template>
+      </section>
+      <div class="dv-panel branding-settings">
+        <h2>Login background</h2>
+        <p class="branding-note">The image displayed behind your login screen.</p>
 
         <div v-if="backgroundImageUrl" class="mb-4">
-          <img :src="backgroundImageUrl" alt="Current background" class="max-w-md rounded-lg shadow-md" />
+          <img :src="backgroundImageUrl" alt="Current background" class="branding-background-preview w-full max-w-md" />
         </div>
 
-        <div class="flex gap-4">
+        <div class="flex flex-wrap gap-4">
           <input type="file" ref="fileInput" @change="handleFileUpload" accept="image/*" class="hidden" />
           <Button @click="fileInput?.click()" :disabled="isLoading">
-            {{ backgroundImageUrl ? 'Change' : 'Upload' }} Background Image
+            {{ isLoading ? 'Updating…' : backgroundImageUrl ? 'Replace background' : 'Upload background' }}
           </Button>
           <Button v-if="backgroundImageUrl" @click="removeBackgroundImage" variant="destructive" :disabled="isLoading">
-            Remove Background Image
+            Remove background
           </Button>
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.branding-settings { padding:28px; max-width:780px; margin-top:0; }
+.settings-sections { display:grid; gap:24px; }
+.settings-sections > .admin-heading { margin-bottom:4px; }
+.branding-settings h2 { font-size:22px; margin-bottom:12px; }
+.branding-settings p { color:var(--dv-text-secondary); font-size:13px; margin-top:8px; }
+.logo-preview { display:flex; align-items:center; justify-content:center; height:110px; max-width:300px; margin:24px 0; background:white; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-graphic); }
+.logo-preview img { max-width:260px; max-height:80px; object-fit:contain; }
+.branding-background-preview { border-radius:var(--dv-radius-graphic); }
+.branding-settings .branding-note { margin-bottom:20px; }
+.branding-settings :deep(.dv-button) { height:auto; padding:9px 14px; box-shadow:none; border-radius:0; }
+@media(max-width:600px) { .branding-settings { padding:20px; } }
+</style>

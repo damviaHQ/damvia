@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { DialogClose } from "@/components/ui/dialog"
+import AdminList from "@/components/admin/AdminList.vue"
 import Loader from "@/components/Loader.vue"
 import {
   AlertDialog,
@@ -25,12 +27,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -72,7 +68,7 @@ function openCreateModal() {
   modalState.value = "creating"
 }
 
-async function onModalSubmit(event: Event) {
+async function submitChanges(event: Event) {
   event.preventDefault()
   try {
     await trpc.authorizedDomain.create.mutate(form.value)
@@ -93,31 +89,33 @@ async function remove(id: string) {
     toast.error((error as Error).message)
   }
 }
+const saving = ref(false)
+async function onModalSubmit(event: Event) {
+  event.preventDefault()
+  if (saving.value) return
+  saving.value = true
+  try { await submitChanges(event) } finally { saving.value = false }
+}
 </script>
 
 <template>
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="flex flex-col p-8">
-    <div class="authorized-domains__top flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Authorized Domains</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Button type="button" variant="link" @click="openCreateModal"
-        class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
+    <div class="admin-heading">
+      <div><h1>Authorized domains</h1><p>Approve new accounts automatically for trusted email domains.</p></div>
+      <Button type="button" variant="default" @click="openCreateModal"
+        class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
-        Add new Authorized Domain
+        Add domain
       </Button>
     </div>
 
+    <AdminList :items="data" :fields="['domain', 'detail']" label="Authorized domains" v-slot="{ items }">
     <Table>
       <TableHeader>
         <TableRow>
@@ -127,13 +125,13 @@ async function remove(id: string) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="authorizedDomain in data" :key="authorizedDomain.id">
+        <TableRow v-for="authorizedDomain in items" :key="authorizedDomain.id">
           <TableCell>{{ authorizedDomain.domain }}</TableCell>
           <TableCell>{{ authorizedDomain.detail }}</TableCell>
           <TableCell>
             <div class="flex space-x-2">
               <AlertDialog>
-                <AlertDialogTrigger>
+                <AlertDialogTrigger as-child>
                   <Button variant="ghost" size="sm">
                     <Trash2 class="w-4 h-4 mr-2" />
                     Remove
@@ -144,9 +142,7 @@ async function remove(id: string) {
                     <AlertDialogTitle>Removing Authorized Domain</AlertDialogTitle>
                     <AlertDialogDescription>
                       Are you sure you want to remove this authorized domain? <br />
-                      User registering with this domain will not be able to self-validate
-                      their accounts amd an Admin or Manager will have to validate new
-                      accounts manually.
+                      New accounts using this domain will need approval from an administrator or manager. Existing accounts are unaffected.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -162,11 +158,12 @@ async function remove(id: string) {
         </TableRow>
       </TableBody>
     </Table>
+    </AdminList>
   </div>
 
-  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && (modalState = 'closed')">
-    <DialogContent class="sm:max-w-[425px]">
-      <form @submit="onModalSubmit">
+  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && !saving && (modalState = 'closed')">
+    <DialogContent class="admin-dialog--compact">
+      <form :aria-busy="saving" @submit="onModalSubmit">
         <DialogHeader>
           <DialogTitle>Add new authorized domain</DialogTitle>
           <DialogDescription>
@@ -177,16 +174,16 @@ async function remove(id: string) {
         <div class="flex flex-col gap-4 py-4">
           <div class="flex flex-col gap-2 w-full">
             <Label for="domain">Domain *</Label>
-            <Input id="domain" v-model="form.domain" placeholder="domain.xtd" class="w-full" />
+            <Input id="domain" v-model="form.domain" placeholder="example.com" class="w-full" />
           </div>
           <div class="flex flex-col gap-2 w-full">
             <Label for="detail">Description</Label>
             <Input id="detail" v-model="form.detail" placeholder="Describe the domain" class="w-full" />
           </div>
         </div>
-        <DialogFooter class="sm:justify-between items-center">
-          <div class="text-sm text-gray-500">* Required</div>
-          <Button type="submit" :disabled="!form.domain || !domainRegex.test(form.domain)">
+        <DialogFooter class="items-center">
+          <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
+          <Button type="submit" :disabled="saving || (!form.domain || !domainRegex.test(form.domain))">
             Create
           </Button>
         </DialogFooter>

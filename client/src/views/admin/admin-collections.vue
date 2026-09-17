@@ -19,12 +19,6 @@ import IconCloudSync from "@/components/icons/IconCloudSync.vue"
 import Loader from "@/components/Loader.vue"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
@@ -71,7 +65,7 @@ function handleEditCollection(collection: RouterOutput["collection"]["treeAdmin"
 }
 
 function handleCollectionUpdated() {
-  queryClient.invalidateQueries({ queryKey: ['collections', 'treeAdmin', 'public'] })
+  queryClient.invalidateQueries({ queryKey: ['collection', 'treeAdmin', 'public'] })
   toast.success('Collection updated successfully')
 }
 
@@ -108,37 +102,32 @@ async function confirmDeleteCollection() {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" class="admin-error">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="flex flex-col p-8">
-    <div class="collections__top flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Collections</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Button type="button" variant="link" @click="handleCreateCollection"
-        class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
+    <div class="admin-heading">
+      <h1>Collections</h1>
+      <Button type="button" variant="default" @click="handleCreateCollection"
+        class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
-        Add new collection
+        Add collection
       </Button>
     </div>
 
+    <div v-if="!collections?.length" class="dv-panel admin-empty"><h2>No collections yet</h2><p>Create a collection to organize and share your assets.</p></div>
     <TreeRoot v-slot="{ flattenItems }" :items="collections" :get-key="(item) => item.id"
-      :get-children="(item) => item.children" class="mt-4 max-w-[80%]">
+      :get-children="(item) => item.children" class="admin-tree dv-panel">
       <TreeItem v-for="item in flattenItems" :key="item._id" v-slot="{ isExpanded }"
         :style="{ paddingLeft: `${(item.level + 1) * 16}px` }" v-bind="item.bind"
-        class="flex items-center py-2 hover:bg-neutral-100 rounded">
+        class="flex items-center py-2 hover:bg-neutral-100">
         <template v-if="item.value.children && item.value.children.length > 0">
           <ChevronDown v-if="isExpanded" class="h-4 w-4 mr-2" />
           <ChevronRight v-else class="h-4 w-4 mr-2" />
         </template>
         <div v-else class="w-4 h-4 mr-2"></div>
-        <IconCloudSync v-if="item.value.synchronized" class="h-5 w-5 mr-2 text-neutral-600" />
-        <Folder v-else class="h-5 w-5 mr-2 text-neutral-600" />
+        <IconCloudSync v-if="item.value.synchronized" class="h-5 w-5 mr-2 admin-text-secondary" />
+        <Folder v-else class="h-5 w-5 mr-2 admin-text-secondary" />
         <span class="flex-grow">{{ item.value.name }}</span>
 
         <div class="flex items-center gap-2 mr-5">
@@ -158,13 +147,13 @@ async function confirmDeleteCollection() {
 
         <div class="flex items-center gap-2 ml-5" @click="stopPropagation">
           <Button variant="link" @click="handleEditCollection(item.value)"
-            class="flex items-center gap-2 text-neutral-600 hover:text-neutral-900">
+            class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
             <PencilLine class="h-4 w-4" /> Edit
           </Button>
           <AlertDialog>
             <AlertDialogTrigger as="div">
               <Button variant="link" @click="handleDeleteCollection(item.value)"
-                class="flex items-center gap-2 text-neutral-600 hover:text-neutral-900">
+                class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
                 <Trash2 class="h-4 w-4" /> Delete
               </Button>
             </AlertDialogTrigger>
@@ -178,7 +167,7 @@ async function confirmDeleteCollection() {
                     from their favorites and
                     their Private Collections.
                   </p>
-                  <h2 class="text-base font-medium text-neutral-600">What will happens to the files?</h2>
+                  <h2 class="text-base font-medium admin-text-secondary">What will happens to the files?</h2>
                   <p>
                     You can safely remove the collection no file will be deleted from your cloud storage. You can always
                     create

@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { DialogClose } from "@/components/ui/dialog"
+import AdminList from "@/components/admin/AdminList.vue"
 import Loader from "@/components/Loader.vue"
 import {
   AlertDialog,
@@ -25,7 +27,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog'
-import {Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage,} from "@/components/ui/breadcrumb"
 import {Button} from "@/components/ui/button"
 import {
   Dialog,
@@ -106,7 +107,7 @@ function openEditModal(license: RouterOutput["license"]["list"][number]) {
   modalState.value = "editing"
 }
 
-async function onModalSubmit(event: Event) {
+async function submitChanges(event: Event) {
   event.preventDefault()
 
   const formData = {
@@ -140,33 +141,35 @@ function formatDate(date: CalendarDate | undefined) {
   if (!date) return ''
   return formatter.custom(toDate(date), { dateStyle: "medium" })
 }
+const saving = ref(false)
+async function onModalSubmit(event: Event) {
+  event.preventDefault()
+  if (saving.value) return
+  saving.value = true
+  try { await submitChanges(event) } finally { saving.value = false }
+}
 </script>
 
 <template>
-  <div class="flex flex-col p-8">
-    <div class="flex flex-col gap-5 mb-2">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbPage>Licenses</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <Button type="button" variant="link" @click="openCreateModal"
-        class="flex w-fit gap-2 text-neutral-600 hover:text-neutral-900">
+  <div class="admin-page admin-resource-page">
+    <div class="admin-heading">
+      <div><h1>Licenses</h1><p>Manage usage dates and regional permissions.</p></div>
+      <Button type="button" variant="default" @click="openCreateModal"
+        class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
-        Add new License
+        Add license
       </Button>
     </div>
 
     <div v-if="status === 'pending'">
       <Loader :text="true" />
     </div>
-    <div v-else-if="status === 'error'" class="alert alert-danger">
+    <div v-else-if="status === 'error'" class="admin-error">
       {{ error?.message }}
     </div>
     <div v-else-if="status === 'success'">
-      <Table>
+      <AdminList :items="data" :fields="['name']" label="Licenses" v-slot="{ items }">
+    <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
@@ -177,7 +180,7 @@ function formatDate(date: CalendarDate | undefined) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="license in data" :key="license.id">
+          <TableRow v-for="license in items" :key="license.id">
             <TableCell>{{ license.name }}</TableCell>
             <TableCell>{{
               license.usageFrom
@@ -211,7 +214,7 @@ function formatDate(date: CalendarDate | undefined) {
                   Edit
                 </Button>
                 <AlertDialog>
-                  <AlertDialogTrigger>
+                  <AlertDialogTrigger as-child>
                     <Button variant="ghost" size="sm">
                       <Trash2 class="w-4 h-4 mr-2" />
                       Remove
@@ -236,22 +239,23 @@ function formatDate(date: CalendarDate | undefined) {
           </TableRow>
         </TableBody>
       </Table>
+    </AdminList>
     </div>
   </div>
 
-  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && (modalState = 'closed')">
-    <DialogContent class="sm:max-w-[900px] md:max-w-[1000px] lg:max-w-[1200px] flex flex-col overflow-hidden bg-white max-h-[90vh]">
+  <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && !saving && (modalState = 'closed')">
+    <DialogContent class="license-dialog admin-dialog--wide flex flex-col bg-white">
       <DialogHeader>
-        <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} License</DialogTitle>
+        <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} license</DialogTitle>
         <DialogDescription>
           Licenses help you restrict access to your assets by time and region and define
           the scopes of usage. At the end of the usage period, the assets won't be
           visible anymore.
         </DialogDescription>
       </DialogHeader>
-      <form @submit.prevent="onModalSubmit" class="flex flex-col h-full">
-        <div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-full px-4 mb-20">
-          <div class="flex flex-col gap-4 pr-4 overflow-y-auto max-h-[60vh]">
+      <form :aria-busy="saving" @submit.prevent="onModalSubmit" class="admin-form">
+        <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6">
+          <div class="flex flex-col gap-4">
             <div class="flex flex-col gap-2">
               <Label for="name">Name *</Label>
               <Input id="name" v-model="form.name" placeholder="License name" />
@@ -268,7 +272,7 @@ function formatDate(date: CalendarDate | undefined) {
                     }
                   }"
                 />
-                <Button type="button" variant="ghost" size="icon" @click="form.usageFrom = null">
+                <Button type="button" variant="ghost" size="icon" aria-label="Clear start date" @click="form.usageFrom = null">
                   <XIcon />
                 </Button>
               </div>
@@ -285,7 +289,7 @@ function formatDate(date: CalendarDate | undefined) {
                     }
                   }"
                 />
-                <Button type="button" variant="ghost" size="icon" @click="form.usageTo = null">
+                <Button type="button" variant="ghost" size="icon" aria-label="Clear end date" @click="form.usageTo = null">
                   <XIcon />
                 </Button>
               </div>
@@ -303,25 +307,25 @@ function formatDate(date: CalendarDate | undefined) {
           </div>
           <div class="flex flex-col gap-2 h-full">
             <Label for="details">Details</Label>
-            <div class="bg-white flex-grow overflow-visible" style="min-height: 50vh; max-height: 65vh; margin-bottom: 20px;">
+            <div class="license-details-editor">
               <QuillEditor
                 ref="editor"
                 v-model:content="form.details"
                 class="bg-white h-full quill-wrapper"
                 theme="snow"
                 toolbar="essential"
-                placeholder="..."
+                placeholder="Add usage instructions or restrictions…"
                 content-type="html"
               />
             </div>
           </div>
         </div>
-        <div class="px-4 mt-6 flex justify-between items-center fixed-footer">
-          <div class="text-sm text-gray-500">* Required</div>
-          <Button type="submit" :disabled="form.name === '' ||
+        <div class="admin-form-footer">
+          <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
+          <Button type="submit" :disabled="saving || (form.name === '' ||
             form.scopes.length === 0 ||
             form.allowedRegionIds.length === 0
-          ">
+          )">
             {{ modalState === "creating" ? "Create" : "Save" }}
           </Button>
         </div>
@@ -343,15 +347,7 @@ function formatDate(date: CalendarDate | undefined) {
   font-size: 0.8rem;
 }
 
-.fixed-footer {
-  position: absolute;
-  bottom: 1rem;
-  left: 0;
-  right: 0;
-  background: white;
-  padding-top: 1rem;
-  margin-top: 10px;
-}
+.license-details-editor { min-width:0; }
 
 .quill-wrapper {
   display: flex;
@@ -361,8 +357,8 @@ function formatDate(date: CalendarDate | undefined) {
 :deep(.ql-editor) {
   overflow-y: auto;
   font-size: 0.875rem;
-  min-height: 450px;
-  max-height: 900px;
+  min-height: 220px;
+  max-height: 360px;
   height: 100%;
 }
 

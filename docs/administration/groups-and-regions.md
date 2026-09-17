@@ -3,7 +3,7 @@ title: Groups and regions
 description: What regions and groups are for, how users get them, and how groups restrict collections.
 sidebar:
   order: 4
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 Regions and groups are the two axes Damvia uses to segment users. A region is chosen at sign-up and drives manager scope and license visibility; groups are memberships that can lock a collection to a subset of users. Both screens are admin only.
@@ -80,3 +80,9 @@ Only the collection owner or an admin can call `update` (`Collection.canEdit` in
 New children inherit a restricted parent’s groups immediately, whether created manually, synchronised from a folder or copied from another collection. Database triggers enforce this rule and propagate later changes. The migration also applies the rule to existing descendants.
 
 `group.moveUsersAndRegions` does not rewrite collections' `limited_to_group_ids`. Before removing or merging a group, inventory those arrays and explicitly review the affected collection permissions.
+
+## Admin interface
+
+Groups and Regions use searchable lists with result counts and 20 rows per page. Group removal asks for confirmation before checking whether users or regional defaults need a replacement group. Default groups cannot be removed. Creation and editing prevent duplicate submissions while saving.
+
+Group and region editors share the compact modal layout with Cancel and submit actions. Dependency-move confirmations use the same header and footer styling.

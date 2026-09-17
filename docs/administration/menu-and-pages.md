@@ -3,7 +3,7 @@ title: Menu and pages
 description: Build the navigation menu and compose pages out of blocks, for the home screen and for collections.
 sidebar:
   order: 9
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 The menu is the tree users see in the main layout; pages are block layouts that can be a standalone destination (for example the home page) or the landing view of a collection. Both are administered from the Content Management section.
@@ -75,3 +75,9 @@ A `files` block whose collection files share one asset type uses the type's name
 :::tip
 To make a custom landing page, create a standalone page, add it to the menu as a `Page` item, then use `Set as Home` on that item.
 :::
+
+## Admin interface
+
+Menu items use square rows and themed action menus, with an empty state and ordering instructions. The Pages list searches names and paginates at 20 rows. The page editor displays the page name, a return link to Pages, and an accessible label on the add-content control.
+
+The menu-item editor now uses the shared shadcn dialog, including a close button, Cancel, loading protection and visible save errors. The content-block editor has an accessible dialog title and a responsive block-type selector.

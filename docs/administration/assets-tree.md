@@ -3,7 +3,7 @@ title: Assets tree
 description: Browse the folder tree synced from cloud storage, tag folders with types and licenses, and understand file statuses and thumbnails.
 sidebar:
   order: 7
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 The assets tree is the mirror of the cloud folder Damvia synchronizes from Dropbox or OneDrive. Administrators do not upload files here; they browse what the sync brought in and decide, per folder, which asset type and license apply. Everything else on this page happens in background jobs.
@@ -87,3 +87,7 @@ Deleting a folder in the cloud source therefore deletes the synchronized collect
 Job names and schedules are summarized in [Background jobs](../reference/background-jobs.md).
 
 Original-upload errors are currently logged and absorbed, as are thumbnail/dimension failures. Processing can still set `up_to_date`; unsupported formats also legitimately lack previews. Verify stored objects independently. The integrity check verifies original presence/size, not thumbnail health; see [Integrity check](../deployment/integrity-check.md).
+
+## Admin interface
+
+The folder sidebar is labeled Cloud folders for either storage provider. The folder workspace uses the admin theme, a folder heading, and a grouped asset-type/license editor. Folder and file navigation are retained.

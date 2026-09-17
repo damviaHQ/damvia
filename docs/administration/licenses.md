@@ -3,7 +3,7 @@ title: Licenses
 description: Define usage licenses, attach them to folders, and understand how access checks and download terms work.
 sidebar:
   order: 5
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 A license describes under which terms, where and for how long a set of files may be used. Licence dates and allowed regions apply to every non-admin user, including owners, group members and invitees. Admins are exempt. The client displays an acceptance checkbox; this is not a server-side record of acceptance.
@@ -62,3 +62,11 @@ In both dialogs the download button stays styled as inactive until the box is ch
 ## Regions show how many licenses cover them
 
 `/admin/regions` displays a `Licenses` column computed with `ArrayContains` on `allowed_region_ids`. Use it before removing a region to see how many licenses will lose that region.
+
+## Admin interface
+
+The Licenses screen has name search, a result count and pagination at 20 rows. The editor retains usage dates, scopes and allowed regions; repeated submissions are disabled while saving.
+
+The license form uses a responsive two-column layout with its action footer in normal document flow, so the editor remains usable on narrow screens. Clear-date buttons have accessible names.
+
+The license editor uses the wide modal layout with a separated action footer; mobile layouts stack the form fields and usage details.

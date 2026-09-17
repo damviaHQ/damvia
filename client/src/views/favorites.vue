@@ -15,12 +15,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
 import Loader from "@/components/Loader.vue"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
+import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 
@@ -28,6 +23,7 @@ const { status, data: favorites, error } = useQuery({
   queryKey: ["favorites"],
   queryFn: () => trpc.favorite.list.query(),
 })
+const breadcrumbItems: PathBreadcrumbItem[] = [{ id: 'favorites', label: 'My Favorites' }]
 </script>
 
 <template>
@@ -38,13 +34,7 @@ const { status, data: favorites, error } = useQuery({
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="favorites__container p-4">
-    <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem class="text-neutral-500 hover:text-neutral-800">
-          <BreadcrumbPage>My Favorites</BreadcrumbPage>
-        </BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
+    <PathBreadcrumb :items="breadcrumbItems" />
     <collection-grid-files :files="favorites" />
   </div>
 </template>
