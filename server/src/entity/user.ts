@@ -77,6 +77,9 @@ export class User {
 	@Column({ default: false })
 	maintenanceContact: boolean
 
+	@Column({ type: 'timestamptz', nullable: true })
+	lastLoginAt: Date | null
+
 	@OneToMany(() => UserGroup, userGroup => userGroup.user, {cascade: true})
 	userGroups: UserGroup[];
 
