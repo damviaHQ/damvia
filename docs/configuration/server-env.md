@@ -3,7 +3,7 @@ title: Server configuration
 description: What each group of server variables controls, and the values that trip people up.
 sidebar:
   order: 2
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 `server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
@@ -29,7 +29,7 @@ Passwords use scrypt with a random salt (`hashPassword` in `server/src/services/
 
 ## Worker on or off
 
-`ENABLE_WORKER=true` starts pg-boss in the same process as the API. Emails, file downloads and thumbnails, archives, deletions and the daily integrity check all run there. `npm run dev` sets it; `npm start` does not, so a production deployment must set it explicitly on the single server process. The cloud sync loop is **not** controlled by this flag and runs in every server process. With the flag off, this process does not start the pg-boss producer either, so publishing jobs can fail. Details in [Worker and scaling](../deployment/worker-and-scaling.md).
+`ENABLE_WORKER=true` starts pg-boss in the same process as the API. Emails, file downloads and thumbnails, archives, deletions and the daily integrity check all run there. `npm run dev` sets it; `npm start` does not, so a production deployment must set it explicitly on the single server process. The cloud sync loop is **not** controlled by this flag and runs in every server process. With the flag off, the process still connects pg-boss and creates the queues, so it can queue jobs; it does not process them or register the cron schedules. Details in [Worker and scaling](../deployment/worker-and-scaling.md).
 
 ## One database for data and jobs
 

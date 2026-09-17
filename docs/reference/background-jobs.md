@@ -3,10 +3,10 @@ title: Background jobs
 description: Every queue and cron the worker runs, what triggers it, and what it does.
 sidebar:
   order: 3
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
-Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. The worker starts inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
+Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. Every API process connects pg-boss and can queue jobs; jobs are processed inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
 
 All queues are declared in `server/src/worker.ts`. The push helpers set `retryBackoff: true`. In installed pg-boss 10.2.0, defaults allow two retries after the initial attempt and expire active jobs after 15 minutes. `uniqueKey` is passed as `singletonKey`, but standard queues without a singleton window do not deduplicate it; no current business caller provides a key.
 

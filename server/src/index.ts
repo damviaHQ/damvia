@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { assetUpdater, dataSource, logger } from "./env"
 import { cleanStaleTempDirectories } from "./services/storage"
-import { startWorker } from "./worker"
+import { startQueues } from "./worker"
 import server from "./server"
 
 async function startAssetUpdater() {
@@ -44,13 +44,11 @@ async function run() {
 
 	await cleanStaleTempDirectories()
 	await dataSource.initialize()
+	await startQueues({ enableWorker: process.env.ENABLE_WORKER === 'true' })
 	const addr = await server.listen({
 		host: '0.0.0.0',
 		port: parseInt(process.env.PORT ?? '3000', 10),
 	})
-	if (process.env.ENABLE_WORKER === 'true') {
-		await startWorker()
-	}
 	logger.info('server listening', { addr })
 }
 

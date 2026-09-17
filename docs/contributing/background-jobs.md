@@ -3,7 +3,7 @@ title: Writing a background job
 description: Declare a pg-boss queue with createQueue, push jobs from the API, understand retries and deduplication, and run a job by hand.
 sidebar:
   order: 5
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 This page explains the job mechanism in `server/src/worker.ts` so you can add a queue or debug one. The list of existing queues, their crons and what they do is in [Background jobs](../reference/background-jobs.md); how to run the worker in production is in [Worker and scaling](../deployment/worker-and-scaling.md).
@@ -41,14 +41,14 @@ export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({
 
 `retryBackoff: true` makes pg-boss retry a failed job with exponential backoff, using pg-boss's default retry limit since none is set here. The installed defaults are two retries after the first attempt and a 15-minute active-job expiry. A `singletonKey` alone does not deduplicate the default `standard` queue: that requires an appropriate queue policy or `singletonSeconds` window and tests of its semantics. No current business call supplies `uniqueKey`.
 
-## Registration happens at module load, activation in startWorker
+## Registration happens at module load, activation in startQueues
 
-`createQueue` does not talk to the database when called. It pushes an initializer into the module-level `workerInitializers` array and returns the `push` / `bulkPush` pair immediately. `startWorker()` then runs `boss.start()` and every initializer in declaration order; each one calls `boss.createQueue(name)`, `boss.schedule(name, cron)` when a cron is set, and `boss.work(name, workerOptions, handler)`.
+`createQueue` does not talk to the database when called. It pushes an initializer into the module-level `queueInitializers` array and returns the `push` / `bulkPush` pair immediately. `startQueues({ enableWorker })` then runs `boss.start()` and every initializer in declaration order; each one calls `boss.createQueue(name)`, then, only when `enableWorker` is true, `boss.schedule(name, cron)` when a cron is set and `boss.work(name, workerOptions, handler)`.
 
 Two consequences for a new queue:
 
-1. Declare it as an `export const` in `worker.ts` and import that constant where you push (`services/asset.ts` imports `assetUpdateContentQueue` and `collectionSynchronizationQueue`; `trpc/router/user.ts` imports the mailer queues). A declaration in another module is also registered if that module imports the same helper and is loaded before `startWorker()` runs.
-2. Pushing works in any process, worker or not: `push` only needs `boss` to be started. The API process starts `boss` inside `startWorker` when `ENABLE_WORKER=true`; the CLI starts it explicitly with `boss.start()`. A process that has neither cannot push.
+1. Declare it as an `export const` in `worker.ts` and import that constant where you push (`services/asset.ts` imports `assetUpdateContentQueue` and `collectionSynchronizationQueue`; `trpc/router/user.ts` imports the mailer queues). A declaration in another module is also registered if that module imports the same helper and is loaded before `startQueues()` runs.
+2. Pushing works in any process, worker or not: `push` only needs `boss` to be started. The API process starts `boss` inside `startQueues` before listening, whatever `ENABLE_WORKER` says; the CLI starts it explicitly with `boss.start()`. A process that has neither cannot push: pg-boss fails with `Cannot destructure property 'rows'`.
 
 `worker.ts` imports the services, and `services/asset.ts` imports `worker.ts` back. This circular import works because the queue constants are only dereferenced inside functions, after both modules have loaded; keep new code in the same shape and do not call `push` at module top level.
 

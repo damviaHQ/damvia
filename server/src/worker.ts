@@ -33,7 +33,7 @@ import {
 	sendUserApprovedEmail
 } from "./services/mailer"
 
-const workerInitializers: (() => Promise<any>)[] = []
+const queueInitializers: ((enableWorker: boolean) => Promise<any>)[] = []
 
 export const boss = new PgBoss(process.env.DATABASE_URL ?? 'postgresql://dam:dam@localhost/dam')
 
@@ -49,8 +49,12 @@ type CreateQueueOptions<T> = {
 }
 
 export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQueueOptions<T>) {
-	workerInitializers.push(async () => {
+	queueInitializers.push(async (enableWorker) => {
 		await boss.createQueue(name)
+
+		if (!enableWorker) {
+			return
+		}
 
 		if (cron) {
 			await boss.schedule(name, cron)
@@ -94,10 +98,10 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 	}
 }
 
-export async function startWorker() {
+export async function startQueues({ enableWorker }: { enableWorker: boolean }) {
 	await boss.start()
-	for (const initializer of workerInitializers) {
-		await initializer()
+	for (const initializer of queueInitializers) {
+		await initializer(enableWorker)
 	}
 }
 

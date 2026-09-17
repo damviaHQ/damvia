@@ -3,7 +3,7 @@ title: Architecture
 description: The single server process, the path of a request from the Vue client to a TypeORM entity, the folder map of both packages, and where a new feature goes.
 sidebar:
   order: 2
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 This page gives a developer the shape of the code: what runs, how a request travels, what each folder holds, and where to add something. The meaning of the objects (collections, pages, products) is in [Core concepts](../introduction/concepts.md).
@@ -14,8 +14,8 @@ This page gives a developer the shape of the code: what runs, how a request trav
 
 1. The cloud sync: `assetUpdater().initialize()`, then a `fetchUpdates()` loop re-armed with `setTimeout` every 5 minutes. After every listing it inserts the missing `collection_files` rows for synchronised collections. This loop is **not** a pg-boss job and runs in every API process.
 2. `dataSource.initialize()`: TypeORM connects and, because `migrationsRun: true`, applies pending migrations.
-3. The Fastify server from `server/src/server.ts`, listening on `0.0.0.0` and `PORT` (default `3000`).
-4. If `ENABLE_WORKER=true`, `startWorker()` from `server/src/worker.ts`: pg-boss connects to the same `DATABASE_URL` and registers every queue.
+3. `startQueues()` from `server/src/worker.ts`: pg-boss connects to the same `DATABASE_URL` and creates every queue, so the API can queue jobs. Only if `ENABLE_WORKER=true` does it also register the cron schedules and the job handlers.
+4. The Fastify server from `server/src/server.ts`, listening on `0.0.0.0` and `PORT` (default `3000`).
 
 Any failure in steps 2 to 4 logs the error and exits with code 1. Sync initialisation failure also exits; sync-pass failures are logged and retried after five minutes. The first pass can reach the database/queues before they are ready. See [Worker and scaling](../deployment/worker-and-scaling.md) for the current single-process constraint.
 

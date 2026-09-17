@@ -3,7 +3,7 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
@@ -22,7 +22,7 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). `
 | `APP_SECRET` | required | Randomly generated signing secret of at least 32 bytes, for example `openssl rand -hex 32`. Checked at startup. JWTs last 180 days; changing the secret logs every user out. |
 | `PORT` | `3000` | HTTP port the server listens on (`0.0.0.0`). |
 | `NODE_ENV` | unset | `production` in deployments. `npm start` sets it. |
-| `ENABLE_WORKER` | unset (worker off) | `true` starts the pg-boss worker inside this process. `npm run dev` sets it. See [Worker and scaling](../deployment/worker-and-scaling.md). |
+| `ENABLE_WORKER` | unset (worker off) | `true` processes jobs and registers cron schedules inside this process. Without it the process still queues jobs. `npm run dev` sets it. See [Worker and scaling](../deployment/worker-and-scaling.md). |
 | `ENABLE_PASSWORD_LESS_AUTH` | `false` | `true` selects passwordless sign-up/login; it does not erase existing hashes or disable password-reset endpoints. |
 | `STORAGE_QUOTA` | unset (no limit) | Storage plan for the two buckets together, in decimal units: `1500GB`, `1.5TB` or a number of bytes. Cloud files that would exceed it are not downloaded, and every admin gets an email at 80, 90, 95 and 100 %. A value that does not parse stops the server at startup. See [Dashboard](../administration/dashboard.md). |
 | `STORAGE_DISK_PATH` | `/` | Path whose disk is measured with `statfs` for the hosting contact. Inside a container `/` reports the host disk that holds Docker's data, which is where the MinIO volume lives on a single-disk server. Set it to the volume's mount point when MinIO sits on another disk. |

@@ -3,14 +3,14 @@ title: Worker and scaling
 description: Understand which tasks run in the server process, why the worker must be enabled, and the current limits on running multiple processes.
 sidebar:
   order: 5
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 The server process has three roles: the HTTP API, the pg-boss worker, and the cloud sync loop. Only the worker is optional, and the way the three are coupled decides your scaling options.
 
 ## ENABLE_WORKER starts pg-boss in the API process
 
-With `ENABLE_WORKER=true`, after the HTTP server is listening, `startWorker()` connects pg-boss to `DATABASE_URL`, creates every queue, registers the cron schedules and starts polling. Everything asynchronous runs here: emails, `asset/update-content` (downloads and thumbnails), archives, deletions, product assignment, the integrity check, the storage measurement. The full list is in [Background jobs](../reference/background-jobs.md).
+Before the HTTP server listens, `startQueues()` connects pg-boss to `DATABASE_URL` and creates every queue, whatever the flag, so any process can queue jobs. With `ENABLE_WORKER=true` it also registers the cron schedules and starts polling. Everything asynchronous runs here: emails, `asset/update-content` (downloads and thumbnails), archives, deletions, product assignment, the integrity check, the storage measurement. The full list is in [Background jobs](../reference/background-jobs.md).
 
 `npm run dev` sets the flag. `npm start` and the Docker `CMD` do not: set it yourself on the container that should do the work.
 
@@ -27,10 +27,10 @@ Options, from simplest to most involved:
 | Need | Approach |
 |---|---|
 | Faster previews on first import | Give the single process more CPU; `asset/update-content` handles 10 jobs concurrently and LibreOffice or ffmpeg conversions are CPU-bound. |
-| API latency during heavy processing | Code changes are needed first: let the API connect to pg-boss to queue work, let a separate worker run that work, and ensure only one process syncs the cloud storage. With `ENABLE_WORKER` off today, the API can fail when it queues a task. |
+| API latency during heavy processing | An API process with `ENABLE_WORKER` off queues jobs for another process to run, but every process still runs the cloud sync (see below), so this setup is not supported yet. |
 | No duplicate sync | Not configurable today. A second process always syncs. |
 
-pg-boss decides which worker picks up a job. If that job times out or is interrupted, a retry can repeat actions such as an upload or email send. Running the API and worker separately also requires code changes so the API can queue work and only one process runs cloud sync.
+pg-boss decides which worker picks up a job. If that job times out or is interrupted, a retry can repeat actions such as an upload or email send. Running the API and worker separately also requires code changes so only one process runs cloud sync.
 
 ## Job concurrency inside the worker
 
