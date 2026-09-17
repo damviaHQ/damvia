@@ -43,6 +43,8 @@ Passwords use scrypt with a random salt (`hashPassword` in `server/src/services/
 
 `STORAGE_QUOTA` is the storage the customer pays for, written in decimal units such as `1500GB` or `1.5TB` (1.5 TB is 1 500 000 000 000 bytes, the way disks and hosting plans are sold). Every 30 minutes the worker adds up every object of the two buckets and compares the total with it. A file listed in the cloud storage is only downloaded when it still fits under the plan; the others wait, and their download resumes on its own once space has been freed. Archives, thumbnails and page media are never blocked, so keep the plan below the disk that holds MinIO: on a 2 TB disk, `STORAGE_QUOTA=1.5TB` leaves 500 GB for exports, previews, Postgres and temporary files.
 
+Setting a plan on an instance that already stores files does not delete anything: when the buckets already hold more than the plan, usage shows above 100 % and no new file is downloaded until space is freed or the plan is raised. Set the plan to at least the current usage shown on the dashboard, then click "Measure now" right after the restart, so the check starts from the real usage instead of zero (see [Known limitations](../reference/known-limitations.md)).
+
 Leave it empty for no limit: the dashboard still shows the used space, but no alert is sent and nothing is blocked. The value is parsed at startup; `abc` or `0` stops the server with `STORAGE_QUOTA must be a size such as 1500GB or 1.5TB.` The alerts and the recovery steps are described in [Dashboard](../administration/dashboard.md).
 
 ## SERVER_ALERT_EMAILS separates the host from the customer
@@ -76,3 +78,7 @@ Leave `SERVER_ALERT_EMAILS` empty and the server never sends nor shows a disk fi
 The API, worker and CLI all require a valid `APP_SECRET` at startup. See [Accounts and links](../administration/accounts-and-links.md) for token lifetime and revocation limits.
 
 For `docker run --env-file`, use literal `KEY=value` lines without quotes or inline comments. The server template uses separate comment lines. Docker does not parse this file as dotenv or as a shell script.
+
+## Host-controlled admin logo
+
+`ADMIN_CLIENT_LOGO=false` keeps the Damvia logo in the admin sidebar. Set it to `true` to allow the uploaded client logo there; if no client logo exists, Damvia is still used. The spelling `ADMIN-CLIENT-LOGO` is also accepted and takes precedence if both are set. Restart the server after changing this environment setting. DAM administrators can upload a client logo but cannot change this host policy. See [Branding](./branding.md).

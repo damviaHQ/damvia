@@ -106,9 +106,11 @@ before(async () => {
     await worker.startWorker()
     // Apply the upgrade to old rows, not just an empty schema.
     const applied = await db.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1')
-    assert.equal(applied[0]?.name, 'StorageUsage1789603200000', 'Review the fixture upgrade setup when adding migrations')
-    await db.undoLastMigration()
-    await db.undoLastMigration()
+    assert.equal(applied[0]?.name, 'HostControlledBranding1789776000000', 'Review the fixture upgrade setup when adding migrations')
+    await db.undoLastMigration() // host-controlled branding
+    await db.undoLastMigration() // admin branding
+    await db.undoLastMigration() // storage usage
+    await db.undoLastMigration() // security upgrade
     await db.query('TRUNCATE users, collections, asset_folders, groups, regions, licenses, products, product_attributes CASCADE')
     await db.query('DROP SCHEMA IF EXISTS pgboss CASCADE; CREATE SCHEMA pgboss; CREATE TABLE pgboss.job (name text, state text)')
     group = await save(Group, { name: 'Default' })
@@ -803,4 +805,116 @@ test('an alert that could not be sent is sent again at the next measurement', as
         env.storageQuota = () => null
         disk = { totalBytes: 10000, freeBytes: 9000 }
     }
+})
+
+
+test('host controls admin branding; clients cannot override it', async () => {
+    const original = process.env.ADMIN_CLIENT_LOGO
+    const alias = process.env['ADMIN-CLIENT-LOGO']
+    try {
+        delete process.env.ADMIN_CLIENT_LOGO
+        delete process.env['ADMIN-CLIENT-LOGO']
+        assert.deepEqual(await caller(admin).settings.getAdminBranding(), { useClientLogo: false })
+        process.env.ADMIN_CLIENT_LOGO = 'true'
+        assert.deepEqual(await caller(manager).settings.getAdminBranding(), { useClientLogo: true })
+        process.env['ADMIN-CLIENT-LOGO'] = 'false'
+        assert.deepEqual(await caller(admin).settings.getAdminBranding(), { useClientLogo: false })
+        process.env['ADMIN-CLIENT-LOGO'] = 'true'
+        assert.deepEqual(await caller(admin).settings.getAdminBranding(), { useClientLogo: true })
+        for (const user of [null, guest, member, { ...admin, approved: false }]) {
+            await forbidden(caller(user).settings.getAdminBranding())
+        }
+        for (const user of [null, guest, member, manager, { ...admin, emailVerified: false }]) {
+            await forbidden(caller(user).settings.getClientLogoUpload({ contentType: 'image/png' }))
+            await forbidden(caller(user).settings.processClientLogo({ uploadId: randomUUID() }))
+            await forbidden(caller(user).settings.removeClientLogo())
+        }
+        await assert.rejects(caller(admin).settings.updateAdminBranding({ logoSource: 'tenant' }))
+        await assert.rejects(caller(admin).settings.getClientLogoUpload({ contentType: 'text/html' }))
+        await assert.rejects(caller(admin).settings.processClientLogo({ uploadId: '../logo' }))
+    } finally {
+        if (original === undefined) delete process.env.ADMIN_CLIENT_LOGO; else process.env.ADMIN_CLIENT_LOGO = original
+        if (alias === undefined) delete process.env['ADMIN-CLIENT-LOGO']; else process.env['ADMIN-CLIENT-LOGO'] = alias
+    }
+})
+
+test('logo uploads validate bytes, rasterise SVG, replace the previous object and clean staged files', async () => {
+    const sharp = require('sharp')
+    const { Client } = require('minio')
+    const { LOGO_KEY, LOGO_TEMP_PREFIX, MAX_LOGO_BYTES } = require('../dist/services/branding')
+    const previousS3 = env.mainS3
+    const objects = new Map()
+    const deleted = []
+    const policies = []
+    let revision = 0
+    const fixtureClient = new Client({ endPoint: 'localhost', accessKey: 'fixture', secretKey: 'fixture-secret' })
+    const notFound = () => Object.assign(new Error('missing'), { code: 'NoSuchKey' })
+    env.mainS3 = () => ({
+        newPostPolicy: () => fixtureClient.newPostPolicy(),
+        presignedPostPolicy: async policy => { policies.push(policy); return { postURL: 'https://example.test/upload', formData: policy.formData } },
+        statObject: async (_bucket, key) => {
+            if (!objects.has(key)) throw notFound()
+            const entry = objects.get(key)
+            return { size: entry.size ?? entry.buffer.length, versionId: entry.versionId }
+        },
+        getObject: async (_bucket, key) => Readable.from([objects.get(key).buffer]),
+        putObject: async (_bucket, key, buffer, _size, metadata) => {
+            assert.equal(metadata['Content-Type'], 'image/webp')
+            objects.set(key, { buffer, versionId: String(++revision) })
+        },
+        removeObject: async (_bucket, key, options) => {
+            deleted.push({ key, versionId: options?.versionId })
+            if (!options?.versionId || objects.get(key)?.versionId === options.versionId) objects.delete(key)
+        },
+        presignedGetObject: async (_bucket, key) => `https://example.test/${key}`,
+        listObjects: (_bucket, prefix) => Readable.from([...objects].filter(([key]) => key.startsWith(prefix)).map(([name, item]) => ({ name, size: item.buffer.length, lastModified: item.lastModified ?? new Date() }))),
+        removeObjects: async (_bucket, keys) => { keys.forEach(key => objects.delete(key)) },
+    })
+    const stage = buffer => {
+        const uploadId = randomUUID()
+        const key = `${LOGO_TEMP_PREFIX}${admin.id}/${uploadId}`
+        objects.set(key, { buffer })
+        return { uploadId, key }
+    }
+    try {
+        assert.deepEqual(await caller(null).settings.getClientLogo(), { exists: false, imageUrl: null })
+        const upload = await caller(admin).settings.getClientLogoUpload({ contentType: 'image/png' })
+        assert.equal(upload.fields.key, `${LOGO_TEMP_PREFIX}${admin.id}/${upload.uploadId}`)
+        assert(policies[0].policy.conditions.some(condition => condition[0] === 'content-length-range' && condition[2] === MAX_LOGO_BYTES))
+        assert(new Date(policies[0].policy.expiration).getTime() <= Date.now() + 600_000)
+        const svg = stage(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><script>alert(1)</script><rect width="40" height="20" fill="blue"/></svg>'))
+        await caller(admin).settings.processClientLogo({ uploadId: svg.uploadId })
+        assert(!objects.has(svg.key))
+        assert.equal((await sharp(objects.get(LOGO_KEY).buffer).metadata()).format, 'webp')
+        assert.equal((await caller(null).settings.getClientLogo()).exists, true)
+        const firstVersion = objects.get(LOGO_KEY).versionId
+        const png = stage(await sharp({ create: { width: 80, height: 40, channels: 4, background: '#ff0000' } }).png().toBuffer())
+        await caller(admin).settings.processClientLogo({ uploadId: png.uploadId })
+        assert(deleted.some(item => item.key === LOGO_KEY && item.versionId === firstVersion))
+        assert.equal(objects.size, 1)
+        const retained = objects.get(LOGO_KEY).buffer
+        const jpeg = await sharp({ create: { width: 20, height: 20, channels: 3, background: 'red' } }).jpeg().toBuffer()
+        for (const bytes of [Buffer.from('<html>not an image</html>'), jpeg, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="100000" height="100000"/>')]) {
+            const invalid = stage(bytes)
+            await assert.rejects(caller(admin).settings.processClientLogo({ uploadId: invalid.uploadId }))
+            assert(!objects.has(invalid.key))
+            assert.deepEqual(objects.get(LOGO_KEY).buffer, retained)
+        }
+        const oversized = stage(Buffer.from('x'))
+        objects.get(oversized.key).size = MAX_LOGO_BYTES + 1
+        await assert.rejects(caller(admin).settings.processClientLogo({ uploadId: oversized.uploadId }))
+        assert(!objects.has(oversized.key))
+        const otherAdmin = await makeUser('admin')
+        const owned = stage(retained)
+        await assert.rejects(caller(otherAdmin).settings.processClientLogo({ uploadId: owned.uploadId }))
+        assert(objects.has(owned.key))
+        await caller(admin).settings.processClientLogo({ uploadId: owned.uploadId }) // WebP accepted.
+        const abandoned = stage(retained)
+        objects.get(abandoned.key).lastModified = new Date(Date.now() - 2 * 86400_000)
+        await storageService.removeOrphanObjects()
+        assert(!objects.has(abandoned.key))
+        assert(objects.has(LOGO_KEY))
+        await caller(admin).settings.removeClientLogo()
+        assert.equal(objects.size, 0)
+    } finally { env.mainS3 = previousS3 }
 })

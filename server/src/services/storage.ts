@@ -239,9 +239,10 @@ async function existingIds(table: 'asset_files' | 'downloads', ids: string[]): P
 
 export async function removeOrphanObjects(): Promise<{ count: number, bytes: number }> {
 	const oldEnough = Date.now() - ORPHAN_MINIMUM_AGE
-	const [assetObjects, downloadObjects] = await Promise.all([
+	const [assetObjects, downloadObjects, logoTempObjects] = await Promise.all([
 		listBucket(assetsS3(), assetsS3Bucket(), 'asset-file/'),
 		listBucket(assetsS3(), assetsS3Bucket(), 'downloads/'),
+        listBucket(mainS3(), mainS3Bucket(), 'settings/client-logo-temp/'),
 	])
 
 	const assetIdOf = (name: string) => name.slice('asset-file/'.length).replace(/-thumbnail$/, '')
@@ -265,17 +266,22 @@ export async function removeOrphanObjects(): Promise<{ count: number, bytes: num
 		}
 	})
 
-	const bytes = orphans.reduce((total, object) => total + object.size, 0)
+	const staleLogos = logoTempObjects.filter(object => object.lastModified.getTime() < oldEnough)
+    for (const object of staleLogos) {
+        const details = await mainS3().statObject(mainS3Bucket(), object.name)
+        await mainS3().removeObject(mainS3Bucket(), object.name, details.versionId ? { versionId: details.versionId } : undefined)
+    }
+    const bytes = [...orphans, ...staleLogos].reduce((total, object) => total + object.size, 0)
 	if (orphans.length > 0) {
 		await assetsS3().removeObjects(assetsS3Bucket(), orphans.map((object) => object.name))
 	}
 	await dataSource.getRepository(StorageUsage).update({ id: 1 }, {
-		orphanObjects: orphans.length,
+		orphanObjects: orphans.length + staleLogos.length,
 		orphanBytes: bytes.toString(),
 		orphansRemovedAt: new Date(),
 	})
-	logger.info('storage.orphans-removed', { count: orphans.length, bytes })
-	return { count: orphans.length, bytes }
+	logger.info('storage.orphans-removed', { count: orphans.length + staleLogos.length, bytes })
+	return { count: orphans.length + staleLogos.length, bytes }
 }
 
 export async function cleanStaleTempDirectories(): Promise<void> {

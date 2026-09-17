@@ -14,11 +14,28 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { rm } from "node:fs/promises"
 import sharp from "sharp"
+import { z } from "zod"
+import { adminClientLogoEnabled, createLogoUpload, getClientLogo, removeClientLogo, LOGO_MIME_TYPES, processClientLogo } from "../../services/branding"
 import { logger, mainS3, mainS3Bucket } from "../../env"
 import { tmpFile } from "../../services/asset"
-import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
+import { authMiddleware, publicProcedure, router, userAdmin, userManagerOrAdmin } from "../index"
 
 export default router({
+  getAdminBranding: publicProcedure
+    .use(authMiddleware(userManagerOrAdmin))
+    .query(() => ({ useClientLogo: adminClientLogoEnabled() })),
+  getClientLogo: publicProcedure.query(() => getClientLogo()),
+  getClientLogoUpload: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ contentType: z.enum(LOGO_MIME_TYPES) }))
+    .mutation(({ ctx, input }) => createLogoUpload(ctx.user.id, input.contentType)),
+  processClientLogo: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ uploadId: z.string().uuid() }))
+    .mutation(({ ctx, input }) => processClientLogo(ctx.user.id, input.uploadId)),
+  removeClientLogo: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .mutation(() => removeClientLogo()),
   getAuthBackgroundUploadUrl: publicProcedure
     .use(authMiddleware(userAdmin))
     .query(async () => {

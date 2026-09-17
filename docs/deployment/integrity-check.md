@@ -57,3 +57,5 @@ npm run cli -- check-integrity
 ```
 
 This queues all assets found unhealthy, including the selected one. Check its resulting object and preview, not just its status: the current processing code absorbs some S3/thumbnail errors. Do not update by filename, which need not be unique, or bulk-refresh unsupported formats just because they lack thumbnails. Collection-file deletion alone does not refresh mosaics; the integrity pass recalculates them.
+
+The check also removes abandoned `settings/client-logo-temp/` objects from the main bucket after 24 hours. It never removes the current processed `settings/client-logo.webp` object.

@@ -12,7 +12,7 @@ Damvia keeps its own copy of every asset in S3-compatible object storage, next t
 
 | Bucket | Variable | Contains | Can be rebuilt? |
 |---|---|---|---|
-| Main | `MAIN_S3_URL` | Collection thumbnails, page images/videos, the login background (`settings/auth-background.webp`) | No. These are uploaded by admins. Back it up. |
+| Main | `MAIN_S3_URL` | Collection thumbnails, page images/videos, the login background (`settings/auth-background.webp`), client logo (`settings/client-logo.webp`) | No. These are uploaded by admins. Back it up. |
 | Assets | `ASSETS_S3_URL` | Asset originals at `asset-file/{id}`, their WebP thumbnails, download archives at `downloads/{id}` | Originals and generated previews, while sources remain available. Download archives are not recreated. See [Integrity check](../deployment/integrity-check.md). |
 
 The two variables may point to the same server with different bucket names, which is the usual setup. Damvia does not create buckets; create both before the first start.
@@ -50,11 +50,12 @@ Damvia never proxies file bytes through the API:
 
 - Thumbnails and previews are served to the browser through presigned GET URLs.
 - Admin uploads (collection thumbnails, page images, the login background) go to presigned PUT URLs valid 24 hours.
+- Client logos use a ten-minute presigned POST policy with a 5 MB limit, followed by server-side validation and WebP conversion. Temporary upload keys are caller-scoped and never used for display.
 - Downloads redirect from `API_URL/v1/downloads/{id}` to a presigned GET URL of the archive; the `download-ready` email carries such a URL directly.
 
 Therefore the endpoint hostname in both URLs must be resolvable and reachable **from users' browsers**, over HTTPS in production, and the bucket must allow the presigned requests. With MinIO behind a reverse proxy, forward the S3 API port (9000 by default) on a public hostname and use that hostname in the URLs; the server can use the same hostname.
 
-CORS is needed for presigned PUT uploads and any cross-origin fetch/XHR reads (the browser performs a cross-origin PUT). Allow `PUT` and `GET` from `APP_URL`'s origin on the main bucket. Presigned GET links opened as navigations or `<img>` sources do not need CORS.
+CORS is needed for presigned PUT uploads and any cross-origin fetch/XHR reads (the browser performs a cross-origin PUT). Allow `PUT`, `POST` and `GET` from `APP_URL`'s origin on the main bucket. Presigned GET links opened as navigations or `<img>` sources do not need CORS.
 
 ## Bucket policy
 

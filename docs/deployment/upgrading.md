@@ -68,6 +68,8 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1751187976556-update-asset-file-trigger` | Same trigger, also fired on `asset_files` updates |
 | `1789516800000-secure-access` | Reset deadlines, account session versions, collection group inheritance and guest membership updates |
 | `1789603200000-storage-usage` | `storage_usage` table: measured and reserved bytes, plan and disk alert levels, sync pause and orphan cleanup timestamps; `maintenance_contact` flag on `users` |
+| `1789689600000-admin-branding` | `admin_branding` single-row table choosing the logo of the admin area |
+| `1789776000000-host-controlled-branding` | Drops `admin_branding`: the host decides with `ADMIN_CLIENT_LOGO` instead |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.
 

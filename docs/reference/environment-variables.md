@@ -17,6 +17,7 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). `
 | Variable | Default | Purpose |
 |---|---|---|
 | `APP_NAME` | `Damvia - Open Source Digital Asset Management` | Returned by the public `env` query; the client uses it as the document title. |
+| `ADMIN_CLIENT_LOGO` | `false` | Host-only: `true` uses the uploaded client logo in the admin sidebar when available; otherwise Damvia. Cannot be changed through the DAM admin. `ADMIN-CLIENT-LOGO` is an accepted alias and takes precedence when both are set. Restart the server after changing it. |
 | `APP_URL` | `http://localhost:5173` | Public URL of the client. Every link in an email is built from it, and expired download links redirect to `APP_URL/link-expired`. |
 | `API_URL` | `http://localhost:3000` | Public URL of this server. Download links are `API_URL/v1/downloads/{id}`. |
 | `APP_SECRET` | required | Randomly generated signing secret of at least 32 bytes, for example `openssl rand -hex 32`. Checked at startup. JWTs last 180 days; changing the secret logs every user out. |
