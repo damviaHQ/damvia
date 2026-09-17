@@ -21,6 +21,7 @@ import {
   AtSign,
   Blocks,
   ContactRound,
+  ChartColumn,
   Copyright,
   FileCog,
   FilePenLine,
@@ -79,6 +80,10 @@ const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent
               exact-active-class="router-link-active">
               <LayoutDashboard class="w-4 h-4 mr-2" />
               Dashboard
+            </router-link>
+            <router-link :to="{ name: 'admin-analytics' }" class="menu-item">
+              <ChartColumn class="w-4 h-4 mr-2" />
+              Insights
             </router-link>
             <router-link :to="{ name: 'admin-settings' }" class="menu-item">
               <Settings class="w-4 h-4 mr-2" />

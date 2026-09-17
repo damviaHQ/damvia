@@ -162,6 +162,7 @@ function exportCsv() {
       <th :aria-sort="sortKey === 'name' ? (ascending ? 'ascending' : 'descending') : 'none'"><button @click="sortBy('name')">User <ArrowUpDown /></button></th>
       <th>Role</th><th>Region & groups</th><th>Status</th>
       <th :aria-sort="sortKey === 'createdAt' ? (ascending ? 'ascending' : 'descending') : 'none'"><button @click="sortBy('createdAt')">Joined <ArrowUpDown /></button></th>
+      <th>Last login</th>
       <th><span class="dv-sr-only">Actions</span></th>
      </tr></thead>
      <tbody><tr v-for="user in visible" :key="user.id" :class="{ 'is-selected': selectedIds.includes(user.id) }">
@@ -171,6 +172,7 @@ function exportCsv() {
       <td><span>{{ user.region || 'No region' }}</span><span class="user-cell-secondary">{{ user.groups.map(group => group.name).join(', ') || 'No groups' }}</span></td>
       <td><Button v-if="canApproveUser(store.user, user)" class="dv-button dv-button--primary user-status-approval" :disabled="!!busyId" :aria-label="`Approve ${user.name}`" @click="approve(user)"><Check />{{ busyId === user.id ? 'Approving…' : 'Approve' }}</Button><span v-else class="dv-badge" :class="{ 'dv-badge--success': userState(user) === 'active', 'dv-badge--warning': userState(user) === 'pending' }">{{ userStateLabels[userState(user)] }}</span></td>
       <td class="user-joined">{{ formatDate(user.createdAt) }}</td>
+      <td class="user-joined">{{ user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never' }}</td>
       <td><div class="user-row-actions"><button v-if="canDeleteUser(store.user, user)" class="user-delete" :disabled="!!busyId" :aria-label="`Delete ${user.name}`" @click="askDelete(user, $event)"><Trash2 /></button></div></td>
      </tr></tbody>
     </table>

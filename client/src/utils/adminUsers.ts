@@ -48,8 +48,8 @@ export function csvCell(value: unknown) {
   return `"${safe.replace(/"/g, '""')}"`
 }
 export function usersCsv(users: AdminUser[]) {
-  const rows = [['Name', 'Email', 'Company', 'Role', 'Region', 'Groups', 'Status', 'Joined'], ...users.map(user => [
-    user.name, user.email, user.company, user.role, user.region, user.groups.map(group => group.name).join('; '), userStateLabels[userState(user)], user.createdAt,
+  const rows = [['Name', 'Email', 'Company', 'Role', 'Region', 'Groups', 'Status', 'Joined', 'Last login'], ...users.map(user => [
+    user.name, user.email, user.company, user.role, user.region, user.groups.map(group => group.name).join('; '), userStateLabels[userState(user)], user.createdAt, user.lastLoginAt,
   ])]
   return '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n')
 }

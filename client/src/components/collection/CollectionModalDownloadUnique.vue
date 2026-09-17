@@ -59,6 +59,7 @@ const emit = defineEmits<{
 }>()
 const toast = useGlobalToast()
 const props = defineProps<Props>()
+const viewedAt = new Map<string, number>()
 const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
 const hasTermsError = ref(false)
@@ -382,6 +383,12 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown)
+})
+
+watch(currentFile, (file) => {
+  if (!file || (viewedAt.get(file.id) ?? 0) > Date.now() - 30 * 60 * 1000) return
+  viewedAt.set(file.id, Date.now())
+  trpc.analytics.trackView.mutate({ collectionFileId: file.id }).catch(() => {})
 })
 
 watch(() => props.modelValue, (newValue) => {
