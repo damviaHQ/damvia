@@ -29,6 +29,12 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
    then copy `client/dist/` to the static host. Deploy the client **after** the server, since the client is built against the server's tRPC types and may call procedures the old server does not have.
 5. Check `docs/reference/environment-variables.md` of the new version (or the diff of `server/.env.template`) for new variables.
 
+## Insights in this upgrade
+
+- The migration creates an empty `activity_events` table. [Insights](../administration/analytics.md) and the Last Login column of Users fill from the first request after the restart; nothing is rebuilt from earlier downloads.
+- Events older than `ANALYTICS_RETENTION_DAYS` (365 by default) are deleted every night. Set the variable before the upgrade if the instance's privacy policy requires a shorter period.
+- The client must be rebuilt with the server: it is the client that reports file views.
+
 ## Storage plan in this upgrade
 
 - The migration creates the `storage_usage` table with its single row. The first measurement runs at the next half hour; open the [dashboard](../administration/dashboard.md) and click "Measure now" to fill it right away.
@@ -71,6 +77,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1789689600000-admin-branding` | `admin_branding` single-row table choosing the logo of the admin area |
 | `1789776000000-host-controlled-branding` | Drops `admin_branding`: the host decides with `ADMIN_CLIENT_LOGO` instead |
 | `1789862400000-track-invitation-creator` | `invited_by_id` on `collection_invitations`, filled with the collection owner for existing invitations |
+| `1789948800000-activity-events` | `activity_events` table with its four indexes, feeding Insights; `last_login_at` on `users` |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.
 

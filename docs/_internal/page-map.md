@@ -28,6 +28,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/trpc/router/settings.ts` | `configuration/branding.md` |
 | `server/src/services/storage.ts`, `trpc/router/dashboard.ts`, `entity/storage-usage.ts` | `administration/dashboard.md`, `deployment/operations.md`, `configuration/server-env.md`, `deployment/integrity-check.md` |
 | `client/src/views/admin/admin-dashboard.vue`, `client/src/layouts/LayoutAdmin.vue` | `administration/dashboard.md`, `administration/index.md` |
+| `server/src/trpc/router/analytics.ts`, `services/analytics.ts`, `entity/activity-event.ts`, `client/src/views/admin/admin-analytics.vue`, the activity inserts in `trpc/router/user.ts` (`me`), `download.ts`, `collection.ts` (`search`), `collection/invitation.ts`, `favorite.ts`, the view report in `client/src/components/collection/CollectionModalDownloadUnique.vue` | `administration/analytics.md`, `contributing/api.md`, `contributing/data-model.md` |
 | `server/src/entity/*` (all) | `introduction/concepts.md` |
 | `server/src/migrations/*` | `deployment/upgrading.md` |
 | `server/Dockerfile` | `deployment/server-docker.md`, `getting-started/index.md` |

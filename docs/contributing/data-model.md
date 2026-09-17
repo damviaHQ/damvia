@@ -3,7 +3,7 @@ title: Data model
 description: Every TypeORM entity with its table, key columns, relations and enums, the three materialized-path trees, the database triggers, and how to write a migration.
 sidebar:
   order: 3
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-17
 ---
 
 This page maps the code in `server/src/entity/` and `server/src/migrations/` so you can add a column, a table or a trigger without surprises. What each object means for an administrator is in [Core concepts](../introduction/concepts.md).
@@ -12,7 +12,7 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 
 - `dataSource` in `server/src/env.ts` uses `SnakeNamingStrategy` from `typeorm-naming-strategies`: a property `assetTypeId` is the column `asset_type_id`, the entity `CollectionFile` mapped with `@Entity('collection_files')` keeps that explicit table name.
 - `synchronize: false` and `migrationsRun: true`: TypeORM never alters the schema from the entities; every schema change is a migration, applied at startup before Fastify listens.
-- Every entity except `UserFavorite` and `StorageUsage` has a `uuid` primary key `id` (declared with `@PrimaryColumn()` and `@PrimaryGeneratedColumn("uuid")`, defaulting to `uuid_generate_v4()` in SQL). All but `StorageUsage` have a `createdAt`; all but `UserGroup` and `StorageUsage` also have an `updatedAt`.
+- Every entity except `UserFavorite` and `StorageUsage` has a `uuid` primary key `id` (declared with `@PrimaryColumn()` and `@PrimaryGeneratedColumn("uuid")`, defaulting to `uuid_generate_v4()` in SQL). All but `StorageUsage` have a `createdAt`; all but `UserGroup`, `StorageUsage` and `ActivityEvent` also have an `updatedAt`.
 - Enums are TypeScript string enums stored as plain `character varying` columns (`@Column({ enum: ... })`), not Postgres enum types.
 - Relations are declared with both the foreign-key column (`folderId`) and the object (`folder`), so a query can filter on the id without a join.
 
@@ -34,11 +34,12 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 | `ProductAttribute` (`product-attribute.ts`) | `product_attributes` | `name` (unique), `displayName`, `facetable`, `searchable` (indexed), `viewable` | No relations declared |
 | `Region` (`region.ts`) | `regions` | `name`, `defaultGroupId` | `defaultGroup`, `users` |
 | `Group` (`group.ts`) | `groups` | `name`, `default` | `userGroups` |
-| `User` (`user.ts`) | `users` | `name`, `company`, `email` (unique), `emailVerified`, `emailVerificationCode`, `password`, `resetPasswordToken` (hash), `resetPasswordExpiresAt` (`timestamptz`), `authVersion`, `role`, `approved`, `maintenanceContact`, `regionId` | `region`, `userGroups` (cascade insert), `favorites`, `invitations`. Enum `UserRole`: `admin`, `manager`, `member`, `guest` (default) |
+| `User` (`user.ts`) | `users` | `name`, `company`, `email` (unique), `emailVerified`, `emailVerificationCode`, `password`, `resetPasswordToken` (hash), `resetPasswordExpiresAt` (`timestamptz`), `authVersion`, `role`, `approved`, `maintenanceContact`, `lastLoginAt` (`timestamptz`, written by `user.me`), `regionId` | `region`, `userGroups` (cascade insert), `favorites`, `invitations`. Enum `UserRole`: `admin`, `manager`, `member`, `guest` (default) |
 | `UserGroup` (`user-group.ts`) | `user_groups` | `userId`, `groupId` | Join table; both sides cascade on delete |
 | `UserFavorite` (`user-favorite.ts`) | `user_favorites` | Composite primary key `userId` + `collectionFileId` | Both sides cascade on delete |
 | `AuthorizedDomain` (`authorized-domain.ts`) | `authorized_domains` | `domain`, `detail` | No relations declared |
 | `StorageUsage` (`storage-usage.ts`) | `storage_usage` | Single row, `id` = 1: `usedBytes`, `reservedBytes` (`bigint`, read as strings), `measuredAt`, `alertLevel`, `diskAlertLevel`, `quotaReachedAt`, `orphanObjects`, `orphanBytes`, `orphansRemovedAt` | No relations. Written by `services/storage.ts` only: the measure job rewrites `usedBytes` and clears `reservedBytes` only when `pgboss.job` has no active `asset/update-content` job (pg-boss must therefore share `DATABASE_URL`), `asset/update-content` reserves and commits sizes with conditional `UPDATE` statements |
+| `ActivityEvent` (`activity-event.ts`) | `activity_events` | `userId`, `type`, `assetFileId`, `collectionId` (all three nullable), `metadata` (`jsonb`: `downloadId` and `downloadType` for downloads, `query` and `total` for searches, `invitationId` for shares), `createdAt` (`timestamptz`) | `user`, `assetFile`, `collection`, each `ON DELETE SET NULL` so an event outlives what it names. Enum `ActivityEventType`: `login`, `asset_view`, `asset_download`, `search`, `collection_share`, `favorite`. Append-only: inserted by the routers where the action happens, read with raw SQL by `trpc/router/analytics.ts`, deleted by `services/analytics.ts` |
 | `Download` (`download.ts`) | `downloads` | `userId`, `collectionFileIds` (`uuid[]`), `status`, `type`, `imageFormat`, `imageResolution`, `videoFormat`, `videoResolution`, `expiresAt` | `user`. Getter `storageKey` (`downloads/{id}`). Enums `DownloadStatus` (`preparing`, `ready`, `failed`, `expired`), `DownloadType` (`direct`, `email`), `DownloadImageFormat` (`original`, `png`, `jpg`, `webp`), `DownloadImageResolution` and `DownloadVideoResolution` (`high`, `medium`, `low`), `DownloadVideoFormat` (`original`, `mp4`, `webm`) |
 
 ## Three trees use a materialized path

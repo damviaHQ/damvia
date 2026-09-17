@@ -15,6 +15,7 @@ The routes below are declared in `client/src/router/index.ts`. The sidebar label
 | Route | Sidebar label | Section | What it manages | Who sees it |
 | --- | --- | --- | --- | --- |
 | `/admin` | Dashboard | (top level) | Workspace totals, recent files, actionable access/sync/export issues, storage and cloud health | admin |
+| `/admin/analytics` | Insights | (top level) | Views, downloads, active users, searches and shares over a chosen period, with CSV exports | admin |
 | `/admin/settings` | Global Settings | (top level) | Brand Logo upload and login background image | admin |
 | `/admin/menu-items` | Menu | Content Management | The navigation tree shown to users: collections, pages, text links, dividers, home item | admin |
 | `/admin/collections` | Collections | Content Management | The public collection tree: create, edit, delete | admin |
@@ -41,10 +42,11 @@ Each screen is documented on its own page:
 - [Menu and pages](./menu-and-pages.md)
 - [Products and PIM](./products-and-pim.md)
 - [Downloads](./downloads.md)
+- [Insights](./analytics.md)
 
 ## Managers only see the Users screen
 
-The sidebar renders the whole User Management section for the roles `admin` and `manager`, but inside it only the Users link is shown to managers. Groups, Regions and Authorized Domains are wrapped in an `admin` check. Every other section (Dashboard, Global Settings, Content Management, Asset Management, PIM) is rendered only for `admin`, and so is the storage banner above the admin pages.
+The sidebar renders the whole User Management section for the roles `admin` and `manager`, but inside it only the Users link is shown to managers. Groups, Regions and Authorized Domains are wrapped in an `admin` check. Every other section (Dashboard, Insights, Global Settings, Content Management, Asset Management, PIM) is rendered only for `admin`, and so is the storage banner above the admin pages.
 
 A manager who opens `/admin/users` is further limited to the users of their own region. The rules are detailed in [Users and approval](./users-and-approval.md).
 

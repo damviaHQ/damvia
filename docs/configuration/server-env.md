@@ -53,6 +53,10 @@ When one server hosts several Damvia instances, each customer's admins must see 
 
 Leave `SERVER_ALERT_EMAILS` empty and the server never sends nor shows a disk figure.
 
+## ANALYTICS_RETENTION_DAYS bounds the activity history
+
+[Insights](../administration/analytics.md) reads the `activity_events` table, which names the user behind each view, download and search. `ANALYTICS_RETENTION_DAYS` is how long those rows live: 365 days by default, deleted every night by `activity/prune-events`. Lower it to match the privacy policy of the instance, or set `0` to keep everything. The table grows by one row per file downloaded, so an instance that exports large archives every day should keep a bound.
+
 ## Mail
 
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` configure Nodemailer. Authentication is only sent when both user and password are set, so leave both empty for an unauthenticated relay such as MailHog. The server adds the header `X-PM-Message-Stream: outbound` to every email, which Postmark uses to pick the message stream and other providers ignore.

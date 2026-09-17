@@ -6,7 +6,7 @@ sidebar:
 lastUpdated: 2026-09-17
 ---
 
-The dashboard is the first admin screen, at `/admin`, and the page every admin lands on from the "Administration" entry of the account menu. It combines workspace totals, user activity, file and download activity, access requests and storage health in the shared Damvia admin design.
+The dashboard is the first admin screen, at `/admin`, and the page every admin lands on from the "Administration" entry of the account menu. It combines workspace totals, user activity, file and download activity, access requests and storage health in the shared Damvia admin design. Usage over time, such as the most downloaded files, active users and search terms, is on [Insights](./analytics.md).
 
 ## What the storage block shows
 

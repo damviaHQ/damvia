@@ -40,6 +40,8 @@ On `/admin/users`, a user who has verified their email but is not approved shows
 2. Pushes a job to `email/user-approved`.
 3. The email contains a link to `/login?token=<jwt>`; opening it logs the user in directly.
 
+The Last Login column shows when the user last opened the application, to the nearest 30 minutes of inactivity, or `never`. It is the same moment [Insights](./analytics.md) counts as a login, and it starts at the upgrade that added it.
+
 Approving an already approved user fails with `User already approved.` The templates for these emails are described in [Email templates](../configuration/email-templates.md).
 
 ## Managers only see their own region
