@@ -576,6 +576,29 @@ test('freed space after a blocked sync queues every pending file again', async (
     } finally { env.storageQuota = () => null }
 })
 
+test('raising or removing the plan resumes a paused sync without freeing space', async () => {
+    await resetStorageUsage({ usedBytes: '900', quotaReachedAt: new Date() })
+    env.storageQuota = () => 800
+    try {
+        const outdated = await pendingAsset('outdated')
+        bucketObjects = [{ name: 'asset-file/a', size: 900, lastModified: new Date() }]
+        await storageService.measureStorageUsage()
+        assert.notEqual((await storageRow()).quotaReachedAt, null)
+        assert(!queued.some(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === outdated.id))
+        env.storageQuota = () => 5000
+        const raised = await storageService.measureStorageUsage()
+        assert.equal((await storageRow()).quotaReachedAt, null)
+        assert(raised.retriedAssets >= 1)
+        assert(queued.some(job => job.name === 'assetUpdateContentQueue' && job.assetFileId === outdated.id))
+        await resetStorageUsage({ usedBytes: '900', quotaReachedAt: new Date() })
+        bucketObjects = [{ name: 'asset-file/a', size: 900, lastModified: new Date() }]
+        env.storageQuota = () => null
+        const removed = await storageService.measureStorageUsage()
+        assert.equal((await storageRow()).quotaReachedAt, null)
+        assert(removed.retriedAssets >= 1)
+    } finally { env.storageQuota = () => null }
+})
+
 test('the dashboard and its actions are admin only and expose numbers, not strings', async () => {
     for (const user of [null, guest, member, manager, { ...admin, approved: false }]) {
         await forbidden(caller(user).dashboard.summary())
