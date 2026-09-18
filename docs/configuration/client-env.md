@@ -15,7 +15,7 @@ VITE_API_ENDPOINT=http://localhost:3000/trpc
 
 # Brand color: a Tailwind color name (red-500) or a hex color without # (e11d48).
 # "#" starts a comment in .env files: write "#e11d48" in quotes or drop the #.
-# Defaults: sky-400 / sky-500 / sky-600. Restart dev server or rebuild after changing.
+# Defaults: #DFE9FF / #F6F8FC / #0044F4. Restart dev server or rebuild after changing.
 VITE_BRAND_COLOR=
 VITE_BRAND_COLOR_HOVER=
 VITE_BRAND_COLOR_STRONG=
@@ -39,9 +39,9 @@ The three `VITE_BRAND_COLOR*` variables define the `brand` colour family in `cli
 
 | Variable | Default | Where it shows |
 |---|---|---|
-| `VITE_BRAND_COLOR` | `sky-400` | Primary accent: badges, the cloud-sync icon, active states. |
-| `VITE_BRAND_COLOR_HOVER` | `sky-500` | Hover state of the accent and the "public collection" badge in the member links tab. |
-| `VITE_BRAND_COLOR_STRONG` | `sky-600` | Emphasised text such as the license acceptance line in the download dialogs. |
+| `VITE_BRAND_COLOR` | `#DFE9FF` | Primary accent surface: badges, selections and download actions. |
+| `VITE_BRAND_COLOR_HOVER` | `#F6F8FC` | Hover surface for accent controls. |
+| `VITE_BRAND_COLOR_STRONG` | `#0044F4` | Strong emphasis colour for text and icons that require more contrast. |
 
 A value that is neither a known Tailwind name nor valid CSS is passed to the browser as is and renders as no colour, so check the result in the download dialog after changing it.
 

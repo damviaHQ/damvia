@@ -37,9 +37,9 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: resolveColor(process.env.VITE_BRAND_COLOR, "sky-400"),
-          hover: resolveColor(process.env.VITE_BRAND_COLOR_HOVER, "sky-500"),
-          strong: resolveColor(process.env.VITE_BRAND_COLOR_STRONG, "sky-600"),
+          DEFAULT: resolveColor(process.env.VITE_BRAND_COLOR, "#DFE9FF"),
+          hover: resolveColor(process.env.VITE_BRAND_COLOR_HOVER, "#F6F8FC"),
+          strong: resolveColor(process.env.VITE_BRAND_COLOR_STRONG, "#0044F4"),
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

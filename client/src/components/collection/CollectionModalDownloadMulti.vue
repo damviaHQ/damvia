@@ -364,13 +364,13 @@ function removeFromSelection(file: { id: string }) {
         </div>
         <div>
           <Button @click="download" :disabled="isLoading"
-            class="w-full text-neutral-800 ring-brand hover:text-neutral-900 hover:bg-brand-hover hover:ring-brand bg-brand"
+            class="w-full bg-brand text-neutral-800 ring-1 ring-inset ring-brand hover:bg-brand-hover hover:text-neutral-900 hover:ring-brand-hover"
             :class="{
               'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-brand hover:text-brand hover:bg-neutral-800': hasLicenses && !form.isAcceptingTerms,
             }">
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>
-          <div :class="{ '!text-neutral-200': hasLicenses && !form.isAcceptingTerms }" class="text-sm text-brand mt-2">
+          <div class="mt-2 text-sm text-neutral-300">
             Total Size: {{ totalSize }}
           </div>
         </div>
