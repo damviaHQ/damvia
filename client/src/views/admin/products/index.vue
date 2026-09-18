@@ -185,11 +185,11 @@ function saveCellValue() {
         [metaDataKey]: editingValue.value,
       },
     }).then(() => {
-      toast.success("Product updated successfully")
+      toast.success("Record updated successfully")
       queryClient.invalidateQueries({ queryKey: ["products"] })
     }).catch((error) => {
       console.error("Error updating product:", error)
-      toast.error("Failed to update product")
+      toast.error("Failed to update record")
     }).finally(() => {
       isSaving.value = false
       activeCell.value = null
@@ -197,7 +197,7 @@ function saveCellValue() {
     })
   } catch (error) {
     console.error("Error updating product:", error)
-    toast.error("Failed to update product")
+    toast.error("Failed to update record")
     isSaving.value = false
     activeCell.value = null
     editorPosition.value = null
@@ -329,7 +329,7 @@ const removeAllProducts = useMutation({
   },
   onSuccess: () => {
     queryClient.invalidateQueries({ queryKey: ["products"] })
-    toast.success("All products removed successfully")
+    toast.success("All records removed successfully")
     showDeleteDialog.value = false
   },
   onSettled: () => {
@@ -477,7 +477,7 @@ onUnmounted(() => {
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page admin-products">
     <div class="admin-product-toolbar">
       <div class="flex items-center gap-5">
-        <div class="admin-heading"><h1>Products</h1></div>
+        <div class="admin-heading"><h1>Records</h1></div>
         <Button as-child variant="outline"><router-link :to="{ name: 'admin-product-attributes' }"><Blocks class="w-4 h-4 mr-2" />Attributes</router-link></Button>
         <Button v-if="data.products.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
           class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
@@ -492,13 +492,13 @@ onUnmounted(() => {
         <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-product-import' }"><FileUp />Import CSV</router-link></Button>
         <DropdownMenu v-model:open="isDropdownOpen">
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Product actions">
+            <Button variant="ghost" size="icon" aria-label="Record actions">
               <EllipsisVertical class="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuItem :disabled="!data.products.length" @select="deleteError = ''; showDeleteDialog = true">
-              <PackageX class="mr-2 h-4 w-4" /><span>Remove all products</span>
+              <PackageX class="mr-2 h-4 w-4" /><span>Remove all records</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -525,8 +525,8 @@ onUnmounted(() => {
     </div>
     
     <section v-if="!data.products.length" class="dv-panel admin-empty">
-      <h2>{{ Object.keys(columnFilters).length ? 'No matching products' : 'No products yet' }}</h2>
-      <p>{{ Object.keys(columnFilters).length ? 'Clear the filters to see your product list.' : 'Import a CSV file to add your product catalog.' }}</p>
+      <h2>{{ Object.keys(columnFilters).length ? 'No matching records' : 'No records yet' }}</h2>
+      <p>{{ Object.keys(columnFilters).length ? 'Clear the filters to see your record list.' : 'Import a CSV file to add your records.' }}</p>
       <Button v-if="Object.keys(columnFilters).length" variant="outline" @click="clearFilters">Clear filters</Button>
       <Button v-else as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-product-import' }"><FileUp />Import CSV</router-link></Button>
     </section>
@@ -653,7 +653,7 @@ onUnmounted(() => {
   </Teleport>
   <AlertDialog :open="showDeleteDialog" @update:open="open => { if (!isDeleting) showDeleteDialog = open }">
     <AlertDialogContent @escape-key-down="event => { if (isDeleting) event.preventDefault() }">
-      <AlertDialogHeader><AlertDialogTitle>Remove all products?</AlertDialogTitle><AlertDialogDescription>This removes the entire product catalog, including products outside the current filters. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+      <AlertDialogHeader><AlertDialogTitle>Remove all records?</AlertDialogTitle><AlertDialogDescription>This removes all records, including records outside the current filters. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
       <p v-if="deleteError" role="alert" class="admin-form-error">{{ deleteError }}</p>
       <AlertDialogFooter><AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel><Button variant="destructive" :disabled="isDeleting" @click="removeAllProducts.mutate()">{{ isDeleting ? 'Removing…' : 'Remove all products' }}</Button></AlertDialogFooter>
     </AlertDialogContent>

@@ -108,7 +108,7 @@ watchEffect(() => {
 async function remove(productAttribute: ProductAttribute) {
   await trpc.productAttribute.remove.mutate(productAttribute.id)
   await queryClient.invalidateQueries({ queryKey: ["products", "attributes"] })
-  toast.success("Product attribute removed!")
+  toast.success("Record attribute removed!")
 }
 
 function submitChanges(event: Event) {
@@ -129,8 +129,8 @@ function submitChanges(event: Event) {
     .then(() => {
       toast.success(
         modalState.value === "creating"
-          ? "Product attribute created!"
-          : "Product attribute updated!"
+          ? "Record attribute created!"
+          : "Record attribute updated!"
       )
       modalState.value = "closed"
     })
@@ -148,7 +148,7 @@ async function onModalSubmit(event: Event) {
 <template>
   <div class="admin-page admin-resource-page">
     <div class="admin-heading">
-      <div><h1>Product attributes</h1><p>Choose which product fields appear in lists, filters and search.</p></div>
+      <div><h1>Record attributes</h1><p>Choose which record fields appear in lists, filters and search.</p></div>
       <Button variant="default" @click="openCreateModal" class="dv-button dv-button--primary">
         <CirclePlus class="w-4 h-4" />
         Add attribute
@@ -159,14 +159,14 @@ async function onModalSubmit(event: Event) {
         <FileUp class="w-4 h-4" />import products data
       </router-link> to use attributes.
     </div>
-    <AdminList v-else :items="productAttributes" :fields="['name', 'displayName']" label="Product attributes" v-slot="{ items }">
+    <AdminList v-else :items="productAttributes" :fields="['name', 'displayName']" label="Record attributes" v-slot="{ items }">
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Attribute Key</TableHead>
           <TableHead>Display Name</TableHead>
           <TableHead>Filter in Search</TableHead>
-          <TableHead>Visible in Product List</TableHead>
+          <TableHead>Visible in Record List</TableHead>
           <TableHead>Searchable</TableHead>
           <TableHead></TableHead>
         </TableRow>
@@ -199,12 +199,12 @@ async function onModalSubmit(event: Event) {
       <DialogContent class="admin-dialog--compact">
         <DialogHeader>
           <DialogTitle>
-            {{ modalState === "creating" ? "Add" : "Edit" }} product attribute
+            {{ modalState === "creating" ? "Add" : "Edit" }} record attribute
           </DialogTitle>
           <DialogDescription>
-            Attributes are characteristics of your products. Define an attribute to let
-            users search or filter for products by this characteristic, or to display in
-            Product List View.
+            Attributes are characteristics of your records. Define an attribute to let
+            users search or filter for records by this characteristic, or to display in
+            Record List View.
           </DialogDescription>
         </DialogHeader>
         <form :aria-busy="saving" @submit="onModalSubmit">
@@ -234,7 +234,7 @@ async function onModalSubmit(event: Event) {
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox id="viewable" v-model:checked="form.viewable" :disabled="form.facetable" />
-              <Label for="viewable">Visible in Product List</Label>
+              <Label for="viewable">Visible in Record List</Label>
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox id="searchable" v-model:checked="form.searchable" />

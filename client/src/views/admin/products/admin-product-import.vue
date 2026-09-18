@@ -173,7 +173,7 @@ const importCsvMutation = useMutation({
     return trpc.pim.importCsv.mutate(csvData)
   },
   onSuccess: () => {
-    toast.success("Products successfully imported")
+    toast.success("Records successfully imported")
     router.push("/admin/products")
   },
   onError: (error) => {
@@ -244,7 +244,7 @@ function handleOverrideAll(value: boolean) {
 <template>
   <div class="admin-page admin-resource-page">
     <div class="flex flex-col gap-5 mb-6">
-      <div class="admin-heading"><h1>Import products</h1></div>
+      <div class="admin-heading"><h1>Import records</h1></div>
     </div>
 
     <div class="dv-panel p-6">
@@ -297,7 +297,7 @@ function handleOverrideAll(value: boolean) {
         <div class="flex flex-col space-y-2">
           <h3 class="text-lg font-semibold mb-2">1. Select Primary Key Column</h3>
           <p class="text-sm admin-text-secondary">
-            This column will be used to identify your product reference.
+            This column will be used to identify your record reference.
           </p>
 
           <div class="w-full max-w-xs">
@@ -330,7 +330,7 @@ function handleOverrideAll(value: boolean) {
         <div class="flex flex-col gap-2">
           <h3 class="text-lg font-semibold">3. Compare with existing data:</h3>
           <p class="text-sm admin-text-secondary">
-            Before saving compare your data with the existing product database.
+            Before saving compare your data with the existing record database.
           </p>
           <Button v-if="columns.length > 0 && parsedData.length > 0" :disabled="primaryKeyName === ''" type="button"
             @click="handleCsvCompare" class="mt-4 w-fit">
@@ -341,7 +341,7 @@ function handleOverrideAll(value: boolean) {
         <Dialog v-model:open="showComparisonDialog">
           <DialogContent class="admin-dialog--large flex flex-col">
             <DialogHeader>
-              <DialogTitle>Review product changes</DialogTitle>
+              <DialogTitle>Review record changes</DialogTitle>
               <DialogDescription>Choose which changed values to replace before importing.</DialogDescription>
             </DialogHeader>
             <div v-if="isComparing" class="flex-grow flex items-center justify-center">
@@ -349,7 +349,7 @@ function handleOverrideAll(value: boolean) {
             </div>
             <div v-else class="flex-grow overflow-auto">
               <Alert variant="default" class="mb-4">
-                <AlertTitle>Review the comparison results and select the products you want to
+                <AlertTitle>Review the comparison results and select the records you want to
                   override.</AlertTitle>
                 <AlertDescription>
                   Light Greyed values are already present in the database and unchanged.
