@@ -1004,3 +1004,76 @@ test('logo uploads validate bytes, rasterise SVG, replace the previous object an
         assert.equal(objects.size, 0)
     } finally { env.mainS3 = previousS3 }
 })
+
+
+test('search demand compares exact periods, detects daily spikes and surfaces gaps outside the top 50', async () => {
+    const { ActivityEvent } = require('../dist/entity/activity-event')
+    const range = { from: new Date('2030-06-08T00:00:00Z'), to: new Date('2030-06-15T00:00:00Z') }
+    const events = []
+    const record = (term, day, count, total = 1, userId = member.id) => {
+        for (let index = 0; index < count; index++) events.push({ type: 'search', userId, metadata: { query: term, total }, createdAt: new Date(`2030-06-${day}T12:00:00Z`) })
+    }
+    for (let day = 1; day <= 7; day++) record('summer launch', String(day).padStart(2, '0'), 1)
+    record('summer launch', '08', 15, 0)
+    record('summer launch', '15', 70, 0)
+    record('new product', '09', 5)
+    record('quiet term', '10', 4)
+    record('missing content', '11', 3, 0)
+    for (let index = 0; index < 51; index++) record(`regular term ${index}`, '12', 4)
+    await db.getRepository(ActivityEvent).insert(events)
+    try {
+        const report = await caller(admin).analytics.searches(range)
+        const term = report.topTerms.find(row => row.term === 'summer launch')
+        assert.equal(term.searches, 15)
+        assert.equal(term.previousSearches, 7)
+        assert.equal(term.zeroResults, 15)
+        assert.equal(term.users, 1)
+        assert.deepEqual(term.spike, { day: '2030-06-08', count: 15, baseline: 1 })
+        assert.equal(report.totals.spikes, 2)
+        assert.equal(report.totals.searches, 231)
+        assert.equal(report.totals.zeroResults, 18)
+        assert.equal(report.volume.reduce((sum, row) => sum + row.count, 0), 231)
+        assert.equal(report.volume.find(row => row.day === '2030-06-08').zeroResults, 15)
+        assert(!report.topTerms.some(row => row.term === 'missing content'))
+        assert(report.signals.some(row => row.term === 'missing content'))
+        assert(!report.signals.some(row => row.term === 'quiet term'))
+        const empty = await caller(admin).analytics.searches({ from: new Date('2029-01-01Z'), to: new Date('2029-01-02Z') })
+        assert.equal(empty.totals.searches, 0)
+        assert.deepEqual(empty.signals, [])
+        const partial = await caller(admin).analytics.searches({ from: new Date('2030-06-08T13:00:00Z'), to: range.to })
+        assert.equal(partial.volume.reduce((sum, row) => sum + row.count, 0), partial.totals.searches)
+        assert(!partial.signals.some(row => row.term === 'summer launch'))
+    } finally {
+        await db.query("DELETE FROM activity_events WHERE created_at >= '2030-06-01' AND created_at < '2030-06-16'")
+    }
+})
+
+test('search audience is admin-only, exact-term scoped, and excludes non-contactable accounts', async () => {
+    const { ActivityEvent } = require('../dist/entity/activity-event')
+    const range = { from: new Date('2031-01-01T00:00:00Z'), to: new Date('2031-01-02T00:00:00Z') }
+    const unverified = await makeUser('member', { emailVerified: false })
+    const unapproved = await makeUser('member', { approved: false })
+    const people = [member, guest, unverified, unapproved]
+    await db.getRepository(ActivityEvent).insert([
+        ...people.map(user => ({ type: 'search', userId: user.id, metadata: { query: 'launch', total: 0 }, createdAt: range.from })),
+        { type: 'search', userId: null, metadata: { query: 'launch', total: 0 }, createdAt: range.from },
+        { type: 'search', userId: admin.id, metadata: { query: 'launch extra', total: 1 }, createdAt: range.from },
+    ])
+    try {
+        for (const user of [null, guest, member, manager, { ...admin, approved: false }]) {
+            await forbidden(caller(user).analytics.searchTerm({ ...range, term: 'launch' }))
+        }
+        const details = await caller(admin).analytics.searchTerm({ ...range, term: 'launch' })
+        assert.equal(details.audienceCount, 1)
+        assert.deepEqual(details.audience.map(row => row.id), [member.id])
+        assert.equal(details.audience[0].zeroResults, 1)
+        assert.equal(details.volume[0].count, 5)
+        assert.deepEqual((await caller(admin).analytics.searchTerm({ ...range, term: "launch' OR 1=1 --" })).audience, [])
+        for (const invalid of [{ from: range.to, to: range.from }, { from: range.from, to: range.from }, { from: range.from, to: new Date('2033-01-01Z') }]) {
+            await assert.rejects(caller(admin).analytics.searches(invalid), error => error.code === 'BAD_REQUEST')
+            await assert.rejects(caller(admin).analytics.searchTerm({ ...invalid, term: 'launch' }), error => error.code === 'BAD_REQUEST')
+        }
+    } finally {
+        await db.query("DELETE FROM activity_events WHERE created_at >= '2031-01-01' AND created_at < '2031-01-02'")
+    }
+})

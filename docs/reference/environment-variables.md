@@ -86,8 +86,8 @@ Client variables are read by Vite **at build time** and baked into the bundle. C
 | Variable | Default | Purpose |
 |---|---|---|
 | `VITE_API_ENDPOINT` | `http://localhost:3000/trpc` | Full URL of the server's tRPC endpoint, that is `API_URL` plus `/trpc`. |
-| `VITE_BRAND_COLOR` | `sky-400` | Accent colour. A Tailwind name (`red-500`), a hex colour without `#` (`e11d48`), or any CSS colour. In dotenv, quote values starting with `#`: `VITE_BRAND_COLOR="#e11d48"`. |
-| `VITE_BRAND_COLOR_HOVER` | `sky-500` | Hover shade of the accent. |
-| `VITE_BRAND_COLOR_STRONG` | `sky-600` | Strong shade of the accent, used for emphasis text. |
+| `VITE_BRAND_COLOR` | `#DFE9FF` | Accent colour. A Tailwind name (`red-500`), a hex colour without `#` (`e11d48`), or any CSS colour. In dotenv, quote values starting with `#`: `VITE_BRAND_COLOR="#e11d48"`. |
+| `VITE_BRAND_COLOR_HOVER` | `#F6F8FC` | Hover shade of the accent. |
+| `VITE_BRAND_COLOR_STRONG` | `#0044F4` | Strong shade of the accent, used for emphasis text. |
 
 The brand colours are resolved in `client/tailwind.config.js`, which loads `client/.env` itself. See [Client configuration](../configuration/client-env.md).

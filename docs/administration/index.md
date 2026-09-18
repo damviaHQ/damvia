@@ -15,7 +15,7 @@ The routes below are declared in `client/src/router/index.ts`. The sidebar label
 | Route | Sidebar label | Section | What it manages | Who sees it |
 | --- | --- | --- | --- | --- |
 | `/admin` | Dashboard | (top level) | Workspace totals, recent files, actionable access/sync/export issues, storage and cloud health | admin |
-| `/admin/analytics` | Insights | (top level) | Views, downloads, active users, searches and shares over a chosen period, with CSV exports | admin |
+| `/admin/analytics` | Insights | (top level) | Usage reports, interactive user activity map, search demand, audience email drafts and CSV exports | admin |
 | `/admin/settings` | Global Settings | (top level) | Brand Logo upload and login background image | admin |
 | `/admin/menu-items` | Menu | Content Management | The navigation tree shown to users: collections, pages, text links, dividers, home item | admin |
 | `/admin/collections` | Collections | Content Management | The public collection tree: create, edit, delete | admin |

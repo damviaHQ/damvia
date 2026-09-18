@@ -199,9 +199,12 @@ The five queries take `{ from, to }` (dates, `to` excluded) and read `activity_e
 | `assets` | query | `userAdmin` | `topDownloaded` and `topViewed` (20 each), `byType`, `byCollection`, `growth`, `neverDownloaded` (`total` and the 50 latest files), `storageByType` (whole library, not the period) |
 | `users` | query | `userAdmin` | `activeSeries`, `loginSeries`, `newUserSeries`, `topDownloaders` (20), `byRole`, `byRegion`, `byGroup` |
 | `searches` | query | `userAdmin` | `topTerms` (50, with `avgResults` and `zeroResults`), `zeroResultTerms`, `volume` |
+| `searchTerm` | query | `userAdmin` | Daily volume and contactable users for one exact search term, including total audience count |
 | `collections` | query | `userAdmin` | `createdSeries`, `shareSeries`, `mostShared`, `mostActive` |
 | `trackView` | mutation | `userApproved` | Records an `asset_view` for a collection file the caller can see, else `NOT_FOUND`. Called by the preview dialog |
 
 `download.create`, `collection.search` (first page, non-empty query), `collection.invitation.create` and `favorite.add` insert their own activity event; see [Data model](./data-model.md).
 
 Uncaught database, storage or service exceptions can also surface as `INTERNAL_SERVER_ERROR`.
+
+`searches` includes totals, daily zero-result counts, previous-period term counts and demand signals. A spike exceeds the preceding seven-day daily average by at least 5 searches and is at least 3× that average. Signals are evaluated before the 50-row display limit. `searchTerm({ from, to, term })` is also admin-only: it returns the exact term’s daily series and up to 200 approved, verified, non-guest users with their search counts and emails, plus the total contactable count. Neither endpoint sends messages. All analytics ranges require `to > from` and a duration no greater than 366 days.

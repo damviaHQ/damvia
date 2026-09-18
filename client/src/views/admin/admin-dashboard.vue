@@ -42,14 +42,14 @@ const storage = computed(() => data.value?.storage)
 const percent = computed(() => storage.value?.percent == null ? null : Math.round(storage.value.percent))
 const barWidth = computed(() => `${Math.min(100, Math.max(0, storage.value?.percent ?? 0))}%`)
 const barColor = computed(() => {
-  if (percent.value === null) return 'bg-brand'
+  if (percent.value === null) return 'storage-bar--primary'
   if (percent.value >= 90) return 'bg-red-500'
   if (percent.value >= 80) return 'bg-amber-500'
-  return 'bg-brand'
+  return 'storage-bar--primary'
 })
 const disk = computed(() => storage.value?.disk ?? null)
 const diskPercent = computed(() => disk.value ? Math.round((disk.value.totalBytes - disk.value.freeBytes) / disk.value.totalBytes * 100) : 0)
-const diskBarColor = computed(() => diskPercent.value >= 90 ? 'bg-red-500' : diskPercent.value >= 80 ? 'bg-amber-500' : 'bg-brand')
+const diskBarColor = computed(() => diskPercent.value >= 90 ? 'bg-red-500' : diskPercent.value >= 80 ? 'bg-amber-500' : 'storage-bar--primary')
 const formatDate = (value: string | Date | null | undefined) =>
   value ? new Date(value).toLocaleString() : 'never'
 const initials = (name: string) => name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()
@@ -372,6 +372,7 @@ const approveUser = async (user: { id: string, name: string }) => {
 .empty-state { padding:24px; font-size:12px; color:var(--dv-text-secondary); }
 .storage-track { height:6px; border-radius:var(--dv-radius-data); overflow:hidden; background:var(--dv-color-line); margin-top:20px; }
 .storage-track > div { height:100%; background:var(--dv-action-primary); }
+.storage-bar--primary { background:var(--dv-action-primary); }
 .storage-track > .bg-red-500 { background:#ef4444; }
 .storage-track > .bg-amber-500 { background:#f59e0b; }
 .measure-button { margin-top:20px; }

@@ -16,13 +16,17 @@ import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 import { ActivityEvent, ActivityEventType } from "../../entity/activity-event"
 import { dataSource } from "../../env"
+import { searchInsights, searchTermDetails } from "../../services/search-insights"
 import { userCollectionFilesQuery } from "../../services/collection"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
-const rangeInput = z.object({
+const rangeFields = z.object({
 	from: z.coerce.date(),
 	to: z.coerce.date(),
 })
+
+const validRange = (input: { from: Date, to: Date }) => input.to > input.from && input.to.getTime() - input.from.getTime() <= 366 * 86400000
+const rangeInput = rangeFields.refine(validRange, 'Choose a period between 1 and 366 days.')
 
 type CountRow = { day: string, count: string }
 
@@ -32,7 +36,7 @@ function formatSeries(rows: CountRow[]) {
 
 function dailyCount(table: string) {
 	return `
-		SELECT date_trunc('day', created_at)::date AS day, count(*) AS count
+		SELECT to_char(created_at, 'YYYY-MM-DD') AS day, count(*) AS count
 		FROM ${table} WHERE created_at >= $1 AND created_at < $2
 		GROUP BY 1 ORDER BY 1
 	`
@@ -61,7 +65,7 @@ export default router({
 					WHERE created_at >= $1 AND created_at < $2 AND user_id IS NOT NULL
 				`, params) as Promise<{ count: string }[]>,
 				dataSource.query(`
-					SELECT date_trunc('day', created_at)::date AS day, type, count(*) AS count, count(DISTINCT user_id) AS users
+					SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, type, count(*) AS count, count(DISTINCT user_id) AS users
 					FROM activity_events WHERE created_at >= $1 AND created_at < $2
 					GROUP BY 1, 2 ORDER BY 1
 				`, params) as Promise<{ day: string, type: string, count: string, users: string }[]>,
@@ -176,12 +180,12 @@ export default router({
 			const params = [input.from, input.to]
 			const [activeSeries, loginSeries, newUserSeries, topDownloaders, byRole, byRegion, byGroup] = await Promise.all([
 				dataSource.query(`
-					SELECT date_trunc('day', created_at)::date AS day, count(DISTINCT user_id) AS count
+					SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, count(DISTINCT user_id) AS count
 					FROM activity_events WHERE created_at >= $1 AND created_at < $2 AND user_id IS NOT NULL
 					GROUP BY 1 ORDER BY 1
 				`, params) as Promise<CountRow[]>,
 				dataSource.query(`
-					SELECT date_trunc('day', created_at)::date AS day, count(*) AS count
+					SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, count(*) AS count
 					FROM activity_events WHERE created_at >= $1 AND created_at < $2 AND type = 'login'
 					GROUP BY 1 ORDER BY 1
 				`, params) as Promise<CountRow[]>,
@@ -240,33 +244,11 @@ export default router({
 	searches: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(rangeInput)
-		.query(async ({ input }) => {
-			const params = [input.from, input.to]
-			const [topTerms, zeroResultTerms, volume] = await Promise.all([
-				dataSource.query(`
-					SELECT metadata ->> 'query' AS term, count(*) AS searches,
-						round(avg((metadata ->> 'total')::int)) AS "avgResults",
-						count(*) FILTER (WHERE (metadata ->> 'total')::int = 0) AS "zeroResults"
-					FROM activity_events WHERE type = 'search' AND created_at >= $1 AND created_at < $2
-					GROUP BY 1 ORDER BY searches DESC LIMIT 50
-				`, params) as Promise<{ term: string, searches: string, avgResults: string, zeroResults: string }[]>,
-				dataSource.query(`
-					SELECT metadata ->> 'query' AS term, count(*) AS searches
-					FROM activity_events WHERE type = 'search' AND created_at >= $1 AND created_at < $2 AND (metadata ->> 'total')::int = 0
-					GROUP BY 1 ORDER BY searches DESC LIMIT 50
-				`, params) as Promise<{ term: string, searches: string }[]>,
-				dataSource.query(`
-					SELECT date_trunc('day', created_at)::date AS day, count(*) AS count
-					FROM activity_events WHERE created_at >= $1 AND created_at < $2 AND type = 'search'
-					GROUP BY 1 ORDER BY 1
-				`, params) as Promise<CountRow[]>,
-			])
-			return {
-				topTerms: topTerms.map((row) => ({ term: row.term, searches: Number(row.searches), avgResults: Number(row.avgResults), zeroResults: Number(row.zeroResults) })),
-				zeroResultTerms: zeroResultTerms.map((row) => ({ term: row.term, searches: Number(row.searches) })),
-				volume: formatSeries(volume),
-			}
-		}),
+		.query(({ input }) => searchInsights({ from: input.from, to: input.to })),
+	searchTerm: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(rangeFields.extend({ term: z.string().trim().min(1).max(500) }).refine(validRange, 'Choose a period between 1 and 366 days.'))
+		.query(({ input }) => searchTermDetails({ from: input.from, to: input.to, term: input.term })),
 	collections: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(rangeInput)
@@ -275,7 +257,7 @@ export default router({
 			const [createdSeries, shareSeries, mostShared, mostActive] = await Promise.all([
 				dataSource.query(dailyCount('collections'), params) as Promise<CountRow[]>,
 				dataSource.query(`
-					SELECT date_trunc('day', created_at)::date AS day, count(*) AS count
+					SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, count(*) AS count
 					FROM activity_events WHERE created_at >= $1 AND created_at < $2 AND type = 'collection_share'
 					GROUP BY 1 ORDER BY 1
 				`, params) as Promise<CountRow[]>,

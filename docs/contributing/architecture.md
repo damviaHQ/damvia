@@ -50,7 +50,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
 | `entity/` | 19 TypeORM entities and their enums |
 | `migrations/` | Hand-written SQL migrations, run at startup |
-| `services/` | `asset.ts` (upsert, deletion, thumbnails, product matching), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation) |
+| `services/` | `asset.ts` (upsert, deletion, thumbnails, product matching), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation), `search-insights.ts` (search demand, daily spikes and contactable search audiences) |
 | `trpc/index.ts` | tRPC init, context, `authMiddleware` and the four predicates |
 | `trpc/router/` | 15 domain routers plus `collection/invitation.ts`, merged in `index.ts` with the public `env` query |
 | `util/array.ts` | `compact()` |
