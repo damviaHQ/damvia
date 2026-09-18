@@ -47,7 +47,7 @@ provide('damvia-admin-theme', true)
 const route = useRoute()
 const mobileOpen = ref(false)
 watch(() => route.fullPath, () => { mobileOpen.value = false })
-const pageTitle = computed(() => String(route.name ?? 'Administration').replace(/^admin-/, '').replace(/-/g, ' '))
+const pageTitle = computed(() => String(route.name ?? 'Administration').replace(/^admin-/, '').replace(/product/g, 'record').replace(/-/g, ' '))
 const adminBreadcrumbItems = computed<PathBreadcrumbItem[]>(() => [
   { id: 'workspace', label: 'Workspace', to: { name: 'admin-dashboard' } },
   { id: String(route.name ?? 'administration'), label: pageTitle.value },
@@ -65,6 +65,12 @@ const { data: summary } = useQuery({
 const storage = computed(() => summary.value?.storage)
 const storagePercent = computed(() => Math.round(storage.value?.percent ?? 0))
 const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent != null && storage.value.percent >= 80)
+const storageLevel = computed(() => {
+  if (!storage.value?.quotaBytes || storage.value.percent == null) return 'ok'
+  if (storage.value.percent >= 90) return 'full'
+  if (storage.value.percent >= 80) return 'warning'
+  return 'ok'
+})
 </script>
 
 <template>
@@ -72,7 +78,16 @@ const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent
     <button class="mobile-nav-toggle" :aria-expanded="mobileOpen" aria-controls="admin-navigation" @click="mobileOpen = !mobileOpen"><Menu />{{ mobileOpen ? 'Close navigation' : 'Open navigation' }}</button>
     <aside id="admin-navigation" class="admin-sidebar" :class="{ 'is-open': mobileOpen }">
       <router-link :to="{ name: 'home' }" class="admin-brand" aria-label="Back to the DAM" title="Back to the DAM" @click="mobileOpen = false"><ClientLogo admin /><span>ADMIN</span></router-link>
-      <div v-if="storage" class="sidebar-storage"><span>Storage used</span><strong>{{ formatStorage(storage.usedBytes) }}</strong><progress v-if="storage.quotaBytes" :value="Math.min(storagePercent, 100)" max="100" aria-label="Storage used" /><small v-if="storage.quotaBytes">of {{ formatStorage(storage.quotaBytes) }} plan</small></div>
+      <div v-if="storage" class="sidebar-storage" :class="`sidebar-storage--${storageLevel}`">
+        <div class="sidebar-storage-head">
+          <span class="sidebar-storage-label">{{ storageLevel === 'ok' ? 'Storage used' : storage.quotaReachedAt ? 'Storage full' : storageLevel === 'full' ? 'Storage almost full' : 'Storage running low' }}</span>
+          <strong class="sidebar-storage-value">{{ formatStorage(storage.usedBytes) }}</strong>
+        </div>
+        <template v-if="storage.quotaBytes">
+          <div class="sidebar-storage-track" role="progressbar" aria-label="Storage used" :aria-valuenow="Math.min(storagePercent, 100)" aria-valuemin="0" aria-valuemax="100"><div :style="{ width: `${Math.min(storagePercent, 100)}%` }"></div></div>
+          <small>{{ storage.quotaReachedAt ? 'Sync paused · plan full' : `of ${formatStorage(storage.quotaBytes)} plan` }}</small>
+        </template>
+      </div>
       <nav aria-label="Administration" class="admin-nav" @click="mobileOpen = false">
         <div class="flex flex-col gap-1 mb-3 mt-2">
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
@@ -146,10 +161,10 @@ const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent
           </div>
           <!-- Product Information Management -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
-            <div class="menu-section-title">PIM</div>
+            <div class="menu-section-title">Data Enrichment</div>
             <router-link :to="{ name: 'admin-products' }" class="menu-item">
               <Package class="w-4 h-4 mr-2" />
-              Products
+              Records
             </router-link>
             <router-link :to="{ name: 'admin-product-attributes' }" class="menu-item">
               <Blocks class="w-4 h-4 mr-2" />
@@ -158,7 +173,6 @@ const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent
           </div>
         </div>
       </nav>
-      <div class="sidebar-profile"><span class="workspace-mark">{{ globalStore.user?.name?.slice(0, 1) }}</span><div><strong>{{ globalStore.user?.name }}</strong><small>{{ globalStore.user?.role }}</small></div></div>
       <div class="sidebar-credit">
         Powered by
         <a href="https://damvia.com" target="_blank">Damvia</a>
@@ -188,10 +202,6 @@ const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent
 .admin-brand :deep(.client-logo--default) { width:108px; filter:brightness(0) invert(1); }
 .admin-brand :deep(.client-logo--uploaded) { filter:none; background:white; padding:8px; border-radius:var(--dv-radius-graphic); width:128px; height:56px; object-fit:contain; }
 .admin-brand span { font-size:9px; letter-spacing:.1em; border:1px solid #46527c; padding:3px 5px; border-radius:var(--dv-radius-data); }
-.sidebar-profile { display:flex; align-items:center; gap:10px; padding:14px 8px; border-top:1px solid #252d52; border-bottom:1px solid #252d52; margin-bottom:22px; }
-.workspace-mark { display:grid; place-items:center; flex-shrink:0; width:32px; height:34px; border-radius:var(--dv-radius-graphic); background:#242d57; color:white; }
-.sidebar-profile strong { display:block; font-size:11px; color:var(--dv-text-on-dark); overflow-wrap:anywhere; }
-.sidebar-profile small { display:block; font-size:10px; color:var(--dv-text-on-dark-muted); margin-top:3px; }
 .admin-nav { flex:1; min-height:0; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#39436b transparent; }
 .admin-nav::-webkit-scrollbar { width:5px; }
 .admin-nav::-webkit-scrollbar-thumb { background:#39436b; }
@@ -201,13 +211,17 @@ const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent
 .menu-item:hover { background:#172049; }
 .menu-item.router-link-active { background:#193674; color:white; font-weight:550; }
 .storage-banner { overflow-wrap:anywhere; }
-.sidebar-storage { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; font-size:11px; padding:18px 10px; }
-.sidebar-storage progress { width:100%; height:4px; border-radius:var(--dv-radius-data); accent-color:#85aaff; }
-.sidebar-storage progress::-webkit-progress-bar { border-radius:var(--dv-radius-data); background:#28315a; }
-.sidebar-storage progress::-webkit-progress-value { border-radius:var(--dv-radius-data); background:#85aaff; }
-.sidebar-storage progress::-moz-progress-bar { border-radius:var(--dv-radius-data); background:#85aaff; }
+.sidebar-storage { font-size:11px; padding:18px 10px; }
+.sidebar-storage-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.sidebar-storage-label { min-width:0; overflow-wrap:anywhere; }
+.sidebar-storage-value { margin-left:auto; flex:none; white-space:nowrap; }
+.sidebar-storage-track { height:4px; margin:8px 0 6px; border-radius:var(--dv-radius-data); overflow:hidden; background:#28315a; }
+.sidebar-storage-track > div { height:100%; border-radius:inherit; background:#85aaff; }
 .sidebar-storage small { color:var(--dv-text-on-dark-muted); }
-.sidebar-profile { margin:0; }
+.sidebar-storage--warning .sidebar-storage-label { color:#fcd34d; }
+.sidebar-storage--warning .sidebar-storage-track > div { background:#f59e0b; }
+.sidebar-storage--full .sidebar-storage-label { color:#fca5a5; }
+.sidebar-storage--full .sidebar-storage-track > div { background:#ef4444; }
 .sidebar-credit { margin-top:16px; color:var(--dv-text-on-dark-muted); font-size:12px; }
 .sidebar-credit a { color:var(--dv-text-on-dark-secondary); }
 .sidebar-credit a:hover { color:var(--dv-text-on-dark); }

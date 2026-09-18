@@ -3,7 +3,7 @@ title: Dashboard
 description: The admin recap at /admin with storage used against the plan, the paused-sync state, orphan cleanup, sync health, pending approvals and recent downloads.
 sidebar:
   order: 2
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-18
 ---
 
 The dashboard is the first admin screen, at `/admin`, and the page every admin lands on from the "Administration" entry of the account menu. It combines workspace totals, user activity, file and download activity, access requests and storage health in the shared Damvia admin design. Usage over time, such as the most downloaded files, active users and search terms, is on [Insights](./analytics.md).
@@ -34,7 +34,7 @@ When a measurement crosses one of these thresholds upwards, every admin designat
 
 From 80 %, the shared admin banner also shows the `SERVER_ALERT_EMAILS` addresses as an email link, for the admin to ask the host for a larger plan. It is omitted when the variable is empty.
 
-The banner is shown once above every admin page: amber from 80 %, red from 90 %, with the paused state and hosting contact link when configured. The dashboard does not repeat the same warning in a second alert. Storage usage sits near the top of the navigation sidebar.
+The banner is shown once above every admin page: amber from 80 %, red from 90 %, with the paused state and hosting contact link when configured. The dashboard does not repeat the same warning in a second alert. Storage usage sits near the top of the navigation sidebar. Its bar follows the same thresholds, amber from 80 % and red from 90 %, and its label becomes "Storage running low", then "Storage almost full". Once the plan has paused the sync, it reads "Storage full" over "Sync paused · plan full".
 
 ## The server disk is for the host, not the customer
 
