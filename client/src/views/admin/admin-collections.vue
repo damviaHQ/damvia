@@ -24,7 +24,6 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { ChevronDown, ChevronRight, CirclePlus, EyeOff, FilePenLine, Folder, Image, PencilLine, Trash2 } from "lucide-vue-next"
-import { TreeItem, TreeRoot } from 'reka-ui'
 import { computed, ref, watch } from "vue"
 
 const { status, data: collections, error } = useQuery({
@@ -38,6 +37,27 @@ const selectedCollectionId = ref<string | null>(null)
 const collectionToDelete = ref<RouterOutput["collection"]["treeAdmin"][number] | null>(null)
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
+
+const expandedIds = ref(new Set<string>())
+
+const visibleRows = computed(() => {
+  const rows: { item: RouterOutput["collection"]["treeAdmin"][number], level: number }[] = []
+  const walk = (items: RouterOutput["collection"]["treeAdmin"], level: number) => {
+    for (const item of items) {
+      rows.push({ item, level })
+      if (item.children?.length && expandedIds.value.has(item.id)) walk(item.children, level + 1)
+    }
+  }
+  walk(collections.value ?? [], 0)
+  return rows
+})
+
+function toggleExpanded(id: string) {
+  const next = new Set(expandedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedIds.value = next
+}
 
 const selectedCollection = computed(() => {
   if (!selectedCollectionId.value || !collections.value) return null
@@ -116,43 +136,43 @@ async function confirmDeleteCollection() {
     </div>
 
     <div v-if="!collections?.length" class="dv-panel admin-empty"><h2>No collections yet</h2><p>Create a collection to organize and share your assets.</p></div>
-    <TreeRoot v-slot="{ flattenItems }" :items="collections" :get-key="(item) => item.id"
-      :get-children="(item) => item.children" class="admin-tree dv-panel">
-      <TreeItem v-for="item in flattenItems" :key="item._id" v-slot="{ isExpanded }"
-        :style="{ paddingLeft: `${(item.level + 1) * 16}px` }" v-bind="item.bind"
-        class="flex items-center py-2 hover:bg-neutral-100">
-        <template v-if="item.value.children && item.value.children.length > 0">
-          <ChevronDown v-if="isExpanded" class="h-4 w-4 mr-2" />
-          <ChevronRight v-else class="h-4 w-4 mr-2" />
-        </template>
+    <ul v-else class="admin-tree dv-panel">
+      <li v-for="{ item, level } in visibleRows" :key="item.id"
+        :style="{ paddingLeft: `${(level + 1) * 16}px` }"
+        class="flex items-center py-2 hover:bg-neutral-100" @click="item.children?.length && toggleExpanded(item.id)">
+        <button v-if="item.children?.length" type="button" class="mr-2" :aria-expanded="expandedIds.has(item.id)"
+          :aria-label="`Subcollections of ${item.name}`" @click.stop="toggleExpanded(item.id)">
+          <ChevronDown v-if="expandedIds.has(item.id)" class="h-4 w-4" />
+          <ChevronRight v-else class="h-4 w-4" />
+        </button>
         <div v-else class="w-4 h-4 mr-2"></div>
-        <IconCloudSync v-if="item.value.synchronized" class="h-5 w-5 mr-2 admin-text-secondary" />
+        <IconCloudSync v-if="item.synchronized" class="h-5 w-5 mr-2 admin-text-secondary" />
         <Folder v-else class="h-5 w-5 mr-2 admin-text-secondary" />
-        <span class="flex-grow">{{ item.value.name }}</span>
+        <span class="flex-grow">{{ item.name }}</span>
 
         <div class="flex items-center gap-2 mr-5">
-          <Badge v-if="item.value.page" variant="outline" class="flex items-center gap-1">
+          <Badge v-if="item.page" variant="outline" class="flex items-center gap-1">
             <FilePenLine class="h-3 w-3" />
             page
           </Badge>
-          <Badge v-if="item.value.draft" variant="outline" class="flex items-center gap-1">
+          <Badge v-if="item.draft" variant="outline" class="flex items-center gap-1">
             <EyeOff class="h-3 w-3" />
             draft
           </Badge>
-          <Badge v-if="item.value.thumbnailURL" variant="outline" class="flex items-center gap-1">
+          <Badge v-if="item.thumbnailURL" variant="outline" class="flex items-center gap-1">
             <Image class="h-3 w-3" />
             thumbnail
           </Badge>
         </div>
 
         <div class="flex items-center gap-2 ml-5" @click="stopPropagation">
-          <Button variant="link" @click="handleEditCollection(item.value)" :aria-label="`Edit ${item.value.name}`"
+          <Button variant="link" @click="handleEditCollection(item)" :aria-label="`Edit ${item.name}`"
             class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
             <PencilLine class="h-4 w-4" /> Edit
           </Button>
           <AlertDialog>
             <AlertDialogTrigger as-child>
-              <Button variant="link" @click="handleDeleteCollection(item.value)" :aria-label="`Delete ${item.value.name}`"
+              <Button variant="link" @click="handleDeleteCollection(item)" :aria-label="`Delete ${item.name}`"
                 class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
                 <Trash2 class="h-4 w-4" /> Delete
               </Button>
@@ -185,8 +205,8 @@ async function confirmDeleteCollection() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
-      </TreeItem>
-    </TreeRoot>
+      </li>
+    </ul>
 
     <AdminDialogCreateCollection v-model="isAdminDialogCreateCollectionOpen" />
     <CollectionDialogEdit v-if="selectedCollection" v-model="isEditCollectionModalOpen" :collection="selectedCollection"

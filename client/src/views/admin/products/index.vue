@@ -191,6 +191,7 @@ function saveCellValue() {
     return
   }
 
+  const savedCell = activeCell.value
   try {
     isSaving.value = true
     trpc.pim.updateProduct.mutate({
@@ -207,8 +208,10 @@ function saveCellValue() {
       toast.error("Failed to update record")
     }).finally(() => {
       isSaving.value = false
-      activeCell.value = null
-      editorPosition.value = null
+      if (activeCell.value === savedCell) {
+        activeCell.value = null
+        editorPosition.value = null
+      }
     })
   } catch (error) {
     console.error("Error updating product:", error)

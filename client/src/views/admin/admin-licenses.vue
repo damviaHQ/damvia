@@ -267,10 +267,11 @@ async function onModalSubmit(event: Event) {
               <Label for="name">Name *</Label>
               <Input id="name" v-model="form.name" placeholder="License name" />
             </FieldGroup>
-            <div class="flex flex-col gap-2" role="group" aria-labelledby="usageFrom">
+            <div class="flex flex-col gap-2">
               <Label id="usageFrom">Usage From</Label>
               <div class="flex gap-2">
                 <DatePickerInput
+                  labelledby="usageFrom"
                   :model-value="form.usageFrom"
                   @update:modelValue="(event) => {
                     form.usageFrom = new CalendarDate(event.year, event.month, event.day)
@@ -284,10 +285,11 @@ async function onModalSubmit(event: Event) {
                 </Button>
               </div>
             </div>
-            <div class="flex flex-col gap-2" role="group" aria-labelledby="usageTo">
+            <div class="flex flex-col gap-2">
               <Label id="usageTo">Usage To</Label>
               <div class="flex gap-2">
                 <DatePickerInput
+                  labelledby="usageTo"
                   :model-value="form.usageTo"
                   @update:modelValue="(event) => {
                     form.usageTo = new CalendarDate(event.year, event.month, event.day)

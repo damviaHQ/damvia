@@ -61,7 +61,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-resource-page tbody tr:last-child td { border-bottom:0; }
 .dv-admin .admin-resource-page tbody tr:hover { background:var(--dv-surface-canvas); }
 .dv-admin .admin-tree { width:100%; margin-top:20px; overflow:auto; padding:8px 0; }
-.dv-admin .admin-tree [role=treeitem] { min-height:60px; border-bottom:1px solid var(--dv-color-line); min-width:620px; }
+.dv-admin .admin-tree > li { min-height:60px; border-bottom:1px solid var(--dv-color-line); min-width:620px; }
 .dv-admin .admin-product-toolbar { display:flex; flex-direction:column; gap:18px; margin-bottom:24px; }
 .dv-admin .admin-product-toolbar > div { flex-wrap:wrap; }
 .dv-admin .admin-product-toolbar .admin-heading { width:100%; margin:0 0 8px; }

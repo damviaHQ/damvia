@@ -1,6 +1,8 @@
 ---
 title: UI stack audit
 description: Neutral client theme, dependency migration and validation on 2609-v2.
+sidebar:
+  order: 9
 lastUpdated: 2026-09-19
 ---
 

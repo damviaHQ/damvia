@@ -2,6 +2,7 @@
   <Popover>
     <PopoverTrigger as-child>
       <Button
+        :id="id" :aria-labelledby="labelledby ? `${labelledby} ${id}` : undefined"
         variant="outline" :class="cn(
           'w-full ps-3 text-start font-normal bg-white',
           !modelValue && 'text-muted-foreground',
@@ -25,16 +26,22 @@ import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
 import {CalendarIcon} from 'lucide-vue-next'
 import {DateValue, toDate} from 'reka-ui/date'
 import {CalendarRootEmits, CalendarRootProps, useForwardPropsEmits} from "reka-ui";
-import {HTMLAttributes} from "vue";
+import {HTMLAttributes, computed, useId} from "vue";
 import {DateFormatter} from '@internationalized/date'
 
 const df = new DateFormatter('en-US', {
   dateStyle: 'long',
 })
 
-const props = defineProps<CalendarRootProps & { class?: HTMLAttributes['class'] }>()
+const props = defineProps<CalendarRootProps & { class?: HTMLAttributes['class'], labelledby?: string }>()
 
 const emits = defineEmits<CalendarRootEmits>()
 
-const forwarded = useForwardPropsEmits(props, emits)
+const id = useId()
+const delegatedProps = computed(() => {
+  const { labelledby: _, ...delegated } = props
+
+  return delegated
+})
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>

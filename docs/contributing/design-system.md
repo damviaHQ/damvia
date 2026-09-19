@@ -106,7 +106,7 @@ Client collection dialogs share title/description headers and aligned footers. T
 
 ### Dialogs and confirmations
 
-Use the shared dialog surface, heading and description classes in `client/src/components/ui/dialog/styles.ts` for both Dialog and AlertDialog. Keep neutral client dialogs static, use shared field components for forms, and keep action footers distinct from content. See `docs/reference/client-modal-review.md` for the desktop client review coverage.
+Use the shared dialog surface, heading and description classes in `client/src/components/ui/dialog/styles.ts` for both Dialog and AlertDialog. Keep neutral client dialogs static, use shared field components for forms, and keep action footers distinct from content. See `docs/_internal/client-modal-review.md` for the desktop client review coverage.
 
 Client modal hierarchy uses headings, grouping and whitespace. Do not add decorative horizontal rules between sections, preference rows or above action footers. Field borders and data-table boundaries remain functional. Dialog and confirmation footers share `dialogFooterClasses`.
 
