@@ -41,7 +41,7 @@ Tailwind now runs through `@tailwindcss/vite`. Its CSS entry imports Tailwind an
 
 Modern-browser support was explicitly approved: Safari 16.4+, Chrome 111+, Firefox 128+. Node must satisfy `^20.19.0 || >=22.12.0`; use a current Node 22 or 24 in development and builds. The existing Node 22 Docker base was not rebuilt in this task.
 
-Tenant colour defaults are neutral, with existing `VITE_BRAND_COLOR`, `VITE_BRAND_COLOR_HOVER` and `VITE_BRAND_COLOR_STRONG` settings preserved. Runtime equivalents are `--tenant-brand-color`, `--tenant-brand-hover`, `--tenant-brand-strong`. Put runtime overrides on the document root so teleported content sees the same values. Semantic neutral action roles remain neutral by default; adding a fully branded tenant action theme requires coordinated foreground/hover/focus overrides and contrast checks, not merely changing one background.
+Tenant colour defaults are neutral, with existing `VITE_BRAND_COLOR`, `VITE_BRAND_COLOR_HOVER` and `VITE_BRAND_COLOR_STRONG` settings preserved. Runtime equivalents are `--tenant-brand-color`, `--tenant-brand-hover`, `--tenant-brand-strong`, plus the derived `--tenant-brand-text` and `--tenant-brand-foreground`. Put runtime overrides on the document root so teleported content sees the same values. Semantic neutral action roles remain neutral by default; adding a fully branded tenant action theme requires coordinated foreground/hover/focus overrides and contrast checks, not merely changing one background.
 
 ## Validation
 

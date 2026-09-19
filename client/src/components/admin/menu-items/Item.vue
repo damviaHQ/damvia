@@ -112,7 +112,7 @@ function openDialog(type: "add" | "edit") {
           <FilePenLine v-if="item.type === 'page'" class="w-4 h-4" />
           <LetterText v-if="item.type === 'text'" class="w-4 h-4" />
           <Folder v-if="item.type === 'collection' && !item.synchronized" class="w-4 h-4 admin-text-secondary" />
-          <IconCloudSync v-if="item.type === 'collection' && item.synchronized" class="!w-8 !h-8 text-brand-strong" />
+          <IconCloudSync v-if="item.type === 'collection' && item.synchronized" class="!w-8 !h-8 text-[var(--dv-action-primary)]" />
         </div>
       </div>
       <component :is="item.children ? 'button' : 'div'" :type="item.children ? 'button' : undefined"

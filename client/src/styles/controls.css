@@ -6,7 +6,7 @@
 
 /* Tree-select renders internal DOM without a class API. Keep its adapter here. */
 :is(.dv-admin, .dv-client) .vue-treeselect .vue-treeselect-helper-hide { display:none; }
-:is(.dv-admin, .dv-client) .vue-treeselect__control { @apply border pl-1 rounded-none; border-color:hsl(var(--border)); min-height:var(--dv-control-height); }
+:is(.dv-admin, .dv-client) .vue-treeselect__control { @apply border pl-1 rounded-none; border-color:hsl(var(--input)); min-height:var(--dv-control-height); }
 :is(.dv-admin, .dv-client) .vue-treeselect:not(.vue-treeselect--disabled) .vue-treeselect__control:hover { border-color:var(--dv-text-secondary); }
 :is(.dv-admin, .dv-client) .vue-treeselect:focus-within .vue-treeselect__control { outline:2px solid hsl(var(--ring)); outline-offset:2px; }
 :is(.dv-admin, .dv-client) .vue-treeselect__menu { @apply border rounded-none shadow-md mt-1; background:var(--dv-surface-panel); color:var(--dv-text-primary); border-color:var(--dv-color-line); }

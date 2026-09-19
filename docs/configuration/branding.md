@@ -3,7 +3,7 @@ title: Branding
 description: Rename the instance, change the accent colour, set the login background, and replace the logo and favicon.
 sidebar:
   order: 5
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 Branding uses runtime settings, build-time colours, an admin background upload, and static logo files. Knowing which is which saves a rebuild.
@@ -23,7 +23,7 @@ The client fetches the public `env` query at startup and sets `document.title` t
 
 ## Accent colour
 
-Three build-time variables define the `brand` Tailwind colour family. See [Client configuration](./client-env.md) for the accepted values. The rest of the interface stays on the neutral palette.
+Three build-time variables define the `brand` Tailwind colour family. The build also derives a readable text shade and a foreground colour from `VITE_BRAND_COLOR`, so a light brand colour never ends up as unreadable text. See [Client configuration](./client-env.md) for the accepted values. The rest of the interface stays on the neutral palette.
 
 ## Login background
 

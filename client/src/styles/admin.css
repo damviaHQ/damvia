@@ -32,7 +32,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-form { display:grid; gap:20px; }
 .dv-admin .admin-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
 .dv-admin .admin-form label { font-size:var(--dv-field-label-size); font-weight:500; line-height:var(--dv-field-line-height); }
-.dv-admin .admin-form input:not([type=checkbox]), .dv-admin .admin-form select { width:100%; border:1px solid var(--dv-color-line); border-radius:0; background:white; padding:var(--dv-control-padding-y) var(--dv-control-padding-x); min-height:var(--dv-control-height); box-shadow:none; color:var(--dv-text-primary); font-size:var(--dv-field-label-size); line-height:var(--dv-field-line-height); }
+.dv-admin .admin-form input:not([type=checkbox]), .dv-admin .admin-form select { width:100%; border:1px solid var(--dv-color-line-strong); border-radius:0; background:white; padding:var(--dv-control-padding-y) var(--dv-control-padding-x); min-height:var(--dv-control-height); box-shadow:none; color:var(--dv-text-primary); font-size:var(--dv-field-label-size); line-height:var(--dv-field-line-height); }
 .dv-admin .admin-form p { font-size:12px; }
 .dv-admin .admin-form-note { padding:12px 14px; background:var(--dv-surface-canvas); color:var(--dv-text-secondary); border-radius:var(--dv-radius-data); line-height:1.6; }
 .dv-admin .admin-form-footer { display:flex; justify-content:flex-end; gap:10px; padding-top:20px; border-top:1px solid var(--dv-color-line); }

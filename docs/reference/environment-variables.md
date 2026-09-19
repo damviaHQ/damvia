@@ -3,7 +3,7 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
@@ -86,8 +86,8 @@ Client variables are read by Vite **at build time** and baked into the bundle. C
 | Variable | Default | Purpose |
 |---|---|---|
 | `VITE_API_ENDPOINT` | `http://localhost:3000/trpc` | Full URL of the server's tRPC endpoint, that is `API_URL` plus `/trpc`. |
-| `VITE_BRAND_COLOR` | `#DFE9FF` | Accent colour. A Tailwind name (`red-500`), a hex colour without `#` (`e11d48`), or any CSS colour. In dotenv, quote values starting with `#`: `VITE_BRAND_COLOR="#e11d48"`. |
-| `VITE_BRAND_COLOR_HOVER` | `#F6F8FC` | Hover shade of the accent. |
-| `VITE_BRAND_COLOR_STRONG` | `#0044F4` | Strong shade of the accent, used for emphasis text. |
+| `VITE_BRAND_COLOR` | `#e5e5e5` | Accent colour. A Tailwind name (`red-500`), a hex colour without `#` (`e11d48`), or any CSS colour. In dotenv, quote values starting with `#`: `VITE_BRAND_COLOR="#e11d48"`. |
+| `VITE_BRAND_COLOR_HOVER` | `#f5f5f5` | Hover shade of the accent. |
+| `VITE_BRAND_COLOR_STRONG` | `#262626` | Strong shade of the accent. |
 
 The brand colours are resolved in `client/tailwind.config.js`, which loads `client/.env` itself. See [Client configuration](../configuration/client-env.md).

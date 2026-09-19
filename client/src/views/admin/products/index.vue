@@ -799,7 +799,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 .spreadsheet-table tbody td.cell-editable:hover {
-  background-color: rgba(37, 99, 235, 0.05);
+  background-color: color-mix(in srgb, var(--dv-action-primary) 5%, transparent);
 }
 .spreadsheet-table tbody td:focus-visible {
   outline: 2px solid var(--dv-action-primary);
@@ -918,9 +918,9 @@ onUnmounted(() => {
   width: 6px;
 }
 .floating-cell-editor .floating-cell-input::-webkit-scrollbar-track {
-  background: #f5f5f5;
+  background: var(--dv-surface-canvas);
 }
 .floating-cell-editor .floating-cell-input::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--dv-color-line-strong);
   border-radius: 0;
 }</style>

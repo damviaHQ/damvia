@@ -194,33 +194,33 @@ const storageLevel = computed(() => {
 </template>
 
 <style scoped>
-.admin-shell { display:flex; height:100dvh; overflow:hidden; background:var(--dv-surface-canvas); }
+.admin-shell { --nav-hover:#172049; --nav-active:#193674; --nav-line:#46527c; --nav-track:#28315a; --nav-accent:#85aaff; --nav-warning:#fcd34d; --nav-danger:#fca5a5; display:flex; height:100dvh; overflow:hidden; background:var(--dv-surface-canvas); }
 .admin-sidebar { width:228px; flex-shrink:0; background:var(--dv-surface-nav); color:var(--dv-text-on-dark-secondary); padding:22px 4px 16px 18px; display:flex; flex-direction:column; overflow:hidden; }
 .admin-brand { display:flex; align-items:center; gap:16px; padding:0 10px 18px; }
 .admin-brand :deep(.client-logo--default) { width:108px; filter:brightness(0) invert(1); }
 .admin-brand :deep(.client-logo--uploaded) { filter:none; background:white; padding:8px; border-radius:var(--dv-radius-graphic); width:128px; height:56px; object-fit:contain; }
-.admin-brand span { font-size:11px; letter-spacing:.1em; border:1px solid #46527c; padding:3px 5px; border-radius:var(--dv-radius-data); }
-.admin-nav { flex:1; min-height:0; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#39436b transparent; }
+.admin-brand span { font-size:11px; letter-spacing:.1em; border:1px solid var(--nav-line); padding:3px 5px; border-radius:var(--dv-radius-data); }
+.admin-nav { flex:1; min-height:0; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--nav-line) transparent; }
 .admin-nav::-webkit-scrollbar { width:5px; }
-.admin-nav :focus-visible, .admin-brand:focus-visible, .sidebar-credit a:focus-visible, .mobile-nav-toggle:focus-visible { outline:2px solid #85aaff; outline-offset:-2px; }
-.admin-nav::-webkit-scrollbar-thumb { background:#39436b; }
+.admin-nav :focus-visible, .admin-brand:focus-visible, .sidebar-credit a:focus-visible, .mobile-nav-toggle:focus-visible { outline:2px solid var(--nav-accent); outline-offset:-2px; }
+.admin-nav::-webkit-scrollbar-thumb { background:var(--nav-line); }
 .menu-section { margin-bottom:8px; }
 .menu-section-title { color:var(--dv-text-on-dark-muted); font-size:10px; padding:8px 12px 4px; }
 .menu-item { display:flex; align-items:center; padding:7px 12px; color:var(--dv-text-on-dark-secondary); font-size:12px; border-radius:0; margin:1px 0; }
-.menu-item:hover { background:#172049; }
-.menu-item.router-link-active { background:#193674; color:white; font-weight:550; }
+.menu-item:hover { background:var(--nav-hover); }
+.menu-item.router-link-active { background:var(--nav-active); color:white; font-weight:550; }
 .storage-banner { overflow-wrap:anywhere; }
 .sidebar-storage { font-size:11px; padding:18px 10px; }
 .sidebar-storage-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
 .sidebar-storage-label { min-width:0; overflow-wrap:anywhere; }
 .sidebar-storage-value { margin-left:auto; flex:none; white-space:nowrap; }
-.sidebar-storage-track { height:4px; margin:8px 0 6px; border-radius:var(--dv-radius-data); overflow:hidden; background:#28315a; }
-.sidebar-storage-track > div { height:100%; border-radius:inherit; background:#85aaff; }
+.sidebar-storage-track { height:4px; margin:8px 0 6px; border-radius:var(--dv-radius-data); overflow:hidden; background:var(--nav-track); }
+.sidebar-storage-track > div { height:100%; border-radius:inherit; background:var(--nav-accent); }
 .sidebar-storage small { color:var(--dv-text-on-dark-muted); }
-.sidebar-storage--warning .sidebar-storage-label { color:#fcd34d; }
-.sidebar-storage--warning .sidebar-storage-track > div { background:#f59e0b; }
-.sidebar-storage--full .sidebar-storage-label { color:#fca5a5; }
-.sidebar-storage--full .sidebar-storage-track > div { background:#ef4444; }
+.sidebar-storage--warning .sidebar-storage-label { color:var(--nav-warning); }
+.sidebar-storage--warning .sidebar-storage-track > div { background:var(--nav-warning); }
+.sidebar-storage--full .sidebar-storage-label { color:var(--nav-danger); }
+.sidebar-storage--full .sidebar-storage-track > div { background:var(--nav-danger); }
 .sidebar-credit { margin-top:16px; color:var(--dv-text-on-dark-muted); font-size:12px; }
 .sidebar-credit a { color:var(--dv-text-on-dark-secondary); }
 .sidebar-credit a:hover { color:var(--dv-text-on-dark); }

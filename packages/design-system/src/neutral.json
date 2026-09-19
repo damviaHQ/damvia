@@ -103,6 +103,19 @@
       "hex": "#e5e5e5"
     }
   },
+  "color.line-strong": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.5607843137254902,
+        0.5607843137254902,
+        0.5607843137254902
+      ],
+      "alpha": 1,
+      "hex": "#8f8f8f"
+    }
+  },
   "text.on-dark-secondary": {
     "$type": "color",
     "$value": {

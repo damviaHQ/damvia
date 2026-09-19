@@ -33,7 +33,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-button--quiet { background: transparent; border-color: transparent; }
 .dv-button--small { min-height: 32px; padding: 5px 10px; font-size: 12px !important; }
 .dv-button--icon { width: 36px; height: 36px; padding: 8px; }
-.dv-input, .dv-select { border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-field); background: var(--dv-surface-panel); color: var(--dv-text-primary); min-height: var(--dv-control-height); padding: var(--dv-control-padding-y) var(--dv-control-padding-x); font-size: var(--dv-field-label-size); line-height: var(--dv-field-line-height); caret-color: var(--dv-action-primary); }
+.dv-input, .dv-select { border: 1px solid var(--dv-color-line-strong); border-radius: var(--dv-radius-field); background: var(--dv-surface-panel); color: var(--dv-text-primary); min-height: var(--dv-control-height); padding: var(--dv-control-padding-y) var(--dv-control-padding-x); font-size: var(--dv-field-label-size); line-height: var(--dv-field-line-height); caret-color: var(--dv-action-primary); }
 .dv-input::placeholder { color: var(--dv-text-secondary); opacity: 1; }
 .dv-input { width: 100%; }
 .dv-select { max-width: 100%; }

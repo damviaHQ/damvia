@@ -353,12 +353,12 @@ function removeFromSelection(file: { id: string }) {
               </div>
               <div class="flex items-center py-6 gap-4">
                 <Checkbox id="terms" v-model="form.isAcceptingTerms"
-                  class="border-brand [&>*]:bg-brand [&>*]:text-neutral-800"
+                  class="border-brand-text [&>*]:bg-brand [&>*]:text-brand-foreground"
                   :class="{ 'border-red-500': hasTermsError }" />
                 <Label for="terms" class="leading-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   :class="{
                     'text-red-500': hasTermsError,
-                    'text-brand': !hasTermsError && form.isAcceptingTerms,
+                    'text-brand-text': !hasTermsError && form.isAcceptingTerms,
                   }">
                   By downloading these assets, I hereby agree to respect the Asset Usage
                   Licensing Agreement.
@@ -371,7 +371,7 @@ function removeFromSelection(file: { id: string }) {
           <Button @click="download" :disabled="isLoading"
             class="w-full bg-primary text-primary-foreground hover:bg-[var(--dv-action-hover)]"
             :class="{
-              'ring ring-neutral-200 bg-white text-neutral-800 hover:ring-brand hover:text-brand hover:bg-white': hasLicenses && !form.isAcceptingTerms,
+              'ring ring-neutral-200 bg-white text-neutral-800 hover:ring-brand-text hover:text-brand-text hover:bg-white': hasLicenses && !form.isAcceptingTerms,
             }">
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>

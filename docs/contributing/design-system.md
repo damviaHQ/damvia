@@ -78,7 +78,7 @@ Keep the shared design-system source in `packages/design-system` in the open-sou
 
 Dialog and AlertDialog headers and footers expose `data-dialog-header` and `data-dialog-footer` styling hooks. The admin theme defines compact (520 px), wide (960 px), and viewport-sized comparison dialogs; panels keep 12 px corners while controls stay square. Modal styles remain scoped to `.dv-admin`. Menu item editing uses the shared shadcn Dialog rather than its own raw overlay. Footer actions stay visible when long forms scroll, and wide editors stack at 640 px.
 
-The token compiler generates shadcn colour bridges for both `.dv-admin` and `.dv-theme.dv-neutral`. Shared controls, including teleported dialogs, selects and dropdowns, receive the same foreground, muted, surface, border, focus and status values as the design-system tokens. Keep the bridge derived from tokens rather than copying colour values into individual controls. Do not hard-code blue utilities into shared controls; use semantic primary, ring, surface and text roles.
+The token compiler generates shadcn colour bridges for both `.dv-admin` and `.dv-theme.dv-neutral`. Shared controls, including teleported dialogs, selects and dropdowns, receive the same foreground, muted, surface, border, focus and status values as the design-system tokens. Keep the bridge derived from tokens rather than copying colour values into individual controls. Field boundaries use `color.line-strong` (the shadcn `--input` role), which keeps 3:1 contrast against white; `color.line` is for dividers and panel edges only. Do not hard-code blue utilities into shared controls; use semantic primary, ring, surface and text roles.
 
 ## Neutral desktop client
 

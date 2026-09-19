@@ -40,7 +40,7 @@ const adminRoles = {
   muted: 'surface.canvas', 'muted-foreground': 'text.secondary',
   popover: 'surface.panel', 'popover-foreground': 'text.primary',
   card: 'surface.panel', 'card-foreground': 'text.primary',
-  border: 'color.line', input: 'color.line',
+  border: 'color.line', input: 'color.line-strong',
   primary: 'action.primary', 'primary-foreground': 'text.on-dark',
   secondary: 'surface.canvas', 'secondary-foreground': 'text.primary',
   accent: 'surface.canvas', 'accent-foreground': 'text.primary',

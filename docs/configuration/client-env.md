@@ -3,7 +3,7 @@ title: Client configuration
 description: "The client has four build-time variables: the API endpoint and three brand colours."
 sidebar:
   order: 3
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 The client is a static bundle built by Vite. Its configuration is read when you run `npm run dev` or `npm run build`, and the values end up inside the JavaScript. Changing `client/.env` on a running dev server has no effect until it restarts; changing it in production means rebuilding and redeploying the bundle.
@@ -15,7 +15,7 @@ VITE_API_ENDPOINT=http://localhost:3000/trpc
 
 # Brand color: a Tailwind color name (red-500) or a hex color without # (e11d48).
 # "#" starts a comment in .env files: write "#e11d48" in quotes or drop the #.
-# Defaults: #DFE9FF / #F6F8FC / #0044F4. Restart dev server or rebuild after changing.
+# Defaults: #e5e5e5 / #f5f5f5 / #262626. Restart dev server or rebuild after changing.
 VITE_BRAND_COLOR=
 VITE_BRAND_COLOR_HOVER=
 VITE_BRAND_COLOR_STRONG=
@@ -35,13 +35,22 @@ The three `VITE_BRAND_COLOR*` variables define the `brand` colour family in `cli
 | Hex without `#` | `e11d48`, `777` | Prefixed with `#`. |
 | Any other CSS colour | `"#e11d48"`, `rgb(225 29 72)`, `hsl(346 77% 50%)` | Used verbatim. |
 
-`#` starts a comment in a `.env` file, so an unquoted `VITE_BRAND_COLOR=#e11d48` is read as empty and the default sky colour is used. Quote it or drop the `#`.
+`#` starts a comment in a `.env` file, so an unquoted `VITE_BRAND_COLOR=#e11d48` is read as empty and the default neutral grey is used. Quote it or drop the `#`.
 
 | Variable | Default | Where it shows |
 |---|---|---|
-| `VITE_BRAND_COLOR` | `#DFE9FF` | Primary accent surface: badges, selections and download actions. |
-| `VITE_BRAND_COLOR_HOVER` | `#F6F8FC` | Hover surface for accent controls. |
-| `VITE_BRAND_COLOR_STRONG` | `#0044F4` | Strong emphasis colour for text and icons that require more contrast. |
+| `VITE_BRAND_COLOR` | `#e5e5e5` | The licence checkbox, its label and the download button hover in the download dialogs. |
+| `VITE_BRAND_COLOR_HOVER` | `#f5f5f5` | Available as the `brand-hover` class; the built-in interface does not use it. |
+| `VITE_BRAND_COLOR_STRONG` | `#262626` | Available as the `brand-strong` class; the built-in interface does not use it. |
+
+## Readable shades are derived from the brand colour
+
+The build derives two more colours from `VITE_BRAND_COLOR`, so any brand colour stays readable:
+
+- `brand-text`: the brand colour darkened until it reaches a 4.5:1 contrast ratio on white. Text, borders and hover states use it instead of the raw colour.
+- `brand-foreground`: dark grey (`#171717`) or white, whichever contrasts more with the brand colour. It is used on top of a `brand` background.
+
+The derivation understands hex values, `rgb()` and Tailwind colour names. For any other CSS colour, such as `rebeccapurple` or `hsl()`, it falls back to `#262626` and `#171717`. To set colours at runtime instead, define `--tenant-brand-color`, `--tenant-brand-text` and `--tenant-brand-foreground` on the document root; you are then responsible for their contrast.
 
 A value that is neither a known Tailwind name nor valid CSS is passed to the browser as is and renders as no colour, so check the result in the download dialog after changing it.
 

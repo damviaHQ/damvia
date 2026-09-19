@@ -19,8 +19,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
   --dv-color-white: rgb(255 255 255 / 1);
   --dv-color-canvas: rgb(246 248 252 / 1);
   --dv-color-ink: rgb(23 35 67 / 1);
-  --dv-color-muted: rgb(100 113 138 / 1);
+  --dv-color-muted: rgb(91 103 127 / 1);
   --dv-color-line: rgb(227 232 240 / 1);
+  --dv-color-line-strong: rgb(132 143 163 / 1);
   --dv-color-success: rgb(24 116 84 / 1);
   --dv-color-success-soft: rgb(234 245 239 / 1);
   --dv-color-warning: rgb(148 98 26 / 1);
@@ -82,13 +83,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
   --background: 0.0000 0.0000% 100.0000%;
   --foreground: 223.6363 48.8889% 17.6471%;
   --muted: 220.0000 49.9989% 97.6471%;
-  --muted-foreground: 219.4738 15.9663% 46.6666%;
+  --muted-foreground: 219.9999 16.5137% 42.7451%;
   --popover: 0.0000 0.0000% 100.0000%;
   --popover-foreground: 223.6363 48.8889% 17.6471%;
   --card: 0.0000 0.0000% 100.0000%;
   --card-foreground: 223.6363 48.8889% 17.6471%;
   --border: 216.9227 30.2322% 91.5686%;
-  --input: 216.9227 30.2322% 91.5686%;
+  --input: 218.7099 14.4187% 57.8432%;
   --primary: 223.2787 100.0000% 47.8432%;
   --primary-foreground: 0.0000 0.0000% 100.0000%;
   --secondary: 220.0000 49.9989% 97.6471%;
@@ -110,6 +111,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
   --dv-color-ink: rgb(38 38 38 / 1);
   --dv-color-muted: rgb(98 98 98 / 1);
   --dv-color-line: rgb(229 229 229 / 1);
+  --dv-color-line-strong: rgb(143 143 143 / 1);
   --dv-text-on-dark-secondary: rgb(212 212 212 / 1);
   --dv-text-on-dark-muted: rgb(163 163 163 / 1);
   --dv-font-body: Inter, system-ui, sans-serif;
@@ -124,7 +126,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
   --card: 0.0000 0.0000% 100.0000%;
   --card-foreground: 0.0000 0.0000% 14.9020%;
   --border: 0.0000 0.0000% 89.8039%;
-  --input: 0.0000 0.0000% 89.8039%;
+  --input: 0.0000 0.0000% 56.0784%;
   --primary: 0.0000 0.0000% 14.9020%;
   --primary-foreground: 0.0000 0.0000% 100.0000%;
   --secondary: 0.0000 0.0000% 98.0392%;

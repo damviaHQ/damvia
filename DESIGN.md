@@ -26,7 +26,8 @@ Never use dark-blue text on a light-blue button background. Filled blue buttons 
 | Selected and soft emphasis | `--dv-action-soft` | `#DFE9FF` |
 | Working canvas | `--dv-surface-canvas` | `#F6F8FC` |
 | Main text | `--dv-text-primary` | `#172343` |
-| Supporting text | `--dv-text-secondary` | `#64718A` |
+| Supporting text | `--dv-text-secondary` | `#5B677F` |
+| Field boundary | `--dv-color-line-strong` | `#848FA3` |
 | Panel surface | `--dv-surface-panel` | `#FFFFFF` |
 | Button / field / panel radius | `--dv-radius-button` / `--dv-radius-field` / `--dv-radius-lg` | 0 / 0 / 12 px |
 | Spacing | `--dv-space-*` | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 px |
