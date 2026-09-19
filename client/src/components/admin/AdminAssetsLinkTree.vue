@@ -22,6 +22,7 @@ import {
 import type { Asset } from "@/layouts/LayoutAdmin.vue"
 import { ChevronDown, ChevronRight, Folder, FolderOpen } from "lucide-vue-next"
 import { ref, watch } from "vue"
+import { useRouter } from "vue-router"
 
 const props = defineProps<{ asset: Asset; openItems: string[] }>()
 const open = ref(props.openItems.includes(props.asset.id))
@@ -37,24 +38,28 @@ watch(
   }
 )
 
-function handleLinkClick(event: MouseEvent) {
-  if (props.openItems[props.openItems.length - 1] === props.asset.collectionId) {
-    event.preventDefault()
-    open.value = !open.value
-  }
+// The chevron and the name do the same thing: open the folder and toggle
+// its children, so the tree never reacts differently to where the click lands.
+const router = useRouter()
+function toggle() {
+  open.value = !open.value
+}
+function handleChevronClick() {
+  toggle()
+  router.push({ name: 'admin-assets', params: { id: props.asset.id } })
 }
 </script>
 
 <template>
   <div class="layout-link-tree__wrapper">
     <div class="layout-link-tree__row">
-    <button v-if="asset.children?.length > 0" type="button" @click="open = !open" class="layout-link-tree__icon-wrapper"
+    <button v-if="asset.children?.length > 0" type="button" @click="handleChevronClick" class="layout-link-tree__icon-wrapper"
       :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${asset.name}`">
       <ChevronDown v-if="open" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
       <ChevronRight v-else class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
     </button>
     <div v-else class="w-4 h-4" />
-    <router-link :to="{ name: 'admin-assets', params: { id: asset.id } }" @click.exact="handleLinkClick"
+    <router-link :to="{ name: 'admin-assets', params: { id: asset.id } }" @click="toggle"
       active-class="layout-link-tree__link--active" class="layout-link-tree__link">
       <FolderOpen v-if="open" class="layout-link-tree__folder" />
       <Folder v-else class="layout-link-tree__folder" />
