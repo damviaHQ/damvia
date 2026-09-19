@@ -22,7 +22,6 @@ import {
 	PrimaryGeneratedColumn,
 	UpdateDateColumn
 } from "typeorm"
-import collection from "../trpc/router/collection"
 import { Collection } from "./collection"
 import { PageBlock } from "./page-block"
 import { User, UserRole } from "./user"

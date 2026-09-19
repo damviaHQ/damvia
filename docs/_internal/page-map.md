@@ -25,7 +25,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/trpc/router/license.ts`, `entity/license.ts` | `administration/licenses.md` |
 | `server/src/trpc/router/asset-type.ts`, `entity/asset-type.ts` | `administration/asset-types.md` |
 | `server/src/trpc/router/asset.ts`, `entity/asset-file.ts`, `entity/asset-folder.ts` | `administration/assets-tree.md` |
-| `server/src/trpc/router/menu-item.ts`, `page.ts`, `services/page.ts`, `entity/menu-item.ts`, `page.ts`, `page-block.ts` | `administration/menu-and-pages.md` |
+| `server/src/trpc/router/menu-item.ts`, `page.ts`, `services/page.ts`, `services/page-storage.ts`, `page-blocks/schema.ts`, `page-blocks/sanitize.ts`, `entity/menu-item.ts`, `page.ts`, `page-block.ts`, `client/src/components/page-renderer/`, `client/src/components/page-editor/` | `administration/menu-and-pages.md` |
 | `server/src/trpc/router/pim.ts`, `product-attributes.ts`, `entity/product.ts`, `product-attribute.ts` | `administration/products-and-pim.md` |
 | `server/src/services/search.ts`, `trpc/router/collection.ts` (`search`, `searchNotFound`), `client/src/components/search/*`, `client/src/components/layout-main/MainSearchBar.vue`, `client/src/views/search.vue`, `client/src/composables/useSearchState.ts` | `administration/products-and-pim.md`, `administration/asset-types.md`, `contributing/api.md`, `contributing/design-system.md` |
 | `server/src/trpc/router/favorite.ts`, `entity/user-favorite.ts`, `entity/user-collection-favorite.ts`, `client/src/composables/useCollectionFavorites.ts`, `client/src/views/favorites.vue`, `client/src/views/my-collections.vue` | `contributing/api.md`, `contributing/data-model.md`, `introduction/roles-and-access.md` |

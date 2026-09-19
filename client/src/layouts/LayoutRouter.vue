@@ -18,6 +18,7 @@ import { useRoute } from "vue-router"
 
 const LayoutAdmin = defineAsyncComponent(() => import("@/layouts/LayoutAdmin.vue"))
 const LayoutAuth = defineAsyncComponent(() => import("@/layouts/LayoutAuth.vue"))
+const LayoutEditor = defineAsyncComponent(() => import("@/layouts/LayoutEditor.vue"))
 const LayoutMain = defineAsyncComponent(() => import("@/layouts/LayoutMain.vue"))
 const LayoutPublic = defineAsyncComponent(() => import("@/layouts/LayoutPublic.vue"))
 
@@ -30,6 +31,8 @@ const component = computed(() => {
       return LayoutAuth
     case "admin":
       return LayoutAdmin
+    case "editor":
+      return LayoutEditor
     case "public":
       return LayoutPublic
   }

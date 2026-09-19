@@ -21,22 +21,19 @@ import CollectionRenderLayout from "@/components/collection/CollectionRenderLayo
 import Loader from "@/components/Loader.vue"
 import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Button } from "@/components/ui/button"
-import LayoutDialogMember from "@/layouts/LayoutDialogMember.vue"
-import LayoutPageEditor from "@/layouts/LayoutPageEditor.vue"
+import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import { trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   ChevronRight,
-  CircleX,
   FilePenLine,
-  LayoutDashboard,
   Link,
   Settings,
   Trash2,
 } from "@lucide/vue"
 import { storeToRefs } from "pinia"
-import { computed, ref, watch } from "vue"
+import { computed, ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 const router = useRouter()
@@ -45,10 +42,8 @@ const globalStore = useGlobalStore()
 const storeRefs = storeToRefs(globalStore)
 const queryClient = useQueryClient()
 const isHovered = ref(false)
-const isEditing = ref(false)
 const isEditCollectionModalOpen = ref(false)
 const isShareModalOpen = ref(false)
-const isMemberDialogOpen = ref(false)
 
 const { status, data: collection, error } = useQuery({
   queryKey: computed(() => ["collection", route.params.id]),
@@ -113,13 +108,6 @@ const breadcrumbItems = computed<PathBreadcrumbItem[]>(() => collectionPath.valu
   to: { name: 'collection', params: { id: item.id } },
 })))
 
-watch(
-  () => route.params.id,
-  () => {
-    isEditing.value = false
-  }
-)
-
 function toggleSelection() {
   if (selection.value.length === maxSelectableItems.value) {
     selection.value.forEach((item) => globalStore.removeFromSelection(item))
@@ -164,9 +152,6 @@ function removeSelectedFiles() {
     })
 }
 
-function openMemberDialog() {
-  isMemberDialogOpen.value = true
-}
 </script>
 
 <template>
@@ -179,12 +164,6 @@ function openMemberDialog() {
   <div v-else-if="status === 'success'" class="collection__container">
     <div class="collection__header mb-6 flex flex-wrap items-center justify-between gap-4">
       <div class="flex min-w-0 flex-1 items-center">
-        <div v-if="isEditing">
-          <div class="text-neutral-600 font-medium">
-            Editing {{ collection.name }} collection
-          </div>
-        </div>
-
         <div v-if="selection.length > 0" class="collection__selection-container flex items-center text-neutral-500" @mouseenter="isHovered = true"
           @mouseleave="isHovered = false" @focusin="isHovered = true" @focusout="isHovered = false">
           <CollectionCheckbox label="Select all items in this collection" @click="toggleSelection" class="mr-2"
@@ -207,7 +186,6 @@ function openMemberDialog() {
         <!-- Select ALL when empty -->
         <button v-if="
           !selection.length &&
-          !isEditing &&
           (collection.children?.length || collection.files?.length)
         " @click="toggleSelection"
           class="flex shrink-0 items-center text-sm gap-1.5 text-neutral-500 bg-transparent border-none cursor-pointer p-0 w-max"
@@ -217,48 +195,38 @@ function openMemberDialog() {
         </button>
         <ChevronRight aria-hidden="true" v-if="
           !selection.length &&
-          !isEditing &&
           (collection.children?.length || collection.files?.length)
         " class="mx-2 size-4 shrink-0 text-neutral-500" />
-        <div v-if="!isEditing" class="collection__path flex min-w-0 items-center">
+        <div class="collection__path flex min-w-0 items-center">
           <PathBreadcrumb :items="breadcrumbItems" />
         </div>
       </div>
       <div class="collection__header-actions flex items-center gap-1">
-        <CollectionFavoriteButton v-if="!isEditing" :collection="collection" />
-        <Button aria-label="Remove selected assets" v-if="canRemoveFiles" @click="removeSelectedFiles" type="button" variant="ghost" size="icon">
+        <CollectionFavoriteButton :collection="collection" toolbar />
+        <Button aria-label="Remove selected assets" title="Remove selected assets" v-if="canRemoveFiles" @click="removeSelectedFiles" type="button" variant="ghost" size="icon-sm">
           <Trash2 class="text-neutral-500 hover:text-neutral-800" />
         </Button>
-        <Button aria-label="Collection settings" v-if="collection.canEdit" @click="isEditCollectionModalOpen = true" type="button" variant="ghost"
-          size="icon">
+        <Button aria-label="Collection settings" title="Collection settings" v-if="collection.canEdit" @click="isEditCollectionModalOpen = true" type="button" variant="ghost"
+          size="icon-sm">
           <Settings class="text-neutral-500 hover:text-neutral-800" />
         </Button>
-        <Button aria-label="Edit page" v-if="collection.canEdit && collection.page && !isEditing" @click="isEditing = !isEditing" type="button"
-          variant="ghost" size="icon">
-          <FilePenLine class="text-neutral-500 hover:text-neutral-800" />
+        <Button aria-label="Edit page" title="Edit page" v-if="collection.canEdit && collection.page" as-child type="button"
+          variant="ghost" size="icon-sm">
+          <router-link :to="{ name: 'collection-edit', params: { id: collection.id } }">
+            <FilePenLine class="text-neutral-500 hover:text-neutral-800" />
+          </router-link>
         </Button>
-        <Button aria-label="Display preferences" v-if="!isEditing" @click="openMemberDialog" type="button" variant="ghost" size="icon">
-          <LayoutDashboard class="text-neutral-500 hover:text-neutral-800" />
-        </Button>
-        <Button aria-label="Share collection" v-if="collection.canEdit && !isEditing" @click="isShareModalOpen = true" type="button" variant="ghost"
-          size="icon">
+        <DisplayPreferences :files="collection.files" :collections="collection.children" />
+        <Button aria-label="Share collection" title="Share collection" v-if="collection.canEdit" @click="isShareModalOpen = true" type="button" variant="ghost"
+          size="icon-sm">
           <Link class="text-neutral-500 hover:text-neutral-800" />
         </Button>
-        <CollectionDialogShare v-if="collection.canEdit && !isEditing" v-model="isShareModalOpen"
+        <CollectionDialogShare v-if="collection.canEdit" v-model="isShareModalOpen"
           :collection="collection" />
-        <div v-if="isEditing">
-          <Button v-if="collection.canEdit" @click="isEditing = !isEditing" type="button" variant="ghost"
-            class="flex text-md gap-1.5 collection__header-action-button text-neutral-500 hover:text-neutral-800 hover:bg-transparent pl-2.5">
-            <CircleX />
-            Close Edit
-          </Button>
-        </div>
       </div>
     </div>
-    <LayoutPageEditor v-if="isEditing" :collection="collection" :page="collection.page" />
-    <CollectionRenderLayout v-else :key="collection.id" :collection="collection"
+    <CollectionRenderLayout :key="collection.id" :collection="collection"
       :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
     <CollectionDialogEdit v-model="isEditCollectionModalOpen" :collection="collection" />
-    <LayoutDialogMember v-model:open="isMemberDialogOpen" :initial-tab="'display-preferences'" />
   </div>
 </template>

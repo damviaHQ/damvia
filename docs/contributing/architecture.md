@@ -61,10 +61,10 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 |---|---|
 | `main.ts` | Creates the app with `VueQueryPlugin` (`refetchOnWindowFocus: false`), `vue3-lazyload`, the router and Pinia |
 | `app.vue` | Root component: shows a loader while the user loads, `LayoutAuth` with the "verify your email" or "wait for approval" message for unapproved users, `LayoutRouter` otherwise; handles `?verificationCode=` and mounts the toaster |
-| `router/index.ts` | 28 routes; each has `meta.layout` set to `auth`, `main`, `admin` or `public`, and a `beforeEach` guard that redirects unauthenticated users to `login` |
-| `layouts/` | `LayoutRouter.vue` maps `route.meta.layout` to `LayoutMain`, `LayoutAuth`, `LayoutAdmin` or `LayoutPublic`, loading each layout on demand so portal visitors never download the admin shell; also `LayoutDialogMember.vue` and `LayoutPageEditor.vue` |
-| `views/` | One component per route: `home`, `collection`, `search`, `favorites`, `page`, `admin/` (one file per admin screen, `products/` and `pages/` sub-folders), `auth/`, `public/` |
-| `components/` | Feature components grouped by area: `admin/`, `collection/`, `dialog-member/`, `layout-main/`, `page-editor/` (block editors and `blocks/` renderers), `icons/` |
+| `router/index.ts` | 29 routes; each has `meta.layout` set to `auth`, `main`, `admin`, `editor` or `public`, and a `beforeEach` guard that redirects unauthenticated users to `login` |
+| `layouts/` | `LayoutRouter.vue` maps `route.meta.layout` to `LayoutMain`, `LayoutAuth`, `LayoutAdmin`, `LayoutEditor` or `LayoutPublic`, loading each layout on demand so portal visitors never download the admin shell; also `LayoutDialogMember.vue`. `LayoutEditor.vue` is the full-height page editor shell, with no navigation tree or top bar |
+| `views/` | One component per route: `home`, `collection`, `search`, `favorites`, `page`, `page-edit` (the editor, for a collection page and a standalone page alike), `admin/` (one file per admin screen, `products/` and `pages/` sub-folders), `auth/`, `public/` |
+| `components/` | Feature components grouped by area: `admin/`, `collection/`, `dialog-member/`, `layout-main/`, `page-renderer/` (`PageRenderer.vue`, the one grid used by readers and by the editor, with one component per block type in `blocks/`), `page-editor/` (the editing shell, block library, block toolbar, media chooser and settings, loaded on demand so readers never download it), `icons/` |
 | `components/ui/` | shadcn-vue primitives (button, dialog, form, table, tabs...) generated from `components.json`; `lib/utils.ts` holds the `cn()` helper they use |
 | `stores/` | Pinia stores: `globalStore.ts` (auth token and `dam_token` cookie, current user, `env`, selection, display preferences) and `downloadStore.ts` (polls `download.list` with Vue Query) |
 | `services/server.ts` | The tRPC client, `RouterInput` / `RouterOutput` types, `extractErrors()` |

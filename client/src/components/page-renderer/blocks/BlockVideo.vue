@@ -13,30 +13,22 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { useQuery } from "@tanstack/vue-query"
 import { computed } from "vue"
-import { trpc } from "../../services/server.ts"
-import CollectionRenderFiles from "../collection/CollectionRenderFiles.vue"
+import { embedSrc, resolveMedia } from "../media"
+import type { PageAssets } from "../types"
 
-const props = defineProps<{
-  title?: string
-  collectionId: string
-  editMode: boolean
-  forceView?: "list" | "grid" | null
-}>()
-
-const { data: collection } = useQuery({
-  queryKey: computed(() => ["collection", props.collectionId]),
-  queryFn: () => trpc.collection.findById.query(props.collectionId),
-})
+const props = defineProps<{ data: any; assets?: PageAssets; editing?: boolean }>()
+const media = computed(() => resolveMedia(props.data?.media, props.assets))
+const embed = computed(() => embedSrc(props.data?.media))
 </script>
 
 <template>
-  <div v-if="collection && (editMode || collection.files?.length)">
-    <div v-if="title" class="text-muted-foreground text-sm font-medium mb-0.5">
-      {{ title }}
-    </div>
-    <collection-render-files v-if="collection" :collection="collection" :force-view="forceView"
-      :placeholder="editMode ? 'No files found.' : null" />
+  <div v-if="embed" class="aspect-video w-full">
+    <iframe :src="embed" class="h-full w-full" title="Video" all* referrerpolicy="strict-origin-when-cross-origin"
+      allowfullscreen />
   </div>
+  <video v-else-if="media" :src="media.url" class="w-full" controls />
+  <p v-else-if="editing" class="text-sm text-neutral-500 italic">
+    {{ data?.media ? "This video is no longer available." : "No video chosen yet." }}
+  </p>
 </template>

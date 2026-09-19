@@ -50,8 +50,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin.admin-dialog p { line-height:1.6; }
 .dv-admin .admin-list { overflow:hidden; min-width:0; }
 .dv-admin .admin-list-toolbar, .dv-admin .admin-list-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:18px 22px; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
-.dv-admin .admin-list-toolbar { border-bottom:1px solid var(--dv-color-line); }
-.dv-admin .admin-list-toolbar input { width:min(340px,100%); padding:var(--dv-control-padding-y) var(--dv-control-padding-x); }
+.dv-admin .admin-list-toolbar { gap:12px; padding:12px 24px; border-bottom:1px solid var(--dv-color-line); }
+.dv-admin .admin-list-toolbar input { flex:1; min-width:0; max-width:340px; padding:var(--dv-control-padding-y) var(--dv-control-padding-x); }
+.dv-admin .admin-list-toolbar > [role=status] { flex-shrink:0; }
 .dv-admin .admin-list-footer { border-top:1px solid var(--dv-color-line); }
 .dv-admin .admin-resource-page table { background:white; }
 .dv-admin .admin-resource-page th { height:44px; padding:12px 20px; background:var(--dv-surface-canvas); color:var(--dv-text-secondary); font-size:var(--dv-size-caption); font-weight:550; white-space:nowrap; }
@@ -67,14 +68,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-product-toolbar .admin-heading { width:100%; margin:0; }
 .dv-admin .admin-assets-workspace { height:100% !important; min-height:420px; }
 .dv-admin .admin-assets-workspace > [data-panel] { min-width:0; }
-@media(max-width:760px) { .dv-admin .admin-list-toolbar, .dv-admin .admin-list-footer { padding:16px; } .dv-admin .admin-product-toolbar > div { gap:8px; } .dv-admin .admin-resource-page td { padding:12px 16px; } }
+@media(max-width:760px) { .dv-admin .admin-list-toolbar { padding:12px 16px; } .dv-admin .admin-list-footer { padding:16px; } .dv-admin .admin-product-toolbar > div { gap:8px; } .dv-admin .admin-resource-page td { padding:12px 16px; } }
 .dv-admin .admin-menu-tree { padding:20px; }
 .dv-admin .admin-menu-tree > .admin-form-note { margin-bottom:20px; }
 .dv-admin .admin-menu-tree .items-tree__item { border-radius:0; min-height:56px; margin:0; border:0; border-bottom:1px solid var(--dv-color-line); }
 .dv-admin .admin-menu-tree .items-tree__item:hover { background:var(--dv-surface-canvas); }
 .dv-admin .admin-back-link { display:inline-block; margin-bottom:12px; font-size:var(--dv-size-body); color:var(--dv-text-secondary); }
-.dv-admin .page-editor__root { background:white; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-surface); padding:0 0 28px; }
-.dv-admin .editor__plus-button { min-height:44px; border-radius:0; }
 .dv-admin .asset__folder > a { border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-control); background:white; }
 .dv-admin .asset__folder > a svg { width:40px; height:40px; fill:none; stroke:var(--dv-color-blue); }
 .dv-admin button { border-radius:0; }

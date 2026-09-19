@@ -14,12 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import Loader from "@/components/Loader.vue"
-import Block from "@/components/page-editor/PageEditorBlock.vue"
+import PageRenderer from "@/components/page-renderer/PageRenderer.vue"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
-import groupBy from "lodash/groupBy"
-import sortBy from "lodash/sortBy"
-import sumBy from "lodash/sumBy"
 import { computed } from "vue"
 import { useRoute } from "vue-router"
 
@@ -28,31 +25,12 @@ const { status, data: page, error } = useQuery({
   queryKey: computed(() => ["pages", route.params.id]),
   queryFn: () => trpc.page.findById.query(route.params.id as string),
 })
-
-const rows = computed(() => {
-  return sortBy(
-    Object.entries(groupBy(page.value?.blocks ?? [], (block: any) => block.row)),
-    ([value]: [string]) => parseInt(value, 10)
-  ).map(([value, blocks]: any) => ({
-    value: parseInt(value, 10),
-    columns: sortBy(blocks, "column"),
-  }))
-})
-
-function getBlockStyle(blocks: any[], block: any) {
-  return { width: `${(block.width / sumBy(blocks, "width")) * 100}%` }
-}
 </script>
 
 <template>
-  <div v-if="page" class="page__container p-4">
-    <div class="page__block-row flex flex-col gap-4">
-      <div v-for="row in rows" :key="row.value" class="page__block-col flex flex-row gap-4">
-        <block v-for="block in row.columns" :key="block.id" :block="block" :page="page"
-          :style="getBlockStyle(row.columns, block)"
-          :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
-      </div>
-    </div>
+  <div v-if="page" class="page__container">
+    <PageRenderer :blocks="page.blocks ?? []" :assets="page.assets"
+      :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
   </div>
   <div v-else-if="status === 'pending'">
     <Loader :text="true" />

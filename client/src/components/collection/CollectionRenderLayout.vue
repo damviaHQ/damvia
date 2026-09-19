@@ -15,12 +15,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRender from "@/components/collection/CollectionRender.vue"
 import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
-import Block from "@/components/page-editor/PageEditorBlock.vue"
-import type { Block as BlockType } from "@/layouts/LayoutPageEditor.vue"
+import PageRenderer from "@/components/page-renderer/PageRenderer.vue"
 import { RouterOutput } from "@/services/server.ts"
-import groupBy from "lodash/groupBy"
-import sortBy from "lodash/sortBy"
-import sumBy from "lodash/sumBy"
 import { computed } from "vue"
 import { RouteLocationRaw } from "vue-router"
 
@@ -34,18 +30,6 @@ const props = defineProps<{
 
 const childrenCollections = computed<Collection[]>(() => props.collection.children)
 
-const rows = computed(() => {
-  return sortBy(
-    Object.entries(
-      groupBy(props.collection.page?.blocks ?? [], (block: BlockType) => block.row)
-    ),
-    ([value]: [string]) => parseInt(value, 10)
-  ).map(([value, blocks]: any) => ({
-    value: parseInt(value, 10),
-    columns: sortBy(blocks, "column"),
-  }))
-})
-
 const getGlobalAssetType = computed(() => {
   if (!props.collection.files?.length) return null
 
@@ -56,19 +40,11 @@ const getGlobalAssetType = computed(() => {
 
   return allSameAssetType ? props.collection.files[0].assetType : null
 })
-
-function getBlockStyle(blocks: BlockType[], block: BlockType) {
-  return { width: `${(block.width / sumBy(blocks, "width")) * 100}%` }
-}
 </script>
 
 <template>
-  <div v-if="collection.page" class="collection-layout-renderer__block-row flex flex-col gap-4">
-    <div v-for="row in rows" :key="row.value" class="collection-layout-renderer__block-col flex flex-row gap-4">
-      <block v-for="block in row.columns" :key="block.id" :block="block" :collection="collection"
-        :page="collection.page" :style="getBlockStyle(row.columns, block)" :generate-route="generateRoute" />
-    </div>
-  </div>
+  <PageRenderer v-if="collection.page" :blocks="collection.page.blocks ?? []" :assets="collection.page.assets"
+    :collection="collection" :generate-route="generateRoute" />
   <div v-else class="collection-layout-renderer__container flex flex-col gap-8 mb-6">
     <div v-if="childrenCollections?.length">
       <div class="mb-4 text-[12px] font-semibold text-neutral-500">Collections</div>

@@ -3,7 +3,7 @@ title: Menu and pages
 description: Build the navigation menu and compose pages out of blocks, for the home screen and for collections.
 sidebar:
   order: 9
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 The menu is the tree users see in the main layout; pages are block layouts that can be a standalone destination (for example the home page) or the landing view of a collection. Both are administered from the Content Management section.
@@ -40,37 +40,56 @@ Each item's menu offers `Add Item to Collection` (create a child) and, for colle
 
 ## Pages and blocks
 
-A row of `pages` has a `name` and an optional `collection_id`. A unique partial index guarantees at most one page per collection. Blocks are rows of `page_blocks` with a `type`, a `column`, a `row`, a `width` (all integers) and a `data` JSON payload.
+A row of `pages` has a `name` and an optional `collection_id`. A unique partial index guarantees at most one page per collection. Blocks are rows of `page_blocks`: a `type`, a `position` in the page and a `size`, plus a `data` payload in `jsonb`.
 
-| Block type | Editor name | Purpose (editor description) |
+Blocks are an ordered list, not a grid. Each one is `full`, `half` or `third` of the page width, and the browser packs consecutive narrow blocks onto the same line: two `half` blocks sit side by side, three `third` blocks make a row of three, and a `full` block always starts a new line. Authors choose nothing else about layout; there is no padding, margin, colour or font setting anywhere in the editor.
+
+| Block type | Editor name | What it shows |
 | --- | --- | --- |
-| `collections` | Collections | List sub-collections or custom selection |
-| `files` | Files | Display all files in a collection |
-| `last_files` | Last Files | Show recently created files |
-| `text` | Text | Add titles or paragraphs |
-| `image` | Image | Add banners or decorative images |
-| `video` | Video | Embed videos in your collection |
+| `hero` | Banner | A picture with a title, a subtitle and an optional button |
+| `text` | Text | Titles and paragraphs |
+| `image` | Picture | One picture, with a description for screen readers, an optional caption and an optional link |
+| `video` | Video | An uploaded video, a library file, or a YouTube or Vimeo address |
+| `collections` | Collections | Sub-collections, or a chosen selection |
+| `files` | Files | Every file of a collection |
+| `last_files` | Latest files | Recently added files |
+
+Each block type has its own payload, defined once in `server/src/page-blocks/schema.ts` and imported by the client, so the editor and the server agree on what is valid. Pictures and videos hold a reference rather than an address: either `{ source: 'upload', s3key }` for a file uploaded to the page, or `{ source: 'file', fileId }` for a file already in the library. Videos also accept `{ source: 'embed', provider, videoId }`.
+
+### The editor
+
+Editing a page is its own screen, at `/collections/:id/edit` for a collection page and `/admin/pages/:id` for a standalone one. The navigation tree and the top bar are replaced, so nothing competes with the page being edited:
+
+- The **left sidebar is the block library**. Drag a block onto the page to insert it where you drop it, or click it to add it at the end.
+- The **top bar** names the page, says whether there are unsaved changes, and holds `Discard`, `Save` and `Exit`.
+- **Each block carries a toolbar** on hover or keyboard focus: a drag handle, the three width buttons, `Move block up` and `Move block down`, a settings popover for the types that have options, `Duplicate block` and `Delete block`. A keyboard move announces the block's new position to screen readers.
+- **Text is written on the page itself.** Selecting text raises a small toolbar with bold, italic, two heading levels, lists, quote and link.
+- **Pictures and videos open a chooser** with two tabs: upload a file, or pick one from the library. The library tab searches the same index as the rest of the application, without recording the search as library activity. Video has a third tab for a YouTube or Vimeo address.
+
+Nothing is written until `Save`, which sends the whole page in one call. `Discard` returns the page to its last saved state, and leaving with unsaved changes asks for confirmation.
 
 ### Standalone pages
 
-`/admin/pages` (admin only) lists pages whose `collection_id` is null with a `Page Name` column and a creation form with a `Name`. Editing happens at `/admin/pages/:id` (`Editing page "..."`) with the block editor from `client/src/components/page-editor/`. `page.findById` only returns standalone pages, which is what a `page` menu item opens.
+`/admin/pages` (admin only) lists pages whose `collection_id` is null, with a `Page Name` column and a creation form. `page.findById` only returns standalone pages, which is what a `page` menu item opens.
 
 ### Collection pages
 
-`page.createForCollection` is available to whoever can edit the collection. It creates the page and two blocks: a `collections` block at row 0 and a `files` block at row 1, both in column 0 with width 1. The page is returned inside the collection payload, so the collection view renders it in place of the default listing.
+`page.createForCollection` is available to whoever can edit the collection. It creates the page with a `collections` block and a `files` block, both full width. The page is returned inside the collection payload, so the collection view renders it in place of the default listing.
 
-### Editing blocks
+### Permissions and stored files
 
-The block procedures (`addBlock`, `removeBlock`, `updateLayout`, `updateBlockData`) all resolve the page through `findPage` in `server/src/services/page.ts` and then check `Page.canEdit`: an admin can edit any page; another user can edit only a collection page whose collection they can see and own. `updateLayout` rewrites `column`, `row` and `width` for the listed blocks.
+`page.save` and the upload procedures resolve the page through `findPage` in `server/src/services/page.ts` and then check `Page.canEdit`: an admin can edit any page; another user can edit only a collection page whose collection they can see and own. A page someone cannot reach is reported as missing rather than forbidden, so the editor never confirms that a page exists to someone who cannot see it.
 
-In the editor, each block has a toolbar that appears on hover or when keyboard focus enters the block. Blocks move by dragging them onto the drop zones between rows and columns, or with the toolbar's `Move block up`, `Move block down`, `Move block left` and `Move block right` buttons. Up and down take a block that shares a row into a new row above or below it; a block alone in its row moves past the neighbouring row. Left and right swap it with the neighbouring block in the same row. Both paths call `updateLayout`, and a keyboard move announces the block's new position to screen readers. The delete button asks `Delete this block?` before calling `removeBlock`.
+What a block points at is resolved for whoever is reading it. A page is returned with an `assets` map holding the addresses of its pictures, files, collections and pages, built for that reader: a file they are not allowed to open simply does not appear, and the block renders nothing rather than a broken or leaked link.
 
-Image and video blocks store their file in the **main** bucket:
+Pictures and videos live in the **main** bucket under `blocks/{pageId}/`:
 
-- On first save, `updateBlockData` assigns `data.s3key = blocks/{pageId}/{uuid}`. Image blocks also keep `data.url` and `data.external` for a linked image.
-- `page.presignedUploadUrl` returns a 24-hour PUT URL for that key; the client uploads directly to storage. Other block types get `Unsupported block type.`
-- When the block is read back, `formatPageBlock` adds `data.presignedUrl` so the client can display the object.
-- `removeBlock` deletes the object with the row.
+- `page.createUpload` returns a ten-minute presigned POST to `blocks/{pageId}/tmp/{uploadId}`, restricted to JPEG, PNG, WebP, GIF and AVIF up to 20 MB, or MP4, WebM and MOV up to 500 MB.
+- `page.finalizeUpload` checks the staged file, re-encodes pictures to WebP no larger than 2400 px, verifies that a video really is one, and moves it to `blocks/{pageId}/{uuid}`. The staged copy is always removed, including when the file is rejected.
+- Saving a page deletes every object under its prefix that no block refers to any more, which also clears uploads that were added and then discarded.
+- Deleting a page, or the collection that owns it, deletes its objects.
+
+Text is sanitised on the way in and on the way out: only paragraphs, headings, basic emphasis, lists, quotes, rules and links survive, links are limited to `http`, `https` and `mailto`, and any style, class or script is dropped.
 
 A `files` block whose collection files share one asset type uses the type's name as its default title; see [Asset types](./asset-types.md). Bucket configuration is described in [Object storage](../integrations/object-storage.md).
 
@@ -80,6 +99,6 @@ To make a custom landing page, create a standalone page, add it to the menu as a
 
 ## Admin interface
 
-Menu items use square rows and themed action menus, with an empty state and ordering instructions. The Pages list searches names and paginates at 20 rows. The page editor displays the page name, a return link to Pages, and an accessible label on the add-content control.
+Menu items use square rows and themed action menus, with an empty state and ordering instructions. The Pages list searches names and paginates at 20 rows. Editing a page from the Pages list opens the same editor screen as a collection page, so the admin sidebar gives way to the block library; `Exit` returns to the list.
 
-The menu-item editor now uses the shared shadcn dialog, including a close button, Cancel, loading protection and visible save errors. The content-block editor has an accessible dialog title and a responsive block-type selector.
+The menu-item editor uses the shared shadcn dialog, including a close button, Cancel, loading protection and visible save errors. The page editor has its own full-height layout, with the block library on the left and the page on a white sheet at a readable width.

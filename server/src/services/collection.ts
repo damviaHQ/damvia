@@ -15,10 +15,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Brackets, EntityManager, SelectQueryBuilder, IsNull } from "typeorm"
 import { Collection } from "../entity/collection"
 import { CollectionFile } from "../entity/collection-file"
+import { Page } from "../entity/page"
 import { MenuItem, MenuItemType } from "../entity/menu-item"
 import { User, UserRole } from "../entity/user"
 import { dataSource, mainS3, mainS3Bucket } from "../env"
 import { collectionSynchronizationQueue } from "../worker"
+
+import { removePageObjects } from "./page-storage"
 
 export function userCollectionsQuery(user: User, em: EntityManager = dataSource.manager): SelectQueryBuilder<Collection> {
 	let query = em.getRepository(Collection)
@@ -216,9 +219,14 @@ export async function synchronizeCollection(em: EntityManager, collectionId: str
 
 export async function removeCollection(em: EntityManager, collectionId: string) {
 	const collection = await em.getRepository(Collection).findOneBy({ id: collectionId })
+	// The collection page cascades in the database; its uploads do not.
+	const page = await em.getRepository(Page).findOneBy({ collectionId })
 	await em.getRepository(Collection).delete({ id: collectionId })
 	if (collection?.hasThumbnail) {
 		await mainS3().removeObjects(mainS3Bucket(), [collection.thumbnailStorageKey])
+	}
+	if (page) {
+		await removePageObjects(page.id)
 	}
 }
 

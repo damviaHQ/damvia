@@ -17,35 +17,49 @@ import { IsNull } from "typeorm"
 import { z } from "zod"
 import { Page } from "../../entity/page"
 import { PageBlock, PageBlockType } from "../../entity/page-block"
-import { dataSource, mainS3, mainS3Bucket } from "../../env"
+import { User } from "../../entity/user"
+import { dataSource } from "../../env"
+import { blockInputSchema, BlockType, emptyBlockData, uploadKeysOf } from "../../page-blocks/schema"
+import { sanitizeBlockHtml } from "../../page-blocks/sanitize"
 import { userCollectionsQuery } from "../../services/collection"
-import { findPage, removeBlock, updateBlockData } from "../../services/page"
+import {
+	collectPageGarbage,
+	createBlockUpload,
+	finalizeBlockUpload,
+	findPage,
+	loadEditablePage,
+	removePageObjects,
+	resolvePageAssets,
+	savePage,
+} from "../../services/page"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
-export async function formatPage(page: Page) {
+export async function formatPage(page: Page, user?: User) {
+	const blocks = [...(page.blocks ?? [])].sort((a, b) => a.position - b.position)
 	return {
 		id: page.id,
 		name: page.name,
-		blocks: page.blocks ? await Promise.all(page.blocks.map(formatPageBlock)) : undefined,
+		blocks: page.blocks ? blocks.map(formatPageBlock) : undefined,
+		// Legacy rows never went through the sanitizer, so assets and text are
+		// both resolved for the reader rather than trusted from the database.
+		assets: page.blocks && user ? await resolvePageAssets(user, blocks) : undefined,
 	}
 }
 
-export async function formatPageBlock(block: PageBlock) {
-	const data = block.data
-	if ([PageBlockType.IMAGE, PageBlockType.VIDEO].includes(block.type) && data.s3key) {
-		data.presignedUrl = await mainS3().presignedGetObject(mainS3Bucket(), data.s3key)
-	}
-
+export function formatPageBlock(block: PageBlock) {
 	return {
 		id: block.id,
-		type: block.type,
+		type: block.type as BlockType,
 		pageId: block.pageId,
-		column: block.column,
-		row: block.row,
-		width: block.width,
-		data,
+		position: block.position,
+		size: block.size,
+		data: block.type === PageBlockType.TEXT
+			? { ...block.data, html: sanitizeBlockHtml((block.data as { html: string })?.html) }
+			: block.data,
 	}
 }
+
+const uploadKind = z.enum(['image', 'video'])
 
 export default router({
 	list: publicProcedure
@@ -55,12 +69,12 @@ export default router({
 				where: { collectionId: IsNull() },
 				relations: { blocks: true },
 			})
-			return Promise.all(pages.map(formatPage))
+			return Promise.all(pages.map((page) => formatPage(page)))
 		}),
 	findById: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.uuid())
-		.query(async ({ input }) => {
+		.query(async ({ input, ctx }) => {
 			const page = await dataSource.getRepository(Page).findOne({
 				where: { id: input, collectionId: IsNull() },
 				relations: { blocks: true },
@@ -68,18 +82,19 @@ export default router({
 			if (!page) {
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'Page not found.' })
 			}
-			return formatPage(page)
+			return formatPage(page, ctx.user)
 		}),
 	create: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
 			name: z.string(),
 		}))
-		.mutation(async ({ input }) => {
+		.mutation(async ({ input, ctx }) => {
 			const page = new Page()
 			page.name = input.name
+			page.blocks = []
 			await dataSource.getRepository(Page).save(page)
-			return formatPage(page)
+			return formatPage(page, ctx.user)
 		}),
 	createForCollection: publicProcedure
 		.use(authMiddleware(userApproved))
@@ -100,12 +115,13 @@ export default router({
 			page.collectionId = collection.id
 			await dataSource.transaction(async (em) => {
 				await em.save(page)
-				await em.save([
-					new PageBlock({ pageId: page.id, type: PageBlockType.COLLECTIONS, width: 1, column: 0, row: 0 }),
-					new PageBlock({ pageId: page.id, type: PageBlockType.FILES, width: 1, column: 0, row: 1 }),
+				// Kept on the entity so the caller gets the blocks it just created.
+				page.blocks = await em.save([
+					new PageBlock({ pageId: page.id, type: PageBlockType.COLLECTIONS, position: 0, size: 'full', data: emptyBlockData('collections') }),
+					new PageBlock({ pageId: page.id, type: PageBlockType.FILES, position: 1, size: 'full', data: emptyBlockData('files') }),
 				])
 			})
-			return formatPage(page)
+			return formatPage(page, ctx.user)
 		}),
 	update: publicProcedure
 		.use(authMiddleware(userAdmin))
@@ -113,7 +129,7 @@ export default router({
 			pageId: z.uuid(),
 			name: z.string().nullable(),
 		}))
-		.mutation(async ({ input }) => {
+		.mutation(async ({ input, ctx }) => {
 			const page = await dataSource.getRepository(Page).findOne({
 				where: { id: input.pageId, collectionId: IsNull() },
 				relations: { blocks: true },
@@ -128,7 +144,7 @@ export default router({
 			}
 
 			await dataSource.getRepository(Page).save(page)
-			return formatPage(page)
+			return formatPage(page, ctx.user)
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userApproved))
@@ -136,144 +152,51 @@ export default router({
 			pageId: z.uuid(),
 		}))
 		.mutation(async ({ input, ctx }) => {
-			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
-			if (!page) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Page not found.' })
-			} else if (!page.canEdit(ctx.user)) {
-				throw new TRPCError({ code: 'FORBIDDEN', message: 'This page cannot be edited.' })
-			}
-
+			const page = await loadEditablePage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
+			const formatted = await formatPage(page, ctx.user)
 			await dataSource.getRepository(Page).remove(page)
-			return formatPage(page)
+			// The rows cascade with the page; their objects never would.
+			await removePageObjects(input.pageId)
+			return formatted
 		}),
-	addBlock: publicProcedure
+	// One mutation for the whole page: the editor saves what the author sees.
+	save: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
 			pageId: z.uuid(),
-			type: z.enum(PageBlockType),
-			width: z.number(),
-			column: z.number(),
-			row: z.number(),
-			data: z.any().optional().nullable(),
+			blocks: z.array(blockInputSchema).max(100),
 		}))
 		.mutation(async ({ input, ctx }) => {
-			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
-			if (!page) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Page not found.' })
-			} else if (!page.canEdit(ctx.user)) {
-				throw new TRPCError({ code: 'FORBIDDEN', message: 'This page cannot be edited.' })
-			}
-
-			const block = new PageBlock()
-			block.page = page
-			block.type = PageBlockType[input.type.toUpperCase()]
-			block.width = input.width
-			block.column = input.column
-			block.row = input.row
-			await dataSource.transaction(async (em) => {
-				await em.getRepository(PageBlock).save(block)
-				await updateBlockData({ em, block, data: input.data })
-			})
-			return formatPageBlock(block)
+			const page = await loadEditablePage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
+			const blocks = await dataSource.transaction((em) => savePage({ em, page, blocks: input.blocks }))
+			// Only once the new payloads are committed can the old ones be dropped.
+			await collectPageGarbage(page.id, blocks.flatMap((block) => uploadKeysOf(block.data)))
+			return formatPage(page, ctx.user)
 		}),
-	removeBlock: publicProcedure
+	createUpload: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
 			pageId: z.uuid(),
-			blockId: z.uuid(),
+			kind: uploadKind,
+			contentType: z.string().max(100),
 		}))
 		.mutation(async ({ input, ctx }) => {
-			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
-			if (!page) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Page not found.' })
-			} else if (!page.canEdit(ctx.user)) {
-				throw new TRPCError({ code: 'FORBIDDEN', message: 'This page cannot be edited.' })
-			}
-
-			const block = page.blocks.find((block) => block.id === input.blockId)
-			if (!block) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Block not found.' })
-			}
-
-			await dataSource.transaction((em) => removeBlock({ em, block }))
-			return formatPageBlock(block)
+			await loadEditablePage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
+			return createBlockUpload(input)
 		}),
-	updateLayout: publicProcedure
+	finalizeUpload: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
 			pageId: z.uuid(),
-			blocks: z.array(z.object({
-				id: z.uuid(),
-				width: z.number(),
-				column: z.number(),
-				row: z.number(),
-			}))
+			uploadId: z.uuid(),
+			kind: uploadKind,
 		}))
 		.mutation(async ({ input, ctx }) => {
-			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
-			if (!page) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Page not found.' })
-			} else if (!page.canEdit(ctx.user)) {
-				throw new TRPCError({ code: 'FORBIDDEN', message: 'This page cannot be edited.' })
-			}
-
-			const updatedBlocks = page.blocks.filter((block) => {
-				const update = input.blocks.find((current) => current.id === block.id)
-				if (!update) {
-					return false
-				}
-
-				block.width = update.width
-				block.column = update.column
-				block.row = update.row
-				return true
-			})
-			await dataSource.getRepository(PageBlock).save(updatedBlocks)
-			return Promise.all(page.blocks.map(formatPageBlock))
-		}),
-	updateBlockData: publicProcedure
-		.use(authMiddleware(userApproved))
-		.input(z.object({
-			pageId: z.uuid(),
-			blockId: z.uuid(),
-			data: z.any().optional().nullable(),
-		}))
-		.mutation(async ({ input, ctx }) => {
-			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
-			if (!page) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Page not found.' })
-			} else if (!page.canEdit(ctx.user)) {
-				throw new TRPCError({ code: 'FORBIDDEN', message: 'This page cannot be edited.' })
-			}
-
-			const block = page.blocks.find((block) => block.id === input.blockId)
-			if (!block) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Block not found.' })
-			}
-
-			await dataSource.transaction((em) => updateBlockData({ em, block, data: input.data }))
-			return formatPageBlock(block)
-		}),
-	presignedUploadUrl: publicProcedure
-		.use(authMiddleware(userApproved))
-		.input(z.object({
-			pageId: z.uuid(),
-			blockId: z.uuid(),
-		}))
-		.query(async ({ input, ctx }) => {
-			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
-			if (!page) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Page not found.' })
-			} else if (!page.canEdit(ctx.user)) {
-				throw new TRPCError({ code: 'FORBIDDEN', message: 'This page cannot be edited.' })
-			}
-
-			const block = page.blocks.find((block) => block.id === input.blockId)
-			if (!block) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Block not found.' })
-			} else if (![PageBlockType.IMAGE, PageBlockType.VIDEO].includes(block.type)) {
-				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Unsupported block type.' })
-			}
-			return mainS3().presignedPutObject(mainS3Bucket(), block.data.s3key, 24 * 60 * 60)
+			await loadEditablePage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
+			const { s3key } = await finalizeBlockUpload(input)
+			const assets = await resolvePageAssets(ctx.user, [{ data: { media: { source: 'upload', s3key } } } as PageBlock])
+			return { s3key, url: assets.uploads[s3key] }
 		}),
 })
+
+export { findPage }

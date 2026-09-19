@@ -22,9 +22,11 @@ import {
 	PrimaryGeneratedColumn,
 	UpdateDateColumn
 } from "typeorm"
+import { BlockData, BlockSize } from "../page-blocks/schema"
 import { Page } from "./page"
 
 export enum PageBlockType {
+	HERO = 'hero',
 	COLLECTIONS = 'collections',
 	FILES = 'files',
 	LAST_FILES = 'last_files',
@@ -50,16 +52,13 @@ export class PageBlock {
 	type: PageBlockType
 
 	@Column({ type: 'integer' })
-	column: number
+	position: number
 
-	@Column({ type: 'integer' })
-	row: number
+	@Column({ type: 'varchar' })
+	size: BlockSize
 
-	@Column({ type: 'integer' })
-	width: number
-
-	@Column("simple-json", { nullable: true })
-	data: any
+	@Column({ type: 'jsonb', default: {} })
+	data: BlockData
 
 	@CreateDateColumn()
 	createdAt: Date
@@ -67,7 +66,7 @@ export class PageBlock {
 	@UpdateDateColumn()
 	updatedAt: Date
 
-	constructor(opts?: { pageId: string, type: PageBlockType, column: number, row: number, width: number, data?: any }) {
+	constructor(opts?: { pageId: string, type: PageBlockType, position: number, size: BlockSize, data: BlockData }) {
 		if (opts) Object.assign(this, opts)
 	}
 }

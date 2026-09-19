@@ -14,57 +14,47 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRender from "@/components/collection/CollectionRender.vue"
-import type { Collection } from "@/layouts/LayoutPageEditor.vue"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 import { computed } from "vue"
 import { RouteLocationRaw } from "vue-router"
+import type { Collection } from "../types"
 
 const props = defineProps<{
-  subCollections?: Collection[]
-  collectionsId?: string[]
-  title?: string
+  data: any
+  collection?: Collection
   generateRoute: (collection: Collection) => RouteLocationRaw
-  editMode: boolean
-  forceView?: "list" | "grid" | null
+  editing?: boolean
 }>()
 
 const { data: collectionTree } = useQuery({
   queryKey: ["collection", "tree"],
   queryFn: () => trpc.collection.tree.query(),
 })
+
+const flatCollections = computed(() => {
+  function flatten(collections: RouterOutput["collection"]["tree"]): Collection[] {
+    return collections.flatMap((collection: Collection) => [collection, ...flatten(collection.children ?? [])])
+  }
+  return collectionTree.value ? flatten(collectionTree.value) : []
+})
+
+// With no explicit choice the block lists whatever sits under this collection.
 const collections = computed(() => {
-  if (!collectionTree.value) {
-    return []
+  if (props.data?.collectionsId?.length) {
+    return props.data.collectionsId
+      .map((id: string) => flatCollections.value.find((collection) => collection.id === id))
+      .filter((collection: Collection | undefined) => !!collection)
   }
-  function formatCollectionArray(collections: RouterOutput["collection"]["tree"]) {
-    return [
-      ...collections,
-      ...collections.flatMap((collection: Collection) =>
-        formatCollectionArray(collection.children ?? [])
-      ),
-    ]
-  }
-  return formatCollectionArray(collectionTree.value)
+  return props.collection?.children ?? []
 })
-const collectionsToDisplay = computed(() => {
-  if (props.collectionsId?.length) {
-    return props.collectionsId
-      .map((id) =>
-        collections.value.find((collection: Collection) => collection.id === id)
-      )
-      .filter((item) => item)
-  }
-  return props.subCollections ?? []
-})
+const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) ? props.data.layout : null))
 </script>
 
 <template>
-  <div v-if="collectionsToDisplay && (editMode || collectionsToDisplay.length)">
-    <div v-if="title" class="text-muted-foreground text-sm font-medium mb-0.5">
-      {{ title }}
-    </div>
-    <CollectionRender :collections="collectionsToDisplay" :generate-route="generateRoute" :force-view="forceView"
-      :placeholder="editMode ? 'No collections found.' : null" />
+  <div v-if="editing || collections.length">
+    <div v-if="data.title" class="mb-0.5 text-sm font-medium text-muted-foreground">{{ data.title }}</div>
+    <CollectionRender :collections="collections" :generate-route="generateRoute" :force-view="forceView"
+      :placeholder="editing ? 'No collections found.' : null" />
   </div>
 </template>

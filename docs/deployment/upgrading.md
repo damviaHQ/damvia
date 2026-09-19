@@ -103,6 +103,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1789862400000-track-invitation-creator` | `invited_by_id` on `collection_invitations`, filled with the collection owner for existing invitations |
 | `1789948800000-activity-events` | `activity_events` table with its four indexes, feeding Insights; `last_login_at` on `users` |
 | `1790035200000-collection-favorites` | `user_collection_favorites` table (each user's starred collections) with its index on `collection_id`; starts empty |
+| `1790208000000-page-block-layout` | Rewrites `page_blocks` for the new page editor: adds `position` and `size`, converts `data` from text to `jsonb` with one shape per block type, and drops `row`, `column` and `width`. Reading order is preserved; a row that held two blocks becomes two `half` blocks, three becomes `third`, anything else becomes `full`. Text alignment chosen in the old editor is dropped, since the new editor has no alignment control. Rolling this migration back puts every block on a row of its own and deletes `hero` blocks, which the old schema cannot represent |
 | `1790121600000-asset-sources` | `source_key` on `asset_folders` and `asset_files` (empty for existing rows, adopted at the next start), unique index on (`source_key`, `external_id`) replacing the unique `external_id`, and the `asset_sources` table holding each configured source's last run |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.

@@ -13,34 +13,25 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
-import Loader from "@/components/Loader.vue"
-import LayoutPageEditor from "@/layouts/LayoutPageEditor.vue"
+import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 import { computed } from "vue"
-import { useRoute } from "vue-router"
+import type { Collection } from "../types"
 
-const route = useRoute()
-const { status, data: page, error } = useQuery({
-  queryKey: computed(() => ["pages", route.params.id]),
-  queryFn: () => trpc.page.findById.query(route.params.id as string),
+const props = defineProps<{ data: any; collection?: Collection; editing?: boolean }>()
+
+const { data: lastFiles } = useQuery({
+  queryKey: computed(() => ["collection", props.collection?.id, "last-files"]),
+  queryFn: () => trpc.collection.lastAddedFiles.query({ collectionId: props.collection?.id ?? null }),
 })
+const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) ? props.data.layout : null))
 </script>
 
 <template>
-  <div v-if="status === 'pending'">
-    <Loader :text="true" />
-  </div>
-  <div v-else-if="status === 'error'" class="admin-error" role="alert">
-    {{ error?.message }}
-  </div>
-  <div v-else-if="page" class="admin-page admin-resource-page">
-    <AdminPageHeader :title="page.name">
-      <template #lead>
-        <router-link :to="{ name: 'admin-pages' }" class="admin-back-link">← Pages</router-link>
-      </template>
-    </AdminPageHeader>
-    <LayoutPageEditor :page="page" />
+  <div v-if="lastFiles && (editing || lastFiles.length)">
+    <div v-if="data.title" class="mb-0.5 text-sm font-medium text-muted-foreground">{{ data.title }}</div>
+    <CollectionRenderFiles :files="lastFiles" :force-view="forceView"
+      :placeholder="editing ? 'No recent files added.' : null" />
   </div>
 </template>

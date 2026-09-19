@@ -28,8 +28,8 @@ process.env.APP_SECRET = 'security-tests-only-random-fixture-secret-20260916'
 process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../../dist/env')
 const { dataSource: db } = env
-const LATEST_MIGRATION = 'AssetSources1790121600000'
-const UPGRADE_MIGRATIONS = 8
+const LATEST_MIGRATION = 'PageBlockLayout1790208000000'
+const UPGRADE_MIGRATIONS = 9
 const state = {
     disk: { totalBytes: 10000, freeBytes: 9000 },
     bucketObjects: [],
@@ -119,7 +119,7 @@ async function setup() {
     const applied = await db.query('SELECT name FROM migrations ORDER BY id DESC LIMIT 1')
     assert.equal(applied[0]?.name, LATEST_MIGRATION, 'Update LATEST_MIGRATION and UPGRADE_MIGRATIONS in test/lib/helpers.cjs when adding migrations')
     for (let i = 0; i < UPGRADE_MIGRATIONS; i++) await db.undoLastMigration()
-    await db.query('TRUNCATE users, collections, asset_folders, groups, regions, licenses, products, product_attributes CASCADE')
+    await db.query('TRUNCATE users, collections, pages, asset_folders, groups, regions, licenses, products, product_attributes CASCADE')
     await db.query('DROP SCHEMA IF EXISTS pgboss CASCADE; CREATE SCHEMA pgboss; CREATE TABLE pgboss.job (name text, state text)')
     fixtures.group = await save(Group, { name: 'Default' })
     fixtures.region = await save(Region, { name: 'Test', defaultGroupId: fixtures.group.id })

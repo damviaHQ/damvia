@@ -17,27 +17,23 @@ import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 import { computed } from "vue"
+import type { Collection } from "../types"
 
-const props = defineProps<{
-  title?: string
-  collectionId?: string
-  editMode: boolean
-  forceView?: "list" | "grid" | null
-}>()
+const props = defineProps<{ data: any; collection?: Collection; editing?: boolean }>()
 
-const { data: lastFiles } = useQuery({
-  queryKey: computed(() => ["collection", props.collectionId, "last-files"]),
-  queryFn: () =>
-    trpc.collection.lastAddedFiles.query({ collectionId: props.collectionId ?? null }),
+const collectionId = computed(() => props.data?.collectionId || props.collection?.id)
+const { data: collection } = useQuery({
+  queryKey: computed(() => ["collection", collectionId.value]),
+  queryFn: () => trpc.collection.findById.query(collectionId.value as string),
+  enabled: computed(() => !!collectionId.value),
 })
+const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) ? props.data.layout : null))
 </script>
 
 <template>
-  <div v-if="lastFiles && (editMode || lastFiles.length)">
-    <div v-if="title" class="text-muted-foreground text-sm font-medium mb-0.5">
-      {{ title }}
-    </div>
-    <collection-render-files :files="lastFiles" :force-view="forceView"
-      :placeholder="editMode ? 'No recent files added.' : null" />
+  <div v-if="collection && (editing || collection.files?.length)">
+    <div v-if="data.title" class="mb-0.5 text-sm font-medium text-muted-foreground">{{ data.title }}</div>
+    <CollectionRenderFiles :collection="collection" :force-view="forceView"
+      :placeholder="editing ? 'No files found.' : null" />
   </div>
 </template>
