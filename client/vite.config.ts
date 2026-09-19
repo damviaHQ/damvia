@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [tailwind(), vue(), vueJsx(), svgLoader()],
   server: { fs: { allow: [fileURLToPath(new URL("..", import.meta.url))] } },
   resolve: {
-    dedupe: ['vue', '@internationalized/date'],
+    dedupe: ['vue', 'zod', '@internationalized/date'],
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
