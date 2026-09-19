@@ -397,8 +397,9 @@ export async function deleteFile(fileId: string): Promise<void> {
 	if (!file) return
 	await dataSource.transaction(async (em) => {
 		await em.getRepository(CollectionFile).delete({ assetFileId: file.id })
+	const storageKeys = [file.originalStorageKey, file.thumbnailStorageKey]
 		await em.getRepository(AssetFile).remove(file)
-		await assetsS3().removeObjects(assetsS3Bucket(), [file.originalStorageKey, file.thumbnailStorageKey])
+		await assetsS3().removeObjects(assetsS3Bucket(), storageKeys)
 	})
 }
 
