@@ -3,7 +3,7 @@ title: Dashboard
 description: The admin recap at /admin with storage used against the plan, the paused-sync state, orphan cleanup, sync health, pending approvals and recent downloads.
 sidebar:
   order: 2
-lastUpdated: 2026-09-18
+lastUpdated: 2026-09-19
 ---
 
 The dashboard is the first admin screen, at `/admin`, and the page every admin lands on from the "Administration" entry of the account menu. It combines workspace totals, user activity, file and download activity, access requests and storage health in the shared Damvia admin design. Usage over time, such as the most downloaded files, active users and search terms, is on [Insights](./analytics.md).
@@ -50,7 +50,7 @@ Files still too large for the remaining space are blocked again at their turn an
 
 ## Needs attention
 
-A compact panel appears above recent files only when there is something to act on:
+A compact panel opens the dashboard, above every total, only when there is something to act on:
 
 - **Access requests:** opens Users with the needs-approval filter.
 - **Files waiting to sync:** offers Retry files when pending or outdated files exist and no file downloads are running. When storage has paused synchronisation, the shared storage banner explains the blocker instead.
@@ -63,9 +63,9 @@ All figures come from one admin-only procedure, `dashboard.summary`; managers ne
 
 ## Workspace overview and activity
 
-The top row shows all asset files, folder and collection counts, workspace users, and downloads created in the last seven days. The equal-height operational row contains Latest user activity, Cloud synchronisation and Storage. Latest user activity combines the most recent registrations, approvals and guest invitations. Invitation entries name the person who created the shared link, the guest email and the collection. A verified account waiting for access has a one-click **Approve** action; unverified and approved accounts retain a compact state label.
+A single summary line follows with the number of asset files, workspace users, collections and downloads created in the last seven days. Pending approvals are not repeated there: they are listed under Needs attention. The equal-height operational row contains Latest user activity, Cloud synchronisation and Storage. Latest user activity combines the most recent registrations, approvals and guest invitations. Invitation entries name the person who created the shared link, the guest email and the collection. A verified account waiting for access has a one-click **Approve** action; unverified and approved accounts retain a compact state label.
 
-Workspace activity sits below those cards without an enclosing white panel. Recently updated lists the three latest asset-file records and opens each file’s containing folder. Recently downloaded lists the three newest download requests with their file count, requester, status and update time. These timestamps describe current records rather than an immutable audit log. The pending-approval link opens Users with its existing needs-approval filter selected.
+Workspace activity sits below those cards without an enclosing white panel. Recently updated lists the three latest asset-file records and opens each file’s containing folder. Recently downloaded lists the three newest download requests with their file count, requester, status and update time. These timestamps describe current records rather than an immutable audit log.
 
 The midnight navigation and Mona Sans typography are shared with the design-system preview. Buttons have square corners and panels retain rounded corners. On narrow screens, Open navigation expands the menu above the content; choosing a destination closes it. The tenant-facing DAM keeps its existing branding.
 

@@ -29,7 +29,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { extractErrors, RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
-import { isAfter, startOfTomorrow } from "date-fns"
 import dayjs from "dayjs"
 import { Copy, Link, Send, XCircle } from "lucide-vue-next"
 import { computed, onMounted, ref } from "vue"
@@ -59,7 +58,7 @@ function resetForm() {
 
 function isValidExpiryDate(date: string): boolean {
   const expiryDate = new Date(date)
-  return isAfter(expiryDate, startOfTomorrow())
+  return dayjs(expiryDate).isAfter(dayjs().add(1, "day").startOf("day"))
 }
 
 async function createInvitation(sendEmail: boolean) {
