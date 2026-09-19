@@ -23,3 +23,4 @@ dist-ssr
 .env.*
 !.env.template
 /server/plans
+server/damvia.code-workspace
