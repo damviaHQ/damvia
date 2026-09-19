@@ -107,7 +107,7 @@ export default router({
 
 			const region = await dataSource.getRepository(Region).findOne({
 				where: { id: input },
-				relations: ['users']
+				relations: { users: true }
 			})
 			if (!region) {
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'Region not found.' })

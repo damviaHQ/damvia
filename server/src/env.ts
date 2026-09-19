@@ -19,7 +19,7 @@ import { readFile, statfs } from "node:fs/promises"
 import { join } from "node:path"
 import { createTransport, Transporter } from 'nodemailer'
 import { DataSource } from "typeorm"
-import { SnakeNamingStrategy } from "typeorm-naming-strategies"
+import { SnakeNamingStrategy } from "./lib/snake-naming-strategy"
 import { URL } from "url"
 import { createLogger, format, transports } from "winston"
 import AssetUpdater from "./asset-updater/base"

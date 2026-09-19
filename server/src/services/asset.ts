@@ -472,7 +472,7 @@ export async function upsertFolder(opts: UpsertFolderOptions): Promise<AssetFold
 export async function deleteFolder(folderId: string): Promise<void> {
 	const folder = await dataSource.getRepository(AssetFolder).findOne({
 		where: { id: folderId },
-		relations: ['children', 'files'],
+		relations: { children: true, files: true },
 	})
 	if (!folder) return
 	for (const child of folder.children) {

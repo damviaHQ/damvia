@@ -106,7 +106,7 @@ test('rows from before sources existed are adopted, keep their ids and their col
     const ids = fresh()
     await upsertFolder({ externalId: ids.root, parentExternalId: '', name: 'Marketing' })
     await upsertFile({ externalId: ids.file, externalChecksum: '"e1"', folderExternalId: ids.root, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
-    await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await db.query("UPDATE asset_files SET status = 'up_to_date'")
     const folder = await db.getRepository(AssetFolder).findOneByOrFail({ externalId: ids.root })
     const mirror = await makeCollection({ assetFolderId: folder.id })
     assert.deepEqual(await listAssetSourceKeys(), [''])

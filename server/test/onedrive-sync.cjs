@@ -51,7 +51,7 @@ async function seedProdLibrary() {
     await upsertFolder({ externalId: ids.nested, parentExternalId: ids.top, name: 'Nested' })
     await upsertFile({ externalId: ids.rootFile, externalChecksum: '"e-root"', folderExternalId: ids.root, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
     await upsertFile({ externalId: ids.nestedFile, externalChecksum: '"e-nested"', folderExternalId: ids.nested, name: 'photo.jpg', size: 20, mimeType: 'image/jpeg' })
-    await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await db.query("UPDATE asset_files SET status = 'up_to_date'")
     await adoptUnassignedAssets('onedrive')
     const rootRow = await db.getRepository(AssetFolder).findOneByOrFail({ externalId: ids.root })
     const mirror = await makeCollection({ assetFolderId: rootRow.id })
@@ -85,7 +85,7 @@ test('upgrading a library synced from a subfolder keeps that folder as the only 
     await upsertFolder({ externalId: ids.top, parentExternalId: driveRoot, name: 'Marketing' })
     await upsertFolder({ externalId: ids.child, parentExternalId: ids.top, name: 'Child' })
     await upsertFile({ externalId: ids.file, externalChecksum: '"e"', folderExternalId: ids.top, name: 'a.jpg', size: 1, mimeType: 'image/jpeg' })
-    await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await db.query("UPDATE asset_files SET status = 'up_to_date'")
     await adoptUnassignedAssets('onedrive')
     state.queued.length = 0
     const before = await snapshot()

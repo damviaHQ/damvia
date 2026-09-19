@@ -54,7 +54,7 @@ async function seedLibrary() {
     await upsertFolder({ externalId: ids.nested, parentExternalId: ids.marketing, name: 'Nested' })
     await upsertFile({ externalId: ids.cover, externalChecksum: 'h-cover', folderExternalId: ids.marketing, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
     await upsertFile({ externalId: ids.photo, externalChecksum: 'h-photo', folderExternalId: ids.nested, name: 'photo.jpg', size: 20, mimeType: 'image/jpeg' })
-    await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await db.query("UPDATE asset_files SET status = 'up_to_date'")
     await adoptUnassignedAssets('dropbox')
     const mirror = await makeCollection({ assetFolderId: (await db.getRepository(AssetFolder).findOneByOrFail({ externalId: ids.marketing })).id })
     state.queued.length = 0
@@ -93,7 +93,7 @@ test('DROPBOX_ROOT_PATH: the pointed folder is the only top-level row, and point
     await upsertFolder({ externalId: ids.nested, parentExternalId: ids.marketing, name: 'Nested' })
     await upsertFile({ externalId: ids.cover, externalChecksum: 'h-cover', folderExternalId: ids.marketing, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
     await upsertFile({ externalId: ids.photo, externalChecksum: 'h-photo', folderExternalId: ids.nested, name: 'photo.jpg', size: 20, mimeType: 'image/jpeg' })
-    await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await db.query("UPDATE asset_files SET status = 'up_to_date'")
     await adoptUnassignedAssets('dropbox')
     state.queued.length = 0
     const before = await snapshot()

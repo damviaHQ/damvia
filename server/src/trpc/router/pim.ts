@@ -96,7 +96,7 @@ export default router({
         }
       }
 
-      await productRepository.delete({})
+      await productRepository.createQueryBuilder().delete().execute()
     }),
   compareCsv: publicProcedure
     .use(authMiddleware(userAdmin))

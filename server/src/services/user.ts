@@ -59,7 +59,7 @@ export async function createUser(opts: CreateUserOptions) {
 	}
 
 	const emailDomain = user.email.split('@').pop()
-	user.approved = await dataSource.getRepository(AuthorizedDomain).exist({ where: { domain: emailDomain } })
+	user.approved = await dataSource.getRepository(AuthorizedDomain).exists({ where: { domain: emailDomain } })
 
 	await dataSource.transaction(async (em) => {
 		await em.getRepository(User).save(user)

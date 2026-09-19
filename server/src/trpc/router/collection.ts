@@ -347,10 +347,9 @@ export default router({
 			collection.name = input.name
 			collection.description = input.description ?? null
 			if (input.parentId) {
-				collection.parent = await dataSource.getRepository(Collection).findOneBy({
-					id: input.parentId,
-					ownerId: ctx.user.role !== UserRole.ADMIN ? ctx.user.id : undefined,
-				})
+				collection.parent = await dataSource.getRepository(Collection).findOneBy(
+					ctx.user.role !== UserRole.ADMIN ? { id: input.parentId, ownerId: ctx.user.id } : { id: input.parentId },
+				)
 			}
 			collection.public = collection.parent?.public ?? input.public ?? false
 			collection.draft = collection.parent?.draft ?? input.draft ?? false
@@ -387,10 +386,9 @@ export default router({
 			collection.description = input.description ?? null
 			collection.assetFolder = assetFolder
 			if (input.parentId) {
-				collection.parent = await dataSource.getRepository(Collection).findOneBy({
-					id: input.parentId,
-					ownerId: ctx.user.role !== UserRole.ADMIN ? ctx.user.id : undefined,
-				})
+				collection.parent = await dataSource.getRepository(Collection).findOneBy(
+					ctx.user.role !== UserRole.ADMIN ? { id: input.parentId, ownerId: ctx.user.id } : { id: input.parentId },
+				)
 			}
 			collection.public = collection.parent?.public ?? input.public ?? false
 			collection.draft = collection.parent?.draft ?? input.draft ?? false

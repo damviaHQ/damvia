@@ -65,7 +65,7 @@ async function seedLibrary() {
     await upsertFolder({ externalId: ids.nested, parentExternalId: ids.top, name: 'Nested' })
     await upsertFile({ externalId: ids.cover, externalChecksum: 'md5-' + ids.cover, folderExternalId: ids.root, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
     await upsertFile({ externalId: ids.photo, externalChecksum: 'md5-' + ids.photo, folderExternalId: ids.nested, name: 'photo.jpg', size: 10, mimeType: 'image/jpeg' })
-    await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await db.query("UPDATE asset_files SET status = 'up_to_date'")
     await adoptUnassignedAssets('googledrive')
     const mirror = await makeCollection({ assetFolderId: (await db.getRepository(AssetFolder).findOneByOrFail({ externalId: ids.root })).id })
     state.queued.length = 0

@@ -37,7 +37,7 @@ export class Page {
 	name: string | null
 
 	@Column({ type: 'varchar', nullable: true })
-	@Index({ unique: true, where: "collection_id IS NOT NULL" })
+	@Index("IDX_560802d28e3563627ca2d19592", { unique: true, where: "collection_id IS NOT NULL" })
 	collectionId: string | null
 
 	@OneToOne(() => Collection, (collection) => collection.page, { onDelete: 'CASCADE' })
