@@ -167,7 +167,7 @@ async function onModalSubmit(event: Event) {
       <div><h1>Regions</h1><p>Organize users by region and set their default group.</p></div>
       <Button type="button" variant="default" @click="openCreateModal"
         class="dv-button dv-button--primary">
-        <CirclePlus class="w-4 h-4" />
+        <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add region
       </Button>
     </div>
@@ -194,13 +194,13 @@ async function onModalSubmit(event: Event) {
           <TableCell>
             <div class="flex space-x-2">
               <Button variant="ghost" size="sm" @click="openEditModal(region)">
-                <PencilLine class="w-4 h-4 mr-2" />
+                <PencilLine class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
                 Edit
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger as-child>
                   <Button variant="ghost" size="sm">
-                    <Trash2 class="w-4 h-4 mr-2" />
+                    <Trash2 class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
                     Remove
                   </Button>
                 </AlertDialogTrigger>

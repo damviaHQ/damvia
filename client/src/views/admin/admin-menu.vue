@@ -43,7 +43,7 @@ const { data: menuItems, status, error } = useQuery({
       <div class="admin-actions">
         <ItemDialog>
           <Button type="button" variant="default" class="dv-button dv-button--primary">
-            <CirclePlus class="w-4 h-4 max-w-4 max-h-4" />
+            <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] max-w-[var(--dv-icon-compact)] max-h-[var(--dv-icon-compact)]" />
             Add menu item
           </Button>
         </ItemDialog>

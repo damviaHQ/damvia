@@ -69,13 +69,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
   --dv-size-heading: 32px;
   --dv-size-display: 56px;
   --dv-field-gap: 8px;
-  --dv-field-label-size: 13px;
+  --dv-field-label-size: var(--dv-size-body);
   --dv-field-help-size: 12px;
   --dv-field-line-height: 20px;
   --dv-control-height: 40px;
   --dv-control-padding-x: 12px;
   --dv-control-padding-y: 8px;
   --dv-selection-color: var(--dv-action-primary);
+  --dv-icon-compact: 16px;
+  --dv-icon-default: 18px;
+  --dv-icon-action: 24px;
 }
 
 /* Admin-only bridge for shared shadcn controls and teleported overlays. */

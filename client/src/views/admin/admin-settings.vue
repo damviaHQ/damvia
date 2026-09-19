@@ -167,7 +167,7 @@ const removeBackgroundImage = async () => {
 .settings-sections { display:grid; gap:24px; }
 .settings-sections > .admin-heading { margin-bottom:4px; }
 .branding-settings h2 { font-size:22px; margin-bottom:12px; }
-.branding-settings p { color:var(--dv-text-secondary); font-size:13px; margin-top:8px; }
+.branding-settings p { color:var(--dv-text-secondary); font-size:var(--dv-size-body); margin-top:8px; }
 .logo-preview { display:flex; align-items:center; justify-content:center; height:110px; max-width:300px; margin:24px 0; background:white; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-graphic); }
 .logo-preview img { max-width:260px; max-height:80px; object-fit:contain; }
 .branding-background-preview { border-radius:var(--dv-radius-graphic); }

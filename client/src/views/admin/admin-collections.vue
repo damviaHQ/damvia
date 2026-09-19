@@ -130,7 +130,7 @@ async function confirmDeleteCollection() {
       <h1>Collections</h1>
       <Button type="button" variant="default" @click="handleCreateCollection"
         class="dv-button dv-button--primary">
-        <CirclePlus class="w-4 h-4" />
+        <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add collection
       </Button>
     </div>
@@ -142,25 +142,25 @@ async function confirmDeleteCollection() {
         class="flex items-center py-2 hover:bg-neutral-100" @click="item.children?.length && toggleExpanded(item.id)">
         <button v-if="item.children?.length" type="button" class="mr-2" :aria-expanded="expandedIds.has(item.id)"
           :aria-label="`Subcollections of ${item.name}`" @click.stop="toggleExpanded(item.id)">
-          <ChevronDown v-if="expandedIds.has(item.id)" class="h-4 w-4" />
-          <ChevronRight v-else class="h-4 w-4" />
+          <ChevronDown v-if="expandedIds.has(item.id)" class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
+          <ChevronRight v-else class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
         </button>
         <div v-else class="w-4 h-4 mr-2"></div>
         <IconCloudSync v-if="item.synchronized" class="h-5 w-5 mr-2 admin-text-secondary" />
-        <Folder v-else class="h-5 w-5 mr-2 admin-text-secondary" />
+        <Folder v-else class="h-[var(--dv-icon-default)] w-[var(--dv-icon-default)] mr-2 admin-text-secondary" />
         <span class="flex-grow">{{ item.name }}</span>
 
         <div class="flex items-center gap-2 mr-5">
           <Badge v-if="item.page" variant="outline" class="flex items-center gap-1">
-            <FilePenLine class="h-3 w-3" />
+            <FilePenLine class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
             page
           </Badge>
           <Badge v-if="item.draft" variant="outline" class="flex items-center gap-1">
-            <EyeOff class="h-3 w-3" />
+            <EyeOff class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
             draft
           </Badge>
           <Badge v-if="item.thumbnailURL" variant="outline" class="flex items-center gap-1">
-            <Image class="h-3 w-3" />
+            <Image class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
             thumbnail
           </Badge>
         </div>
@@ -168,13 +168,13 @@ async function confirmDeleteCollection() {
         <div class="flex items-center gap-2 ml-5" @click="stopPropagation">
           <Button variant="link" @click="handleEditCollection(item)" :aria-label="`Edit ${item.name}`"
             class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
-            <PencilLine class="h-4 w-4" /> Edit
+            <PencilLine class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Edit
           </Button>
           <AlertDialog>
             <AlertDialogTrigger as-child>
               <Button variant="link" @click="handleDeleteCollection(item)" :aria-label="`Delete ${item.name}`"
                 class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
-                <Trash2 class="h-4 w-4" /> Delete
+                <Trash2 class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Delete
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>

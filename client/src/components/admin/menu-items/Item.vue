@@ -103,22 +103,22 @@ function openDialog(type: "add" | "edit") {
   <div v-if="props.item">
     <div class="items-tree__item flex w-full items-center border border-gray-200 p-2 mb-2 justify-between">
       <div class="items-tree__grab" aria-hidden="true">
-        <GripVertical class="h-4 w-4 cursor-grab" />
+        <GripVertical class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] cursor-grab" />
       </div>
       <div class="items-tree__icon-group">
 
         <div class="items-tree__type-icon w-full">
-          <BetweenHorizontalStart v-if="item.type === 'divider'" class="w-4 h-4" />
-          <FilePenLine v-if="item.type === 'page'" class="w-4 h-4" />
-          <LetterText v-if="item.type === 'text'" class="w-4 h-4" />
-          <Folder v-if="item.type === 'collection' && !item.synchronized" class="w-4 h-4 admin-text-secondary" />
+          <BetweenHorizontalStart v-if="item.type === 'divider'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
+          <FilePenLine v-if="item.type === 'page'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
+          <LetterText v-if="item.type === 'text'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
+          <Folder v-if="item.type === 'collection' && !item.synchronized" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] admin-text-secondary" />
           <IconCloudSync v-if="item.type === 'collection' && item.synchronized" class="!w-8 !h-8 text-[var(--dv-action-primary)]" />
         </div>
       </div>
       <component :is="item.children ? 'button' : 'div'" :type="item.children ? 'button' : undefined"
         :aria-expanded="item.children ? isOpen : undefined" @click="isOpen = !isOpen"
         class="flex w-full min-w-[20rem] items-center text-left">
-        <ChevronDown v-if="item.children" :class="['w-4 h-4', !isOpen && '-rotate-90']" class="mx-2" />
+        <ChevronDown v-if="item.children" :class="['w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]', !isOpen && '-rotate-90']" class="mx-2" />
         <div v-else class="w-4 h-4" />
         <template v-if="props.item?.type === 'collection'">
           {{ props.item.collectionName }}
@@ -141,41 +141,41 @@ function openDialog(type: "add" | "edit") {
         </template>
       </component>
       <div v-if="['collection', 'page'].includes(item.type) && item.home" class="items-tree__home-icon">
-        <Home class="h-4 w-4" />
+        <Home class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
       </div>
       <DropdownMenu v-model:open="dropdownOpen">
         <DropdownMenuTrigger asChild>
           <Button ref="actionsTrigger" variant="ghost" size="icon" aria-label="Menu item actions">
-            <Ellipsis class="h-4 w-4" />
+            <Ellipsis class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem v-if="item.type === 'collection'" @select="openDialog('add')">
             <div class="flex items-center">
-              <Plus class="h-4 w-4 mr-2" />
+              <Plus class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
               <span>Add Item to Collection</span>
             </div>
           </DropdownMenuItem>
           <DropdownMenuItem @select="openDialog('edit')">
             <div class="flex items-center">
-              <Settings class="h-4 w-4 mr-2" />
+              <Settings class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
               <span>Edit Item</span>
             </div>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="index > 0" @select="moveItem(-1)">
-            <ArrowUp class="h-4 w-4 mr-2" />
+            <ArrowUp class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
             <span>Move up</span>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="index < count - 1" @select="moveItem(1)">
-            <ArrowDown class="h-4 w-4 mr-2" />
+            <ArrowDown class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
             <span>Move down</span>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="['collection', 'page'].includes(item.type)" @click="setHome(item)">
-            <Home class="h-4 w-4 mr-2" />
+            <Home class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
             <span>Set as Home</span>
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleRemove(item)">
-            <Trash class="h-4 w-4 mr-2" />
+            <Trash class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
             <span>Remove from menu</span>
           </DropdownMenuItem>
         </DropdownMenuContent>

@@ -14,18 +14,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-page { padding:36px; width:100%; min-width:0; max-width:1540px; margin:0 auto; }
 .dv-admin .admin-heading { display:flex; justify-content:space-between; align-items:center; gap:20px; margin-bottom:28px; }
-.dv-admin .admin-heading h1 { font-size:30px; font-weight:550; }
-.dv-admin .admin-heading p { color:var(--dv-text-secondary); font-size:13px; margin-top:7px; }
+.dv-admin .admin-heading h1 { font-size:var(--dv-size-heading); font-weight:550; }
+.dv-admin .admin-heading p { color:var(--dv-text-secondary); font-size:var(--dv-size-body); margin-top:7px; }
 .dv-admin .admin-text-secondary { color:var(--dv-text-secondary); }
 .dv-admin .admin-text-primary-hover:hover { color:var(--dv-text-primary); }
 .dv-admin .admin-actions { display:flex; gap:10px; flex-wrap:wrap; }
 .dv-admin .dv-button { height:auto; padding:9px 14px; box-shadow:none; border-radius:0; }
-.dv-admin .dv-button svg { width:15px; height:15px; }
-.dv-admin .admin-error { border:1px solid var(--dv-color-danger); background:var(--dv-color-danger-soft); color:var(--dv-color-danger); padding:14px 18px; border-radius:var(--dv-radius-data); font-size:13px; }
+.dv-admin .dv-button svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
+.dv-admin .admin-error { border:1px solid var(--dv-color-danger); background:var(--dv-color-danger-soft); color:var(--dv-color-danger); padding:14px 18px; border-radius:var(--dv-radius-data); font-size:var(--dv-size-body); }
 .dv-admin .admin-empty { display:grid; justify-items:center; gap:12px; padding:56px 24px; text-align:center; }
 .dv-admin .admin-empty > svg { width:30px; height:30px; color:var(--dv-text-secondary); }
-.dv-admin .admin-empty h2 { font-size:16px; }
-.dv-admin .admin-empty p { color:var(--dv-text-secondary); font-size:13px; }
+.dv-admin .admin-empty h2 { font-size:var(--dv-size-body); }
+.dv-admin .admin-empty p { color:var(--dv-text-secondary); font-size:var(--dv-size-body); }
 .dv-admin.admin-dialog { max-height:90dvh; width:calc(100% - 32px); overflow-y:auto; border-radius:var(--dv-radius-surface); background:var(--dv-surface-panel); padding:28px; }
 .dv-admin.admin-dialog h2 { font-size:22px; padding-right:24px; }
 .dv-admin.admin-dialog [role=dialog] { font-family:var(--dv-font-body); }
@@ -33,10 +33,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
 .dv-admin .admin-form label { font-size:var(--dv-field-label-size); font-weight:500; line-height:var(--dv-field-line-height); }
 .dv-admin .admin-form input:not([type=checkbox]), .dv-admin .admin-form select { width:100%; border:1px solid var(--dv-color-line-strong); border-radius:0; background:white; padding:var(--dv-control-padding-y) var(--dv-control-padding-x); min-height:var(--dv-control-height); box-shadow:none; color:var(--dv-text-primary); font-size:var(--dv-field-label-size); line-height:var(--dv-field-line-height); }
-.dv-admin .admin-form p { font-size:12px; }
+.dv-admin .admin-form p { font-size:var(--dv-size-caption); }
 .dv-admin .admin-form-note { padding:12px 14px; background:var(--dv-surface-canvas); color:var(--dv-text-secondary); border-radius:var(--dv-radius-data); line-height:1.6; }
 .dv-admin .admin-form-footer { display:flex; justify-content:flex-end; gap:10px; padding-top:20px; border-top:1px solid var(--dv-color-line); }
-.dv-admin .admin-form-error { color:var(--dv-color-danger); margin-top:5px; font-size:12px; }
+.dv-admin .admin-form-error { color:var(--dv-color-danger); margin-top:5px; font-size:var(--dv-size-caption); }
 .dv-admin .admin-group-options { max-height:160px; overflow:auto; display:grid; gap:10px; border:1px solid var(--dv-color-line); padding:12px; }
 .dv-admin .admin-group-options label { display:flex; align-items:center; gap:9px; font-weight:400; }
 @media(max-width:760px) { .dv-admin .admin-page { padding:28px 20px; } .dv-admin .admin-heading { align-items:flex-start; flex-direction:column; } }
@@ -49,13 +49,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 /* Shared administration controls; the portal keeps its own theme. */
 .dv-admin.admin-dialog p { line-height:1.6; }
 .dv-admin .admin-list { overflow:hidden; min-width:0; }
-.dv-admin .admin-list-toolbar, .dv-admin .admin-list-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:18px 22px; font-size:12px; color:var(--dv-text-secondary); }
+.dv-admin .admin-list-toolbar, .dv-admin .admin-list-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:18px 22px; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
 .dv-admin .admin-list-toolbar { border-bottom:1px solid var(--dv-color-line); }
 .dv-admin .admin-list-toolbar input { width:min(340px,100%); padding:var(--dv-control-padding-y) var(--dv-control-padding-x); }
 .dv-admin .admin-list-footer { border-top:1px solid var(--dv-color-line); }
 .dv-admin .admin-resource-page table { background:white; }
-.dv-admin .admin-resource-page th { height:44px; padding:12px 20px; background:var(--dv-surface-canvas); color:var(--dv-text-secondary); font-size:11px; font-weight:550; white-space:nowrap; }
-.dv-admin .admin-resource-page td { padding:16px 20px; font-size:13px; border-bottom:1px solid var(--dv-color-line); }
+.dv-admin .admin-resource-page th { height:44px; padding:12px 20px; background:var(--dv-surface-canvas); color:var(--dv-text-secondary); font-size:var(--dv-size-caption); font-weight:550; white-space:nowrap; }
+.dv-admin .admin-resource-page td { padding:16px 20px; font-size:var(--dv-size-body); border-bottom:1px solid var(--dv-color-line); }
 .dv-admin .admin-resource-page td:first-child { font-weight:550; }
 .dv-admin .admin-resource-page td:last-child > div { justify-content:flex-end; }
 .dv-admin .admin-resource-page tbody tr:last-child td { border-bottom:0; }
@@ -72,7 +72,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-menu-tree > .admin-form-note { margin-bottom:20px; }
 .dv-admin .admin-menu-tree .items-tree__item { border-radius:0; min-height:56px; margin:0; border:0; border-bottom:1px solid var(--dv-color-line); }
 .dv-admin .admin-menu-tree .items-tree__item:hover { background:var(--dv-surface-canvas); }
-.dv-admin .admin-back-link { display:inline-block; margin-bottom:12px; font-size:13px; color:var(--dv-text-secondary); }
+.dv-admin .admin-back-link { display:inline-block; margin-bottom:12px; font-size:var(--dv-size-body); color:var(--dv-text-secondary); }
 .dv-admin .page-editor__root { background:white; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-surface); padding:0 0 28px; }
 .dv-admin .editor__plus-button { min-height:44px; border-radius:0; }
 .dv-admin .asset__folder > a { border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-control); background:white; }
@@ -93,10 +93,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin.admin-dialog.collection-edit-dialog { max-width:640px; }
 .dv-admin.admin-dialog [data-dialog-header] { display:flex; flex-direction:column; gap:8px; text-align:left; margin:0; padding:0 28px 0 0; }
 .dv-admin.admin-dialog h2 { font-size:22px; font-weight:600; line-height:1.3; letter-spacing:-.025em; padding:0; }
-.dv-admin.admin-dialog [data-dialog-header] p, .dv-admin.admin-dialog > p { font-size:13px; color:var(--dv-text-secondary); line-height:1.65; }
+.dv-admin.admin-dialog [data-dialog-header] p, .dv-admin.admin-dialog > p { font-size:var(--dv-size-body); color:var(--dv-text-secondary); line-height:1.65; }
 .dv-admin.admin-dialog [data-dialog-close] { top:20px; right:20px; display:grid; place-items:center; width:32px; height:32px; opacity:1; color:var(--dv-text-secondary); }
 .dv-admin.admin-dialog [data-dialog-close]:hover { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
-.dv-admin.admin-dialog [data-dialog-close] svg { width:16px; height:16px; stroke-width:1.6; }
+.dv-admin.admin-dialog [data-dialog-close] svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); stroke-width:1.6; }
 .dv-admin.admin-dialog form { display:flex; flex-direction:column; gap:22px; height:auto; min-width:0; }
 .dv-admin.admin-dialog :where(label) { font-size:var(--dv-field-label-size); font-weight:500; line-height:var(--dv-field-line-height); }
 .dv-admin.admin-dialog :where(input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea) { font-size:var(--dv-field-label-size); line-height:var(--dv-field-line-height); padding:var(--dv-control-padding-y) var(--dv-control-padding-x); }
@@ -108,15 +108,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin.admin-dialog [data-admin-button=confirmation]:hover { background:#a52d35; }
 .dv-admin .modal-editor-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:32px; }
 .dv-admin .modal-attribute-list { max-height:420px; overflow:auto; padding-right:4px; }
-.dv-admin .modal-attribute-list > div { font-size:13px; }
+.dv-admin .modal-attribute-list > div { font-size:var(--dv-size-body); }
 .dv-admin .block-editor-grid { display:grid; grid-template-columns:240px minmax(0,1fr); gap:28px; min-width:0; }
 .dv-admin .block-editor-types { padding-right:20px; border-right:1px solid var(--dv-color-line); }
 .dv-admin .block-type-option { width:100%; display:flex; align-items:center; padding:12px; text-align:left; margin:4px 0; gap:8px; border:1px solid transparent; }
 .dv-admin .block-type-option[aria-pressed=true] { border-color:var(--dv-color-blue); background:var(--dv-surface-canvas); }
-.dv-admin .block-type-option h3 { font-size:13px; }
-.dv-admin .block-type-option p { font-size:11px; line-height:1.5; }
+.dv-admin .block-type-option h3 { font-size:var(--dv-size-body); }
+.dv-admin .block-type-option p { font-size:var(--dv-size-caption); line-height:1.5; }
 .dv-admin .block-editor-fields { min-width:0; padding-bottom:18px; }
-.dv-admin.admin-dialog .create-collection-modal__type { flex:1; min-height:48px; border-radius:0; font-size:13px; }
+.dv-admin.admin-dialog .create-collection-modal__type { flex:1; min-height:48px; border-radius:0; font-size:var(--dv-size-body); }
 @media(max-width:640px) {
  .dv-admin.admin-dialog { width:calc(100vw - 24px); max-height:calc(100dvh - 24px); padding:22px; gap:20px; }
  .dv-admin.admin-dialog [data-dialog-footer], .dv-admin.admin-dialog .admin-form-footer { bottom:-22px; margin-left:-22px; margin-right:-22px; margin-bottom:-22px; padding:16px 22px; }
@@ -129,7 +129,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 }
 @media(prefers-reduced-motion:reduce) { .dv-admin.admin-dialog { animation:none; transition:none; } }
 
-.dv-theme .user-status-approval { padding:5px 10px; min-height:32px; font-size:12px; }
+.dv-theme .user-status-approval { padding:5px 10px; min-height:32px; font-size:var(--dv-size-caption); }
 
 /* Shared controls must resolve colours inside the admin, including portal roots. */
 .dv-admin .create-collection-modal__type:hover { background:var(--dv-surface-canvas); }

@@ -220,7 +220,7 @@ async function onModalSubmit(event: Event) {
       <div><h1>Asset types</h1><p>Configure search defaults and file information for each asset type.</p></div>
       <Button type="button" variant="default" @click="openCreateModal"
         class="dv-button dv-button--primary">
-        <CirclePlus class="w-4 h-4" />
+        <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add asset type
       </Button>
     </div>
@@ -244,13 +244,13 @@ async function onModalSubmit(event: Event) {
           <TableCell>
             <div class="flex space-x-2">
               <Button variant="ghost" size="sm" @click="openEditModal(assetType)">
-                <PencilLine class="w-4 h-4 mr-2" />
+                <PencilLine class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
                 Edit
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger as-child>
                   <Button variant="ghost" size="sm">
-                    <Trash2 class="w-4 h-4 mr-2" />
+                    <Trash2 class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
                     Remove
                   </Button>
                 </AlertDialogTrigger>
@@ -306,7 +306,7 @@ async function onModalSubmit(event: Event) {
           <div class="flex flex-col gap-4 min-w-0">
             <div class="flex flex-col gap-2">
               <Label>List columns</Label>
-              <p class="text-sm admin-text-secondary">
+              <p class="text-body admin-text-secondary">
                 Add attributes, drag and drop or use the arrow buttons to reorder, or click the trash icon to
                 remove.
               </p>
@@ -316,7 +316,7 @@ async function onModalSubmit(event: Event) {
                     <div :data-list-column="element"
                       class="flex items-center justify-between p-1 border border-neutral-300 hover:border-neutral-800 cursor-grab">
                       <div class="flex items-center gap-2">
-                        <GripVertical class="h-4 w-4 admin-text-secondary" aria-hidden="true" />
+                        <GripVertical class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] admin-text-secondary" aria-hidden="true" />
                         {{
                           listItems.find((item) => item.value === element)?.name ??
                           element
@@ -326,17 +326,17 @@ async function onModalSubmit(event: Event) {
                       <Button type="button" variant="ghost" size="sm" data-move="up" :disabled="index === 0"
                         @click="moveListItem(index, -1)"
                         :aria-label="`Move ${listItems.find(item => item.value === element)?.name ?? element} up`">
-                        <ArrowUp class="h-4 w-4 admin-text-secondary" />
+                        <ArrowUp class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] admin-text-secondary" />
                       </Button>
                       <Button type="button" variant="ghost" size="sm" data-move="down" :disabled="index === form.listDisplayItems.length - 1"
                         @click="moveListItem(index, 1)"
                         :aria-label="`Move ${listItems.find(item => item.value === element)?.name ?? element} down`">
-                        <ArrowDown class="h-4 w-4 admin-text-secondary" />
+                        <ArrowDown class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] admin-text-secondary" />
                       </Button>
                       <Button type="button" variant="ghost" size="sm"
                         @click="(event: Event) => toggleAttribute(element, event)"
                         :aria-label="`Remove ${listItems.find(item => item.value === element)?.name ?? element}`">
-                        <Trash2 class="h-4 w-4 admin-text-secondary admin-text-primary-hover" />
+                        <Trash2 class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] admin-text-secondary admin-text-primary-hover" />
                       </Button>
                       </div>
                     </div>
@@ -350,7 +350,7 @@ async function onModalSubmit(event: Event) {
                     <Button type="button" variant="ghost" size="sm"
                       @click="(event: Event) => toggleAttribute(item.value, event)"
                       :aria-label="`Add ${item.name}`">
-                      <CirclePlus class="h-4 w-4 hover:text-green-600" />
+                      <CirclePlus class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] hover:text-green-600" />
                     </Button>
                   </div>
                 </div>

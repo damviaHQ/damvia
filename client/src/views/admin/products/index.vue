@@ -550,27 +550,27 @@ onUnmounted(() => {
     <div class="admin-product-toolbar">
       <div class="flex items-center gap-5">
         <div class="admin-heading"><h1>Records</h1></div>
-        <Button as-child variant="outline"><router-link :to="{ name: 'admin-product-attributes' }"><Blocks class="w-4 h-4 mr-2" />Attributes</router-link></Button>
+        <Button as-child variant="outline"><router-link :to="{ name: 'admin-product-attributes' }"><Blocks class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />Attributes</router-link></Button>
         <Button v-if="data?.products.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
           class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
-          <Filter class="w-5 h-5" />
+          <Filter class="w-[var(--dv-icon-default)] h-[var(--dv-icon-default)]" />
           {{ showFilters ? "Hide Filters" : "Show Filters" }}
         </Button>
         <Button v-if="Object.keys(columnFilters).length > 0" variant="link" type="button" @click="clearFilters"
           class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
-          <FilterX class="w-5 h-5" />
+          <FilterX class="w-[var(--dv-icon-default)] h-[var(--dv-icon-default)]" />
           Clear Filters
         </Button>
         <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-product-import' }"><FileUp />Import CSV</router-link></Button>
         <DropdownMenu v-model:open="isDropdownOpen">
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Record actions">
-              <EllipsisVertical class="h-5 w-5" />
+              <EllipsisVertical class="h-[var(--dv-icon-default)] w-[var(--dv-icon-default)]" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuItem :disabled="!data?.products.length" @select="deleteError = ''; showDeleteDialog = true">
-              <PackageX class="mr-2 h-4 w-4" /><span>Remove all records</span>
+              <PackageX class="mr-2 h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /><span>Remove all records</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -744,7 +744,7 @@ onUnmounted(() => {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 14px;
+  font-size:var(--dv-size-body);
   table-layout: fixed;
 }
 .spreadsheet-table thead {
@@ -772,7 +772,7 @@ onUnmounted(() => {
   border: 1px solid var(--dv-color-line);
   border-radius: 0;
   padding: 4px 8px;
-  font-size: 12px;
+  font-size:var(--dv-size-caption);
 }
 .spreadsheet-table thead tr:nth-child(2) th .filter-input:focus-visible {
   outline: 2px solid var(--dv-action-primary);
@@ -856,7 +856,7 @@ onUnmounted(() => {
   border: none;
   padding: 0 8px;
   background-color: white;
-  font-size: 14px;
+  font-size:var(--dv-size-body);
   margin: 0;
   box-sizing: border-box;
   min-height: 32px;
@@ -905,7 +905,7 @@ onUnmounted(() => {
   resize: none;
   border: none;
   padding: 4px 8px;
-  font-size: 14px;
+  font-size:var(--dv-size-body);
   line-height: 1.5;
   font-family: inherit;
   margin: 0;

@@ -135,17 +135,17 @@ async function onSubmit() {
               'create-collection-modal__type',
               { 'create-collection-modal__type--active': !form.synchronized },
             ]">
-              <FolderPen class="w-4 h-4" />
+              <FolderPen class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
               <div class="font-medium">Custom</div>
-              <Check v-if="!form.synchronized" class="w-4 h-4 text-primary ml-auto" />
+              <Check v-if="!form.synchronized" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
             </button>
             <button type="button" :aria-pressed="form.synchronized" @click="form.synchronized = true" :class="[
               'create-collection-modal__type',
               { 'create-collection-modal__type--active': form.synchronized },
             ]">
-              <FolderSync class="w-4 h-4" />
+              <FolderSync class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
               <div class="font-medium">Synchronized</div>
-              <Check v-if="form.synchronized" class="w-4 h-4 text-primary ml-auto" />
+              <Check v-if="form.synchronized" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
             </button>
           </div>
           <FieldGroup v-if="form.synchronized" role="group" aria-labelledby="assetFolderId">

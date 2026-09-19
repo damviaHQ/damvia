@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { menuIconClasses, menuIconSlotClasses, treeRowClasses } from "./navigationStyles"
+import { menuIconClasses, menuIconSlotClasses, treeRowClasses, treeConnectorStartClasses } from "./navigationStyles"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsTruncated } from "@/composables/useIsTruncated"
@@ -135,7 +135,7 @@ function handleLinkClick(event: MouseEvent) {
         marginBottom: item.data.spacingBottom ? `${item.data.spacingBottom}px` : '0px',
       }" />
     <div v-if="open || !item.hasAccess" class="children-container relative" :class="item.hasAccess && 'pl-4'">
-      <span v-if="hasActiveChild" aria-hidden="true" data-tree-connector class="pointer-events-none absolute left-[11px] -top-[18px] h-[18px] w-px bg-[#d4d4d4]" />
+      <span v-if="hasActiveChild" aria-hidden="true" data-tree-connector :class="treeConnectorStartClasses" />
       <div v-for="(child, index) in sortedChildren" :key="child.id" class="relative">
         <span v-if="hasActiveChild && index <= activeChildIndex" aria-hidden="true" data-tree-connector
           class="pointer-events-none absolute -left-[5px] top-0 w-px bg-[#d4d4d4]"

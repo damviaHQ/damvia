@@ -257,7 +257,7 @@ const isNewColumn = (column: string) => {
             <Upload />
             Choose CSV file
           </Button>
-          <span role="status" class="text-sm text-[var(--dv-color-success)]">
+          <span role="status" class="text-body text-[var(--dv-color-success)]">
             {{ parsedData.length > 0 ? "CSV ready for review" : "" }}
           </span>
         </div>
@@ -296,7 +296,7 @@ const isNewColumn = (column: string) => {
       <div v-if="columns.length > 0" class="flex flex-col gap-8">
         <div class="flex flex-col space-y-2">
           <h3 id="primary-key-heading" class="text-lg font-semibold mb-2">1. Select Primary Key Column</h3>
-          <p class="text-sm admin-text-secondary">
+          <p class="text-body admin-text-secondary">
             This column will be used to identify your record reference.
           </p>
 
@@ -317,7 +317,7 @@ const isNewColumn = (column: string) => {
           <p v-if="primaryKeyError" id="primary-key-error" class="admin-form-error" role="alert">
             {{ primaryKeyError }}
           </p>
-          <p class="text-sm admin-text-secondary">
+          <p class="text-body admin-text-secondary">
             The primary key is a unique identifier for each row in your data.
           </p>
         </div>
@@ -333,7 +333,7 @@ const isNewColumn = (column: string) => {
         </div>
         <div class="flex flex-col gap-2">
           <h3 class="text-lg font-semibold">3. Compare with existing data:</h3>
-          <p class="text-sm admin-text-secondary">
+          <p class="text-body admin-text-secondary">
             Before saving compare your data with the existing record database.
           </p>
           <Button v-if="columns.length > 0 && parsedData.length > 0" :disabled="primaryKeyName === ''" type="button"
@@ -405,7 +405,7 @@ const isNewColumn = (column: string) => {
                         highlight: result.differences[column],
                         'new-entry': result.status === 'new',
                       }">
-                        <Pencil v-if="result.differences[column]" class="inline size-3 mr-1" aria-hidden="true" />
+                        <Pencil v-if="result.differences[column]" class="inline size-[var(--dv-icon-compact)] mr-1" aria-hidden="true" />
                         {{ result.new[column] }}
                         <span v-if="result.differences[column]" class="sr-only">(changed)</span>
                       </div>

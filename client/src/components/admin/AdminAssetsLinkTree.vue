@@ -50,8 +50,8 @@ function handleLinkClick(event: MouseEvent) {
     <div class="layout-link-tree__row">
     <button v-if="asset.children?.length > 0" type="button" @click="open = !open" class="layout-link-tree__icon-wrapper"
       :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${asset.name}`">
-      <ChevronDown v-if="open" class="w-4 h-4" />
-      <ChevronRight v-else class="w-4 h-4" />
+      <ChevronDown v-if="open" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
+      <ChevronRight v-else class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
     </button>
     <div v-else class="w-4 h-4" />
     <router-link :to="{ name: 'admin-assets', params: { id: asset.id } }" @click.exact="handleLinkClick"
@@ -102,13 +102,14 @@ function handleLinkClick(event: MouseEvent) {
   min-height: 38px;
   padding: 6px 8px 6px 0;
   color: var(--dv-text-secondary);
-  font-size: 12px;
+  font-size:var(--dv-size-caption);
   cursor: pointer;
   text-decoration: none;
-  transition: background .15s ease, color .15s ease;
+  background: transparent;
+  transition: color .15s ease;
 }
 
-.layout-link-tree__link:hover { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
+.layout-link-tree__link:hover { color:var(--dv-text-primary); }
 
 .layout-link-tree__link--disabled {
   pointer-events: none;
@@ -129,7 +130,7 @@ function handleLinkClick(event: MouseEvent) {
 }
 
 .layout-link-tree__icon-wrapper:hover { color:var(--dv-action-primary); }
-.layout-link-tree__icon-wrapper svg { width:14px; height:14px; }
+.layout-link-tree__icon-wrapper svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 
 .layout-link-tree__icon {
   width: 1rem;
@@ -157,6 +158,6 @@ function handleLinkClick(event: MouseEvent) {
   font-weight:650;
 }
 
-.layout-link-tree__link--active { background:var(--dv-action-soft); color:var(--dv-action-primary); }
+.layout-link-tree__link--active { color:var(--dv-action-primary); }
 .layout-link-tree__link--active .layout-link-tree__folder { color:var(--dv-action-primary); }
 </style>

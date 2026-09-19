@@ -163,7 +163,7 @@ async function handleSubmit() {
         <DialogTitle>
           {{ item ? "Edit item" : "Add item to menu" }}
         </DialogTitle>
-        <DialogDescription class="text-sm admin-text-secondary mb-4">
+        <DialogDescription class="text-body admin-text-secondary mb-4">
           Choose a collection, page, link or divider for your navigation.
         </DialogDescription>
 
@@ -195,7 +195,7 @@ async function handleSubmit() {
             <div class="form-field flex items-center space-x-2">
               <Checkbox v-model="form.data.sync" :disabled="!!item" id="sync" />
               <Label for="sync"
-                class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                class="text-body font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Display and synchronize all sub-collections in the menu
               </Label>
             </div>
@@ -211,7 +211,7 @@ async function handleSubmit() {
             <div class="form-field">
               <Checkbox v-model="form.data.border" id="border" />
               <Label for="border"
-                class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                class="text-body font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Show a divider line
               </Label>
             </div>
@@ -247,7 +247,7 @@ async function handleSubmit() {
             <div v-if="form.data.url" class="form-field flex items-center space-x-2">
               <Checkbox v-model="form.data.external" id="external" />
               <Label for="external"
-                class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                class="text-body font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Open in new tab
               </Label>
             </div>

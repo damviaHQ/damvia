@@ -156,13 +156,13 @@ async function onModalSubmit(event: Event) {
     <div class="admin-heading">
       <div><h1>Record attributes</h1><p>Choose which record fields appear in lists, filters and search.</p></div>
       <Button variant="default" @click="openCreateModal" class="dv-button dv-button--primary">
-        <CirclePlus class="w-4 h-4" />
+        <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add attribute
       </Button>
     </div>
     <div v-if="productAttributes && !productAttributes.length" class="admin-text-secondary flex items-center gap-2">
       You must first <router-link :to="{ name: 'admin-product-import' }" class="underline flex items-center gap-2">
-        <FileUp class="w-4 h-4" />import products data
+        <FileUp class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />import products data
       </router-link> to use attributes.
     </div>
     <AdminList v-else :items="productAttributes" :fields="['name', 'displayName']" label="Record attributes" v-slot="{ items }">
@@ -187,11 +187,11 @@ async function onModalSubmit(event: Event) {
           <TableCell>
             <div class="flex space-x-2">
               <Button variant="ghost" size="sm" @click="openEditModal(attribute)">
-                <PencilLine class="w-4 h-4 mr-2" />
+                <PencilLine class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
                 Edit
               </Button>
               <Button variant="ghost" size="sm" @click="remove(attribute)">
-                <Trash2 class="w-4 h-4 mr-2" />
+                <Trash2 class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
                 Remove
               </Button>
             </div>

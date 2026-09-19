@@ -19,27 +19,27 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-theme :is(button, select, input):disabled, .dv-theme [aria-disabled=true] { cursor: not-allowed; }
 .dv-theme button:disabled { opacity: .45; }
 .dv-theme a { color: inherit; text-underline-offset: 4px; }
-.dv-theme svg { width: 18px; height: 18px; stroke-width: 1.7; flex-shrink: 0; }
+.dv-theme svg { width:var(--dv-icon-default); height:var(--dv-icon-default); stroke-width: 1.7; flex-shrink: 0; }
 .dv-theme h1, .dv-theme h2, .dv-theme h3, .dv-theme p { margin: 0; }
 .dv-theme h1, .dv-theme h2, .dv-theme h3 { text-wrap: balance; }
 .dv-theme h1 { font-size: var(--dv-size-heading); line-height: 1.2; font-weight: 650; letter-spacing: -.035em; }
 .dv-theme h2 { font-size: var(--dv-size-section); line-height: 1.4; font-weight: 650; letter-spacing: -.02em; }
-.dv-theme h3 { font-size: 14px; font-weight: 650; }
-.dv-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--dv-space-2); padding: 9px 14px; min-height: 38px; border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-button); background: var(--dv-surface-panel); color: var(--dv-text-primary); font-weight: 550 !important; font-size: 13px !important; text-decoration: none; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+.dv-theme h3 { font-size:var(--dv-size-body); font-weight: 650; }
+.dv-button { display: inline-flex; align-items: center; justify-content: center; gap: var(--dv-space-2); padding: 9px 14px; min-height: 38px; border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-button); background: var(--dv-surface-panel); color: var(--dv-text-primary); font-weight: 550 !important; font-size:var(--dv-size-body) !important; text-decoration: none; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
 .dv-button:hover:not(:disabled) { background: var(--dv-surface-canvas); border-color: var(--dv-text-secondary); }
 .dv-theme .dv-button--primary { background: var(--dv-action-primary); color: var(--dv-text-on-dark); border-color: var(--dv-action-primary); }
 .dv-theme .dv-button--primary:hover:not(:disabled) { background: var(--dv-action-hover); border-color: var(--dv-action-hover); }
 .dv-theme .dv-button:disabled { opacity: 1; background: var(--dv-surface-canvas); color: var(--dv-text-secondary); border-color: var(--dv-color-line); }
 .dv-button--quiet { background: transparent; border-color: transparent; }
-.dv-button--small { min-height: 32px; padding: 5px 10px; font-size: 12px !important; }
+.dv-button--small { min-height: 32px; padding: 5px 10px; font-size:var(--dv-size-caption) !important; }
 .dv-button--icon { width: 36px; height: 36px; padding: 8px; }
 .dv-input, .dv-select { border: 1px solid var(--dv-color-line-strong); border-radius: var(--dv-radius-field); background: var(--dv-surface-panel); color: var(--dv-text-primary); min-height: var(--dv-control-height); padding: var(--dv-control-padding-y) var(--dv-control-padding-x); font-size: var(--dv-field-label-size); line-height: var(--dv-field-line-height); caret-color: var(--dv-action-primary); }
 .dv-input::placeholder { color: var(--dv-text-secondary); opacity: 1; }
 .dv-input { width: 100%; }
 .dv-select { max-width: 100%; }
 .dv-label { display: grid; gap: var(--dv-field-gap); font-weight: 500; font-size: var(--dv-field-label-size); line-height: var(--dv-field-line-height); }
-.dv-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--dv-radius-data); padding: 3px 8px; white-space: nowrap; font-size: 11px; font-weight: 550; line-height: 1.4; background: var(--dv-surface-canvas); color: var(--dv-text-secondary); }
-.dv-badge svg { width: 12px; height: 12px; }
+.dv-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--dv-radius-data); padding: 3px 8px; white-space: nowrap; font-size:var(--dv-size-caption); font-weight: 550; line-height: 1.4; background: var(--dv-surface-canvas); color: var(--dv-text-secondary); }
+.dv-badge svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 .dv-badge--success { color: var(--dv-color-success); background: var(--dv-color-success-soft); }
 .dv-badge--warning { color: var(--dv-color-warning); background: var(--dv-color-warning-soft); }
 .dv-badge--danger { color: var(--dv-color-danger); background: var(--dv-color-danger-soft); }
@@ -51,42 +51,42 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-toast--success .dv-toast__icon { color:var(--dv-color-success); }
 .dv-toast--danger .dv-toast__icon { color:var(--dv-color-danger); }
 .dv-toast--warning .dv-toast__icon { color:var(--dv-color-warning); }
-.dv-toast__title { color: var(--dv-text-on-dark); font-size: 13px; font-weight: 600; line-height: 1.4; letter-spacing: -.01em; }
-.dv-toast__description { color: var(--dv-text-on-dark-secondary); font-size: 11px; line-height: 1.5; }
-.dv-toast__action, .dv-toast__cancel { min-height: 32px; margin-left: auto; border: 1px solid rgb(255 255 255 / .24); border-radius: var(--dv-radius-button); padding: 0 11px; font-size: 11px; font-weight: 550; }
-.dv-theme .dv-toast__action { display:inline-flex; align-items:center; justify-content:center; background:var(--dv-action-primary); color:var(--dv-text-on-dark); border:1px solid var(--dv-action-primary); font-family:var(--dv-font-body); font-size:12px; font-weight:550; line-height:1.5; padding:5px 10px; }
+.dv-toast__title { color: var(--dv-text-on-dark); font-size:var(--dv-size-body); font-weight: 600; line-height: 1.4; letter-spacing: -.01em; }
+.dv-toast__description { color: var(--dv-text-on-dark-secondary); font-size:var(--dv-size-caption); line-height: 1.5; }
+.dv-toast__action, .dv-toast__cancel { min-height: 32px; margin-left: auto; border: 1px solid rgb(255 255 255 / .24); border-radius: var(--dv-radius-button); padding: 0 11px; font-size:var(--dv-size-caption); font-weight: 550; }
+.dv-theme .dv-toast__action { display:inline-flex; align-items:center; justify-content:center; background:var(--dv-action-primary); color:var(--dv-text-on-dark); border:1px solid var(--dv-action-primary); font-family:var(--dv-font-body); font-size:var(--dv-size-caption); font-weight:550; line-height:1.5; padding:5px 10px; }
 .dv-theme .dv-toast__action:hover { background:var(--dv-action-hover); border-color:var(--dv-action-hover); }
 .dv-toast__cancel { background: transparent; color: var(--dv-text-on-dark-secondary); }
 .dv-toast__close { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; margin-left: auto; padding: 0; border: 0; border-radius: var(--dv-radius-button); background: transparent; color: var(--dv-text-on-dark-secondary); }
 .dv-table-wrap { position: relative; overflow-x: auto; }
-.dv-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
-.dv-table th { background: var(--dv-surface-canvas); color: var(--dv-text-secondary); font-weight: 500; font-size: 11px; padding: 11px 20px; white-space: nowrap; }
+.dv-table { width: 100%; border-collapse: collapse; text-align: left; font-size:var(--dv-size-body); }
+.dv-table th { background: var(--dv-surface-canvas); color: var(--dv-text-secondary); font-weight: 500; font-size:var(--dv-size-caption); padding: 11px 20px; white-space: nowrap; }
 .dv-table td { border-top: 1px solid var(--dv-color-line); padding: 16px 20px; }
 .dv-table tbody tr:hover { background: var(--dv-surface-canvas); }
 .dv-table input[type=checkbox], .dv-theme input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--dv-action-primary); cursor: pointer; }
 .dv-table th button { display: flex; align-items: center; gap: 7px; color: inherit; border: 0; background: transparent; padding: 0; }
-.dv-table th button svg { width: 13px; height: 13px; }
+.dv-table th button svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 .dv-breadcrumb { min-width: 0; }
 /* Resolve shared primitive colours at the breadcrumb boundary, above utility classes. */
 .dv-breadcrumb .dv-breadcrumb__list { color: var(--dv-text-secondary, hsl(var(--muted-foreground))); }
 .dv-breadcrumb .dv-breadcrumb__current { color: var(--dv-text-primary, hsl(var(--foreground))); }
 .dv-breadcrumb .dv-breadcrumb__separator { color: inherit; }
-.dv-breadcrumb__list { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--dv-space-2, 8px); min-width: 0; margin: 0; padding: 0; overflow: hidden; list-style: none; color: var(--dv-text-secondary, inherit); font-size: 12px; }
+.dv-breadcrumb__list { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--dv-space-2, 8px); min-width: 0; margin: 0; padding: 0; overflow: hidden; list-style: none; color: var(--dv-text-secondary, inherit); font-size:var(--dv-size-body); }
 .dv-breadcrumb__item { display: inline-flex; align-items: center; min-width: 0; flex: 0 1 auto; }
 .dv-breadcrumb__link, .dv-breadcrumb__current { display: inline-flex; align-items: center; min-width: 0; padding: 4px 0; border: 0; border-radius: var(--dv-radius-control, 0); background: transparent; color: inherit; font: inherit; line-height: 1.4; text-decoration: none; }
-.dv-breadcrumb__link { cursor: pointer; }
+.dv-breadcrumb__link { cursor: pointer; font-weight:500; }
 .dv-breadcrumb__link:hover { color: var(--dv-text-primary, currentColor); }
 .dv-breadcrumb__current { color: var(--dv-text-primary, currentColor); font-weight: 600; }
 .dv-breadcrumb__link:focus-visible, .dv-breadcrumb__current:focus-visible, .dv-breadcrumb__ellipsis:focus-visible { outline: 2px solid var(--dv-action-primary, #0044f4); outline-offset: 3px; }
 .dv-breadcrumb__label { display: block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-breadcrumb__current .dv-breadcrumb__label { max-width: none; }
 .dv-breadcrumb__separator { display: inline-flex; flex: 0 0 auto; color: var(--dv-color-muted, currentColor); }
-.dv-breadcrumb__separator svg { width: 13px; height: 13px; }
+.dv-breadcrumb__separator svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 .dv-breadcrumb__ellipsis { display: grid; place-items: center; flex: 0 0 auto; width: 20px; height: 28px; padding: 0; border: 0; border-radius: var(--dv-radius-control, 0); background: transparent; color: inherit; cursor: pointer; }
 .dv-breadcrumb__ellipsis:hover { background: transparent; color: var(--dv-text-primary, currentColor); }
 .dv-breadcrumb__ellipsis > span { width: 100%; height: 100%; }
 .dv-breadcrumb__menu-link { display: block; width: 100%; max-width: 320px; overflow: hidden; padding: 4px 2px; color: inherit; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
-.dv-breadcrumb__tooltip { max-width: 320px; border: 1px solid rgb(255 255 255 / .14); border-radius: var(--dv-radius-surface); background: var(--dv-color-midnight); color: var(--dv-text-on-dark); font-size: 11px; overflow-wrap: anywhere; }
+.dv-breadcrumb__tooltip { max-width: 320px; border: 1px solid rgb(255 255 255 / .14); border-radius: var(--dv-radius-surface); background: var(--dv-color-midnight); color: var(--dv-text-on-dark); font-size:var(--dv-size-caption); overflow-wrap: anywhere; }
 .dv-breadcrumb__menu--dark { border-color: #4b5563; border-radius: var(--dv-radius-surface); background: #374151; color: #e5e7eb; }
 .dv-breadcrumb__menu--dark .dropdown-item { color: #e5e7eb; }
 .dv-breadcrumb__menu--dark .dropdown-item[data-highlighted] { background: #4b5563; color: white; }
@@ -95,6 +95,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-breadcrumb[data-tone=dark] .dv-breadcrumb__ellipsis:hover { background: transparent; color: white; }
 @media (max-width: 640px) { .dv-breadcrumb__label { max-width: 96px; } }
 .dv-theme .dv-muted { color: var(--dv-text-secondary); }
-.dv-theme .dv-mono { font-family: var(--dv-font-mono); font-size: 12px; }
+.dv-theme .dv-mono { font-family: var(--dv-font-mono); font-size:var(--dv-size-caption); }
 .dv-theme .dv-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: reduce) { .dv-theme *, .dv-theme *::before, .dv-theme *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

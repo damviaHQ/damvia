@@ -160,7 +160,7 @@ async function onModalSubmit(event: Event) {
       <div><h1>Groups</h1><p>Control which collections people can access.</p></div>
       <Button type="button" variant="default" @click="openCreateModal"
         class="dv-button dv-button--primary">
-        <CirclePlus class="w-4 h-4" />
+        <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add group
       </Button>
     </div>
@@ -182,15 +182,15 @@ async function onModalSubmit(event: Event) {
           <TableCell>
             <div class="flex space-x-2">
               <Button variant="ghost" size="sm" @click="openEditModal(group)">
-                <PencilLine class="w-4 h-4 mr-2" />
+                <PencilLine class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
                 Edit
               </Button>
               <AlertDialog>
-                <AlertDialogTrigger as-child><Button variant="ghost" size="sm" :disabled="group.isDefault"><Trash2 class="w-4 h-4 mr-2" />Remove</Button></AlertDialogTrigger>
+                <AlertDialogTrigger as-child><Button variant="ghost" size="sm" :disabled="group.isDefault"><Trash2 class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />Remove</Button></AlertDialogTrigger>
                 <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove {{ group.name }}?</AlertDialogTitle><AlertDialogDescription>If this group has users or is a region default, you will be asked to choose a replacement group.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="remove(group.id)">Remove group</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
               </AlertDialog>
               <Button v-if="!group.isDefault" variant="ghost" size="sm" @click="setDefault(group.id)">
-                <Flag class="w-4 h-4 mr-2" />
+                <Flag class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
                 Set as Default
               </Button>
             </div>

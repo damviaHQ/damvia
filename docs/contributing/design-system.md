@@ -121,3 +121,25 @@ Client menus use Lucide, matching the dashboard menu: 16px icons, default 2px st
 Use `ui/checkbox/Checkbox.vue` for checked, unchecked, disabled and indeterminate states (`modelValue: true | false | "indeterminate"`). CollectionCheckbox only maps legacy selection states to that component; it must not define its own visuals. Search asset-type options use the same component. The `checkbox-surface` Tailwind utility owns size, border, background and shape; the tree-select adapter consumes it because that dependency owns its internal checkbox markup. Partial selection uses a minus, and Space toggles the focused control.
 
 Search modal options form a readable sentence ("I … in …"). Preserve this interaction when changing shared styles; technical labels remain accessible names rather than visible form headings.
+
+## Typography and icon sizing after Tailwind 4
+
+Dashboard body text, navigation, standard actions and form labels use
+`size.body` (14px); supplementary captions use `size.caption` (12px).
+Page headings use `size.heading` (32px). Dashboard metric figures and larger
+illustrations retain their own display sizes. Use `text-body` and `text-caption`
+in Vue templates and their `--dv-size-*` variables in structural CSS; do not
+introduce local 9–13px text rules. Breadcrumb ancestors use medium weight and
+the current page semibold.
+
+Lucide controls use `icon.compact` (16px), general icons `icon.default` (18px),
+and large toolbar actions `icon.action` (24px). Consume these variables in
+both dimensions rather than mixing local width/height values. Hit area and
+icon size are separate decisions. The palettes and font families remain
+independent of this shared geometry.
+
+Tailwind utilities take precedence over the shared component layer. Keep
+explicit role utilities token-based, and verify rendered styles rather than
+assuming the global defaults override them. `admin-design.spec.ts` checks
+admin navigation, heading, action and dialog text, including propagation of
+a token change into a teleported dialog.
