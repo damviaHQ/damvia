@@ -16,8 +16,8 @@ import { Dropbox, DropboxAuth } from 'dropbox'
 import { rm as removeFile, writeFile } from "node:fs/promises"
 import { AssetFile } from "../entity/asset-file"
 import { logger } from "../env"
-import { tmpFile, upsertFile, upsertFolder } from "../services/asset"
-import AssetUpdater from "./base"
+import { tmpFile } from "../services/asset"
+import AssetUpdater, { AssetSourceIdentity } from "./base"
 import { DropboxEntry, DropboxRoot, planDropboxEntries, WHOLE_DROPBOX_ROOT } from "./dropbox-entries"
 
 const isUnauthorized = (error: any) => error?.status === 401
@@ -39,13 +39,14 @@ export default class DropboxAssetUpdater extends AssetUpdater {
 	private readonly rootPath: string
 
 	constructor(
+		source: AssetSourceIdentity,
 		private readonly appKey: string,
 		private readonly appSecret: string,
 		private readonly refreshToken: string,
 		private readonly useTeamRoot = false,
 		rootPath = '',
 	) {
-		super()
+		super(source, 'Dropbox')
 		this.auth = new DropboxAuth({
 			clientId: this.appKey,
 			clientSecret: this.appSecret,
@@ -118,49 +119,11 @@ export default class DropboxAssetUpdater extends AssetUpdater {
 
 	async fetchUpdates() {
 		const [entries, root] = await Promise.all([this.listAll(), this.rootFolder()])
-		logger.info(`Fetched ${entries.length} entries from Dropbox`)
+		logger.info(`Fetched ${entries.length} entries from Dropbox`, { source: this.key })
 
 		const plan = planDropboxEntries(entries, root)
-		if (plan.folders.length === 0 && plan.files.length === 0) {
-			logger.warn('Dropbox listing is empty, skipping sync to avoid deleting all assets. Check the app permission type, the account, DROPBOX_USE_TEAM_ROOT and DROPBOX_ROOT_PATH.')
-			return
-		}
-
-		const syncFolderIds: string[] = []
-		const syncFileIds: string[] = []
-		let failed = 0
-
-		for (const folder of plan.folders) {
-			try {
-				syncFolderIds.push((await retryOnDeadlock(() => upsertFolder(folder))).id)
-			} catch (error) {
-				failed += 1
-				logger.error('Error processing Dropbox folder', { error: error.message, stack: error.stack, entry: folder })
-			}
-		}
-
-		for (const file of plan.files) {
-			try {
-				syncFileIds.push((await retryOnDeadlock(() => upsertFile(file))).id)
-			} catch (error) {
-				failed += 1
-				logger.error('Error processing Dropbox file', { error: error.message, stack: error.stack, entry: file })
-			}
-		}
-
-		if (failed > 0) {
-			throw new Error(`${failed} Dropbox item(s) failed to sync, skipping the deletion pass`)
-		}
-
-		const [allAssetFolderIds, allAssetFileIds] = await Promise.all([
-			this.getAllAssetFolderIds(),
-			this.getAllAssetFileIds()
-		])
-
-		await Promise.all([
-			this.deleteAssetFoldersInBatches(this.arrayDifference(allAssetFolderIds, syncFolderIds)),
-			this.deleteAssetFilesInBatches(this.arrayDifference(allAssetFileIds, syncFileIds))
-		])
+		entries.length = 0
+		await this.applyPlan(plan, (fn) => retryOnDeadlock(fn))
 	}
 
 	async fetchFileContent(file: AssetFile): Promise<string> {

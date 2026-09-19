@@ -67,8 +67,12 @@ test('collection favorite migration rolls back and upgrades without changing fil
   const file = await makeFile(folder)
   const collectionFile = await save(CollectionFile, { collectionId: collection.id, assetFileId: file.id })
   await caller(member).favorite.add({ collectionFileId: collectionFile.id })
+  // Asset sources sit above collection favorites, so both come off and go back
+  // on; while they are off the entities no longer match the tables, so the
+  // rolled-back state is checked in SQL.
   await db.undoLastMigration()
-  assert((await caller(member).favorite.list()).some(f => f.id === collectionFile.id))
+  await db.undoLastMigration()
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM user_favorites WHERE collection_file_id = $1', [collectionFile.id]))[0].n, 1)
   await db.runMigrations()
   assert((await caller(member).favorite.list()).some(f => f.id === collectionFile.id))
   await caller(member).favorite.addCollection({ collectionId: collection.id })

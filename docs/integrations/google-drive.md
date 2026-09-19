@@ -2,11 +2,13 @@
 title: Google Drive
 description: Create a service account, share one folder with it and point Damvia at that folder, on My Drive or a shared drive.
 sidebar:
-  order: 4
+  order: 5
 lastUpdated: 2026-09-19
 ---
 
 The Google Drive driver (`server/src/asset-updater/google-drive.ts`) lists one Drive folder, folder by folder, every 5 minutes with a service account and downloads file contents on demand. Nothing is written to Drive. It behaves like the [OneDrive](onedrive.md) and [Dropbox](dropbox.md) drivers and gives the same tree: the pointed folder is the single top-level asset folder, the same kinds of items are skipped, the same protections surround deletion.
+
+To sync several folders, or this provider next to another one, declare the same values as accounts and sources in `ASSET_SOURCES` instead of the variables below; see [Sources](./sources.md).
 
 ## Variables
 

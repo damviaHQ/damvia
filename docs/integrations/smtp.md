@@ -2,7 +2,7 @@
 title: SMTP
 description: Configure outgoing email with any SMTP provider; Postmark is the one the code is tuned for.
 sidebar:
-  order: 5
+  order: 6
 lastUpdated: 2026-09-19
 ---
 

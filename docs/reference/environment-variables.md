@@ -59,7 +59,8 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ASSET_UPDATER` | none, required | `dropbox`, `onedrive` or `googledrive`. Any other value stops the server at startup with `Provide a valid asset updater`. |
+| `ASSET_SOURCES` | unset | JSON object, raw or base64, declaring several cloud folders (`accounts` and `sources`) across Dropbox, OneDrive and Google Drive. When set, `ASSET_UPDATER` and the provider variables below are ignored. Overlapping roots on one account stop the server. See [Sources](../integrations/sources.md). |
+| `ASSET_UPDATER` | required unless `ASSET_SOURCES` is set | `dropbox`, `onedrive` or `googledrive`: the single source, keyed by that name. Any other value stops the server at startup with `Provide ASSET_SOURCES or a valid ASSET_UPDATER`. |
 | `DROPBOX_APP_KEY` | unset | Dropbox app key (Dropbox only). |
 | `DROPBOX_APP_SECRET` | unset | Dropbox app secret. |
 | `DROPBOX_REFRESH_TOKEN` | unset | Long-lived refresh token obtained once through the OAuth flow. See [Dropbox](../integrations/dropbox.md). |

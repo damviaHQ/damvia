@@ -1,6 +1,6 @@
 ---
 title: Integrations
-description: "How Damvia talks to the outside world: one cloud storage driver, an SMTP server, and two S3 buckets."
+description: "How Damvia talks to the outside world: one or more cloud storage sources, an SMTP server, and two S3 buckets."
 sidebar:
   order: 1
 lastUpdated: 2026-09-19
@@ -10,23 +10,23 @@ Damvia integrates with three kinds of external services. The cloud storage is wh
 
 | Integration | Direction | Pages |
 |---|---|---|
-| Dropbox, OneDrive for Business or Google Drive | Read only, polled every 5 minutes | [Dropbox](./dropbox.md), [OneDrive](./onedrive.md), [Google Drive](./google-drive.md) |
+| Dropbox, OneDrive for Business or Google Drive, one or several folders | Read only, polled every 5 minutes | [Sources](./sources.md), [Dropbox](./dropbox.md), [OneDrive](./onedrive.md), [Google Drive](./google-drive.md) |
 | SMTP | Outbound | [SMTP](./smtp.md) |
 | S3 / MinIO | Read and write; browsers use presigned URLs | [Object storage](./object-storage.md) |
 
-## Exactly one storage driver per instance
+## One or several sources per instance
 
-`ASSET_UPDATER` selects the driver class in `server/src/env.ts`: `dropbox`, `onedrive` or `googledrive`. All three extend the same base class (`server/src/asset-updater/base.ts`) with three operations: `initialize()`, `fetchUpdates()` and `fetchFileContent()`. Anything else stops the server at startup.
+A source is one cloud folder on one account; each becomes a top-level folder of the library. `ASSET_SOURCES` declares any number of them across Dropbox, OneDrive and Google Drive accounts, see [Sources](./sources.md). Without it, `ASSET_UPDATER` (`dropbox`, `onedrive` or `googledrive`) and the provider variables declare a single source, as before. Every source is an instance of a driver class extending `server/src/asset-updater/base.ts`, with three operations: `initialize()`, `fetchUpdates()` and `fetchFileContent()`. An invalid configuration stops the server at startup.
 
 ## The sync loop runs every 5 minutes, in every server process
 
-`server/src/index.ts` initialises the driver, then calls `fetchUpdates()` immediately and again 5 minutes after each run finishes (`setTimeout`, not cron). The loop is part of the API process and does not depend on `ENABLE_WORKER`. A failed run is logged as `failed to update assets` and the next one is scheduled anyway. A failed `initialize()` exits the process for Dropbox (token refresh); the OneDrive and Google Drive startup checks only log.
+`server/src/index.ts` adopts the rows of a single-source instance upgraded from before sources existed, refuses to start while rows of an unconfigured source key exist (see [Sources](./sources.md#stale-rows-stop-the-server)), initialises every source, then runs the sources one after another, in the order of the list, immediately and again 5 minutes after the last one finishes (`setTimeout`, not cron). The loop is part of the API process and does not depend on `ENABLE_WORKER`. A failed run is logged as `failed to update assets` with the source key, the next source runs anyway, and the cycle is scheduled again. A failed `initialize()` exits the process for Dropbox (token refresh); the OneDrive and Google Drive startup checks only log.
 
-One run does the following:
+One run of one source does the following:
 
 1. Lists the whole tree from the provider (a full recursive listing for Dropbox, the delta feed for OneDrive, a folder-by-folder listing for Google Drive), all pages first, and turns it into folder upserts (parents first) and file upserts. Every driver stores the pointed folder as the single top-level asset folder and skips hidden, empty and undownloadable items in the same way; see each driver's page for the exact rules and the tests that lock them.
-2. Upserts each folder and file by its provider id (`external_id`): new files get status `creating` and an `asset/update-content` job that downloads the content and builds the preview; existing files are updated in place (name, size, folder, inherited asset type and license). A changed listing checksum (`eTag`, `content_hash`, `md5Checksum`) marks the file `outdated` and queues a fresh download; the daily [integrity check](../deployment/integrity-check.md) catches size differences on top.
-3. Marks every folder and file that was **not** in the listing as `pending_deletion`, in batches of 1,000. The `asset/process-deletion` job checks them every minute, including their objects in the assets bucket.
+2. Upserts each folder and file by its provider id (`external_id`, unique within the source): new files get status `creating` and an `asset/update-content` job that downloads the content and builds the preview; existing files are updated in place (name, size, folder, inherited asset type and license). A changed listing checksum (`eTag`, `content_hash`, `md5Checksum`) marks the file `outdated` and queues a fresh download; the daily [integrity check](../deployment/integrity-check.md) catches size differences on top.
+3. Marks every folder and file **of this source** that was **not** in the listing as `pending_deletion`, in batches of 1,000. Rows of other sources, and rows of a source key that is no longer configured, are never touched. The `asset/process-deletion` job checks them every minute, including their objects in the assets bucket.
 4. Inserts a `collection_files` row for every asset file whose folder is linked to a collection, so linked collections pick up new files without waiting for the `collection/synchronization` job.
 
 Step 3 is why every driver stops before it on an empty listing, and when any item failed to upsert: either would delete part or all of the library.

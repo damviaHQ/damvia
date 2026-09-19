@@ -23,7 +23,7 @@ const { readdir, readFile, rm } = require('node:fs/promises')
 const harness = require('./lib/helpers.cjs')
 const { db, state, makeCollection } = harness
 const { AssetFolder, AssetFile, Collection } = harness.entities
-const { upsertFolder, upsertFile, tmpDir } = harness.services.assets
+const { upsertFolder, upsertFile, tmpDir, adoptUnassignedAssets } = harness.services.assets
 const DropboxAssetUpdater = require('../dist/asset-updater/dropbox').default
 before(async () => { await harness.setup() })
 after(() => harness.teardown())
@@ -33,7 +33,7 @@ const file = (id, p, size = 10, hash = 'h') => ({ '.tag': 'file', id, name: p.sp
 const unauthorized = () => Object.assign(new Error('expired'), { status: 401 })
 
 const updaterFor = (pages, { rootPath = '', rootMeta = null, failFirstWith = null } = {}) => {
-    const updater = new DropboxAssetUpdater('key', 'secret', 'refresh', false, rootPath)
+    const updater = new DropboxAssetUpdater({ key: 'dropbox' }, 'key', 'secret', 'refresh', false, rootPath)
     const queue = pages.map((entries, i) => ({ result: { entries, has_more: i < pages.length - 1, cursor: `c${i + 1}` } }))
     let failures = failFirstWith ? 1 : 0
     const next = async () => { if (failures-- > 0) throw failFirstWith; return queue.shift() }
@@ -55,6 +55,7 @@ async function seedLibrary() {
     await upsertFile({ externalId: ids.cover, externalChecksum: 'h-cover', folderExternalId: ids.marketing, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
     await upsertFile({ externalId: ids.photo, externalChecksum: 'h-photo', folderExternalId: ids.nested, name: 'photo.jpg', size: 20, mimeType: 'image/jpeg' })
     await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await adoptUnassignedAssets('dropbox')
     const mirror = await makeCollection({ assetFolderId: (await db.getRepository(AssetFolder).findOneByOrFail({ externalId: ids.marketing })).id })
     state.queued.length = 0
     return { ids, mirror }
@@ -93,6 +94,7 @@ test('DROPBOX_ROOT_PATH: the pointed folder is the only top-level row, and point
     await upsertFile({ externalId: ids.cover, externalChecksum: 'h-cover', folderExternalId: ids.marketing, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
     await upsertFile({ externalId: ids.photo, externalChecksum: 'h-photo', folderExternalId: ids.nested, name: 'photo.jpg', size: 20, mimeType: 'image/jpeg' })
     await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await adoptUnassignedAssets('dropbox')
     state.queued.length = 0
     const before = await snapshot()
     assert.deepEqual(before.folders.filter(f => f[1] === null).map(f => f[3]), ['Marketing'])

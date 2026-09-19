@@ -35,6 +35,14 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
 - Events older than `ANALYTICS_RETENTION_DAYS` (365 by default) are deleted every night. Set the variable before the upgrade if the instance's privacy policy requires a shorter period.
 - The client must be rebuilt with the server: it is the client that reports file views.
 
+## Sources in this upgrade
+
+- The migration adds `source_key` to `asset_folders` and `asset_files` and replaces the unique constraint on `external_id` by a unique index on (`source_key`, `external_id`). It rewrites no rows.
+- At the first start, the rows of an instance with one configured source are stamped with that source's key (`onedrive`, `dropbox` or `googledrive` without `ASSET_SOURCES`), logged as `asset source adopted existing assets`. Ids, collections and downloaded copies are kept; the first run changes nothing.
+- `ASSET_SOURCES` can then declare more folders and accounts, see [Sources](../integrations/sources.md). Keep the provider name as the key of the existing source, and never let two sources on one account overlap. A later change of key or removal of a source stops the server until `rename-source` or `remove-source` has dealt with the old rows.
+- Once the storage plan is reached, downloads now pause for every source, including files that would still fit, until a measurement finds room; before, smaller files kept trickling in. See [Dashboard](../administration/dashboard.md).
+- Adding sources raises the sync memory by about 1 MB per 1,000 items in the largest source, see [Worker and scaling](./worker-and-scaling.md#memory-and-disk).
+
 ## OneDrive in this upgrade
 
 - The OneDrive driver keeps the same tree and the same `eTag` checksum as before, so the upgrade re-parents, re-downloads and deletes nothing. Before upgrading, note the top-level rows with `SELECT name, external_id FROM asset_folders WHERE parent_id IS NULL;` and check after the first run that they are unchanged.
@@ -87,6 +95,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1789862400000-track-invitation-creator` | `invited_by_id` on `collection_invitations`, filled with the collection owner for existing invitations |
 | `1789948800000-activity-events` | `activity_events` table with its four indexes, feeding Insights; `last_login_at` on `users` |
 | `1790035200000-collection-favorites` | `user_collection_favorites` table (each user's starred collections) with its index on `collection_id`; starts empty |
+| `1790121600000-asset-sources` | `source_key` on `asset_folders` and `asset_files` (empty for existing rows, adopted at the next start), unique index on (`source_key`, `external_id`) replacing the unique `external_id`, and the `asset_sources` table holding each configured source's last run |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.
 

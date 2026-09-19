@@ -24,14 +24,14 @@ const { Readable } = require('node:stream')
 const harness = require('./lib/helpers.cjs')
 const { db, state, makeCollection } = harness
 const { AssetFolder, AssetFile } = harness.entities
-const { upsertFolder, upsertFile, tmpDir } = harness.services.assets
+const { upsertFolder, upsertFile, tmpDir, adoptUnassignedAssets } = harness.services.assets
 const OneDriveAssetUpdater = require('../dist/asset-updater/one-drive').default
 before(async () => { await harness.setup() })
 after(() => harness.teardown())
 
 const ref = (id) => ({ driveId: 'drive', id })
 const updaterFor = (pages) => {
-    const updater = new OneDriveAssetUpdater('tenant', 'client', 'secret', 'user@example.test', 'root')
+    const updater = new OneDriveAssetUpdater({ key: 'onedrive' }, 'tenant', 'client', 'secret', 'user@example.test', 'root')
     const queue = pages.map((value, i) => ({ value, '@odata.nextLink': i < pages.length - 1 ? `/next/${i + 1}` : undefined }))
     updater.graphClient = { api: () => ({ get: async () => queue.shift() }) }
     return updater
@@ -52,6 +52,7 @@ async function seedProdLibrary() {
     await upsertFile({ externalId: ids.rootFile, externalChecksum: '"e-root"', folderExternalId: ids.root, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
     await upsertFile({ externalId: ids.nestedFile, externalChecksum: '"e-nested"', folderExternalId: ids.nested, name: 'photo.jpg', size: 20, mimeType: 'image/jpeg' })
     await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await adoptUnassignedAssets('onedrive')
     const rootRow = await db.getRepository(AssetFolder).findOneByOrFail({ externalId: ids.root })
     const mirror = await makeCollection({ assetFolderId: rootRow.id })
     state.queued.length = 0
@@ -85,6 +86,7 @@ test('upgrading a library synced from a subfolder keeps that folder as the only 
     await upsertFolder({ externalId: ids.child, parentExternalId: ids.top, name: 'Child' })
     await upsertFile({ externalId: ids.file, externalChecksum: '"e"', folderExternalId: ids.top, name: 'a.jpg', size: 1, mimeType: 'image/jpeg' })
     await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await adoptUnassignedAssets('onedrive')
     state.queued.length = 0
     const before = await snapshot()
     assert.equal(before.folders.filter(f => f[1] === null).length, 1, 'one top-level row, the named folder')

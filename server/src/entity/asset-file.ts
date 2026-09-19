@@ -16,6 +16,7 @@ import {
 	Column,
 	CreateDateColumn,
 	Entity,
+	Index,
 	JoinColumn,
 	ManyToOne, OneToMany,
 	PrimaryColumn,
@@ -36,6 +37,7 @@ export enum AssetFileStatus {
 }
 
 @Entity('asset_files')
+@Index(['sourceKey', 'externalId'], { unique: true })
 export class AssetFile {
 	@PrimaryColumn()
 	@PrimaryGeneratedColumn("uuid")
@@ -47,8 +49,11 @@ export class AssetFile {
 	@Column({ enum: AssetFileStatus })
 	status: AssetFileStatus
 
-	@Column({ unique: true })
+	@Column()
 	externalId: string
+
+	@Column({ default: '' })
+	sourceKey: string
 
 	@Column()
 	externalChecksum: string

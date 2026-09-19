@@ -16,6 +16,7 @@ import {
 	Column,
 	CreateDateColumn,
 	Entity,
+	Index,
 	ManyToOne,
 	OneToMany,
 	PrimaryColumn,
@@ -36,6 +37,7 @@ export enum AssetFolderStatus {
 }
 
 @Entity('asset_folders')
+@Index(['sourceKey', 'externalId'], { unique: true })
 @Tree('materialized-path')
 export class AssetFolder {
 	@PrimaryColumn()
@@ -48,8 +50,11 @@ export class AssetFolder {
 	@Column({ enum: AssetFolderStatus })
 	status: AssetFolderStatus
 
-	@Column({ unique: true })
+	@Column()
 	externalId: string
+
+	@Column({ default: '' })
+	sourceKey: string
 
 	@Column({ type: 'varchar', nullable: true })
 	parentId: string | null

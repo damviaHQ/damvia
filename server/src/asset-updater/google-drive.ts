@@ -18,8 +18,8 @@ import { rm as removeFile } from "node:fs/promises"
 import { pipeline } from "node:stream/promises"
 import { AssetFile } from "../entity/asset-file"
 import { logger } from "../env"
-import { tmpFile, upsertFile, upsertFolder } from "../services/asset"
-import AssetUpdater from "./base"
+import { tmpFile } from "../services/asset"
+import AssetUpdater, { AssetSourceIdentity } from "./base"
 import { DriveFileEntry, DriveRoot, FOLDER_MIME, planDriveFiles } from "./google-drive-items"
 
 const FIELDS = 'id,name,mimeType,parents,size,md5Checksum,trashed'
@@ -39,11 +39,12 @@ export default class GoogleDriveAssetUpdater extends AssetUpdater {
 	private drive: drive_v3.Drive
 
 	constructor(
+		source: AssetSourceIdentity,
 		credentials: GoogleDriveCredentials,
 		private readonly folderId: string,
 		impersonate?: string,
 	) {
-		super()
+		super(source, 'Google Drive')
 		const jwt = new auth.JWT({
 			email: credentials.client_email,
 			key: credentials.private_key,
@@ -99,49 +100,11 @@ export default class GoogleDriveAssetUpdater extends AssetUpdater {
 	async fetchUpdates() {
 		const root = await this.rootFolder()
 		const entries = await this.listAll(root)
-		logger.info(`Fetched ${entries.length} entries from Google Drive`)
+		logger.info(`Fetched ${entries.length} entries from Google Drive`, { source: this.key })
 
 		const plan = planDriveFiles(entries, root)
-		if (plan.folders.length === 0 && plan.files.length === 0) {
-			logger.warn('Google Drive listing is empty, skipping sync to avoid deleting all assets. Check GOOGLE_DRIVE_FOLDER_ID and that the folder is shared with the service account.')
-			return
-		}
-
-		const syncFolderIds: string[] = []
-		const syncFileIds: string[] = []
-		let failed = 0
-
-		for (const folder of plan.folders) {
-			try {
-				syncFolderIds.push((await upsertFolder(folder)).id)
-			} catch (error) {
-				failed += 1
-				logger.error('Error processing Google Drive folder', { error: error.message, stack: error.stack, entry: folder })
-			}
-		}
-
-		for (const file of plan.files) {
-			try {
-				syncFileIds.push((await upsertFile(file)).id)
-			} catch (error) {
-				failed += 1
-				logger.error('Error processing Google Drive file', { error: error.message, stack: error.stack, entry: file })
-			}
-		}
-
-		if (failed > 0) {
-			throw new Error(`${failed} Google Drive item(s) failed to sync, skipping the deletion pass`)
-		}
-
-		const [allAssetFolderIds, allAssetFileIds] = await Promise.all([
-			this.getAllAssetFolderIds(),
-			this.getAllAssetFileIds()
-		])
-
-		await Promise.all([
-			this.deleteAssetFoldersInBatches(this.arrayDifference(allAssetFolderIds, syncFolderIds)),
-			this.deleteAssetFilesInBatches(this.arrayDifference(allAssetFileIds, syncFileIds))
-		])
+		entries.length = 0
+		await this.applyPlan(plan)
 	}
 
 	async fetchFileContent(file: AssetFile): Promise<string> {

@@ -28,8 +28,8 @@ process.env.APP_SECRET = 'security-tests-only-random-fixture-secret-20260916'
 process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../../dist/env')
 const { dataSource: db } = env
-const LATEST_MIGRATION = 'CollectionFavorites1790035200000'
-const UPGRADE_MIGRATIONS = 7
+const LATEST_MIGRATION = 'AssetSources1790121600000'
+const UPGRADE_MIGRATIONS = 8
 const state = {
     disk: { totalBytes: 10000, freeBytes: 9000 },
     bucketObjects: [],
@@ -51,7 +51,7 @@ const storage = {
 env.assetsS3 = () => storage
 env.mainS3Bucket = () => 'fixture'
 env.assetsS3Bucket = () => 'fixture'
-env.assetUpdater = () => ({
+env.assetUpdaterFor = () => ({
     fetchFileContent: async file => {
         state.fetchedFiles.push(file.id)
         const path = join(tmpdir(), `security-test-${randomUUID()}`)

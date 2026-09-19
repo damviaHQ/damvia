@@ -10,17 +10,17 @@ This page describes what a storage driver must do so that a third provider can b
 
 ## A driver is a subclass of AssetUpdater
 
-`server/src/asset-updater/base.ts` exports the class `AssetUpdater`. Its three public methods throw `Unimplemented` and are what a driver overrides:
+`server/src/asset-updater/base.ts` exports the class `AssetUpdater`. Its constructor takes the source identity (`{ key, label? }`, see [Sources](../integrations/sources.md)) and the provider's display name; `key` stamps every row the driver writes and scopes its sweep. Its three public methods throw `Unimplemented` and are what a driver overrides:
 
 | Method | Called by | Contract |
 |---|---|---|
-| `initialize()` | `startAssetUpdater()` in `index.ts`, once at startup | Authenticate and prepare the client. A rejection exits the process with code 1. OneDrive's is empty; Dropbox refreshes the access token and picks the team root. |
-| `fetchUpdates()` | The 5-minute loop in `index.ts` | List the **whole** storage, call `upsertFolder` for every folder and `upsertFile` for every file, then mark everything else `pending_deletion`. Errors are logged as `failed to update assets` and the loop continues. |
-| `fetchFileContent(file: AssetFile)` | `updateFileContent` in `services/asset.ts`, from the `asset/update-content` job | Download one file and resolve with the path of a temporary file holding its bytes. |
+| `initialize()` | `startAssetUpdater()` in `index.ts`, once per source at startup | Authenticate and prepare the client. A rejection exits the process with code 1. Dropbox refreshes the access token and picks the team root; OneDrive and Google Drive only log a failed check. |
+| `fetchUpdates()` | The 5-minute loop in `index.ts`, one source after another | List the **whole** root, build a plan (`{ folders, files }`) and hand it to `applyPlan()`. Errors are logged as `failed to update assets` with the source key and the loop continues with the next source. |
+| `fetchFileContent(file: AssetFile)` | `updateFileContent` in `services/asset.ts`, from the `asset/update-content` job, on the driver whose key is `file.sourceKey` (`assetUpdaterFor()` in `env.ts`) | Download one file and resolve with the path of a temporary file holding its bytes. |
 
-The base class also provides five protected helpers for the deletion sweep: `getAllAssetFolderIds()` and `getAllAssetFileIds()` return every id in the two tables; `arrayDifference(allIds, keepIds)` returns the ids not in `keepIds`; `deleteAssetFoldersInBatches(ids)` and `deleteAssetFilesInBatches(ids)` set `status = pending_deletion` on those rows, 1000 per `UPDATE`.
+The base class does the writing: `applyPlan(plan, write?)` stamps every entry with the source key, applies the `label` to the top-level folders, refuses a top-level name another source already shows, upserts folders then files each in its own `try/catch` (the optional `write` wrapper is how Dropbox retries deadlocks), ends the run with an error when any item failed, and otherwise sweeps. The sweep helpers are protected: `getAllAssetFolderIds()` and `getAllAssetFileIds()` return the ids **of this source**; `arrayDifference(allIds, keepIds)` returns the ids not in `keepIds`; `deleteAssetFoldersInBatches(ids)` and `deleteAssetFilesInBatches(ids)` set `status = pending_deletion` on those rows, 1000 per `UPDATE`.
 
-`server/src/asset-updater/one-drive.ts` is the minimal example: a constructor building a Graph client, an empty `initialize`, a `fetchUpdates` that walks the `/users/{user}/drive/{drive}/delta` pages, skips names starting with `.` and items of size 0, upserts each item and collects the returned ids, then runs the sweep. `fetchFileContent` streams `/users/{user}/drive/items/{externalId}/content` into `tmpFile()`.
+`server/src/asset-updater/one-drive.ts` is the minimal example: a constructor building a Graph client, a logged startup check, a `fetchUpdates` that reads every `/users/{user}/drive/{drive}/delta` page, plans the items with `one-drive-items.ts`, releases the raw listing and calls `applyPlan`. `fetchFileContent` streams `/users/{user}/drive/items/{externalId}/content` into `tmpFile()`.
 
 ## upsertFolder creates or moves a folder
 
@@ -52,11 +52,9 @@ In the current code `file.externalChecksum = opts.externalChecksum` is assigned 
 
 ## The sweep deletes everything you did not list
 
-After the upserts, both drivers compute `arrayDifference(allIds, syncedIds)` for folders and files and mark the difference `pending_deletion`; the `asset/process-deletion` job then deletes those rows, their objects in the assets bucket and any collection bound to a deleted folder, every minute. The rule is therefore: **return every folder and file, or return nothing**. A successful but narrowed listing can delete omitted assets. If fetching a page fails and the error is allowed to propagate, the sync stops before marking assets for deletion. Dropbox instead catches individual upsert errors and continues. Those failed items can be missing from the list of ids to keep, so the final deletion step can mark them for removal.
+After the upserts, `applyPlan` computes `arrayDifference(allIds, syncedIds)` for the folders and files of the source and marks the difference `pending_deletion`; the `asset/process-deletion` job then deletes those rows, their objects in the assets bucket and any collection bound to a deleted folder, every minute. The rule is therefore: **return every folder and file of the root, or return nothing**. A successful but narrowed listing deletes the omitted assets. A listing error must propagate (the loop logs it and retries 5 minutes later): the sweep is never reached. Rows of other sources are outside the sweep by construction, which is what lets several sources share the tables; `server/test/asset-sources.cjs` locks it.
 
-The Dropbox driver guards the empty case: when the listing yields no folder and no file it logs `Dropbox listing is empty, skipping sync to avoid deleting all assets` and returns before the sweep. A new driver needs the same guard, and should let a listing error propagate (the loop logs it and retries 5 minutes later) rather than swallow it and sweep.
-
-Whatever a driver skips (both skip names starting with `.`) is deleted from Damvia if it existed before.
+Whatever a driver skips (all three skip names starting with `.`) is deleted from Damvia if it existed before.
 
 ### Guard the sweep
 
@@ -66,14 +64,14 @@ Because the sweep deletes whatever the run did not list, a driver must refuse to
 
 `fetchFileContent(file)` must resolve with an absolute path. Use `tmpFile()` from `services/asset.ts`, which returns a fresh uuid-named path inside a `dam-asset` directory created once with `mkdtemp` in the OS temp directory. Write the download there and return the path; `updateFileContent` detects the MIME type, uploads the original, builds the thumbnail, and removes the file in a `finally`. If the download fails, remove the temp file yourself before rethrowing, as the OneDrive driver does; the caller wraps the error as `Failed to fetch file content (asset file id: ...)` and the job is retried.
 
-The lookup key is `file.externalId`: it must be enough to fetch the content (an item id for OneDrive; Dropbox passes it as `path` to `filesDownload`, which accepts ids).
+The lookup key is `file.externalId`: it must be enough to fetch the content (an item id for OneDrive; Dropbox passes it as `path` to `filesDownload`, which accepts ids). It is unique within a source only; `file.sourceKey` picks the driver.
 
-## The driver is chosen by ASSET_UPDATER
+## Drivers are instantiated from the sources
 
 `server/src/asset-updater/google-drive.ts` is the most recent driver and the shortest complete example of the pattern: a pure planner, a paginated listing, the two guards, a streamed download.
 
 
-`assetUpdater()` in `server/src/env.ts` lazily instantiates the driver from `process.env.ASSET_UPDATER`: `dropbox` builds `DropboxAssetUpdater(DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN, DROPBOX_USE_TEAM_ROOT === 'true')`, `onedrive` builds `OneDriveAssetUpdater(ONEDRIVE_TENANT_ID, ONEDRIVE_CLIENT_ID, ONEDRIVE_CLIENT_SECRET, ONEDRIVE_USER, ONEDRIVE_DRIVE)`, anything else throws `Provide a valid asset updater`.
+`server/src/asset-updater/sources.ts` turns `ASSET_SOURCES` (or the single-provider variables) into a validated list of `{ key, label, root, account }` and refuses overlapping roots on one account; `server/test/sources.cjs` locks those rules. `assetUpdaters()` in `server/src/env.ts` builds one driver per source with `buildAssetUpdater()`, a `switch` on `account.provider`, and `assetUpdaterFor(sourceKey)` finds the driver of a file. A new provider adds a case to that switch, its account fields to `ACCOUNT_FIELDS` and, when its roots are paths, a branch to `normalizeRoot()`.
 
 ## Skeleton of a new driver
 
@@ -116,7 +114,7 @@ export default class MyProviderAssetUpdater extends AssetUpdater {
 ## Checklist for a new driver
 
 1. Create `server/src/asset-updater/<provider>.ts` with the class above and the AGPL header.
-2. Add a branch to the `assetUpdater()` switch in `server/src/env.ts`, reading the new variables from `process.env`.
+2. Add the provider to `server/src/asset-updater/sources.ts` (`ACCOUNT_FIELDS`, `accountIdentity`, `normalizeRoot`, `legacyAssetSource`) and a case to `buildAssetUpdater()` in `server/src/env.ts`.
 3. Add the variables to `server/.env.template` next to the `DROPBOX_*` and `ONEDRIVE_*` lines, and to [Environment variables](../reference/environment-variables.md) (`scripts/check-docs.sh` fails otherwise). Extend the accepted values of `ASSET_UPDATER` there.
 4. Write `docs/integrations/<provider>.md` following [Dropbox](../integrations/dropbox.md) (app registration, permissions, the variables), and add it to the table in [Integrations](../integrations/index.md).
 5. Add the code area to `docs/_internal/page-map.md`, then test nested folders, a rename, a move and a deletion, watching `SELECT status, count(*) FROM asset_files GROUP BY 1;` after the first sync.

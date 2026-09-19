@@ -21,8 +21,8 @@ import { DriveItem } from '@microsoft/microsoft-graph-types'
 import { writeFile, rm as removeFile } from "node:fs/promises"
 import { AssetFile } from "../entity/asset-file"
 import { logger } from "../env"
-import { tmpFile, upsertFile, upsertFolder } from "../services/asset"
-import AssetUpdater from "./base"
+import { tmpFile } from "../services/asset"
+import AssetUpdater, { AssetSourceIdentity } from "./base"
 import { planDriveItems } from "./one-drive-items"
 
 export default class OneDriveAssetUpdater extends AssetUpdater {
@@ -31,13 +31,14 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 	private readonly graphClient: GraphClient
 
 	constructor(
+		source: AssetSourceIdentity,
 		private readonly tenantId: string,
 		private readonly clientId: string,
 		private readonly clientSecret: string,
 		private readonly user: string,
 		private readonly drive: string,
 	) {
-		super()
+		super(source, 'OneDrive')
 		this.credential = new ClientSecretCredential(this.tenantId, this.clientId, this.clientSecret)
 		this.authProvider = new TokenCredentialAuthenticationProvider(this.credential, {
 			scopes: ['https://graph.microsoft.com/.default'],
@@ -68,52 +69,11 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 			items.push(...(res.value as DriveItem[]))
 			nextLink = res['@odata.nextLink']
 		}
-		logger.info(`Fetched ${items.length} entries from OneDrive`)
+		logger.info(`Fetched ${items.length} entries from OneDrive`, { source: this.key })
 
 		const plan = planDriveItems(items)
-		if (plan.folders.length === 0 && plan.files.length === 0) {
-			logger.warn('OneDrive listing is empty, skipping sync to avoid deleting all assets. Check ONEDRIVE_USER, ONEDRIVE_DRIVE and the application permissions.')
-			return
-		}
-
-		const syncFolderIds: string[] = []
-		const syncFileIds: string[] = []
-		let failed = 0
-
-		for (const folder of plan.folders) {
-			try {
-				syncFolderIds.push((await upsertFolder(folder)).id)
-			} catch (error) {
-				failed += 1
-				logger.error('Error processing OneDrive folder', { error: error.message, stack: error.stack, entry: folder })
-			}
-		}
-
-		for (const file of plan.files) {
-			try {
-				syncFileIds.push((await upsertFile(file)).id)
-			} catch (error) {
-				failed += 1
-				logger.error('Error processing OneDrive file', { error: error.message, stack: error.stack, entry: file })
-			}
-		}
-
-		if (failed > 0) {
-			throw new Error(`${failed} OneDrive item(s) failed to sync, skipping the deletion pass`)
-		}
-
-		const [allAssetFolderIds, allAssetFileIds] = await Promise.all([
-			this.getAllAssetFolderIds(),
-			this.getAllAssetFileIds()
-		])
-
-		const assetFolderIdsToDelete = this.arrayDifference(allAssetFolderIds, syncFolderIds)
-		const assetFileIdsToDelete = this.arrayDifference(allAssetFileIds, syncFileIds)
-
-		await Promise.all([
-			this.deleteAssetFoldersInBatches(assetFolderIdsToDelete),
-			this.deleteAssetFilesInBatches(assetFileIdsToDelete)
-		])
+		items.length = 0
+		await this.applyPlan(plan)
 	}
 
 	async fetchFileContent(file: AssetFile): Promise<string> {

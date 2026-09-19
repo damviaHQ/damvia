@@ -2,11 +2,13 @@
 title: OneDrive
 description: Register an Azure application with Microsoft Graph permissions and point Damvia at one user's drive.
 sidebar:
-  order: 3
+  order: 4
 lastUpdated: 2026-09-19
 ---
 
 The OneDrive driver (`server/src/asset-updater/one-drive.ts`) uses Microsoft Graph with application credentials (client id and secret, no user login) to read the delta feed of one user's OneDrive for Business and download file contents.
+
+To sync several folders, or this provider next to another one, declare the same values as accounts and sources in `ASSET_SOURCES` instead of the variables below; see [Sources](./sources.md).
 
 ## Variables
 

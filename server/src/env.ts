@@ -26,6 +26,7 @@ import AssetUpdater from "./asset-updater/base"
 import DropboxAssetUpdater from "./asset-updater/dropbox"
 import OneDriveAssetUpdater from "./asset-updater/one-drive"
 import GoogleDriveAssetUpdater, { parseServiceAccount } from "./asset-updater/google-drive"
+import { AssetSourceConfig, legacyAssetSource, parseAssetSources } from "./asset-updater/sources"
 
 import { validateAppSecret } from './services/credentials'
 
@@ -180,36 +181,33 @@ export function assetsS3Bucket(): string {
   return _assetsS3Bucket
 }
 
-let _assetUpdater: AssetUpdater | null = null
-export function assetUpdater(): AssetUpdater {
-  if (!_assetUpdater) {
-    if (process.env.ASSET_UPDATER === 'dropbox') {
-      _assetUpdater = new DropboxAssetUpdater(
-        requireEnv('DROPBOX_APP_KEY'),
-        requireEnv('DROPBOX_APP_SECRET'),
-        requireEnv('DROPBOX_REFRESH_TOKEN'),
-        process.env.DROPBOX_USE_TEAM_ROOT === 'true',
-        process.env.DROPBOX_ROOT_PATH ?? '',
-      )
-    } else if (process.env.ASSET_UPDATER === 'onedrive') {
-      _assetUpdater = new OneDriveAssetUpdater(
-        requireEnv('ONEDRIVE_TENANT_ID'),
-        requireEnv('ONEDRIVE_CLIENT_ID'),
-        requireEnv('ONEDRIVE_CLIENT_SECRET'),
-        requireEnv('ONEDRIVE_USER'),
-        requireEnv('ONEDRIVE_DRIVE'),
-      )
-    } else if (process.env.ASSET_UPDATER === 'googledrive') {
-      _assetUpdater = new GoogleDriveAssetUpdater(
-        parseServiceAccount(requireEnv('GOOGLE_DRIVE_SERVICE_ACCOUNT')),
-        requireEnv('GOOGLE_DRIVE_FOLDER_ID'),
-        process.env.GOOGLE_DRIVE_IMPERSONATE,
-      )
-    } else {
-      throw new Error('Provide a valid asset updater')
-    }
+function buildAssetUpdater(source: AssetSourceConfig): AssetUpdater {
+  const identity = { key: source.key, label: source.label, root: source.root }
+  switch (source.account.provider) {
+    case 'dropbox':
+      return new DropboxAssetUpdater(identity, source.account.appKey, source.account.appSecret, source.account.refreshToken, source.account.useTeamRoot === true, source.root)
+    case 'onedrive':
+      return new OneDriveAssetUpdater(identity, source.account.tenantId, source.account.clientId, source.account.clientSecret, source.account.user, source.root)
+    case 'googledrive':
+      return new GoogleDriveAssetUpdater(identity, parseServiceAccount(source.account.serviceAccount), source.root, source.account.impersonate)
   }
-  return _assetUpdater
+}
+
+let _assetUpdaters: AssetUpdater[] | null = null
+export function assetUpdaters(): AssetUpdater[] {
+  if (!_assetUpdaters) {
+    const sources = process.env.ASSET_SOURCES
+      ? parseAssetSources(process.env.ASSET_SOURCES)
+      : [legacyAssetSource(process.env, requireEnv)]
+    _assetUpdaters = sources.map(buildAssetUpdater)
+  }
+  return _assetUpdaters
+}
+
+export function assetUpdaterFor(sourceKey: string): AssetUpdater {
+  const updater = assetUpdaters().find((candidate) => candidate.key === sourceKey)
+  if (!updater) throw new Error(`No asset source is configured with the key "${sourceKey}"`)
+  return updater
 }
 
 type MailTemplateConfig = { from: string, subject: string, body: string }

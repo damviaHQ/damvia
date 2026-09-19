@@ -1,9 +1,9 @@
 ---
 title: CLI
-description: The server ships one maintenance command, run with npm from the server folder.
+description: The server ships four maintenance commands, run with npm from the server folder.
 sidebar:
   order: 4
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 The CLI lives in `server/src/cli.ts` and is built with Commander. It connects to the database and starts pg-boss before running a command, so it needs the same `.env` as the server and a reachable `DATABASE_URL`.
@@ -29,6 +29,9 @@ docker exec -it <container> npm run cli -- check-integrity
 | Command | What it does |
 |---|---|
 | `check-integrity` | Runs the same integrity check as the daily `system/integrity-check` job, including the deletion of orphan objects older than 24 hours, then exits. See [Integrity check](../deployment/integrity-check.md) for what it compares and repairs. |
+| `list-sources` | Prints every source key found in the database with its folder and file counts, the names of its top-level folders, and whether `ASSET_SOURCES` still configures it, is deleting it, or needs `rename-source` or `remove-source`. Run it when the startup error names a key you do not recognise. |
+| `rename-source <from> <to>` | Moves every asset folder and file stamped with the source key `from` to the key `to`, for a source whose `key` in `ASSET_SOURCES` changed; the server refuses to start until this is done. Refuses an invalid `to`, an unknown `from`, and a `to` that already owns rows. Use `""` as `from` for rows written before sources existed. See [Sources](../integrations/sources.md#renaming-a-source). |
+| `remove-source <key>` | Marks every asset folder and file stamped with a source key that is no longer configured for deletion, which is what lets the server start again; the `asset/process-deletion` job then removes them with their storage objects and mirrored collections. Refuses a key still present in `ASSET_SOURCES`. See [Sources](../integrations/sources.md#removing-a-source). |
 
 `npm run cli -- --help` prints the command list, and `--version` prints `1.0.0`.
 

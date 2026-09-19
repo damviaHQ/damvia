@@ -24,7 +24,7 @@ const { Readable } = require('node:stream')
 const harness = require('./lib/helpers.cjs')
 const { db, state, makeCollection } = harness
 const { AssetFolder, AssetFile, Collection } = harness.entities
-const { upsertFolder, upsertFile, tmpDir } = harness.services.assets
+const { upsertFolder, upsertFile, tmpDir, adoptUnassignedAssets } = harness.services.assets
 const GoogleDriveAssetUpdater = require('../dist/asset-updater/google-drive').default
 const { parseServiceAccount } = require('../dist/asset-updater/google-drive')
 const { FOLDER_MIME } = require('../dist/asset-updater/google-drive-items')
@@ -37,7 +37,7 @@ const file = (id, name, parent, extra = {}) => ({ id, name, mimeType: 'image/jpe
 
 // A stub Drive client: files.list answers per parent id with optional pagination.
 const updaterFor = (byParent, { root = { id: 'root', name: 'Marketing', mimeType: FOLDER_MIME }, pageSize = 1000 } = {}) => {
-    const updater = new GoogleDriveAssetUpdater(KEY, root.id)
+    const updater = new GoogleDriveAssetUpdater({ key: 'googledrive' }, KEY, root.id)
     state.listCalls = 0
     updater.drive = { files: {
         get: async (params) => { if (params.fileId !== root.id) throw new Error('File not found'); return { data: root } },
@@ -66,6 +66,7 @@ async function seedLibrary() {
     await upsertFile({ externalId: ids.cover, externalChecksum: 'md5-' + ids.cover, folderExternalId: ids.root, name: 'cover.jpg', size: 10, mimeType: 'image/jpeg' })
     await upsertFile({ externalId: ids.photo, externalChecksum: 'md5-' + ids.photo, folderExternalId: ids.nested, name: 'photo.jpg', size: 10, mimeType: 'image/jpeg' })
     await db.getRepository(AssetFile).update({}, { status: 'up_to_date' })
+    await adoptUnassignedAssets('googledrive')
     const mirror = await makeCollection({ assetFolderId: (await db.getRepository(AssetFolder).findOneByOrFail({ externalId: ids.root })).id })
     state.queued.length = 0
     return { ids, mirror }
@@ -136,7 +137,7 @@ test('a folder id that is not a folder or cannot be read fails the run and never
     const asFile = updaterFor({}, { root: { id: 'root', name: 'x.pdf', mimeType: 'application/pdf' } })
     await asFile.initialize()
     await assert.rejects(asFile.fetchUpdates(), /is not a folder/)
-    const missing = new GoogleDriveAssetUpdater(KEY, 'missing')
+    const missing = new GoogleDriveAssetUpdater({ key: 'googledrive' }, KEY, 'missing')
     missing.drive = { files: { get: async () => { throw new Error('File not found') } } }
     await missing.initialize()
     await assert.rejects(missing.fetchUpdates(), /File not found/)

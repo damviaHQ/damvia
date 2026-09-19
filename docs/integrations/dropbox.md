@@ -2,11 +2,13 @@
 title: Dropbox
 description: Create a Dropbox app, obtain a refresh token, and choose between a member's folder and the Business team space.
 sidebar:
-  order: 2
+  order: 3
 lastUpdated: 2026-09-19
 ---
 
 The Dropbox driver (`server/src/asset-updater/dropbox.ts`) lists the Dropbox, or one folder of it, recursively every 5 minutes and downloads file contents on demand, using an app key, an app secret and a long-lived refresh token. Nothing is written to Dropbox. It behaves like the [OneDrive driver](onedrive.md) and gives the same tree: one top-level folder when a folder is pointed at, the same skipped items, the same protections around deletion.
+
+To sync several folders, or this provider next to another one, declare the same values as accounts and sources in `ASSET_SOURCES` instead of the variables below; see [Sources](./sources.md).
 
 ## Variables
 

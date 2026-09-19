@@ -22,10 +22,11 @@ import sharp from "sharp"
 import {v4 as uuid} from 'uuid'
 import {AssetFile, AssetFileStatus} from "../entity/asset-file"
 import {AssetFolder, AssetFolderStatus} from "../entity/asset-folder"
+import {AssetSource} from "../entity/asset-source"
 import {Collection} from "../entity/collection"
 import {CollectionFile} from "../entity/collection-file"
 import {Product} from "../entity/product"
-import {assetsS3, assetsS3Bucket, assetUpdater, dataSource, logger} from "../env"
+import {assetsS3, assetsS3Bucket, assetUpdaterFor, dataSource, logger} from "../env"
 import {assetUpdateContentQueue, collectionSynchronizationQueue} from "../worker"
 import {commitStorage, releaseStorage, reserveStorage, StorageQuotaExceededError} from "./storage"
 import {
@@ -87,7 +88,7 @@ export async function updateFileContent(file: AssetFile): Promise<void> {
 }
 
 async function uploadFileContent(file: AssetFile, size: number): Promise<void> {
-	const contentPath = await assetUpdater().fetchFileContent(file).catch((error) => {
+	const contentPath = await assetUpdaterFor(file.sourceKey).fetchFileContent(file).catch((error) => {
 		throw new Error(`Failed to fetch file content (asset file id: ${file.id}): ${error.message}`)
 	})
 	try {
@@ -280,21 +281,158 @@ export async function processDeletion() {
 	}
 }
 
+// Rows written before sources existed carry an empty key. When exactly one
+// source is configured they belong to it, so stamp them before its first sweep.
+export async function adoptUnassignedAssets(sourceKey: string): Promise<{ folders: number, files: number }> {
+	const folders = await dataSource.getRepository(AssetFolder).update({ sourceKey: '' }, { sourceKey })
+	const files = await dataSource.getRepository(AssetFile).update({ sourceKey: '' }, { sourceKey })
+	return { folders: folders.affected ?? 0, files: files.affected ?? 0 }
+}
+
+// Keys of rows that no configured source owns, ignoring rows already handed
+// to the deletion job. The server refuses to start while any exist, so users
+// never see a frozen or duplicated library.
+export async function staleAssetSourceKeys(configured: string[]): Promise<string[]> {
+	const rows = await dataSource.query(`
+		SELECT source_key FROM asset_folders WHERE status <> $1 AND NOT (source_key = ANY($2))
+		UNION SELECT source_key FROM asset_files WHERE status <> $1 AND NOT (source_key = ANY($2))
+		ORDER BY 1
+	`, ['pending_deletion', configured])
+	return rows.map((row: { source_key: string }) => row.source_key)
+}
+
+// The configured sources, as the dashboard shows them, with their last run
+// and the state of their rows.
+export type AssetSourceStatus = {
+	key: string
+	provider: string
+	label: string | null
+	root: string
+	name: string
+	folderId: string | null
+	folders: number
+	files: { up_to_date: number, creating: number, outdated: number, pending_deletion: number }
+	lastRunStartedAt: Date | null
+	lastRunFinishedAt: Date | null
+	lastSuccessAt: Date | null
+	lastError: string | null
+	state: 'never' | 'running' | 'ok' | 'failed'
+}
+
+export async function registerAssetSources(sources: { key: string, provider: string, label?: string, root: string }[]): Promise<void> {
+	await dataSource.transaction(async (em) => {
+		for (const source of sources) {
+			await em.query(`
+				INSERT INTO asset_sources (key, provider, label, root) VALUES ($1, $2, $3, $4)
+				ON CONFLICT (key) DO UPDATE SET provider = EXCLUDED.provider, label = EXCLUDED.label, root = EXCLUDED.root
+			`, [source.key, source.provider, source.label ?? null, source.root])
+		}
+		await em.query('DELETE FROM asset_sources WHERE NOT (key = ANY($1))', [sources.map((source) => source.key)])
+	})
+}
+
+export async function recordAssetSourceRun(key: string, outcome: 'started' | 'succeeded' | { error: string }): Promise<void> {
+	const repository = dataSource.getRepository(AssetSource)
+	if (outcome === 'started') {
+		await repository.update({ key }, { lastRunStartedAt: new Date() })
+	} else if (outcome === 'succeeded') {
+		const now = new Date()
+		await repository.update({ key }, { lastRunFinishedAt: now, lastSuccessAt: now, lastError: null })
+	} else {
+		await repository.update({ key }, { lastRunFinishedAt: new Date(), lastError: outcome.error.slice(0, 1000) })
+	}
+}
+
+export async function assetSourceStatuses(): Promise<AssetSourceStatus[]> {
+	const rows = await dataSource.query(`
+		SELECT s.key, s.provider, s.label, s.root,
+			s.last_run_started_at, s.last_run_finished_at, s.last_success_at, s.last_error,
+			top.id AS folder_id, top.name AS folder_name,
+			(SELECT count(*) FROM asset_folders f WHERE f.source_key = s.key AND f.status = 'up_to_date')::int AS folders,
+			(SELECT count(*) FROM asset_files f WHERE f.source_key = s.key AND f.status = 'up_to_date')::int AS up_to_date,
+			(SELECT count(*) FROM asset_files f WHERE f.source_key = s.key AND f.status = 'creating')::int AS creating,
+			(SELECT count(*) FROM asset_files f WHERE f.source_key = s.key AND f.status = 'outdated')::int AS outdated,
+			(SELECT count(*) FROM asset_files f WHERE f.source_key = s.key AND f.status = 'pending_deletion')::int AS pending_deletion
+		FROM asset_sources s
+		LEFT JOIN LATERAL (
+			SELECT id, name FROM asset_folders f WHERE f.source_key = s.key AND f.parent_id IS NULL AND f.status = 'up_to_date' ORDER BY name LIMIT 1
+		) top ON true
+		ORDER BY s.key
+	`)
+	return rows.map((row: any) => ({
+		key: row.key,
+		provider: row.provider,
+		label: row.label,
+		root: row.root,
+		name: row.label ?? row.folder_name ?? row.key,
+		folderId: row.folder_id,
+		folders: row.folders,
+		files: { up_to_date: row.up_to_date, creating: row.creating, outdated: row.outdated, pending_deletion: row.pending_deletion },
+		lastRunStartedAt: row.last_run_started_at,
+		lastRunFinishedAt: row.last_run_finished_at,
+		lastSuccessAt: row.last_success_at,
+		lastError: row.last_error,
+		state: !row.last_run_started_at ? 'never'
+			: !row.last_run_finished_at || row.last_run_started_at > row.last_run_finished_at ? 'running'
+			: row.last_error ? 'failed' : 'ok',
+	}))
+}
+
+export type AssetSourceSummary = { sourceKey: string, folders: number, files: number, pendingDeletion: number, topLevel: string[] }
+
+// One line per key found in the database, for the operator who has to decide
+// between rename-source and remove-source.
+export async function summarizeAssetSources(): Promise<AssetSourceSummary[]> {
+	const rows = await dataSource.query(`
+		SELECT keys.source_key,
+			(SELECT count(*) FROM asset_folders f WHERE f.source_key = keys.source_key)::int AS folders,
+			(SELECT count(*) FROM asset_files f WHERE f.source_key = keys.source_key)::int AS files,
+			(SELECT count(*) FROM asset_files f WHERE f.source_key = keys.source_key AND f.status = 'pending_deletion')::int
+				+ (SELECT count(*) FROM asset_folders f WHERE f.source_key = keys.source_key AND f.status = 'pending_deletion')::int AS pending_deletion,
+			(SELECT coalesce(array_agg(f.name ORDER BY f.name), '{}') FROM asset_folders f WHERE f.source_key = keys.source_key AND f.parent_id IS NULL) AS top_level
+		FROM (SELECT source_key FROM asset_folders UNION SELECT source_key FROM asset_files) keys
+		ORDER BY keys.source_key
+	`)
+	return rows.map((row: any) => ({ sourceKey: row.source_key, folders: row.folders, files: row.files, pendingDeletion: row.pending_deletion, topLevel: row.top_level }))
+}
+
+export async function listAssetSourceKeys(): Promise<string[]> {
+	const rows = await dataSource.query('SELECT source_key FROM asset_folders UNION SELECT source_key FROM asset_files')
+	return rows.map((row: { source_key: string }) => row.source_key)
+}
+
+export async function renameAssetSource(from: string, to: string): Promise<{ folders: number, files: number }> {
+	const folders = await dataSource.getRepository(AssetFolder).update({ sourceKey: from }, { sourceKey: to })
+	const files = await dataSource.getRepository(AssetFile).update({ sourceKey: from }, { sourceKey: to })
+	return { folders: folders.affected ?? 0, files: files.affected ?? 0 }
+}
+
+// Hands every row of a source to the deletion job, which removes the files,
+// their objects, the folders and the collections mirrored on them.
+export async function removeAssetSource(sourceKey: string): Promise<{ folders: number, files: number }> {
+	const folders = await dataSource.getRepository(AssetFolder).update({ sourceKey }, { status: AssetFolderStatus.PENDING_DELETION })
+	const files = await dataSource.getRepository(AssetFile).update({ sourceKey }, { status: AssetFileStatus.PENDING_DELETION })
+	return { folders: folders.affected ?? 0, files: files.affected ?? 0 }
+}
+
 export type UpsertFolderOptions = {
 	externalId: string
 	parentExternalId: string
 	name: string
+	sourceKey?: string
 }
 
 export async function upsertFolder(opts: UpsertFolderOptions): Promise<AssetFolder> {
+	const sourceKey = opts.sourceKey ?? ''
 	let folder = await dataSource.getRepository(AssetFolder).findOne({
-		where: { externalId: opts.externalId },
+		where: { sourceKey, externalId: opts.externalId },
 		relations: { parent: { collections: true }, collections: true },
 	})
 	const alreadyExists = !!folder
 	if (!folder) {
 		folder = new AssetFolder()
 		folder.externalId = opts.externalId
+		folder.sourceKey = sourceKey
 		folder.status = AssetFolderStatus.UP_TO_DATE
 	}
 
@@ -303,7 +441,7 @@ export async function upsertFolder(opts: UpsertFolderOptions): Promise<AssetFold
 	const previousParent = folder.parent
 	if (folder.parent?.externalId !== opts.parentExternalId) {
 		folder.parent = await dataSource.getRepository(AssetFolder).findOne({
-			where: { externalId: opts.parentExternalId },
+			where: { sourceKey, externalId: opts.parentExternalId },
 			relations: { collections: true },
 		})
 	}
@@ -354,16 +492,19 @@ export type UpsertFileOptions = {
 	name: string
 	size: number
 	mimeType: string
+	sourceKey?: string
 }
 
 export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
+	const sourceKey = opts.sourceKey ?? ''
 	let file = await dataSource.getRepository(AssetFile).findOne({
-		where: { externalId: opts.externalId },
+		where: { sourceKey, externalId: opts.externalId },
 		relations: { folder: { collections: true } },
 	})
 	if (!file) {
 		file = new AssetFile()
 		file.externalId = opts.externalId
+		file.sourceKey = sourceKey
 		file.status = AssetFileStatus.CREATING
 	}
 
@@ -371,7 +512,7 @@ export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
 	file.name = opts.name
 	file.size = opts.size.toString()
 	const folder = await dataSource.getRepository(AssetFolder).findOne({
-		where: { externalId: opts.folderExternalId },
+		where: { sourceKey, externalId: opts.folderExternalId },
 		relations: { collections: true },
 	})
 	if (!folder) throw new Error(`Folder ${opts.folderExternalId} not found`)

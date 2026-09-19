@@ -2,7 +2,7 @@
 title: Object storage
 description: The two S3 buckets Damvia writes to, the URL syntax that configures them, and what browsers need to reach.
 sidebar:
-  order: 6
+  order: 7
 lastUpdated: 2026-09-19
 ---
 

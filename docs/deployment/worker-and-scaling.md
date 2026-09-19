@@ -3,7 +3,7 @@ title: Worker and scaling
 description: Understand which tasks run in the server process, why the worker must be enabled, and the current limits on running multiple processes.
 sidebar:
   order: 5
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 The server process has three roles: the HTTP API, the pg-boss worker, and the cloud sync loop. Only the worker is optional, and the way the three are coupled decides your scaling options.
@@ -16,7 +16,7 @@ Before the HTTP server listens, `startQueues()` connects pg-boss to `DATABASE_UR
 
 ## The sync loop runs everywhere
 
-`server/src/index.ts` starts the cloud storage sync before anything else, unconditionally. Every server process lists Dropbox or OneDrive every 5 minutes and upserts the whole tree. Two API replicas mean two concurrent full listings writing the same rows; the code retries on Postgres deadlocks (three attempts) but it doubles the provider traffic and the database load for no benefit.
+`server/src/index.ts` starts the cloud storage sync before anything else, unconditionally. Every server process lists every configured source every 5 minutes, one after another, and upserts the whole tree. Two API replicas mean two concurrent full listings writing the same rows; the code retries on Postgres deadlocks (three attempts) but it doubles the provider traffic and the database load for no benefit.
 
 **Run one server process.** It handles the API, the worker and the sync. This is the configuration the code is written for.
 
@@ -44,7 +44,7 @@ Inside `download/create-archive`, files are transformed 25 at a time.
 
 ## Memory and disk
 
-- A full listing of the cloud storage is held in memory during sync; no tested entry-count capacity is published. Dropbox file downloads also buffer content in memory.
+- One source's full listing is held in memory during its run, then released before the next source starts, so the peak follows the largest source, not their number. Measured on a synthetic OneDrive listing of 100,000 items: 80 MB for the raw listing, 25 MB for the plan derived from it. Size the container at 512 MB for the server plus 2 MB per 1,000 items in the largest source; a 200,000-item source fits in 1 GB. Dropbox file downloads also buffer content in memory.
 - Downloads and conversions use the OS temp directory; see [Server with Docker](./server-docker.md).
 - pg-boss stores jobs in the `pgboss` schema and archives completed ones; the tables grow with activity and pg-boss prunes them on its own schedule.
 
