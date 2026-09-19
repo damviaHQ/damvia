@@ -12,6 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { guardNavigation } from "@/router/guard.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { nextTick } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
@@ -52,21 +53,7 @@ const router = createRouter({
 	],
 })
 
-const authRoutes = ['login', 'sign-up', 'password-reset', 'password-update']
-const publicRoutes = ['legal-information', 'privacy-policy', 'link-expired']
-
-router.beforeEach((to) => {
-	const store = useGlobalStore()
-	if (publicRoutes.includes(to.name as string)) {
-		return true
-	}
-
-	if (!store.isAuthenticated && !authRoutes.includes(to.name as string)) {
-		return { name: 'login', query: to.query }
-	} else if (store.isAuthenticated && authRoutes.includes(to.name as string)) {
-		return { name: 'home' }
-	}
-})
+router.beforeEach((to) => guardNavigation(to, useGlobalStore().isAuthenticated))
 
 router.afterEach((to, from, failure) => {
 	if (failure) {

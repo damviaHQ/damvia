@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { parseSearchQuery } from "@/utils/searchQuery.ts"
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionDisplayGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
@@ -34,7 +35,7 @@ import {
 } from "lucide-vue-next"
 import { storeToRefs } from "pinia"
 import { computed, ref } from "vue"
-import { LocationQueryValue, useRoute, useRouter } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import Treeselect from "vue3-treeselect-ts"
 
 const route = useRoute()
@@ -139,39 +140,7 @@ const productViewOptions = computed(() =>
     .sort((a, b) => a.label.localeCompare(b.label))
 )
 
-function handleRouteQueryArray(
-  query: LocationQueryValue | LocationQueryValue[]
-): string[] {
-  if (!query) {
-    return []
-  } else if (!Array.isArray(query)) {
-    return [query]
-  }
-  return query as string[]
-}
-
-const form = computed(() => {
-  const attributes = Object.fromEntries(
-    Object.entries(route.query)
-      .map(([key, value]) => {
-        const match = /attributes\[(.+)]/g.exec(key)
-        return match ? [match[1], handleRouteQueryArray(value)] : null
-      })
-      .filter((value) => value)
-  )
-
-  return {
-    query: route.query.q as string,
-    page: route.query.page ? parseInt(route.query.page as string, 10) : undefined,
-    collectionId: route.query.from_collection as string,
-    assetTypes: handleRouteQueryArray(route.query.asset_types),
-    productViews: handleRouteQueryArray(route.query.product_views),
-    fileTypes: handleRouteQueryArray(route.query.file_types),
-    searchScope: (route.query.search_scope as string) ?? searchScopeOptions.value[0].id,
-    exactMatch: route.query.exact_match === "true",
-    attributes,
-  }
-})
+const form = computed(() => parseSearchQuery(route.query, searchScopeOptions.value[0].id))
 
 const { status, data: search, error } = useQuery({
   queryKey: computed(() => ["search", form.value]),

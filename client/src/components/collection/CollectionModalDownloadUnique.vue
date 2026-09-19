@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import * as fileType from "@/utils/fileType.ts"
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Button } from "@/components/ui/button/index.js"
@@ -114,119 +115,15 @@ const hasThumbnail = computed(() => {
   return !!currentFile.value.thumbnailURL && currentFile.value.thumbnailURL !== ''
 })
 
-const isPdf = computed(() => {
-  if (!currentFile.value) return false
-  return currentFile.value.mimeType === 'application/pdf' ||
-         currentFile.value.name.toLowerCase().endsWith('.pdf')
-})
-
-const isPsd = computed(() => {
-  if (!currentFile.value) return false
-  return currentFile.value.name.toLowerCase().endsWith('.psd') ||
-         currentFile.value.mimeType === 'image/vnd.adobe.photoshop' ||
-         currentFile.value.mimeType === 'application/photoshop' ||
-         currentFile.value.mimeType === 'application/psd' ||
-         currentFile.value.mimeType === 'image/psd'
-})
-
-const isVectorFile = computed(() => {
-  if (!currentFile.value) return false
-  return currentFile.value.name.toLowerCase().endsWith('.ai') ||
-         currentFile.value.name.toLowerCase().endsWith('.eps') ||
-         currentFile.value.mimeType === 'application/postscript' ||
-         currentFile.value.mimeType === 'application/illustrator'
-})
-
-const isTextFile = computed(() => {
-  if (!currentFile.value) return false
-  const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.txt') ||
-         filename.endsWith('.md') ||
-         filename.endsWith('.json') ||
-         filename.endsWith('.xml') ||
-         filename.endsWith('.html') ||
-         filename.endsWith('.htm') ||
-         filename.endsWith('.css') ||
-         filename.endsWith('.js') ||
-         filename.endsWith('.ts') ||
-         filename.endsWith('.yaml') ||
-         filename.endsWith('.yml') ||
-         currentFile.value.mimeType === 'text/plain' ||
-         currentFile.value.mimeType === 'text/markdown' ||
-         currentFile.value.mimeType === 'application/json' ||
-         currentFile.value.mimeType === 'text/xml' ||
-         currentFile.value.mimeType === 'text/html' ||
-         currentFile.value.mimeType === 'text/css' ||
-         currentFile.value.mimeType === 'text/javascript' ||
-         currentFile.value.mimeType === 'application/javascript' ||
-         currentFile.value.mimeType === 'application/typescript' ||
-         currentFile.value.mimeType === 'text/yaml'
-})
-
-const isFontFile = computed(() => {
-  if (!currentFile.value) return false
-  const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.ttf') ||
-         filename.endsWith('.otf') ||
-         currentFile.value.mimeType === 'font/ttf' ||
-         currentFile.value.mimeType === 'font/otf' ||
-         currentFile.value.mimeType === 'application/x-font-ttf' ||
-         currentFile.value.mimeType === 'application/x-font-otf' ||
-         currentFile.value.mimeType === 'application/vnd.ms-fontobject'
-})
-
-const isVideoFile = computed(() => {
-  if (!currentFile.value) return false
-  const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.mp4') ||
-         filename.endsWith('.mov') ||
-         filename.endsWith('.avi') ||
-         filename.endsWith('.mkv') ||
-         filename.endsWith('.wmv') ||
-         filename.endsWith('.flv') ||
-         filename.endsWith('.webm') ||
-         filename.endsWith('.m4v') ||
-         currentFile.value.mimeType.startsWith('video/')
-})
-
-const isPowerPoint = computed(() => {
-  if (!currentFile.value) return false
-  const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.ppt') ||
-         filename.endsWith('.pptx') ||
-         filename.endsWith('.ppsx') ||
-         filename.endsWith('.pps') ||
-         filename.endsWith('.potx') ||
-         filename.endsWith('.pot') ||
-         currentFile.value.mimeType === 'application/vnd.ms-powerpoint' ||
-         currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
-         currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.slideshow'
-})
-
-const isWord = computed(() => {
-  if (!currentFile.value) return false
-  const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.doc') ||
-         filename.endsWith('.docx') ||
-         filename.endsWith('.rtf') ||
-         filename.endsWith('.odt') ||
-         currentFile.value.mimeType === 'application/msword' ||
-         currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-         currentFile.value.mimeType === 'application/rtf' ||
-         currentFile.value.mimeType === 'application/vnd.oasis.opendocument.text'
-})
-
-const isExcel = computed(() => {
-  if (!currentFile.value) return false
-  const filename = currentFile.value.name.toLowerCase()
-  return filename.endsWith('.xls') ||
-         filename.endsWith('.xlsx') ||
-         filename.endsWith('.csv') ||
-         filename.endsWith('.ods') ||
-         currentFile.value.mimeType === 'application/vnd.ms-excel' ||
-         currentFile.value.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-         currentFile.value.mimeType === 'application/vnd.oasis.opendocument.spreadsheet'
-})
+const isPdf = computed(() => !!currentFile.value && fileType.isPdf(currentFile.value))
+const isPsd = computed(() => !!currentFile.value && fileType.isPsd(currentFile.value))
+const isVectorFile = computed(() => !!currentFile.value && fileType.isVectorFile(currentFile.value))
+const isTextFile = computed(() => !!currentFile.value && fileType.isTextFile(currentFile.value))
+const isFontFile = computed(() => !!currentFile.value && fileType.isFontFile(currentFile.value))
+const isVideoFile = computed(() => !!currentFile.value && fileType.isVideoFile(currentFile.value))
+const isPowerPoint = computed(() => !!currentFile.value && fileType.isPowerPoint(currentFile.value))
+const isWord = computed(() => !!currentFile.value && fileType.isWord(currentFile.value))
+const isExcel = computed(() => !!currentFile.value && fileType.isExcel(currentFile.value))
 
 const breadcrumbItems = computed<PathBreadcrumbItem[]>(() => collectionPath.value.map(item => ({
   id: item.id,
