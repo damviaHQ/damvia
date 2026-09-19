@@ -38,7 +38,7 @@
     "typeorm": "^0.3.22",
     "typeorm-naming-strategies": "^4.1.0",
     "winston": "^3.19.0",
-    "zod": "^3.24.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",

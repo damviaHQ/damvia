@@ -47,8 +47,8 @@ export default router({
 				details: z.string().nullable().optional(),
 				usageFrom: z.coerce.date().nullable().optional(),
 				usageTo: z.coerce.date().nullable().optional(),
-				scopes: z.array(z.nativeEnum(LicenseScope)),
-				allowedRegionIds: z.array(z.string().uuid()),
+				scopes: z.array(z.enum(LicenseScope)),
+				allowedRegionIds: z.array(z.uuid()),
 			}),
 		)
 		.mutation(async ({ input }) => {
@@ -66,13 +66,13 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.input(
 			z.object({
-				id: z.string().uuid(),
+				id: z.uuid(),
 				name: z.string().max(50).optional(),
 				details: z.string().nullable().optional(),
 				usageFrom: z.coerce.date().nullable().optional(),
 				usageTo: z.coerce.date().nullable().optional(),
-				scopes: z.array(z.nativeEnum(LicenseScope)),
-				allowedRegionIds: z.array(z.string().uuid()),
+				scopes: z.array(z.enum(LicenseScope)),
+				allowedRegionIds: z.array(z.uuid()),
 			})
 		)
 		.mutation(async ({ input }) => {
@@ -92,7 +92,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ input }) => {
 			const license = await dataSource.getRepository(License).findOneBy({ id: input })
 			if (!license) {

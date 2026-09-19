@@ -59,7 +59,7 @@ export default router({
 		}),
 	findById: publicProcedure
 		.use(authMiddleware(userApproved))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.query(async ({ input }) => {
 			const page = await dataSource.getRepository(Page).findOne({
 				where: { id: input, collectionId: IsNull() },
@@ -84,7 +84,7 @@ export default router({
 	createForCollection: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			collectionId: z.string().uuid(),
+			collectionId: z.uuid(),
 		}))
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user)
@@ -110,7 +110,7 @@ export default router({
 	update: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			pageId: z.string().uuid(),
+			pageId: z.uuid(),
 			name: z.string().nullable(),
 		}))
 		.mutation(async ({ input }) => {
@@ -133,7 +133,7 @@ export default router({
 	remove: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			pageId: z.string().uuid(),
+			pageId: z.uuid(),
 		}))
 		.mutation(async ({ input, ctx }) => {
 			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
@@ -149,8 +149,8 @@ export default router({
 	addBlock: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			pageId: z.string().uuid(),
-			type: z.nativeEnum(PageBlockType),
+			pageId: z.uuid(),
+			type: z.enum(PageBlockType),
 			width: z.number(),
 			column: z.number(),
 			row: z.number(),
@@ -179,8 +179,8 @@ export default router({
 	removeBlock: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			pageId: z.string().uuid(),
-			blockId: z.string().uuid(),
+			pageId: z.uuid(),
+			blockId: z.uuid(),
 		}))
 		.mutation(async ({ input, ctx }) => {
 			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })
@@ -201,9 +201,9 @@ export default router({
 	updateLayout: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			pageId: z.string().uuid(),
+			pageId: z.uuid(),
 			blocks: z.array(z.object({
-				id: z.string().uuid(),
+				id: z.uuid(),
 				width: z.number(),
 				column: z.number(),
 				row: z.number(),
@@ -234,8 +234,8 @@ export default router({
 	updateBlockData: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			pageId: z.string().uuid(),
-			blockId: z.string().uuid(),
+			pageId: z.uuid(),
+			blockId: z.uuid(),
 			data: z.any().optional().nullable(),
 		}))
 		.mutation(async ({ input, ctx }) => {
@@ -257,8 +257,8 @@ export default router({
 	presignedUploadUrl: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			pageId: z.string().uuid(),
-			blockId: z.string().uuid(),
+			pageId: z.uuid(),
+			blockId: z.uuid(),
 		}))
 		.query(async ({ input, ctx }) => {
 			const page = await findPage({ em: dataSource.createEntityManager(), user: ctx.user, pageId: input.pageId })

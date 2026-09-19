@@ -78,12 +78,12 @@ export default router({
 		.use(authMiddleware(userApproved))
 		.input(
 			z.object({
-				collectionFileIds: z.string().uuid().array(),
-				imageFormat: z.nativeEnum(DownloadImageFormat),
-				imageResolution: z.nativeEnum(DownloadImageResolution),
-				videoFormat: z.nativeEnum(DownloadVideoFormat),
-				videoResolution: z.nativeEnum(DownloadVideoResolution),
-				downloadType: z.nativeEnum(DownloadType),
+				collectionFileIds: z.uuid().array(),
+				imageFormat: z.enum(DownloadImageFormat),
+				imageResolution: z.enum(DownloadImageResolution),
+				videoFormat: z.enum(DownloadVideoFormat),
+				videoResolution: z.enum(DownloadVideoResolution),
+				downloadType: z.enum(DownloadType),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {

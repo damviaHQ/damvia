@@ -285,7 +285,7 @@ export default router({
 		}),
 	trackView: publicProcedure
 		.use(authMiddleware(userApproved))
-		.input(z.object({ collectionFileId: z.string().uuid() }))
+		.input(z.object({ collectionFileId: z.uuid() }))
 		.mutation(async ({ input, ctx }) => {
 			const collectionFile = await userCollectionFilesQuery(ctx.user).andWhere('collection_file.id = :fileId', { fileId: input.collectionFileId }).getOne()
 			if (!collectionFile) {

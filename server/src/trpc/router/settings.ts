@@ -31,7 +31,7 @@ export default router({
     .mutation(({ ctx, input }) => createLogoUpload(ctx.user.id, input.contentType)),
   processClientLogo: publicProcedure
     .use(authMiddleware(userAdmin))
-    .input(z.object({ uploadId: z.string().uuid() }))
+    .input(z.object({ uploadId: z.uuid() }))
     .mutation(({ ctx, input }) => processClientLogo(ctx.user.id, input.uploadId)),
   removeClientLogo: publicProcedure
     .use(authMiddleware(userAdmin))

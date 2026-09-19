@@ -50,7 +50,7 @@ export default router({
 		}),
 	setDefault: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ input }) => {
 			const group = await dataSource.getRepository(Group).findOneBy({ id: input })
 			if (!group) {
@@ -74,7 +74,7 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.input(
 			z.object({
-				id: z.string().uuid(),
+				id: z.uuid(),
 				name: z.string().min(1).max(80),
 			})
 		)
@@ -89,7 +89,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ input }) => {
 			const group = await dataSource.getRepository(Group).findOneBy({ id: input })
 			if (!group) {
@@ -110,8 +110,8 @@ export default router({
 	moveUsersAndRegions: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			fromGroupId: z.string().uuid(),
-			toGroupId: z.string().uuid(),
+			fromGroupId: z.uuid(),
+			toGroupId: z.uuid(),
 		}))
 		.mutation(async ({ input }) => {
 			const fromGroup = await dataSource.getRepository(Group).findOneBy({ id: input.fromGroupId })

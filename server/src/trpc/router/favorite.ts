@@ -36,7 +36,7 @@ export default router({
         }),
     addCollection: publicProcedure
         .use(authMiddleware(userApproved, userMember))
-        .input(z.object({ collectionId: z.string().uuid() }))
+        .input(z.object({ collectionId: z.uuid() }))
         .mutation(async ({ input, ctx }) => {
             const collection = await userCollectionsQuery(ctx.user)
                 .andWhere('collection.id = :collectionId', { collectionId: input.collectionId })
@@ -49,7 +49,7 @@ export default router({
         }),
     removeCollection: publicProcedure
         .use(authMiddleware(userApproved, userMember))
-        .input(z.object({ collectionId: z.string().uuid() }))
+        .input(z.object({ collectionId: z.uuid() }))
         .mutation(async ({ input, ctx }) => {
             await dataSource.getRepository(UserCollectionFavorite).delete({
                 userId: ctx.user.id,
@@ -71,7 +71,7 @@ export default router({
 		}),
 	add: publicProcedure
 		.use(authMiddleware(userApproved, userMember))
-		.input(z.object({ collectionFileId: z.string().uuid() }))
+		.input(z.object({ collectionFileId: z.uuid() }))
 		.mutation(async ({ input, ctx }) => {
 			const collectionFile = await userCollectionFilesQuery(ctx.user).andWhere('collection_file.id = :fileId', { fileId: input.collectionFileId }).getOne()
 			if (!collectionFile) {
@@ -86,7 +86,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userApproved, userMember))
-		.input(z.object({ collectionFileId: z.string().uuid() }))
+		.input(z.object({ collectionFileId: z.uuid() }))
 		.mutation(async ({ input, ctx }) => {
 			await dataSource.getRepository(UserFavorite).delete({
 				userId: ctx.user.id,

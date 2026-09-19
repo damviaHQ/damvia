@@ -59,7 +59,7 @@ export default router({
 		.input(
 			z.object({
 				name: z.string().min(1).max(80),
-				defaultGroupId: z.string().uuid(),
+				defaultGroupId: z.uuid(),
 			}),
 		)
 		.mutation(async ({ input }) => {
@@ -77,9 +77,9 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.input(
 			z.object({
-				id: z.string().uuid(),
+				id: z.uuid(),
 				name: z.string().min(1).max(80),
-				defaultGroupId: z.string().uuid(),
+				defaultGroupId: z.uuid(),
 			})
 		)
 		.mutation(async ({ input }) => {
@@ -98,7 +98,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ input }) => {
 			const regionsCount = await dataSource.getRepository(Region).count()
 			if (regionsCount <= 1) {
@@ -146,8 +146,8 @@ export default router({
 	moveUsers: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			fromRegionId: z.string().uuid(),
-			toRegionId: z.string().uuid()
+			fromRegionId: z.uuid(),
+			toRegionId: z.uuid()
 		}))
 		.mutation(async ({ input }) => {
 			await dataSource.getRepository(User).update(

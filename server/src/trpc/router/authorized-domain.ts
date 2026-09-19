@@ -50,7 +50,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ input }) => {
 			const authorizedDomain = await dataSource.getRepository(AuthorizedDomain).findOneBy({ id: input })
 			if (!authorizedDomain) {

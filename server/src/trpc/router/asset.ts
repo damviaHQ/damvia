@@ -76,7 +76,7 @@ export default router({
 		}),
 	findById: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.query(async ({ input }) => {
 			const assetFolder = await dataSource.getRepository(AssetFolder).findOne({
 				where: { id: input },
@@ -91,9 +91,9 @@ export default router({
 	update: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			id: z.string().uuid(),
-			assetTypeId: z.string().uuid().nullable().optional(),
-			licenseId: z.string().uuid().nullable().optional(),
+			id: z.uuid(),
+			assetTypeId: z.uuid().nullable().optional(),
+			licenseId: z.uuid().nullable().optional(),
 		}))
 		.mutation(async ({ input }) => {
 			const assetFolder = await dataSource.getRepository(AssetFolder).findOneBy({ id: input.id })

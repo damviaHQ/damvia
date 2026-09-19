@@ -14,19 +14,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { initTRPC, TRPCError } from '@trpc/server'
 import { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify"
-import { ZodError } from "zod"
+import { z } from "zod"
 import { User, UserRole } from "../entity/user"
 import { getUserFromRequest } from "../services/user"
 
 export const t = initTRPC.context<typeof createContext>().create({
 	errorFormatter({ shape, error }) {
-		if (error.code === 'BAD_REQUEST' && error.cause instanceof ZodError) {
+		if (error.code === 'BAD_REQUEST' && error.cause instanceof z.ZodError) {
 			return {
 				...shape,
 				message: 'Invalid request.',
 				data: {
 					...shape.data,
-					fieldErrors: error.cause.flatten().fieldErrors,
+					fieldErrors: z.flattenError(error.cause).fieldErrors,
 				},
 			}
 		}

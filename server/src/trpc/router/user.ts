@@ -72,8 +72,8 @@ export default router({
 			z.object({
 				name: z.string().min(1).max(80),
 				company: z.string().min(1).max(80),
-				regionId: z.string().uuid('Invalid region'),
-				email: z.string().email(),
+				regionId: z.uuid('Invalid region'),
+				email: z.email(),
 				password: passwordLessAuth() ? z.string() : z.string().min(6).max(100),
 			}),
 		)
@@ -100,7 +100,7 @@ export default router({
 	login: publicProcedure
 		.input(
 			z.object({
-				email: z.string().email(),
+				email: z.email(),
 				password: z.string(),
 				magicLink: z.boolean().nullable().optional(),
 			}),
@@ -128,7 +128,7 @@ export default router({
 			return null
 		}),
 	sendResetPasswordEmail: publicProcedure
-		.input(z.string().email())
+		.input(z.email())
 		.mutation(async ({ input }) => {
 			const user = await dataSource.getRepository(User).findOneBy({ email: input })
 			if (!user) return
@@ -142,7 +142,7 @@ export default router({
 	resetPassword: publicProcedure
 		.input(
 			z.object({
-				email: z.string().email(),
+				email: z.email(),
 				token: z.string().regex(/^[a-f0-9]{64}$/),
 				newPassword: z.string().min(6).max(100),
 			})
@@ -191,7 +191,7 @@ export default router({
 		.input(z.object({
 			name: z.string().min(1).max(80),
 			company: z.string().min(1).max(80),
-			email: z.string().email(),
+			email: z.email(),
 		}))
 		.mutation(async ({ ctx, input }) => {
 			const user = await dataSource.getRepository(User).findOneBy({ id: ctx.user.id })
@@ -236,13 +236,13 @@ export default router({
 	update: publicProcedure
 		.use(authMiddleware(userManagerOrAdmin))
 		.input(z.object({
-			id: z.string().uuid(),
+			id: z.uuid(),
 			name: z.string().min(1).max(80),
 			company: z.string().min(1).max(80),
-			regionId: z.string().uuid('Invalid region'),
-			email: z.string().email(),
-			role: z.nativeEnum(UserRole),
-			groupIds: z.string().uuid('Invalid group').array(),
+			regionId: z.uuid('Invalid region'),
+			email: z.email(),
+			role: z.enum(UserRole),
+			groupIds: z.uuid('Invalid group').array(),
 			maintenanceContact: z.boolean().optional(),
 		}))
 		.mutation(async ({ ctx, input }) => {
@@ -349,7 +349,7 @@ export default router({
 	approve:
 		publicProcedure
 			.use(authMiddleware(userManagerOrAdmin))
-			.input(z.string().uuid())
+			.input(z.uuid())
 			.mutation(async ({ ctx, input }) => {
 				const user = await dataSource.getRepository(User).findOneBy(
 					ctx.user.role === UserRole.ADMIN ? { id: input } : { regionId: ctx.user.regionId, id: input },
@@ -371,7 +371,7 @@ export default router({
 	remove:
 		publicProcedure
 			.use(authMiddleware(userManagerOrAdmin))
-			.input(z.string().uuid())
+			.input(z.uuid())
 			.mutation(async ({ ctx, input }) => {
 				const user = await dataSource.getRepository(User).findOneBy(
 					ctx.user.role === UserRole.ADMIN ? { id: input } : { regionId: ctx.user.regionId, id: input },
@@ -386,7 +386,7 @@ export default router({
 	removeAccount:
 		publicProcedure
 			.use(authMiddleware())
-			.input(z.string().uuid())
+			.input(z.uuid())
 			.mutation(async ({ ctx, input }) => {
 				if (ctx.user.id !== input) {
 					throw new TRPCError({
@@ -398,7 +398,7 @@ export default router({
 			}),
 	resendVerificationEmail: publicProcedure
 		.use(authMiddleware())
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ ctx, input }) => {
 			if (input !== ctx.user.id) throw new TRPCError({ code: 'FORBIDDEN' })
 			const user = await dataSource.getRepository(User).findOneBy({ id: input })

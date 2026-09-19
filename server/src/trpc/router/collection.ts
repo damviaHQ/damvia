@@ -202,13 +202,14 @@ export default router({
 		.input(z.object({
 			page: z.number().int().min(1).default(1),
 			query: z.string().max(2000).nullable().optional(),
-			collectionId: z.string().uuid().nullable().optional(),
-			assetTypes: z.string().uuid().array().optional().nullable(),
+			collectionId: z.uuid().nullable().optional(),
+			assetTypes: z.uuid().array().optional().nullable(),
 			productViews: z.string().array().optional().nullable(),
 			fileTypes: z.string().array().optional().nullable(),
+			extensions: z.string().max(20).array().max(50).optional().nullable(),
 			searchScope: searchScope,
 			exactMatch: z.boolean().optional().nullable(),
-			attributes: z.record(z.string().array().nullable()).nullable().optional(),
+			attributes: z.record(z.string(), z.string().array().nullable()).nullable().optional(),
 			sort: z.enum(['relevance', 'name', 'newest']).optional().nullable(),
 		}))
 		.query(async ({ input, ctx }) => {
@@ -248,10 +249,11 @@ export default router({
 		.use(authMiddleware(userApproved))
 		.input(z.object({
 			query: z.string().max(200).array().max(300),
-			collectionId: z.string().uuid().nullable().optional(),
-			assetTypes: z.string().uuid().array().optional().nullable(),
+			collectionId: z.uuid().nullable().optional(),
+			assetTypes: z.uuid().array().optional().nullable(),
 			productViews: z.string().array().optional().nullable(),
 			fileTypes: z.string().array().optional().nullable(),
+			extensions: z.string().max(20).array().max(50).optional().nullable(),
 			searchScope: searchScope,
 		}))
 		.query(async ({ input, ctx }) => {
@@ -271,7 +273,7 @@ export default router({
 		}),
 	findById: publicProcedure
 		.use(authMiddleware(userApproved))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.query(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user)
 				.setFindOptions({
@@ -310,7 +312,7 @@ export default router({
 	lastAddedFiles: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			collectionId: z.string().uuid().nullable().optional(),
+			collectionId: z.uuid().nullable().optional(),
 		}))
 		.query(async ({ input, ctx }) => {
 			let filesQuery = userCollectionFilesQuery(ctx.user)
@@ -337,7 +339,7 @@ export default router({
 				description: z.string().max(255).optional(),
 				public: z.boolean().optional(),
 				draft: z.boolean().optional(),
-				parentId: z.string().uuid().optional(),
+				parentId: z.uuid().optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
@@ -367,11 +369,11 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.input(
 			z.object({
-				assetFolderId: z.string().uuid(),
+				assetFolderId: z.uuid(),
 				description: z.string().max(255).optional(),
 				public: z.boolean().optional(),
 				draft: z.boolean().optional(),
-				parentId: z.string().uuid().optional(),
+				parentId: z.uuid().optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
@@ -403,9 +405,9 @@ export default router({
 		.use(authMiddleware(userApproved))
 		.input(
 			z.object({
-				id: z.string().uuid(),
+				id: z.uuid(),
 				items: z.array(z.object({
-					id: z.string().uuid(),
+					id: z.uuid(),
 					type: z.union([z.literal('collection'), z.literal('file')]),
 				}))
 			}),
@@ -491,7 +493,7 @@ export default router({
 	presignedThumbnailUploadUrl: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			id: z.string().uuid(),
+			id: z.uuid(),
 		}))
 		.query(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
@@ -504,7 +506,7 @@ export default router({
 		}),
 	removeFiles: publicProcedure
 		.use(authMiddleware(userApproved))
-		.input(z.string().uuid().array())
+		.input(z.uuid().array())
 		.mutation(async ({ input, ctx }) => {
 			const collectionFiles = await userCollectionFilesQuery(ctx.user)
 				.andWhere('collection_file.id IN (:...input)', { input })
@@ -521,7 +523,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userApproved))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user)
 				.andWhere('collection.id = :id', { id: input })
@@ -542,7 +544,7 @@ export default router({
 		.input(
 			z.object({
 				items: z.array(z.object({
-					id: z.string().uuid(),
+					id: z.uuid(),
 					type: z.union([z.literal('collection'), z.literal('file')]),
 				}))
 			}),
@@ -593,7 +595,7 @@ export default router({
 			z.object({
 				name: z.string().min(1).max(80),
 				description: z.string().max(255).optional(),
-				parentId: z.string().uuid().optional(),
+				parentId: z.uuid().optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {

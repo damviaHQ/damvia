@@ -66,7 +66,7 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.input(
 			z.object({
-				id: z.string().uuid(),
+				id: z.uuid(),
 				name: z.string().min(1).max(30),
 				description: z.string().max(255).optional(),
 				isRelatedToProducts: z.boolean().optional(),
@@ -92,7 +92,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ input }) => {
 			const assetType = await dataSource.getRepository(AssetType).findOneBy({ id: input })
 			if (!assetType) {

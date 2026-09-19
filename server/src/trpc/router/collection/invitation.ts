@@ -39,8 +39,8 @@ export default router({
 		.use(authMiddleware(userApproved))
 		.input(
 			z.object({
-				collectionId: z.string().uuid(),
-				email: z.string().email(),
+				collectionId: z.uuid(),
+				email: z.email(),
 				expiresAt: z.coerce.date(),
 				sendEmail: z.boolean().optional(),
 			}),
@@ -74,7 +74,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userApproved))
-		.input(z.object({ id: z.string().uuid() }))
+		.input(z.object({ id: z.uuid() }))
 		.mutation(async ({ input, ctx }) => {
 			const invitation = await dataSource.getRepository(CollectionInvitation).findOne({
 				where: { id: input.id },

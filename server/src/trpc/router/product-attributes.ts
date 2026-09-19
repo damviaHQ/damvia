@@ -86,7 +86,7 @@ export default router({
 	update: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			id: z.string().uuid(),
+			id: z.uuid(),
 			displayName: z.string().nullable(),
 			facetable: z.boolean(),
 			viewable: z.boolean(),
@@ -107,7 +107,7 @@ export default router({
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.string().uuid())
+		.input(z.uuid())
 		.mutation(async ({ input }) => {
 			const attribute = await dataSource.getRepository(ProductAttribute).findOneBy({ id: input })
 			if (!attribute) {

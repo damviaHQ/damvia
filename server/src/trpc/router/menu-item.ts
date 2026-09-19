@@ -82,10 +82,10 @@ export default router({
 	create: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			type: z.nativeEnum(MenuItemType),
-			parentId: z.string().uuid().nullable().optional(),
-			collectionId: z.string().uuid().nullable().optional(),
-			pageId: z.string().uuid().nullable().optional(),
+			type: z.enum(MenuItemType),
+			parentId: z.uuid().nullable().optional(),
+			collectionId: z.uuid().nullable().optional(),
+			pageId: z.uuid().nullable().optional(),
 			data: z.any(),
 		}))
 		.mutation(async ({ input }) => {
@@ -143,10 +143,10 @@ export default router({
 	update: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			id: z.string().uuid(),
-			type: z.nativeEnum(MenuItemType),
-			collectionId: z.string().uuid().nullable().optional(),
-			pageId: z.string().uuid().nullable().optional(),
+			id: z.uuid(),
+			type: z.enum(MenuItemType),
+			collectionId: z.uuid().nullable().optional(),
+			pageId: z.uuid().nullable().optional(),
 			data: z.any(),
 		}))
 		.mutation(async ({ input }) => {
@@ -166,7 +166,7 @@ export default router({
 	setHome: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			id: z.string().uuid(),
+			id: z.uuid(),
 		}))
 		.mutation(async ({ input }) => {
 			await dataSource.transaction(async (em) => {
@@ -177,7 +177,7 @@ export default router({
 	remove: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			id: z.string().uuid(),
+			id: z.uuid(),
 		}))
 		.mutation(async ({ input }) => {
 			const menuItem = await dataSource.getTreeRepository(MenuItem).findOneBy({ id: input.id })
@@ -191,7 +191,7 @@ export default router({
 	updatePositions: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
-			itemsPosition: z.record(z.number()),
+			itemsPosition: z.record(z.string(), z.number()),
 		}))
 		.mutation(async ({ input }) => {
 			const menuItems = await dataSource.getRepository(MenuItem).findBy({
