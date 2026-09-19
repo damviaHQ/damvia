@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useSearchState } from "@/composables/useSearchState"
+import { type SearchScope } from "@/utils/searchQuery"
 import { trpc } from "@/services/server"
 import { useQuery } from "@tanstack/vue-query"
 import { ArrowLeft, Copy, Trash2 } from "lucide-vue-next"
@@ -34,7 +35,7 @@ const { data: productFacets } = useQuery({ queryKey: ["products", "attributes", 
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
-  queryFn: () => trpc.collection.findById.query(form.value.collectionId),
+  queryFn: () => trpc.collection.findById.query(form.value.collectionId!),
 })
 // Same key as the results view, so the counts come from the one request.
 const { data: search } = useQuery({
@@ -129,7 +130,7 @@ function removeMissing() {
 
     <section v-if="form.collectionId" aria-labelledby="search-where-title" class="flex min-w-0 flex-col gap-1 border-t border-neutral-200 pt-1 pb-1">
       <h2 id="search-where-title" :class="sidebarSectionTitleClasses" class="flex h-8 items-center">Where</h2>
-      <RadioGroup :model-value="form.searchScope" class="flex min-w-0 flex-col" @update:model-value="setScope($event as string)">
+      <RadioGroup :model-value="form.searchScope" class="flex min-w-0 flex-col" @update:model-value="setScope($event as SearchScope)">
         <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-all" value="all" /> Everywhere</label>
         <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-sub" value="current_with_sub" /> <span class="min-w-0 flex-1 truncate">{{ collectionName }} and its sub-collections</span></label>
         <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-current" value="current" /> <span class="min-w-0 flex-1 truncate">{{ collectionName }} only</span></label>

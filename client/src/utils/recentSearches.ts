@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 export const RECENT_SEARCHES_KEY = 'damvia.recentSearches'
 export const RECENT_SEARCHES_LIMIT = 8
+export const RECENT_SEARCH_MAX_LENGTH = 200
 
 export type RecentSearch = { query: string, exactMatch: boolean }
 
@@ -22,7 +23,9 @@ function read(storage: Storage | undefined): RecentSearch[] {
     const raw = storage?.getItem(RECENT_SEARCHES_KEY)
     const parsed = raw ? JSON.parse(raw) : []
     return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is RecentSearch => typeof entry?.query === 'string' && entry.query.trim() !== '')
+      ? parsed
+        .filter((entry) => typeof entry?.query === 'string' && entry.query.trim() !== '')
+        .map((entry): RecentSearch => ({ query: entry.query.trim().slice(0, RECENT_SEARCH_MAX_LENGTH), exactMatch: entry.exactMatch === true }))
       : []
   } catch (_) {
     return []
@@ -45,7 +48,7 @@ export function listRecentSearches(storage = storageOrNone()): RecentSearch[] {
 
 // Newest first, one entry per query and mode, capped to the limit.
 export function rememberSearch(entry: RecentSearch, storage = storageOrNone()): RecentSearch[] {
-  const query = entry.query.trim()
+  const query = entry.query.trim().slice(0, RECENT_SEARCH_MAX_LENGTH)
   if (!query) {
     return read(storage)
   }

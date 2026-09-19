@@ -20,6 +20,7 @@ import {
   patchSearchQuery,
   toggleQueryValue,
   type QueryPatch,
+  type SearchScope,
   type SearchSort,
 } from "@/utils/searchQuery"
 import { computed } from "vue"
@@ -54,7 +55,7 @@ export function useSearchState() {
     isScoped,
     setTerms: (values: string[]) => push({ q: values.join(" ") }),
     setExactMatch: (exactMatch: boolean) => push({ exact_match: exactMatch ? "true" : undefined }),
-    setScope: (searchScope: string) => push({ search_scope: searchScope }),
+    setScope: (searchScope: SearchScope) => push({ search_scope: searchScope }),
     setSort: (sort: SearchSort | undefined) => push({ sort }),
     setValues: (key: string, values: string[]) => push({ [key]: values }),
     toggleValue: (key: string, value: string) =>

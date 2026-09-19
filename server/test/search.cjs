@@ -173,3 +173,24 @@ test('searchNotFound returns only the terms without a visible match in the reque
     assert.deepEqual(await notFound({ query: ['hat'], fileTypes: ['toString'] }), [])
     assert.deepEqual(await notFound({ query: [] }), [])
 })
+
+test('malformed search input is rejected before it reaches the database', async () => {
+    const notFound = input => caller(fixtures.member).collection.searchNotFound(input)
+    const rejected = [
+        { assetTypes: ['x'] },
+        { searchScope: 'current', collectionId: 'x' },
+        { searchScope: 'current_with_sub', collectionId: '%' },
+        { searchScope: 'everything' },
+        { page: 0 },
+        { page: 1.5 },
+        { query: 'a'.repeat(2001) },
+    ]
+    for (const input of rejected) {
+        await assert.rejects(searchAs(input), { code: 'BAD_REQUEST' }, JSON.stringify(input).slice(0, 80))
+    }
+    for (const input of [{ query: ['x'], assetTypes: ['x'] }, { query: Array(301).fill('a') }, { query: ['a'.repeat(201)] }, { query: ['x'], searchScope: 'current', collectionId: '%' }]) {
+        await assert.rejects(notFound(input), { code: 'BAD_REQUEST' }, JSON.stringify(input).slice(0, 80))
+    }
+    assert.equal((await searchAs({ query: 'zz '.repeat(600), page: 1 })).total, 0)
+    assert.deepEqual(await notFound({ query: Array(300).fill('zzz') }), Array(300).fill('zzz'))
+})

@@ -47,7 +47,7 @@ const { data: productFacets } = useQuery({ queryKey: ["products", "attributes", 
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
-  queryFn: () => trpc.collection.findById.query(form.value.collectionId),
+  queryFn: () => trpc.collection.findById.query(form.value.collectionId!),
 })
 const { status, data: search, error } = useQuery({
   queryKey: computed(() => ["search", form.value]),

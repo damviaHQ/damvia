@@ -175,6 +175,8 @@ export async function formatCollectionFile({ file, productAttributes }: FormatCo
 	}
 }
 
+const searchScope = z.enum(['all', 'current', 'current_with_sub']).optional().nullable()
+
 export default router({
 	invitation: invitationRouter,
 	tree: publicProcedure
@@ -198,13 +200,13 @@ export default router({
 	search: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			page: z.number().default(1),
-			query: z.string().nullable().optional(),
-			collectionId: z.string().nullable().optional(),
-			assetTypes: z.string().array().optional().nullable(),
+			page: z.number().int().min(1).default(1),
+			query: z.string().max(2000).nullable().optional(),
+			collectionId: z.string().uuid().nullable().optional(),
+			assetTypes: z.string().uuid().array().optional().nullable(),
 			productViews: z.string().array().optional().nullable(),
 			fileTypes: z.string().array().optional().nullable(),
-			searchScope: z.string().optional().nullable(),
+			searchScope: searchScope,
 			exactMatch: z.boolean().optional().nullable(),
 			attributes: z.record(z.string().array().nullable()).nullable().optional(),
 			sort: z.enum(['relevance', 'name', 'newest']).optional().nullable(),
@@ -245,12 +247,12 @@ export default router({
 	searchNotFound: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({
-			query: z.string().array(),
-			collectionId: z.string().nullable().optional(),
-			assetTypes: z.string().array().optional().nullable(),
+			query: z.string().max(200).array().max(300),
+			collectionId: z.string().uuid().nullable().optional(),
+			assetTypes: z.string().uuid().array().optional().nullable(),
 			productViews: z.string().array().optional().nullable(),
 			fileTypes: z.string().array().optional().nullable(),
-			searchScope: z.string().optional().nullable(),
+			searchScope: searchScope,
 		}))
 		.query(async ({ input, ctx }) => {
 			// A term counts as found when a visible file name or a searchable attribute contains it.

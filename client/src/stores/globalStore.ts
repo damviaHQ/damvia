@@ -18,6 +18,7 @@ import { defineStore } from "pinia"
 import { computed, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { RouterOutput, trpc } from "../services/server.ts"
+import { clearRecentSearches } from "../utils/recentSearches"
 
 export const useGlobalStore = defineStore('global', () => {
 	const router = useRouter()
@@ -68,6 +69,8 @@ export const useGlobalStore = defineStore('global', () => {
 
 	function logout() {
 		Cookie.remove('dam_token')
+		clearRecentSearches()
+		localStorage.removeItem('damvia_search_options')
 		authToken.value = undefined
 		router.push({ name: 'login' })
 	}

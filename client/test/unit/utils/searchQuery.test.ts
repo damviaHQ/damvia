@@ -33,7 +33,16 @@ describe('search query parsing', () => {
       query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], productViews: ['front', 'back'], fileTypes: ['image'], searchScope: 'current', exactMatch: true, attributes: {}, sort: 'newest',
     })
     expect(parseSearchQuery({ sort: 'random' }, 'all').sort).toBeUndefined()
-    expect(parseSearchQuery({ exact_match: 'yes', page: 'x' }, 'all')).toMatchObject({ exactMatch: false, page: NaN })
+    expect(parseSearchQuery({ exact_match: 'yes', page: 'x' }, 'all')).toMatchObject({ exactMatch: false, page: undefined })
+  })
+
+  test('repeated scalar params keep their first value and the page is a positive integer', () => {
+    expect(parseSearchQuery({ q: ['a', 'b'], page: ['3', '4'], from_collection: ['c1', 'c2'], search_scope: ['current', 'all'] }, 'all'))
+      .toMatchObject({ query: 'a', page: 3, collectionId: 'c1', searchScope: 'current' })
+    expect(parseSearchQuery({ q: [null], search_scope: [null] }, 'all')).toMatchObject({ query: undefined, searchScope: 'all' })
+    expect(parseSearchQuery({ page: '0' }, 'all').page).toBeUndefined()
+    expect(parseSearchQuery({ page: '-2' }, 'all').page).toBeUndefined()
+    expect(parseSearchQuery({ page: '2.5' }, 'all').page).toBe(2)
   })
 
   test('attribute filters are read from bracketed keys and malformed keys are ignored', () => {

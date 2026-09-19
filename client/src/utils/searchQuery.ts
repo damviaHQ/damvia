@@ -19,6 +19,13 @@ const attributeKey = /^attributes\[(.+)]$/
 export const SEARCH_SORTS = ['relevance', 'name', 'newest'] as const
 export type SearchSort = typeof SEARCH_SORTS[number]
 
+export const SEARCH_SCOPES = ['all', 'current', 'current_with_sub'] as const
+export type SearchScope = typeof SEARCH_SCOPES[number]
+
+export function toSearchScope(value: unknown): SearchScope | undefined {
+  return SEARCH_SCOPES.find((scope) => scope === value)
+}
+
 export const FILE_TYPE_OPTIONS = [
   { id: 'image', label: 'Images' },
   { id: 'video', label: 'Videos' },
@@ -37,6 +44,16 @@ export function queryValueToArray(query: LocationQueryValue | LocationQueryValue
   return query.filter((value): value is string => typeof value === 'string')
 }
 
+// A scalar param repeated in the URL keeps its first value.
+export function queryValueToString(query: LocationQueryValue | LocationQueryValue[] | undefined): string | undefined {
+  return queryValueToArray(query)[0]
+}
+
+function queryValueToPage(query: LocationQueryValue | LocationQueryValue[] | undefined): number | undefined {
+  const page = parseInt(queryValueToString(query) ?? '', 10)
+  return page > 0 ? page : undefined
+}
+
 // Splits pasted or typed references on any whitespace or comma.
 export function parseQueryParts(query: string | null | undefined): string[] {
   return (query ?? '')
@@ -46,7 +63,7 @@ export function parseQueryParts(query: string | null | undefined): string[] {
     .filter((part) => part)
 }
 
-export function parseSearchQuery(query: LocationQuery, defaultSearchScope: string) {
+export function parseSearchQuery(query: LocationQuery, defaultSearchScope: SearchScope) {
   const attributes = Object.fromEntries(
     Object.entries(query)
       .map(([key, value]) => {
@@ -58,13 +75,13 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: strin
   const sort = SEARCH_SORTS.find((value) => value === query.sort)
 
   return {
-    query: query.q as string,
-    page: query.page ? parseInt(query.page as string, 10) : undefined,
-    collectionId: query.from_collection as string,
+    query: queryValueToString(query.q),
+    page: queryValueToPage(query.page),
+    collectionId: queryValueToString(query.from_collection),
     assetTypes: queryValueToArray(query.asset_types),
     productViews: queryValueToArray(query.product_views),
     fileTypes: queryValueToArray(query.file_types),
-    searchScope: (query.search_scope as string) ?? defaultSearchScope,
+    searchScope: toSearchScope(queryValueToString(query.search_scope)) ?? defaultSearchScope,
     exactMatch: query.exact_match === "true",
     attributes,
     sort,

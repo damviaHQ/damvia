@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { clearRecentSearches, listRecentSearches, RECENT_SEARCHES_KEY, RECENT_SEARCHES_LIMIT, rememberSearch } from '@/utils/recentSearches.ts'
+import { clearRecentSearches, listRecentSearches, RECENT_SEARCH_MAX_LENGTH, RECENT_SEARCHES_KEY, RECENT_SEARCHES_LIMIT, rememberSearch } from '@/utils/recentSearches.ts'
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
   const data = new Map(Object.entries(initial))
@@ -53,5 +53,15 @@ describe('recent searches', () => {
     expect(listRecentSearches(undefined)).toEqual([])
     clearRecentSearches(storage)
     expect(storage.getItem(RECENT_SEARCHES_KEY)).toBeNull()
+  })
+
+  test('seeded entries are normalised: non-boolean modes, long queries and odd shapes', () => {
+    const long = 'x'.repeat(RECENT_SEARCH_MAX_LENGTH + 50)
+    const storage = memoryStorage({ [RECENT_SEARCHES_KEY]: JSON.stringify([{ query: 'a', exactMatch: {} }, { query: long, exactMatch: 'true' }, { query: 1 }, null, 'b', { query: ' c ', exactMatch: true }]) })
+    expect(listRecentSearches(storage)).toEqual([
+      { query: 'a', exactMatch: false },
+      { query: 'x'.repeat(RECENT_SEARCH_MAX_LENGTH), exactMatch: false },
+      { query: 'c', exactMatch: true },
+    ])
   })
 })

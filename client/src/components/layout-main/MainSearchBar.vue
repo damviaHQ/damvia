@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label"
 import { PopoverContent, Popover } from "@/components/ui/popover"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { clearRecentSearches, listRecentSearches, rememberSearch, type RecentSearch } from "@/utils/recentSearches"
-import { parseQueryParts, queryValueToArray } from "@/utils/searchQuery"
+import { parseQueryParts, queryValueToArray, queryValueToString, toSearchScope, type SearchScope } from "@/utils/searchQuery"
 import { useQuery } from "@tanstack/vue-query"
 import { ChevronDown, History, Search, SlidersHorizontal, X } from "lucide-vue-next"
 import { PopoverAnchor } from "reka-ui"
@@ -38,7 +38,7 @@ const { data: assetTypes } = useQuery({
 
 const currentCollectionId = computed(() => {
   if (route.name === "search") {
-    return (route.query.from_collection as string | undefined) ?? null
+    return queryValueToString(route.query.from_collection) ?? null
   } else if (route.name === "collection") {
     return route.params.id as string
   }
@@ -52,13 +52,22 @@ const searchScopeOptions = computed(() => {
   }
   return currentCollectionId.value ? { ...collectionOptions, ...globalOptions } : globalOptions
 })
+const defaultSearchScope = () => Object.keys(searchScopeOptions.value)[0] as SearchScope
 
-type SearchOptions = { assetTypes: string[]; searchScope: string; exactMatch: boolean }
+type SearchOptions = { assetTypes: string[]; searchScope: SearchScope; exactMatch: boolean }
 
+// Storage is untrusted: anything that is not the expected shape falls back to the defaults.
 function readStoredOptions(): SearchOptions | null {
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
-    return raw ? JSON.parse(raw) : null
+    const stored = JSON.parse(localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY) ?? 'null')
+    if (!stored || !Array.isArray(stored.assetTypes)) {
+      return null
+    }
+    return {
+      assetTypes: stored.assetTypes.filter((id: unknown) => typeof id === 'string'),
+      searchScope: toSearchScope(stored.searchScope) ?? 'all',
+      exactMatch: stored.exactMatch === true,
+    }
   } catch (_) {
     return null
   }
@@ -69,7 +78,7 @@ function defaultOptions(): SearchOptions {
     assetTypes: (assetTypes.value ?? [])
       .filter((assetType: any) => assetType.includeInSearchByDefault)
       .map((assetType: any) => assetType.id),
-    searchScope: Object.keys(searchScopeOptions.value)[0],
+    searchScope: defaultSearchScope(),
     exactMatch: false,
   }
 }
@@ -79,18 +88,15 @@ function initialOptions(): SearchOptions {
   if (route.name === "search") {
     return {
       assetTypes: queryValueToArray(route.query.asset_types),
-      searchScope: (route.query.search_scope as string) ?? Object.keys(searchScopeOptions.value)[0],
+      searchScope: toSearchScope(queryValueToString(route.query.search_scope)) ?? defaultSearchScope(),
       exactMatch: route.query.exact_match === "true",
     }
   }
-  const stored = readStoredOptions()
-  return stored
-    ? { assetTypes: stored.assetTypes ?? [], searchScope: stored.searchScope ?? "all", exactMatch: stored.exactMatch ?? false }
-    : defaultOptions()
+  return readStoredOptions() ?? defaultOptions()
 }
 
 const options = ref<SearchOptions>(initialOptions())
-const text = ref(route.name === "search" ? ((route.query.q as string) ?? "") : "")
+const text = ref(route.name === "search" ? (queryValueToString(route.query.q) ?? "") : "")
 const hasStoredOptions = ref(!!readStoredOptions())
 const recent = ref<RecentSearch[]>(listRecentSearches())
 const isOpen = ref(false)
@@ -101,7 +107,7 @@ watch(() => assetTypes.value, () => { options.value = initialOptions() })
 watch(() => route.query, () => {
   if (route.name === "search") {
     options.value = initialOptions()
-    text.value = (route.query.q as string) ?? ""
+    text.value = queryValueToString(route.query.q) ?? ""
   }
 })
 
@@ -125,7 +131,7 @@ function toggleAssetType(assetType: RouterOutput["assetType"]["list"][number]) {
       : [...options.value.assetTypes, assetType.id],
   }
 }
-function setSearchScope(searchScope: string) {
+function setSearchScope(searchScope: SearchScope) {
   options.value = { ...options.value, searchScope }
   isSearchScopeSelectOpen.value = false
 }
@@ -263,7 +269,7 @@ function clearText() {
               <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
             </button>
             <div v-if="isSearchScopeSelectOpen" id="search-scope-options" class="absolute z-20 mt-1 flex min-w-full flex-col gap-1 border border-input bg-white p-1 shadow-md">
-              <button v-for="[value, name] in Object.entries(searchScopeOptions)" :key="value" type="button" class="flex cursor-pointer items-center whitespace-nowrap px-2 py-2 text-body text-neutral-700 hover:bg-neutral-100" @click="setSearchScope(value)">{{ name }}</button>
+              <button v-for="[value, name] in Object.entries(searchScopeOptions)" :key="value" type="button" class="flex cursor-pointer items-center whitespace-nowrap px-2 py-2 text-body text-neutral-700 hover:bg-neutral-100" @click="setSearchScope(value as SearchScope)">{{ name }}</button>
             </div>
           </div>
         </div>

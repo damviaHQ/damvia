@@ -38,6 +38,14 @@ describe('useSearchState', () => {
     expect(state.filters.value.map((filter) => filter.value)).toEqual(['t1', 'x', 'y'])
   })
 
+  test('a repeated q param does not break the derived state', async () => {
+    const { state } = await setup({ q: ['red hat', 'blue'], exact_match: 'true', page: ['2', '3'] })
+    expect(state.terms.value).toEqual(['red hat'])
+    expect(state.form.value.page).toBe(2)
+    const { state: tokens } = await setup({ q: ['red, hat', 'blue'] })
+    expect(tokens.terms.value).toEqual(['red', 'hat'])
+  })
+
   test('exact mode keeps the phrase as one term', async () => {
     const { state } = await setup({ q: ' red hat ', exact_match: 'true' })
     expect(state.terms.value).toEqual(['red hat'])
