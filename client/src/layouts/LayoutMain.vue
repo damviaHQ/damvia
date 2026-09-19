@@ -13,7 +13,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import CollectionDialogCreate from "@/components/collection/CollectionDialogCreate.vue"
 import MainLinkTree from "@/components/layout-main/MainLinkTree.vue"
 import MainMenuTree from "@/components/layout-main/MainMenuTree.vue"
 import { menuIconClasses, menuIconSlotClasses, sidebarRowClasses } from "@/components/layout-main/navigationStyles"
@@ -23,9 +22,9 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
-import { sortBy } from "lodash"
+import sortBy from "lodash/sortBy"
 import { ChevronDown, ChevronRight, Plus, Menu, X, Star } from "lucide-vue-next"
-import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
 const SIDEBAR_WIDTH_KEY = "damvia.sidebarWidth"
@@ -240,6 +239,7 @@ const isMyCollectionsTabOpen = ref<boolean>(false)
 watch([myCollectionsActive], () => {
   isMyCollectionsTabOpen.value = myCollectionsActive.value
 })
+const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/collection/CollectionDialogCreate.vue"))
 </script>
 
 <template>

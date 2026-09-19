@@ -20,6 +20,11 @@ import App from './app.vue'
 import router from './router'
 import './style.css'
 
+const interStylesheet = document.createElement('link')
+interStylesheet.rel = 'stylesheet'
+interStylesheet.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
+document.head.append(interStylesheet)
+
 const app = createApp(App)
 app.use(vueQuery, {
 	queryClientConfig: {

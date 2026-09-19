@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsTruncated } from "@/composables/useIsTruncated"
 import { RouterOutput } from "@/services/server.ts"
-import { sortBy } from "lodash"
+import sortBy from "lodash/sortBy"
 import { ChevronDown, ChevronRight } from "lucide-vue-next"
 import { computed, ref, watch } from "vue"
 

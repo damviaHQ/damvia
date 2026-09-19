@@ -13,12 +13,13 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import LayoutAdmin from "@/layouts/LayoutAdmin.vue"
-import LayoutAuth from "@/layouts/LayoutAuth.vue"
-import LayoutMain from "@/layouts/LayoutMain.vue"
-import LayoutPublic from "@/layouts/LayoutPublic.vue"
-import { computed } from "vue"
+import { computed, defineAsyncComponent } from "vue"
 import { useRoute } from "vue-router"
+
+const LayoutAdmin = defineAsyncComponent(() => import("@/layouts/LayoutAdmin.vue"))
+const LayoutAuth = defineAsyncComponent(() => import("@/layouts/LayoutAuth.vue"))
+const LayoutMain = defineAsyncComponent(() => import("@/layouts/LayoutMain.vue"))
+const LayoutPublic = defineAsyncComponent(() => import("@/layouts/LayoutPublic.vue"))
 
 const route = useRoute()
 const component = computed(() => {

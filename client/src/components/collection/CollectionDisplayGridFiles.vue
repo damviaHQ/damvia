@@ -109,7 +109,7 @@ async function remove(file: File) {
     <article v-for="file in files" :key="file.id" :class="gridCardClasses">
       <div :class="[gridPreviewClasses, isFileSelected(file) && 'outline-2 outline-neutral-500']">
         <button type="button" class="absolute inset-0 flex size-full items-center justify-center p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-800" :aria-label="`Preview ${file.name}`" @click="currentCollectionFileId = file.id">
-          <img v-if="file.thumbnailURL" :src="file.thumbnailURL" :alt="file.name" loading="lazy" class="size-full object-contain" />
+          <img v-if="file.thumbnailURL" :src="file.thumbnailURL" :alt="file.name" loading="lazy" decoding="async" class="size-full object-contain" />
           <thumbnailPlaceholder v-else class="h-20 w-auto! fill-neutral-400" aria-hidden="true" />
         </button>
         <CollectionCheckbox :label="`Select ${file.name}`" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="isFileSelected(file) ? 'opacity-100' : 'opacity-0'" :state="isFileSelected(file) ? 'check' : false" @click="handleSelection(file)" />

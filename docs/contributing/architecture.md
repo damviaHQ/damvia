@@ -3,7 +3,7 @@ title: Architecture
 description: The single server process, the path of a request from the Vue client to a TypeORM entity, the folder map of both packages, and where a new feature goes.
 sidebar:
   order: 2
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 This page gives a developer the shape of the code: what runs, how a request travels, what each folder holds, and where to add something. The meaning of the objects (collections, pages, products) is in [Core concepts](../introduction/concepts.md).
@@ -62,7 +62,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `main.ts` | Creates the app with `VueQueryPlugin` (`refetchOnWindowFocus: false`), `vue3-lazyload`, the router and Pinia |
 | `app.vue` | Root component: shows a loader while the user loads, `LayoutAuth` with the "verify your email" or "wait for approval" message for unapproved users, `LayoutRouter` otherwise; handles `?verificationCode=` and mounts the toaster |
 | `router/index.ts` | 28 routes; each has `meta.layout` set to `auth`, `main`, `admin` or `public`, and a `beforeEach` guard that redirects unauthenticated users to `login` |
-| `layouts/` | `LayoutRouter.vue` maps `route.meta.layout` to `LayoutMain`, `LayoutAuth`, `LayoutAdmin` or `LayoutPublic`; also `LayoutDialogMember.vue` and `LayoutPageEditor.vue` |
+| `layouts/` | `LayoutRouter.vue` maps `route.meta.layout` to `LayoutMain`, `LayoutAuth`, `LayoutAdmin` or `LayoutPublic`, loading each layout on demand so portal visitors never download the admin shell; also `LayoutDialogMember.vue` and `LayoutPageEditor.vue` |
 | `views/` | One component per route: `home`, `collection`, `search`, `favorites`, `page`, `admin/` (one file per admin screen, `products/` and `pages/` sub-folders), `auth/`, `public/` |
 | `components/` | Feature components grouped by area: `admin/`, `collection/`, `dialog-member/`, `layout-main/`, `page-editor/` (block editors and `blocks/` renderers), `icons/` |
 | `components/ui/` | shadcn-vue primitives (button, dialog, form, table, tabs...) generated from `components.json`; `lib/utils.ts` holds the `cn()` helper they use |

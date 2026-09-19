@@ -18,26 +18,21 @@ import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles
 import Block from "@/components/page-editor/PageEditorBlock.vue"
 import type { Block as BlockType } from "@/layouts/LayoutPageEditor.vue"
 import { RouterOutput } from "@/services/server.ts"
-import { groupBy, sortBy, sumBy } from "lodash"
-import { computed, ref, watch } from "vue"
+import groupBy from "lodash/groupBy"
+import sortBy from "lodash/sortBy"
+import sumBy from "lodash/sumBy"
+import { computed } from "vue"
 import { RouteLocationRaw } from "vue-router"
 
 type Collection = RouterOutput["collection"]["findById"]
 type File = RouterOutput["collection"]["findById"]["files"][number]
 
-const childrenCollections = ref<Collection[]>([])
 const props = defineProps<{
   collection: Collection
   generateRoute: (collection: Collection) => RouteLocationRaw
 }>()
 
-watch(
-  () => props.collection,
-  (value) => {
-    childrenCollections.value = value.children
-  },
-  { deep: true, immediate: true }
-)
+const childrenCollections = computed<Collection[]>(() => props.collection.children)
 
 const rows = computed(() => {
   return sortBy(

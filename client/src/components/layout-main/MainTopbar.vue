@@ -14,9 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import Logo from "@/components/ClientLogo.vue"
-import CollectionDialogAddToCollection from "@/components/collection/CollectionDialogAddToCollection.vue"
-import CollectionDialogCreate from "@/components/collection/CollectionDialogCreate.vue"
-import CollectionModalDownloadMulti from "@/components/collection/CollectionModalDownloadMulti.vue"
 import MainSearchBar from "@/components/layout-main/MainSearchBar.vue"
 import MainTopbarDownloadNotification from "@/components/layout-main/MainTopbarDownloadNotification.vue"
 import { Button } from "@/components/ui/button"
@@ -28,7 +25,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import LayoutDialogMember from "@/layouts/LayoutDialogMember.vue"
 import { useGlobalStore } from "@/stores/globalStore"
 import {
   Combine,
@@ -41,7 +37,7 @@ import {
   User,
   Users
 } from "lucide-vue-next"
-import { ref } from "vue"
+import { defineAsyncComponent, ref } from "vue"
 
 const globalStore = useGlobalStore()
 const isDownloadAssetModalOpen = ref<boolean>(false)
@@ -49,6 +45,10 @@ const isCreateCollectionModalOpen = ref<boolean>(false)
 const isAddToCollectionModalOpen = ref<boolean>(false)
 const showMemberDialog = ref(false)
 const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-preferences">("downloads")
+const CollectionDialogAddToCollection = defineAsyncComponent(() => import("@/components/collection/CollectionDialogAddToCollection.vue"))
+const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/collection/CollectionDialogCreate.vue"))
+const CollectionModalDownloadMulti = defineAsyncComponent(() => import("@/components/collection/CollectionModalDownloadMulti.vue"))
+const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDialogMember.vue"))
 </script>
 
 <template>

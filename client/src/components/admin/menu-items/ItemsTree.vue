@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import Item from "@/components/admin/menu-items/Item.vue"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
-import { sortBy } from "lodash"
+import sortBy from "lodash/sortBy"
 import { computed, ref } from "vue"
 import Draggable from "vuedraggable"
 

@@ -24,7 +24,7 @@ import LayoutDialogMember from "@/layouts/LayoutDialogMember.vue"
 import { trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
-import { groupBy } from "lodash"
+import groupBy from "lodash/groupBy"
 import {
   ChevronLeft,
   ChevronRight,
@@ -181,6 +181,7 @@ const { status, data: search, error } = useQuery({
 const { data: searchForFacets } = useQuery({
   queryKey: computed(() => ["search-for-facets", { ...form.value, attributes: {} }]),
   queryFn: () => trpc.collection.search.query({ ...form.value, attributes: {} }),
+  enabled: computed(() => Object.keys(form.value.attributes).length > 0),
 })
 
 const searchResults = computed(() =>

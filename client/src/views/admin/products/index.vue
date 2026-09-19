@@ -658,7 +658,7 @@ onUnmounted(() => {
                       :aria-label="`Enlarge image of ${row.original.productKey}`"
                       @click.stop="handleImageClick($event, cell.getValue() as string)"
                     >
-                      <img :src="cell.getValue() as string" alt="" class="product-thumbnail" />
+                      <img :src="cell.getValue() as string" alt="" loading="lazy" decoding="async" class="product-thumbnail" />
                     </button>
                   </template>
                   
@@ -908,7 +908,6 @@ onUnmounted(() => {
   box-sizing: border-box;
   overflow-y: auto;
   display: block;
-  transition: height 0.1s ease;
 }
 .floating-cell-editor .floating-cell-input:focus-visible {
   outline: 2px solid var(--dv-action-primary);
