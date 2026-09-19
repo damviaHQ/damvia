@@ -21,7 +21,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useSearchState } from "@/composables/useSearchState"
 import { type SearchScope } from "@/utils/searchQuery"
-import { trpc } from "@/services/server"
+import { RouterOutput, trpc } from "@/services/server"
 import { useQuery } from "@tanstack/vue-query"
 import { ArrowLeft, Copy, Trash2 } from "@lucide/vue"
 import { computed } from "vue"
@@ -57,7 +57,8 @@ const { data: notFound } = useQuery({
 })
 const missing = computed(() => (form.value.exactMatch ? [] : notFound.value ?? []))
 
-const facets = computed(() => search.value?.facets ?? { assetTypes: {}, fileTypes: {}, productViews: {}, attributes: {} })
+const emptyFacets: RouterOutput["collection"]["search"]["facets"] = { assetTypes: {}, fileTypes: {}, extensions: {}, productViews: {}, attributes: {} }
+const facets = computed(() => search.value?.facets ?? emptyFacets)
 const collectionName = computed(() => collection.value?.name ?? "this collection")
 
 const assetTypeOptions = computed<FacetOption[]>(() =>
