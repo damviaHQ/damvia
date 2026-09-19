@@ -3,7 +3,7 @@ title: Design system
 description: Review the proposed Damvia design foundation and reuse its tokens across the admin and website.
 sidebar:
   order: 7
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 Damvia’s proposed design system shares the brand’s blue and midnight palette, typography, spacing and common control styles across the admin and website. The production admin uses this foundation. A single isolated reference page documents the tokens and shared component contracts. Customer portals keep their own branding.
@@ -73,6 +73,10 @@ Keep the shared design-system source in `packages/design-system` in the open-sou
 ## Shared admin patterns
 
 `AdminList.vue` provides search over explicitly named fields, result counts, empty states and pagination at 20 rows for configuration lists. Shared Vue controls use semantic Tailwind utilities; `client/src/styles/controls.css` contains only the tree-select integration and reduced-motion fallback; admin-specific layouts remain in `client/src/styles/admin.css`. `LayoutAdmin` provides `damvia-admin-theme`; shadcn portal components inject it to preserve the admin theme outside the page DOM, while tenant overlays explicitly receive `.dv-theme.dv-neutral.dv-client`. Existing server permissions and editing APIs remain authoritative.
+
+### Admin page headers
+
+`AdminPageHeader.vue` owns the heading of every admin screen: it renders the `admin-heading` landmark, the `h1`, an optional description and an `admin-actions` slot, and it falls back to the route's `meta.title` so the name is declared once, in `client/src/router/index.ts`. Pass `title` only when the name is dynamic, such as a folder or page name, and use the `lead` slot for an eyebrow or a back link. Do not hand-roll a heading block or restate the page name in a literal, and do not raise its size: a page name already appears in the sidebar and the breadcrumb, so its heading uses `size.page-title` and shares a line with its buttons rather than acting as a display heading. Section headings inside a page stay at or below `size.section` so they do not outrank it.
 
 ## Admin dialogs
 
