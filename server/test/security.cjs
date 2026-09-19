@@ -372,6 +372,30 @@ test('a file that does not fit in the quota is left pending without a retry, a d
     } finally { env.storageQuota = () => null }
 })
 
+test('once the plan is reached every download waits, even a file that would fit, until a measurement finds room', async () => {
+    await resetStorageUsage({ usedBytes: '90' })
+    env.storageQuota = () => 100
+    try {
+        const big = await pendingAsset()
+        await runUpdateJob(big.id)
+        assert((await storageRow()).quotaReachedAt instanceof Date)
+        const small = await pendingAsset()
+        await db.getRepository(AssetFile).update({ id: small.id }, { size: '1' })
+        const fetchedBefore = fetchedFiles.length
+        await runUpdateJob(small.id)
+        assert.equal((await db.getRepository(AssetFile).findOneByOrFail({ id: small.id })).status, 'creating')
+        assert.equal(fetchedFiles.length, fetchedBefore)
+        await assert.rejects(caller(admin).dashboard.retryPendingAssets(), e => e.code === 'BAD_REQUEST' && /paused/.test(e.message))
+        const summary = await caller(admin).dashboard.summary()
+        assert.equal(summary.sync.paused, true)
+        assert.equal((await caller(admin).asset.sources()).sync.paused, true)
+        await db.query('UPDATE storage_usage SET quota_reached_at = NULL WHERE id = 1')
+        await runUpdateJob(small.id)
+        assert.equal((await db.getRepository(AssetFile).findOneByOrFail({ id: small.id })).status, 'up_to_date')
+        assert.equal((await caller(admin).dashboard.summary()).sync.paused, false)
+    } finally { env.storageQuota = () => null }
+})
+
 test('a file that fits is uploaded once, counted once, and a duplicate job does nothing', async () => {
     await resetStorageUsage()
     env.storageQuota = () => 1000

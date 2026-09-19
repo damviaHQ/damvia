@@ -162,9 +162,11 @@ export async function reserveStorage(bytes: number): Promise<boolean> {
 	if (quota === null) {
 		return true
 	}
+	// Once the plan is reached every download waits, including files that would
+	// still fit: the pause is lifted by a measurement that finds room again.
 	const [, reserved] = await dataSource.query(`
 		UPDATE storage_usage SET reserved_bytes = reserved_bytes + $1
-		WHERE id = 1 AND used_bytes + reserved_bytes + $1 <= $2
+		WHERE id = 1 AND quota_reached_at IS NULL AND used_bytes + reserved_bytes + $1 <= $2
 	`, [bytes, quota])
 	if (!reserved) {
 		await dataSource.query(`UPDATE storage_usage SET quota_reached_at = coalesce(quota_reached_at, now()) WHERE id = 1`)

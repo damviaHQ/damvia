@@ -21,6 +21,7 @@ import { Download } from "../../entity/download"
 import { User, UserRole } from "../../entity/user"
 import { dataSource } from "../../env"
 import { getStorageStatus, retryPendingAssets } from "../../services/storage"
+import { assetSourceStatuses } from "../../services/asset"
 import { storageMeasureUsageQueue } from "../../worker"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
@@ -28,8 +29,9 @@ export default router({
 	summary: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.query(async ({ ctx }) => {
-			const [storage, assetRows, userRows, pendingApproval, maintenanceContacts, downloadRows, jobRows, collectionCount, folderCount, recentFiles, recentUsers, recentInvitations, recentDownloads] = await Promise.all([
+			const [storage, sources, assetRows, userRows, pendingApproval, maintenanceContacts, downloadRows, jobRows, collectionCount, folderCount, recentFiles, recentUsers, recentInvitations, recentDownloads] = await Promise.all([
 				getStorageStatus(ctx.user.email),
+				assetSourceStatuses(),
 				dataSource.getRepository(AssetFile).createQueryBuilder('asset_file')
 					.select('asset_file.status', 'status').addSelect('COUNT(*)', 'count')
 					.groupBy('asset_file.status')
@@ -72,6 +74,12 @@ export default router({
 			const byRole = Object.fromEntries(userRows.map((row) => [row.role, Number(row.count)]))
 			return {
 				storage,
+				sources,
+				sync: {
+					paused: !!storage.quotaReachedAt,
+					pausedSince: storage.quotaReachedAt,
+					failedSources: sources.filter((source) => source.state === 'failed').length,
+				},
                 collections: { total: collectionCount },
                 folders: { total: folderCount },
                 recentFiles,
@@ -126,6 +134,10 @@ export default router({
 			`)
 			if (!locked || running) {
 				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Files are already being downloaded. Try again once they are done.' })
+			}
+			const [{ paused }] = await em.query('SELECT quota_reached_at IS NOT NULL AS paused FROM storage_usage WHERE id = 1')
+			if (paused) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Synchronisation is paused because the storage plan is full. Free space or raise the plan, then measure the storage.' })
 			}
 			return { queued: await retryPendingAssets() }
 		})),

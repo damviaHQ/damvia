@@ -3,7 +3,7 @@ title: Server configuration
 description: What each group of server variables controls, and the values that trip people up.
 sidebar:
   order: 2
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 `server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
@@ -41,7 +41,7 @@ Passwords use scrypt with a random salt (`hashPassword` in `server/src/services/
 
 ## STORAGE_QUOTA is the plan, not the disk
 
-`STORAGE_QUOTA` is the storage the customer pays for, written in decimal units such as `1500GB` or `1.5TB` (1.5 TB is 1 500 000 000 000 bytes, the way disks and hosting plans are sold). Every 30 minutes the worker adds up every object of the two buckets and compares the total with it. A file listed in the cloud storage is only downloaded when it still fits under the plan; the others wait, and their download resumes on its own once space has been freed. Archives, thumbnails and page media are never blocked, so keep the plan below the disk that holds MinIO: on a 2 TB disk, `STORAGE_QUOTA=1.5TB` leaves 500 GB for exports, previews, Postgres and temporary files.
+`STORAGE_QUOTA` is the storage the customer pays for, written in decimal units such as `1500GB` or `1.5TB` (1.5 TB is 1 500 000 000 000 bytes, the way disks and hosting plans are sold). Every 30 minutes the worker adds up every object of the two buckets and compares the total with it. A file listed in the cloud storage is only downloaded while the plan has room; the first file that does not fit pauses the downloads of every source, and they resume on their own once a measurement finds space under the plan again. Archives, thumbnails and page media are never blocked, so keep the plan below the disk that holds MinIO: on a 2 TB disk, `STORAGE_QUOTA=1.5TB` leaves 500 GB for exports, previews, Postgres and temporary files.
 
 Setting a plan on an instance that already stores files does not delete anything: when the buckets already hold more than the plan, usage shows above 100 % and no new file is downloaded until space is freed or the plan is raised. Set the plan to at least the current usage shown on the dashboard, then click "Measure now" right after the restart, so the check starts from the real usage instead of zero (see [Known limitations](../reference/known-limitations.md)).
 

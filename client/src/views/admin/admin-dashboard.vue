@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, ArrowUpRight, Users, FolderOpen, Cloud, HardDrive, RefreshCw, Bell, AlertCircle, Check, FileArchive, UserCheck, UserPlus, MailPlus } from "lucide-vue-next"
+import { ArrowRight, ArrowUpRight, Users, FolderOpen, Cloud, CloudOff, HardDrive, RefreshCw, Bell, AlertCircle, Check, FileArchive, UserCheck, UserPlus, MailPlus } from "lucide-vue-next"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
@@ -65,7 +65,18 @@ const pendingFiles = computed(() => (data.value?.assets.byStatus.creating ?? 0) 
 const canRetryFiles = computed(() => pendingFiles.value > 0 && !storage.value?.quotaReachedAt && data.value?.jobs.downloading === 0)
 const failedExports = computed(() => data.value?.downloads.last7DaysByStatus.failed ?? 0)
 const missingAlertContact = computed(() => !!storage.value?.quotaBytes && data.value?.users.maintenanceContacts === 0)
-const attentionCount = computed(() => [!!data.value?.users.pendingApproval, canRetryFiles.value, failedExports.value > 0, missingAlertContact.value].filter(Boolean).length)
+const syncPaused = computed(() => !!data.value?.sync.paused)
+const failedSources = computed(() => data.value?.sources.filter((source) => source.state === 'failed') ?? [])
+const sourceStateLabels: Record<string, string> = { ok: 'Synced', failed: 'Failed', running: 'Syncing', never: 'Never synced' }
+const sourceStateVariant = (state: string) => state === 'failed' ? 'destructive' : state === 'ok' ? 'secondary' : 'outline'
+const syncStateLine = computed(() => {
+  if (!data.value) return ''
+  if (syncPaused.value) return 'Paused · storage full, no file is downloaded'
+  if (failedSources.value.length) return `${failedSources.value.length} ${failedSources.value.length === 1 ? 'source is' : 'sources are'} failing to sync`
+  if (data.value.jobs.downloading) return 'Files are downloading'
+  return data.value.sources.length === 1 ? 'Your asset library' : `${data.value.sources.length} sources are synchronising`
+})
+const attentionCount = computed(() => [!!data.value?.users.pendingApproval, syncPaused.value, failedSources.value.length > 0, canRetryFiles.value, failedExports.value > 0, missingAlertContact.value].filter(Boolean).length)
 const latestUserActivity = computed(() => {
   if (!data.value) return []
   const invitedEmails = new Set(data.value.recentInvitations.map((invitation) => invitation.email.toLocaleLowerCase()))
@@ -146,6 +157,16 @@ const approveUser = async (user: { id: string, name: string }) => {
      <span class="task-icon"><Users /></span>
      <div class="task-copy"><h3>{{ number(data.users.pendingApproval) }} {{ data.users.pendingApproval === 1 ? 'person is' : 'people are' }} waiting for access</h3><p>Review their details and decide who can join your workspace.</p></div>
      <Button as-child variant="outline" class="dv-button"><router-link :to="{ name: 'admin-users', query: { needsApproval: 'true' } }">Review requests <ArrowRight /></router-link></Button>
+    </div>
+    <div v-if="syncPaused" class="task-row">
+     <span class="task-icon task-icon--warning"><CloudOff /></span>
+     <div class="task-copy"><h3>Synchronisation is paused: the storage plan is full</h3><p>Since {{ formatDate(data.sync.pausedSince) }}, no file is downloaded from any cloud source. Free space or ask for a larger plan, then measure the storage to resume.</p></div>
+     <Button variant="outline" class="dv-button" :disabled="isWorking || data.jobs.measuring" @click="measureStorage">Measure now <ArrowRight /></Button>
+    </div>
+    <div v-if="failedSources.length" class="task-row">
+     <span class="task-icon task-icon--warning"><AlertCircle /></span>
+     <div class="task-copy"><h3>{{ failedSources.length === 1 ? `The source ${failedSources[0].name} failed to sync` : `${failedSources.length} sources failed to sync` }}</h3><p>{{ failedSources.length === 1 ? failedSources[0].lastError : 'Their last run ended with an error; the next attempt is in a few minutes.' }}</p></div>
+     <Button as-child variant="outline" class="dv-button"><router-link :to="{ name: 'admin-assets' }">View sources <ArrowRight /></router-link></Button>
     </div>
     <div v-if="canRetryFiles" class="task-row">
      <span class="task-icon"><RefreshCw /></span>
@@ -228,7 +249,7 @@ const approveUser = async (user: { id: string, name: string }) => {
 
     </div>
     <aside class="dashboard-aside" aria-label="Workspace health">
-     <section class="dv-panel health-panel"><div class="section-heading"><h2>Cloud synchronisation</h2><Cloud /></div><p class="sync-state">{{ storage.quotaReachedAt ? 'Paused · storage full' : data.jobs.downloading ? 'Files are downloading' : 'Your asset library' }}</p><dl class="health-list"><div><dt>Up to date</dt><dd>{{ number(data.assets.byStatus.up_to_date ?? 0) }} / {{ number(assetTotal) }}</dd></div><div><dt>Waiting for download</dt><dd>{{ data.assets.byStatus.creating ?? 0 }}</dd></div><div><dt>Outdated</dt><dd>{{ data.assets.byStatus.outdated ?? 0 }}</dd></div><div><dt>Download jobs</dt><dd>{{ data.jobs.downloading }}</dd></div></dl><Button variant="outline" class="dv-button full-width" :disabled="isWorking || data.jobs.downloading > 0" @click="retryPendingAssets"><RefreshCw />{{ data.jobs.downloading > 0 ? 'Downloading…' : 'Retry pending files' }}</Button><p class="small-note">Retries files waiting to download from your cloud storage.</p></section>
+     <section class="dv-panel health-panel"><div class="section-heading"><h2>Cloud synchronisation</h2><CloudOff v-if="syncPaused" /><Cloud v-else /></div><p class="sync-state" :class="{ 'sync-state--paused': syncPaused, 'sync-state--failed': !syncPaused && failedSources.length }">{{ syncStateLine }}</p><ul class="source-list" aria-label="Cloud sources"><li v-for="source in data.sources" :key="source.key" class="source-row"><span class="source-row__copy"><strong>{{ source.name }}</strong><small>{{ source.provider }} · {{ source.lastSuccessAt ? `synced ${formatDate(source.lastSuccessAt)}` : 'never synced' }}</small></span><Badge :variant="syncPaused ? 'outline' : sourceStateVariant(source.state)">{{ syncPaused ? 'Paused' : sourceStateLabels[source.state] }}</Badge></li></ul><router-link :to="{ name: 'admin-assets' }" class="stat-link">View sources <ArrowRight /></router-link><dl class="health-list"><div><dt>Up to date</dt><dd>{{ number(data.assets.byStatus.up_to_date ?? 0) }} / {{ number(assetTotal) }}</dd></div><div><dt>Waiting for download</dt><dd>{{ data.assets.byStatus.creating ?? 0 }}</dd></div><div><dt>Outdated</dt><dd>{{ data.assets.byStatus.outdated ?? 0 }}</dd></div><div><dt>Download jobs</dt><dd>{{ data.jobs.downloading }}</dd></div></dl><Button variant="outline" class="dv-button full-width" :disabled="isWorking || data.jobs.downloading > 0" @click="retryPendingAssets"><RefreshCw />{{ data.jobs.downloading > 0 ? 'Downloading…' : 'Retry pending files' }}</Button><p class="small-note">Retries files waiting to download from your cloud storage.</p></section>
      <section class="dv-panel capacity-panel"><div class="section-heading"><h2>{{ percent !== null && percent >= 80 ? 'Storage needs attention' : 'Storage' }}</h2><HardDrive /></div><div class="capacity-number">{{ formatStorage(storage.usedBytes) }}<span v-if="storage.quotaBytes"> / {{ formatStorage(storage.quotaBytes) }}</span></div><template v-if="storage.quotaBytes"><div class="storage-track" role="progressbar" aria-label="Storage used" :aria-valuenow="Math.min(100, Math.max(0, percent ?? 0))" :aria-valuetext="`${percent}% of storage plan used`"><div :style="{ width: barWidth }" :class="barColor"></div></div><p class="small-note">{{ percent }}% used · {{ formatStorage(Math.max(0, storage.quotaBytes - storage.usedBytes)) }} available</p></template><p v-else class="small-note">No storage limit configured.</p><Button variant="outline" class="dv-button full-width measure-button" :disabled="isWorking || data.jobs.measuring" @click="measureStorage"><HardDrive />{{ isMeasuring || data.jobs.measuring ? 'Measuring…' : 'Measure now' }}</Button><p class="small-note">Last measured {{ formatDate(storage.measuredAt) }}</p><details class="storage-details"><summary>What counts towards storage?</summary><p>Original files and generated previews count towards your usage. A hosting administrator can configure the plan with STORAGE_QUOTA.</p></details></section>
     </aside>
    </div>
@@ -290,6 +311,12 @@ const approveUser = async (user: { id: string, name: string }) => {
 .health-list div { display: flex; justify-content: space-between; padding: 6px 0; }
 .health-list dt { color: var(--dv-text-secondary); }
 .health-list dd { margin: 0; }
+.sync-state--paused, .sync-state--failed { color: var(--dv-color-danger, #b42318); font-weight: 600; }
+.source-list { display:flex; flex-direction:column; gap:8px; margin:12px 0; padding:0; list-style:none; }
+.source-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.source-row__copy { display:grid; min-width:0; gap:2px; }
+.source-row__copy strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.source-row__copy small { color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
 .full-width { width: 100%; }
 .small-note { color: var(--dv-text-secondary); font-size:var(--dv-size-caption); margin-top: 9px !important; }
 .health-panel > .small-note { text-align: center; font-size:var(--dv-size-caption); }

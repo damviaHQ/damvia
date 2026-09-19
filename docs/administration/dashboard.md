@@ -1,6 +1,6 @@
 ---
 title: Dashboard
-description: The admin recap at /admin with storage used against the plan, the paused-sync state, orphan cleanup, sync health, pending approvals and recent downloads.
+description: The admin recap at /admin with storage used against the plan, the paused-sync state, the state of every cloud source, orphan cleanup, pending approvals and recent downloads.
 sidebar:
   order: 2
 lastUpdated: 2026-09-19
@@ -14,11 +14,11 @@ The worker adds up every object of the two buckets every 30 minutes (`storage/me
 
 Between two measurements the total is kept current by adding the size of each file the worker uploads, so the figure never lags more than half an hour and never under-counts for long. Sizes reserved by downloads still running survive a measurement; they are only cleared when no `asset/update-content` job is active, which is how a reservation left by a crashed process disappears. "Last measured" gives the time of the last full listing.
 
-When a file from Dropbox or OneDrive no longer fits under the plan, the shared banner says that new files are not downloaded until space is freed.
+When a file no longer fits under the plan, synchronisation is paused for every source: the shared banner, the "Needs attention" panel and the "Cloud synchronisation" panel all say so until a measurement finds room again.
 
 ## The plan pauses the sync, not the DAM
 
-With `STORAGE_QUOTA` set, each `asset/update-content` job reserves the file's size against the plan before downloading anything. Ten files are processed at once, and the reservation is a single conditional `UPDATE`, so ten large videos cannot slip past the limit together. A file that does not fit stays `creating` or `outdated`, the job ends without a retry, and the worker logs `storage.quota-exceeded`.
+With `STORAGE_QUOTA` set, each `asset/update-content` job reserves the file's size against the plan before downloading anything. Ten files are processed at once, and the reservation is a single conditional `UPDATE`, so ten large videos cannot slip past the limit together. The first file that does not fit stays `creating` or `outdated`, the job ends without a retry, the worker logs `storage.quota-exceeded` and the plan is marked reached. From that moment **every download waits, from every source, including files that would still fit**: the reservation is refused while the plan is marked reached, so the library never fills to the last byte behind the administrator's back. Listing continues, so new files appear as "waiting for download" and folders deleted in the cloud still free space; only downloads stop. The pause ends when a measurement finds the usage back under the plan (see below).
 
 Everything else keeps working: users still browse, download archives, upload page media and collection thumbnails, and thumbnails of files already downloaded are still generated. That is why the plan must be smaller than the disk: on a 2 TB disk, a 1.5 TB plan leaves room for archives, previews, Postgres and temporary files.
 
@@ -46,14 +46,20 @@ An admin whose address is listed in `SERVER_ALERT_EMAILS` sees one more block, "
 2. Click "Measure now" instead of waiting for the next half hour. The button is disabled while a measurement is already waiting or running, and the server refuses a second one with `The storage is already being measured.` The button reads "Measuring…" until the new figures arrive, usually a few seconds, longer on a very large library, then a message gives the used space. If it takes more than two minutes the page says so and the figures update on their own when the worker is done.
 3. When a measurement finds the usage back under the plan, or no plan at all, and the sync was paused, the worker clears the pause, queues `asset/update-content` for every `creating` and `outdated` file on its own and logs `storage.quota-recovered`. Raising `STORAGE_QUOTA` is enough: after the restart, the next measurement resumes the sync without any file being deleted. "Retry pending files" does the same by hand and says how many files will be downloaded again. It is only available when no file download is waiting or running: the button then reads "Downloading N files…", and the server refuses the action with `Files are already being downloaded. Try again once they are done.` The cloud sync queues new files every 5 minutes, so the button is often disabled for a moment right after a sync pass.
 
-Files still too large for the remaining space are blocked again at their turn and logged; the rest downloads in order.
+While the pause lasts, "Retry pending files" is refused with `Synchronisation is paused because the storage plan is full. Free space or raise the plan, then measure the storage.`; the "Measure now" button in the "Needs attention" row is the way to resume. After a resume, a file still too large for the remaining space pauses everything again at its turn and is logged.
+
+## The Cloud synchronisation panel lists every source
+
+The panel in the right column names each configured [source](../integrations/sources.md) with its provider, the time of its last successful sync and a state: `Synced`, `Syncing`, `Failed` (its last run ended with an error, retried 5 minutes later) or `Never synced`; while the plan is full every source reads `Paused`. The line above the list sums it up: "Your asset library", "N sources are synchronising", "N sources are failing to sync", "Files are downloading" or "Paused · storage full, no file is downloaded". "View sources" opens the [assets tree](./assets-tree.md), whose root page carries the same states with counts and the last error text. The figures come from the `asset_sources` table, which the server refreshes at startup and after every run.
 
 ## Needs attention
 
 A compact panel opens the dashboard, above every total, only when there is something to act on:
 
 - **Access requests:** opens Users with the needs-approval filter.
-- **Files waiting to sync:** offers Retry files when pending or outdated files exist and no file downloads are running. When storage has paused synchronisation, the shared storage banner explains the blocker instead.
+- **Synchronisation paused:** shown while the plan is full, with the time the pause started and a "Measure now" button, since a measurement that finds room is what resumes the downloads.
+- **A source failed to sync:** names the source and shows its last error (or the number of failing sources) with a link to the assets tree.
+- **Files waiting to sync:** offers Retry files when pending or outdated files exist, no file downloads are running and the sync is not paused.
 - **Failed exports:** shows failures from the past seven days and offers a hosting-contact email link when configured.
 - **Missing storage-alert recipient:** opens Users to designate an administrator who receives maintenance emails.
 

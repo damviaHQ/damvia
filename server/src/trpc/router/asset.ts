@@ -18,6 +18,7 @@ import { z } from "zod"
 import { AssetFile } from "../../entity/asset-file"
 import { AssetFolder } from "../../entity/asset-folder"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
+import { assetSourceStatuses } from "../../services/asset"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
 export async function formatAssetFolder(assetFolder: AssetFolder) {
@@ -47,6 +48,15 @@ export async function formatAssetFile(file: AssetFile) {
 }
 
 export default router({
+	sources: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.query(async () => {
+			const [sources, [usage]] = await Promise.all([
+				assetSourceStatuses(),
+				dataSource.query('SELECT quota_reached_at FROM storage_usage WHERE id = 1') as Promise<{ quota_reached_at: Date | null }[]>,
+			])
+			return { sources, sync: { paused: !!usage?.quota_reached_at, pausedSince: usage?.quota_reached_at ?? null } }
+		}),
 	tree: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.query(async () => {

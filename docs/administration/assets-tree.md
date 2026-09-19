@@ -3,24 +3,24 @@ title: Assets tree
 description: Browse the folder tree synced from cloud storage, tag folders with types and licenses, and understand file statuses and thumbnails.
 sidebar:
   order: 7
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 The assets tree is the mirror of the cloud folder Damvia synchronizes from Dropbox or OneDrive. Administrators do not upload files here; they browse what the sync brought in and decide, per folder, which asset type and license apply. Everything else on this page happens in background jobs.
 
 ## The screen
 
-`/admin/assets/:id?` (admin only) has a resizable left panel headed `OneDrive Folders` that lists the root folders, and a main panel with a breadcrumb starting at `Assets`. Without an id it shows the root folders; with an id it shows:
+`/admin/assets/:id?` (admin only) has a resizable left panel headed `Cloud folders` that lists the root folders, and a main panel with a breadcrumb starting at `Assets`. In the left panel, clicking a folder's name or its chevron does the same thing: it opens the folder and expands or collapses its children.
+
+Without an id the main panel shows one card per configured [source](../integrations/sources.md): its name (the label or the cloud folder's name), the provider and the pointed root, a state (`Synced`, `Syncing`, `Failed`, `Never synced`, or `Paused` for every source while the storage plan is full), the number of folders and files, the files waiting for download, outdated or pending deletion, the time of the last successful sync, and the last error text when the last run failed. The card opens the source's top-level folder once it exists. While the plan is full a red notice above the cards explains that no file is downloaded from any source and how to resume, see [Dashboard](./dashboard.md). The figures refresh every 30 seconds.
+
+With an id the main panel shows:
 
 - an `Asset Type` select (`No asset type` or one of the types) and a `License` select (`No license` or one of the licenses), followed by a `Save` button,
 - the subfolders as folder icons,
 - the files with their thumbnail, an extension badge and their name.
 
 `Save` calls `asset.update`, which applies both selects to the folder, all its descendant folders and all files in them. The toast reads `Asset Types and License settings saved`. How each value is used is described in [Asset types](./asset-types.md) and [Licenses](./licenses.md).
-
-:::note
-The panel title says `OneDrive Folders` whatever `ASSET_UPDATER` is set to.
-:::
 
 ## What the sync writes
 

@@ -34,7 +34,9 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
+  CloudOff,
   Copyright,
   FileCog,
   Folder,
@@ -81,6 +83,17 @@ const { status, data: assets, error } = useQuery({
   queryKey: ["asset", "tree"],
   queryFn: () => trpc.asset.tree.query(),
 })
+const { data: sourceStatus } = useQuery({
+  queryKey: ["asset", "sources"],
+  queryFn: () => trpc.asset.sources.query(),
+  refetchInterval: 30_000,
+})
+const sources = computed(() => sourceStatus.value?.sources ?? [])
+const syncPaused = computed(() => !!sourceStatus.value?.sync.paused)
+const sourceStateLabels: Record<string, string> = { ok: 'Synced', failed: 'Failed', running: 'Syncing', never: 'Never synced' }
+const sourceStateVariant = (state: string) => state === 'failed' ? 'destructive' : state === 'ok' ? 'secondary' : 'outline'
+const formatDate = (value: string | Date | null | undefined) => value ? new Date(value).toLocaleString() : 'never'
+const number = (value: number) => value.toLocaleString()
 
 const assetPath = computed(() => {
   if (!asset.value) {
@@ -307,15 +320,35 @@ function getFileExtension(filename: string): string {
             </div>
             <span class="asset-browser__heading-mark"><HardDrive /></span>
           </header>
+          <Alert v-if="syncPaused" variant="destructive" class="asset-browser__pause">
+            <CloudOff />
+            <AlertTitle>Synchronisation is paused: the storage plan is full</AlertTitle>
+            <AlertDescription>Since {{ formatDate(sourceStatus?.sync.pausedSince) }}, no file is downloaded from any source. Folders and files are still listed, and deletions still free space. Free space or ask for a larger plan, then measure the storage from the dashboard to resume.</AlertDescription>
+          </Alert>
           <section class="asset-browser__section asset-browser__section--root" aria-labelledby="sources-heading">
             <div class="asset-browser__section-heading">
               <div>
                 <h2 id="sources-heading">Cloud sources</h2>
-                <p>Choose a source to explore its contents and defaults.</p>
+                <p>Each source is one cloud folder synchronised into the library. Choose one to explore its contents and defaults.</p>
               </div>
-              <span>{{ rootAssets.length }}</span>
+              <span>{{ sources.length || rootAssets.length }}</span>
             </div>
-            <div v-if="rootAssets.length" class="asset-grid asset-grid--sources">
+            <div v-if="sources.length" class="asset-grid asset-grid--sources">
+              <component :is="source.folderId ? 'router-link' : 'div'" v-for="source in sources" :key="source.key"
+                :to="source.folderId ? { name: 'admin-assets', params: { id: source.folderId } } : undefined"
+                class="asset-source asset-source--status dv-panel" :class="{ 'asset-source--failed': source.state === 'failed' && !syncPaused }">
+                <span class="asset-source__icon"><Server /></span>
+                <span class="asset-source__copy">
+                  <span class="asset-source__title"><strong>{{ source.name }}</strong><Badge :variant="syncPaused ? 'outline' : sourceStateVariant(source.state)">{{ syncPaused ? 'Paused' : sourceStateLabels[source.state] }}</Badge></span>
+                  <small>{{ source.provider }} · {{ source.root || 'whole account' }}</small>
+                  <small>{{ number(source.folders) }} {{ source.folders === 1 ? 'folder' : 'folders' }} · {{ number(source.files.up_to_date) }} {{ source.files.up_to_date === 1 ? 'file' : 'files' }}<template v-if="source.files.creating"> · {{ number(source.files.creating) }} waiting for download</template><template v-if="source.files.outdated"> · {{ number(source.files.outdated) }} outdated</template><template v-if="source.files.pending_deletion"> · {{ number(source.files.pending_deletion) }} pending deletion</template></small>
+                  <small>Last successful sync {{ formatDate(source.lastSuccessAt) }}<template v-if="source.state === 'running'"> · syncing since {{ formatDate(source.lastRunStartedAt) }}</template></small>
+                  <small v-if="source.lastError" class="asset-source__error">Last error: {{ source.lastError }}</small>
+                </span>
+                <span class="asset-source__action">{{ source.folderId ? 'Open' : '' }}</span>
+              </component>
+            </div>
+            <div v-else-if="rootAssets.length" class="asset-grid asset-grid--sources">
               <router-link v-for="folder in rootAssets" :key="folder.id"
                 :to="{ name: 'admin-assets', params: { id: folder.id } }" class="asset-source dv-panel">
                 <span class="asset-source__icon"><Server /></span>
@@ -399,6 +432,12 @@ function getFileExtension(filename: string): string {
 .asset-source__copy strong { overflow:hidden; color:var(--dv-color-midnight); font-size:var(--dv-size-body); font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
 .asset-source__copy small { color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
 .asset-source__action { color:var(--dv-action-primary); font-size:var(--dv-size-caption); font-weight:600; }
+.asset-source--status { align-items:start; }
+.asset-source--failed { border-color:var(--dv-color-danger, #b42318); }
+.asset-source__title { display:flex; align-items:center; gap:8px; min-width:0; }
+.asset-source__title strong { overflow:hidden; color:var(--dv-color-midnight); font-size:var(--dv-size-body); font-weight:650; text-overflow:ellipsis; white-space:nowrap; }
+.asset-source__error { color:var(--dv-color-danger, #b42318); white-space:normal; }
+.asset-browser__pause { margin-bottom:20px; }
 .asset-browser__empty { display:grid; justify-items:center; gap:9px; padding:52px 24px; text-align:center; }
 .asset-browser__empty > span { display:grid; place-items:center; width:48px; height:48px; margin-bottom:4px; border-radius:var(--dv-radius-graphic); background:var(--dv-action-soft); color:var(--dv-action-primary); }
 .asset-browser__empty h2 { font-size:var(--dv-size-body); }
