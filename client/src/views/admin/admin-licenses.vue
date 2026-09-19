@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { DialogClose } from "@/components/ui/dialog"
 import AdminList from "@/components/admin/AdminList.vue"
@@ -168,14 +169,13 @@ async function onModalSubmit(event: Event) {
 
 <template>
   <div class="admin-page admin-resource-page">
-    <div class="admin-heading">
-      <div><h1>Licenses</h1><p>Manage usage dates and regional permissions.</p></div>
+    <AdminPageHeader description="Manage usage dates and regional permissions.">
       <Button type="button" variant="default" @click="openCreateModal"
         class="dv-button dv-button--primary">
         <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add license
       </Button>
-    </div>
+    </AdminPageHeader>
 
     <div v-if="status === 'pending'">
       <Loader :text="true" />

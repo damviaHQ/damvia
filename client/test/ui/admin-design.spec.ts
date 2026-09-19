@@ -12,6 +12,7 @@ test('admin typography and icons follow shared tokens in pages and portals', asy
         downloads: { last7DaysByStatus: { completed: 12 } }, collections: { total: 6 },
         jobs: { downloading: 0, measuring: 0 }, storage: { usedBytes: 1024, quotaBytes: 10240, percent: 10, serverContactEmails: [], disk: null },
         recentUsers: [], recentInvitations: [], recentFiles: [], recentDownloads: [],
+        sync: { paused: false }, sources: [{ id: 'source-1', name: 'Dropbox', state: 'ok', lastSyncedAt: null }],
       }
       : responses[name] ?? []
     await route.fulfill({ json: { result: { data } } })
@@ -21,7 +22,7 @@ test('admin typography and icons follow shared tokens in pages and portals', asy
   const menu = page.locator('.menu-item').first()
   await expect(menu).toHaveCSS('font-size', '14px')
   await expect(menu.locator('svg')).toHaveCSS('width', '16px')
-  await expect(page.locator('.admin-heading h1')).toHaveCSS('font-size', '32px')
+  await expect(page.locator('.admin-heading h1')).toHaveCSS('font-size', '20px')
   const action = page.locator('.admin-heading button').first()
   await expect(action).toHaveCSS('font-size', '14px')
   await action.click()
@@ -36,9 +37,14 @@ test('admin typography and icons follow shared tokens in pages and portals', asy
   await page.keyboard.press('Escape')
   await expect(action).toBeFocused()
   await page.goto('/admin')
-  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toHaveCSS('font-size', '32px')
+  await expect(page.getByRole('heading', { name: 'Dashboard', exact: true })).toHaveCSS('font-size', '20px')
   await expect(page.locator('.overview-summary')).toBeVisible()
   await expect(page.locator('.admin-dashboard .dv-button').first()).toHaveCSS('font-size', '14px')
   await page.screenshot({ path: '/tmp/damvia-dashboard-sizing.png' })
+  await page.goto('/admin/products/attributes')
+  await expect(page.locator('.admin-topbar .dv-breadcrumb__label')).toHaveText(['Workspace', 'Records', 'Record attributes'])
+  await expect(page.getByRole('heading', { name: 'Record attributes', exact: true })).toBeVisible()
+  await page.goto('/admin/settings')
+  await expect(page.locator('.admin-topbar .dv-breadcrumb__current')).toHaveText('Settings')
   expect(errors).toEqual([])
 })

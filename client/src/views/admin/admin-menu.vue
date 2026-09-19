@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminDialogCreateCollection from "@/components/admin/AdminDialogCreateCollection.vue"
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import ItemDialog from "@/components/admin/menu-items/ItemDialog.vue"
 import ItemsTree from "@/components/admin/menu-items/ItemsTree.vue"
 import Loader from "@/components/Loader.vue"
@@ -39,8 +40,7 @@ const { data: menuItems, status, error } = useQuery({
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
     <div class="admin-menu-content">
-      <div class="admin-heading"><h1>Menu</h1>
-      <div class="admin-actions">
+      <AdminPageHeader>
         <ItemDialog>
           <Button type="button" variant="default" class="dv-button dv-button--primary">
             <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] max-w-[var(--dv-icon-compact)] max-h-[var(--dv-icon-compact)]" />
@@ -49,8 +49,7 @@ const { data: menuItems, status, error } = useQuery({
         </ItemDialog>
         <AdminDialogCreateCollection :modelValue="isAdminDialogCreateCollectionOpen"
           @update:modelValue="isAdminDialogCreateCollectionOpen = $event" />
-      </div>
-      </div>
+      </AdminPageHeader>
       <div class="dv-panel admin-menu-tree">
         <p class="admin-form-note">Drag items to change their order, or use Move up and Move down in an item’s menu. Open an item’s menu to edit it or set the home page.</p>
         <div v-if="!menuItems?.length" class="admin-empty"><h2>No menu items yet</h2><p>Add a collection, page or link to your navigation.</p></div>

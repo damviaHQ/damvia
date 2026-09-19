@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import AdminUserEdit from '@/components/admin/AdminUserEdit.vue'
 import Loader from '@/components/Loader.vue'
 import { Button } from '@/components/ui/button'
@@ -129,13 +130,10 @@ function exportCsv() {
 
 <template>
  <div class="admin-page admin-users">
-  <header class="admin-heading">
-   <div><h1>Users</h1><p v-if="store.user?.role === 'manager'">Users in your region.</p></div>
-   <div class="admin-actions">
-    <Button variant="outline" class="dv-button" :disabled="!verifiedEmailCount" @click="copyEmails"><ClipboardList />Copy emails</Button>
-    <Button variant="outline" class="dv-button" :disabled="!exportRecords.length" @click="exportCsv"><ArrowDownToLine />{{ selectedIds.length ? `Export ${selectedIds.length} selected` : 'Export users' }}</Button>
-   </div>
-  </header>
+  <AdminPageHeader :description="store.user?.role === 'manager' ? 'Users in your region.' : undefined">
+   <Button variant="outline" class="dv-button" :disabled="!verifiedEmailCount" @click="copyEmails"><ClipboardList />Copy emails</Button>
+   <Button variant="outline" class="dv-button" :disabled="!exportRecords.length" @click="exportCsv"><ArrowDownToLine />{{ selectedIds.length ? `Export ${selectedIds.length} selected` : 'Export users' }}</Button>
+  </AdminPageHeader>
   <Loader v-if="status === 'pending'" :text="true" />
   <div v-else-if="status === 'error'" class="admin-error" role="alert"><p>{{ error?.message }}</p><Button variant="outline" class="dv-button" @click="refetch()">Try again</Button></div>
   <section v-else class="dv-panel users-panel" aria-label="User directory">

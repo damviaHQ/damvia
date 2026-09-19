@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import Loader from "@/components/Loader.vue"
 import LayoutPageEditor from "@/layouts/LayoutPageEditor.vue"
 import { trpc } from "@/services/server.ts"
@@ -35,9 +36,11 @@ const { status, data: page, error } = useQuery({
     {{ error?.message }}
   </div>
   <div v-else-if="page" class="admin-page admin-resource-page">
-    <div class="admin-layout__top flex items-center mb-2">
-      <div class="admin-heading"><div><router-link :to="{ name: 'admin-pages' }" class="admin-back-link">← Pages</router-link><h1>{{ page.name }}</h1></div></div>
-    </div>
+    <AdminPageHeader :title="page.name">
+      <template #lead>
+        <router-link :to="{ name: 'admin-pages' }" class="admin-back-link">← Pages</router-link>
+      </template>
+    </AdminPageHeader>
     <LayoutPageEditor :page="page" />
   </div>
 </template>

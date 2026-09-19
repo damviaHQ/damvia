@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminDialogCreateCollection from "@/components/admin/AdminDialogCreateCollection.vue"
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import CollectionDialogEdit from "@/components/collection/CollectionDialogEdit.vue"
 import IconCloudSync from "@/components/icons/IconCloudSync.vue"
 import Loader from "@/components/Loader.vue"
@@ -126,14 +127,13 @@ async function confirmDeleteCollection() {
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
-    <div class="admin-heading">
-      <h1>Collections</h1>
+    <AdminPageHeader>
       <Button type="button" variant="default" @click="handleCreateCollection"
         class="dv-button dv-button--primary">
         <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add collection
       </Button>
-    </div>
+    </AdminPageHeader>
 
     <div v-if="!collections?.length" class="dv-panel admin-empty"><h2>No collections yet</h2><p>Create a collection to organize and share your assets.</p></div>
     <ul v-else class="admin-tree dv-panel">

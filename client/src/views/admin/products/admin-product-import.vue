@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -243,7 +244,7 @@ const isNewColumn = (column: string) => {
 <template>
   <div class="admin-page admin-resource-page">
     <div class="flex flex-col gap-5 mb-6">
-      <div class="admin-heading"><h1>Import records</h1></div>
+      <AdminPageHeader />
     </div>
 
     <div class="dv-panel p-6">

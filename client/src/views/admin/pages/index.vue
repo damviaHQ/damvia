@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { DialogClose } from "@/components/ui/dialog"
 import AdminList from "@/components/admin/AdminList.vue"
@@ -112,14 +113,13 @@ async function onModalSubmit(event: Event) {
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
-    <div class="admin-heading">
-      <div><h1>Pages</h1><p>Create and edit pages for your asset library.</p></div>
+    <AdminPageHeader description="Create and edit pages for your asset library.">
       <Button type="button" variant="default" @click="openCreateModal"
         class="dv-button dv-button--primary">
         <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add page
       </Button>
-    </div>
+    </AdminPageHeader>
     <AdminList :items="data" :fields="['name']" label="Pages" v-slot="{ items }">
     <Table>
       <TableHeader>

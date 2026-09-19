@@ -36,19 +36,31 @@ import {
   Users,
 } from "@lucide/vue"
 import { computed, ref, watch, provide } from "vue"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 import ClientLogo from '@/components/ClientLogo.vue'
 import PathBreadcrumb, { type PathBreadcrumbItem } from '@/components/navigation/PathBreadcrumb.vue'
 import '@/styles/admin.css'
 provide('damvia-admin-theme', true)
 const route = useRoute()
+const router = useRouter()
 const mobileOpen = ref(false)
 watch(() => route.fullPath, () => { mobileOpen.value = false })
-const pageTitle = computed(() => String(route.name ?? 'Administration').replace(/^admin-/, '').replace(/product/g, 'record').replace(/-/g, ' '))
-const adminBreadcrumbItems = computed<PathBreadcrumbItem[]>(() => [
-  { id: 'workspace', label: 'Workspace', to: { name: 'admin-dashboard' } },
-  { id: String(route.name ?? 'administration'), label: pageTitle.value },
-])
+// Child routes highlight no sidebar entry, so the breadcrumb is their only locator.
+const adminParents: Record<string, string> = {
+  'admin-product-import': 'admin-products',
+  'admin-product-attributes': 'admin-products',
+  'admin-page': 'admin-pages',
+}
+const routeTitle = (name: string) => String(router.resolve({ name }).meta.title ?? name)
+const adminBreadcrumbItems = computed<PathBreadcrumbItem[]>(() => {
+  const name = String(route.name ?? 'admin-dashboard')
+  const parent = adminParents[name]
+  return [
+    { id: 'workspace', label: 'Workspace', to: { name: 'admin-dashboard' } },
+    ...(parent ? [{ id: parent, label: routeTitle(parent), to: { name: parent } }] : []),
+    { id: name, label: String(route.meta.title ?? 'Administration') },
+  ]
+})
 export type Asset = RouterOutput["asset"]["tree"][number]
 
 const globalStore = useGlobalStore()
@@ -100,7 +112,7 @@ const storageLevel = computed(() => {
             </router-link>
             <router-link :to="{ name: 'admin-settings' }" class="menu-item">
               <Settings class="w-4 h-4 mr-2" />
-              Global Settings
+              Settings
             </router-link>
           </div>
           <!-- Content Management -->
@@ -233,7 +245,6 @@ const storageLevel = computed(() => {
 .skip-link:focus { transform:none; }
 .admin-topbar { min-height:65px; padding:12px 36px; display:flex; align-items:center; justify-content:space-between; gap:16px; background:white; border-bottom:1px solid var(--dv-color-line); font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
 .admin-topbar > :deep(.dv-breadcrumb) { flex:1; min-width:0; }
-.admin-topbar :deep(.dv-breadcrumb__current) { text-transform:capitalize; }
 .admin-topbar .dv-button { font-size:var(--dv-size-caption); }
 .mobile-nav-toggle { display:none; }
 @media(max-width:760px) {

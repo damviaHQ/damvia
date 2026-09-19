@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -147,7 +148,7 @@ const approveUser = async (user: { id: string, name: string }) => {
 
 <template>
  <div class="admin-dashboard page">
-  <div class="page-heading"><div><h1>Dashboard</h1></div><Button as-child variant="outline" class="dv-button"><router-link :to="{ name: 'admin-users' }"><Users />Manage users<ArrowUpRight /></router-link></Button></div>
+  <AdminPageHeader><Button as-child variant="outline" class="dv-button"><router-link :to="{ name: 'admin-users' }"><Users />Manage users<ArrowUpRight /></router-link></Button></AdminPageHeader>
   <Loader v-if="status === 'pending'" :text="true" />
   <Alert v-else-if="status === 'error'" variant="destructive"><AlertTitle>Failed to load the dashboard</AlertTitle><AlertDescription>{{ error?.message }}<Button variant="outline" class="dv-button" @click="refetch()">Try again</Button></AlertDescription></Alert>
   <template v-else-if="data && storage">
@@ -274,10 +275,6 @@ const approveUser = async (user: { id: string, name: string }) => {
 
 <style scoped>
 .page { container-type:inline-size; padding: 39px 36px 32px; max-width: 1540px; margin: auto; }
-.page-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 30px; }
-.page-heading h1 { font-size: var(--dv-size-heading); }
-.page-heading p { color: var(--dv-text-secondary); font-size:var(--dv-size-caption); margin-top: 10px; }
-.page-heading .dv-button { flex-shrink: 0; }
 .overview-summary { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 0 0 28px; }
 .overview-summary > div { display: flex; align-items: baseline; gap: 8px; }
 .overview-summary dt { font-size:var(--dv-size-caption); color: var(--dv-text-secondary); }
@@ -375,8 +372,8 @@ const approveUser = async (user: { id: string, name: string }) => {
 .activity-row time { flex:0 0 auto; max-width:38%; color:var(--dv-text-secondary); font-size:var(--dv-size-caption); text-align:right; }
 .activity-empty { padding:21px 0; border-bottom:1px solid var(--dv-color-line); color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
 @media(max-width:1200px) { .dashboard-grid { grid-template-columns:minmax(0,1fr) 270px; gap:18px; } }
-@media(max-width:1000px) { .dashboard-grid { grid-template-columns:1fr; } .dashboard-aside { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .page-heading { align-items:flex-start; } .activity-columns { grid-template-columns:1fr; } }
-@media(max-width:600px) { .page { padding:28px 20px; } .page-heading { flex-direction:column; } .dashboard-aside { display:flex; } .user-activity-panel .section-heading, .user-activity-row { padding-left:16px; padding-right:16px; } .user-activity-row { flex-wrap:wrap; } .approve-button, .activity-state { margin-left:51px; } .recent-asset { padding:16px; flex-wrap:wrap; } .asset-meta { margin-left:65px; text-align:left; max-width:100%; } .asset-name { flex:1; } .panel-foot { flex-wrap:wrap; } .activity-row time { display:none; } }
+@media(max-width:1000px) { .dashboard-grid { grid-template-columns:1fr; } .dashboard-aside { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .activity-columns { grid-template-columns:1fr; } }
+@media(max-width:600px) { .page { padding:28px 20px; } .dashboard-aside { display:flex; } .user-activity-panel .section-heading, .user-activity-row { padding-left:16px; padding-right:16px; } .user-activity-row { flex-wrap:wrap; } .approve-button, .activity-state { margin-left:51px; } .recent-asset { padding:16px; flex-wrap:wrap; } .asset-meta { margin-left:65px; text-align:left; max-width:100%; } .asset-name { flex:1; } .panel-foot { flex-wrap:wrap; } .activity-row time { display:none; } }
 
 /* Use the available dashboard width, including the space taken by navigation. */
 @container (min-width:1120px) {

@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { DialogClose } from "@/components/ui/dialog"
 import AdminList from "@/components/admin/AdminList.vue"
@@ -153,13 +154,12 @@ async function onModalSubmit(event: Event) {
 
 <template>
   <div class="admin-page admin-resource-page">
-    <div class="admin-heading">
-      <div><h1>Record attributes</h1><p>Choose which record fields appear in lists, filters and search.</p></div>
+    <AdminPageHeader description="Choose which record fields appear in lists, filters and search.">
       <Button variant="default" @click="openCreateModal" class="dv-button dv-button--primary">
         <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add attribute
       </Button>
-    </div>
+    </AdminPageHeader>
     <div v-if="productAttributes && !productAttributes.length" class="admin-text-secondary flex items-center gap-2">
       You must first <router-link :to="{ name: 'admin-product-import' }" class="underline flex items-center gap-2">
         <FileUp class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />import products data

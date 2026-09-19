@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import Loader from "@/components/Loader.vue"
 import { Button } from "@/components/ui/button"
@@ -549,8 +550,7 @@ onUnmounted(() => {
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page admin-products">
     <div class="admin-product-toolbar">
-      <div class="flex items-center gap-5">
-        <div class="admin-heading"><h1>Records</h1></div>
+      <AdminPageHeader>
         <Button as-child variant="outline"><router-link :to="{ name: 'admin-product-attributes' }"><Blocks class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />Attributes</router-link></Button>
         <Button v-if="data?.products.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
           class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
@@ -575,7 +575,7 @@ onUnmounted(() => {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
+      </AdminPageHeader>
       <Pagination v-if="data && data.products.length" :total="totalItems" :sibling-count="1" show-edges
         :default-page="currentPage" v-model:page="currentPage" :items-per-page="pageSize">
         <PaginationList v-slot="{ items }" class="flex items-center gap-1">

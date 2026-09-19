@@ -3,7 +3,7 @@ title: Administration
 description: Map of every admin screen, what it manages, and which role can open it.
 sidebar:
   order: 1
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 The administration area lives under `/admin/...` in the client and is reached from the account menu of the main layout ("Administration" opens the dashboard, "Manage Users" the user list). It groups everything a self-hoster or an administrator changes after the instance is running: who can log in, how assets are typed and licensed, what the menu and pages look like, and how the product catalogue is wired to files.
@@ -16,7 +16,7 @@ The routes below are declared in `client/src/router/index.ts`. The sidebar label
 | --- | --- | --- | --- | --- |
 | `/admin` | Dashboard | (top level) | Workspace totals, recent files, actionable access/sync/export issues, storage and cloud health | admin |
 | `/admin/analytics` | Insights | (top level) | Usage reports, interactive user activity map, search demand, audience email drafts and CSV exports | admin |
-| `/admin/settings` | Global Settings | (top level) | Brand Logo upload and login background image | admin |
+| `/admin/settings` | Settings | (top level) | Brand Logo upload and login background image | admin |
 | `/admin/menu-items` | Menu | Content Management | The navigation tree shown to users: collections, pages, text links, dividers, home item | admin |
 | `/admin/collections` | Collections | Content Management | The public collection tree: create, edit, delete | admin |
 | `/admin/pages` and `/admin/pages/:id` | Pages | Content Management | Standalone pages and their block layout | admin |
@@ -46,7 +46,7 @@ Each screen is documented on its own page:
 
 ## Managers only see the Users screen
 
-The sidebar renders the whole User Management section for the roles `admin` and `manager`, but inside it only the Users link is shown to managers. Groups, Regions and Authorized Domains are wrapped in an `admin` check. Every other section (Dashboard, Insights, Global Settings, Content Management, Asset Management, PIM) is rendered only for `admin`, and so is the storage banner above the admin pages.
+The sidebar renders the whole User Management section for the roles `admin` and `manager`, but inside it only the Users link is shown to managers. Groups, Regions and Authorized Domains are wrapped in an `admin` check. Every other section (Dashboard, Insights, Settings, Content Management, Asset Management, PIM) is rendered only for `admin`, and so is the storage banner above the admin pages.
 
 A manager who opens `/admin/users` is further limited to the users of their own region. The rules are detailed in [Users and approval](./users-and-approval.md).
 
@@ -78,6 +78,8 @@ All admin screens talk to the tRPC API under `server/src/trpc/router/`. Most of 
 ## Admin interface
 
 Admin pages share square buttons, inputs and navigation states, with rounded panels and dialogs. The configuration lists include local search, result counts and pagination. Settings names the uploaded image **Brand Logo**. Portaled dialogs, dropdowns and selectors inherit the admin theme; portal pages retain their own styling.
+
+Every admin screen states its name once. The breadcrumb in the top bar carries the location, starting at `Workspace`, and the page's own heading sits on the same line as its buttons, at the compact page-title size rather than a display size. Screens that add nothing beyond the name show only the heading; the rest add one sentence of description under it. The three screens without a sidebar entry of their own — record import, record attributes and the page editor — name their parent in the breadcrumb, so `Workspace › Records › Record attributes`.
 
 The sidebar keeps branding, storage usage and the account footer visible while its compact navigation scrolls independently.
 

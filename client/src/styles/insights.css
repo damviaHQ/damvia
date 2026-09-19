@@ -16,9 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .insights-page {
   --insights-blue: var(--dv-action-primary);
 }
-.dv-admin .insights-heading {
-  margin-bottom: 24px;
-}
 .insights-period {
   gap: 10px;
   min-width: 174px;
@@ -106,9 +103,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
   padding: 6px 0 0;
 }
 .report-title h2 {
-  font-size: 21px;
-  font-weight: 550;
-  letter-spacing: -0.025em;
+  font-size: var(--dv-size-section);
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 .report-title p {
   font-size: 12px;
@@ -695,9 +692,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 @media (max-width: 540px) {
   .dv-admin .insights-page {
     padding: 24px 14px;
-  }
-  .insights-heading {
-    gap: 16px;
   }
   .insights-period {
     width: 100%;

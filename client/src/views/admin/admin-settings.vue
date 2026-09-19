@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
@@ -123,7 +124,7 @@ const removeBackgroundImage = async () => {
 <template>
   <div class="admin-page admin-resource-page">
     <div class="settings-sections">
-      <div class="admin-heading"><h1>Settings</h1></div>
+      <AdminPageHeader />
 
       <section class="dv-panel branding-settings">
         <h2>Brand Logo</h2>
@@ -166,7 +167,7 @@ const removeBackgroundImage = async () => {
 .branding-settings { padding:28px; max-width:780px; margin-top:0; }
 .settings-sections { display:grid; gap:24px; }
 .settings-sections > .admin-heading { margin-bottom:4px; }
-.branding-settings h2 { font-size:22px; margin-bottom:12px; }
+.branding-settings h2 { font-size:var(--dv-size-section); margin-bottom:12px; }
 .branding-settings p { color:var(--dv-text-secondary); font-size:var(--dv-size-body); margin-top:8px; }
 .logo-preview { display:flex; align-items:center; justify-content:center; height:110px; max-width:300px; margin:24px 0; background:white; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-graphic); }
 .logo-preview img { max-width:260px; max-height:80px; object-fit:contain; }

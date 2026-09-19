@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import InsightsChart from '@/components/analytics/InsightsChart.vue'
 import InsightsTable from '@/components/analytics/InsightsTable.vue'
 import { Button } from '@/components/ui/button'
@@ -483,11 +484,7 @@ const exportTerms = () =>
 
 <template>
   <div class="admin-page insights-page">
-    <div class="admin-heading insights-heading">
-      <div>
-        <h1>Insights</h1>
-        <p>Turn library activity into better decisions.</p>
-      </div>
+    <AdminPageHeader description="Turn library activity into better decisions.">
       <Popover v-model:open="dateOpen">
         <PopoverTrigger as-child
           ><Button variant="outline" class="insights-period"
@@ -518,7 +515,7 @@ const exportTerms = () =>
           </form>
         </PopoverContent>
       </Popover>
-    </div>
+    </AdminPageHeader>
     <div class="insights-workspace">
       <nav class="insights-nav" aria-label="Insights reports">
         <span class="nav-caption">Reports</span>

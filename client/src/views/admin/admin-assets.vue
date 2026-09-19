@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import AdminAssetsLinkTree from "@/components/admin/AdminAssetsLinkTree.vue"
 import Loader from "@/components/Loader.vue"
@@ -214,13 +215,13 @@ function getFileExtension(filename: string): string {
           {{ assetError?.message ?? 'The folder could not be loaded.' }}
         </div>
         <template v-else-if="asset">
-          <header class="asset-browser__page-heading">
-            <div>
-              <span class="asset-browser__eyebrow">Folder</span>
-              <h1>{{ asset.name }}</h1>
-              <p>{{ childFolders.length }} {{ childFolders.length === 1 ? 'folder' : 'folders' }} · {{ assetFiles.length }} {{ assetFiles.length === 1 ? 'file' : 'files' }}</p>
-            </div>
-          </header>
+          <AdminPageHeader
+            class="asset-browser__page-heading"
+            :title="asset.name"
+            :description="`${childFolders.length} ${childFolders.length === 1 ? 'folder' : 'folders'} · ${assetFiles.length} ${assetFiles.length === 1 ? 'file' : 'files'}`"
+          >
+            <template #lead><span class="asset-browser__eyebrow">Folder</span></template>
+          </AdminPageHeader>
 
           <section class="asset-settings dv-panel" aria-labelledby="asset-settings-heading">
             <div class="asset-settings__intro">
@@ -312,14 +313,13 @@ function getFileExtension(filename: string): string {
           </section>
         </template>
         <template v-else>
-          <header class="asset-browser__page-heading asset-browser__page-heading--root">
-            <div>
-              <span class="asset-browser__eyebrow">Asset management</span>
-              <h1>Assets</h1>
-              <p>Browse the folders and files connected to your cloud storage.</p>
-            </div>
+          <AdminPageHeader
+            class="asset-browser__page-heading asset-browser__page-heading--root"
+            description="Browse the folders and files connected to your cloud storage."
+          >
+            <template #lead><span class="asset-browser__eyebrow">Asset management</span></template>
             <span class="asset-browser__heading-mark"><HardDrive /></span>
-          </header>
+          </AdminPageHeader>
           <Alert v-if="syncPaused" variant="destructive" class="asset-browser__pause">
             <CloudOff />
             <AlertTitle>Synchronisation is paused: the storage plan is full</AlertTitle>
@@ -386,9 +386,8 @@ function getFileExtension(filename: string): string {
 .asset-browser__handle :deep(svg) { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 .asset-browser__main { width:100%; height:100%; overflow-y:auto; padding:30px clamp(24px,3.2vw,52px) 56px; }
 .asset-browser__breadcrumb { min-height:24px; color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
-.asset-browser__page-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding:36px 0 30px; }
-.asset-browser__page-heading h1 { margin-left:-.03em; color:var(--dv-color-midnight); font-size:var(--dv-size-heading); font-weight:650; }
-.asset-browser__page-heading p { max-width:62ch; margin-top:8px; color:var(--dv-text-secondary); font-size:var(--dv-size-body); }
+.dv-admin .asset-browser__page-heading { padding:36px 0 30px; margin-bottom:0; }
+.asset-browser__page-heading :deep(p) { max-width:62ch; }
 .asset-browser__eyebrow { display:block; margin-bottom:8px; color:var(--dv-action-primary); font-size:var(--dv-size-caption); font-weight:650; letter-spacing:.11em; text-transform:uppercase; }
 .asset-browser__heading-mark { width:64px; height:64px; border-radius:var(--dv-radius-graphic); }
 .asset-browser__heading-mark :deep(svg) { width:25px; height:25px; }
@@ -451,7 +450,7 @@ function getFileExtension(filename: string): string {
 @media(max-width:760px) {
   .asset-browser__sidebar, .asset-browser__handle { display:none; }
   .asset-browser__main { padding:24px 20px 44px; }
-  .asset-browser__page-heading { padding:28px 0 24px; }
+  .dv-admin .asset-browser__page-heading { padding:28px 0 24px; }
   .asset-browser__heading-mark { display:none; }
   .asset-settings__fields { grid-template-columns:1fr; }
   .asset-grid--folders, .asset-grid--files, .asset-grid--sources { grid-template-columns:1fr; }
