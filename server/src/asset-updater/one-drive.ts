@@ -29,7 +29,6 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 	private readonly credential: ClientSecretCredential
 	private readonly authProvider: TokenCredentialAuthenticationProvider
 	private readonly graphClient: GraphClient
-	private rootId: string | null = null
 
 	constructor(
 		private readonly tenantId: string,
@@ -47,22 +46,21 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 	}
 
 	async initialize() {
-		const root = await this.graphClient.api(`/users/${this.user}/drive/${this.drive}`).get() as DriveItem
-		if (!root.id) throw new Error('OneDrive drive root without id')
-		this.rootId = root.id
-		logger.info('OneDrive drive', {
-			user: this.user,
-			drive: this.drive,
-			rootId: root.id,
-			rootName: root.name,
-			childCount: root.folder?.childCount,
-		})
+		try {
+			const root = await this.graphClient.api(`/users/${this.user}/drive/${this.drive}`).get() as DriveItem
+			logger.info('OneDrive drive', {
+				user: this.user,
+				drive: this.drive,
+				rootId: root.id,
+				rootName: root.name,
+				childCount: root.folder?.childCount,
+			})
+		} catch (error) {
+			logger.error('OneDrive drive check failed, the sync will retry every run', { error: error.message })
+		}
 	}
 
 	async fetchUpdates() {
-		if (!this.rootId) await this.initialize()
-		const rootId = this.rootId!
-
 		const items: DriveItem[] = []
 		let nextLink: string | undefined = `/users/${this.user}/drive/${this.drive}/delta`
 		while (nextLink) {
@@ -72,7 +70,7 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 		}
 		logger.info(`Fetched ${items.length} entries from OneDrive`)
 
-		const plan = planDriveItems(items, rootId)
+		const plan = planDriveItems(items)
 		if (plan.folders.length === 0 && plan.files.length === 0) {
 			logger.warn('OneDrive listing is empty, skipping sync to avoid deleting all assets. Check ONEDRIVE_USER, ONEDRIVE_DRIVE and the application permissions.')
 			return

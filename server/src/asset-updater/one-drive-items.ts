@@ -22,20 +22,39 @@ export type DriveItemPlan = {
 	skipped: number
 }
 
-function pathDepth(item: DriveItem): number {
-	return (item.parentReference?.path ?? '').split('/').filter(Boolean).length
+// Delta responses never carry parentReference.path, so depth is derived by
+// following parent ids through the feed itself. Unknown parents count as depth 0.
+function folderDepths(folders: DriveItem[]): Map<string, number> {
+	const byId = new Map(folders.map((folder) => [folder.id!, folder]))
+	const depths = new Map<string, number>()
+	const depthOf = (id: string, seen: Set<string>): number => {
+		const known = depths.get(id)
+		if (known !== undefined) return known
+		const parentId = byId.get(id)?.parentReference?.id
+		const depth = parentId && byId.has(parentId) && !seen.has(parentId)
+			? depthOf(parentId, seen.add(id)) + 1
+			: 0
+		depths.set(id, depth)
+		return depth
+	}
+	for (const folder of folders) depthOf(folder.id!, new Set())
+	return depths
 }
 
-export function planDriveItems(items: DriveItem[], rootId: string): DriveItemPlan {
-	const folders: (UpsertFolderOptions & { depth: number })[] = []
+// Mirrors the feed exactly as production always did: the drive root is kept
+// as a top-level folder (its parent reference has no id), every other item
+// keeps its Graph parent id, size-0 items (empty folders and files) are skipped,
+// and eTag stays the checksum so an upgrade never re-parents, re-downloads or
+// deletes anything.
+export function planDriveItems(items: DriveItem[]): DriveItemPlan {
+	const folderItems: DriveItem[] = []
 	const files: UpsertFileOptions[] = []
 	let skipped = 0
 
 	for (const item of items) {
 		const name = item.name
 		if (
-			!item.id || !name || name.startsWith('.') ||
-			item.root !== undefined || item.id === rootId ||
+			!item.id || !name || name.startsWith('.') || name.includes('\0') || item.size === 0 ||
 			item.deleted !== undefined ||
 			(item.folder === undefined && item.file === undefined)
 		) {
@@ -43,33 +62,31 @@ export function planDriveItems(items: DriveItem[], rootId: string): DriveItemPla
 			continue
 		}
 
-		const parentId = item.parentReference?.id
-		const parentExternalId = !parentId || parentId === rootId ? '' : parentId
+		const parentExternalId = item.parentReference?.id ?? ''
 
 		if (item.folder !== undefined) {
-			folders.push({ externalId: item.id, parentExternalId, name, depth: pathDepth(item) })
-			continue
-		}
-
-		if (!item.size) {
-			skipped += 1
+			folderItems.push(item)
 			continue
 		}
 
 		files.push({
 			externalId: item.id,
-			externalChecksum: item.cTag ?? item.eTag ?? '',
+			externalChecksum: item.eTag ?? '',
 			folderExternalId: parentExternalId,
 			name,
-			size: item.size,
+			size: item.size ?? 0,
 			mimeType: item.file?.mimeType || lookup(name) || 'application/octet-stream',
 		})
 	}
 
-	folders.sort((a, b) => a.depth - b.depth)
-	return {
-		folders: folders.map(({ depth, ...folder }) => folder),
-		files,
-		skipped,
-	}
+	const depths = folderDepths(folderItems)
+	const folders = folderItems
+		.map((item, index) => ({ item, index, depth: depths.get(item.id!) ?? 0 }))
+		.sort((a, b) => a.depth - b.depth || a.index - b.index)
+		.map(({ item }) => ({
+			externalId: item.id!,
+			parentExternalId: item.parentReference?.id ?? '',
+			name: item.name!,
+		}))
+	return { folders, files, skipped }
 }
