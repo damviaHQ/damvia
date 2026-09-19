@@ -92,15 +92,22 @@ export async function createDownloadArchive({ em, download }: CreateDownloadArch
 	await em.getRepository(Download).save(download)
 }
 
+// Cloud storage names end up in a Content-Disposition header and in archive
+// entry paths; Google Drive allows slashes, quotes and control characters in them.
+export function safePathComponent(name: string): string {
+	const cleaned = name.replace(/[\/\\"\u0000-\u001f\u007f]/g, '_').trim()
+	return cleaned === '' || cleaned === '.' || cleaned === '..' ? '_' : cleaned
+}
+
 export function formatFileName(download: Download, assetFile: AssetFile, collection: Collection | null) {
-	let filename = assetFile.name
+	let filename = safePathComponent(assetFile.name)
 	if (assetFile.mimeType.startsWith('image/') && download.imageFormat !== DownloadImageFormat.ORIGINAL) {
-		const filenameParts = assetFile.name.split('.').slice(0, -1)
+		const filenameParts = filename.split('.').slice(0, -1)
 		filename = filenameParts.length > 0
 			? `${filenameParts.join('.')}.${download.imageFormat}`
 			: `${filename}.${download.imageFormat}`
 	} else if (assetFile.mimeType.startsWith('video/') && download.videoFormat !== DownloadVideoFormat.ORIGINAL) {
-		const filenameParts = assetFile.name.split('.').slice(0, -1)
+		const filenameParts = filename.split('.').slice(0, -1)
 		filename = filenameParts.length > 0
 			? `${filenameParts.join('.')}.${download.videoFormat}`
 			: `${filename}.${download.videoFormat}`
@@ -108,7 +115,7 @@ export function formatFileName(download: Download, assetFile: AssetFile, collect
 
 	const path = [filename]
 	for (let current = collection; current; current = current.parent) {
-		path.push(current.name)
+		path.push(safePathComponent(current.name))
 	}
 	return path.reverse().join('/')
 }

@@ -21,7 +21,8 @@ process.env.MAILCONFIG = Buffer.from('{}').toString('base64')
 const env = require('../dist/env')
 const credentials = require('../dist/services/credentials')
 const { formatBytes } = require('../dist/services/storage')
-const { formatFileName } = require('../dist/services/download')
+const { formatFileName, safePathComponent } = require('../dist/services/download')
+const { resolveMimeType } = require('../dist/services/asset')
 const { compact } = require('../dist/util/array')
 const { Collection } = require('../dist/entity/collection')
 
@@ -100,4 +101,28 @@ test('download file names swap the extension only for converted images and video
     assert.equal(formatFileName({ imageFormat: 'jpg', videoFormat: 'mp4' }, document, null), 'brief.pdf')
     const chain = { name: 'Child', parent: { name: 'Root', parent: null } }
     assert.equal(formatFileName(original, image, chain), 'Root/Child/photo.final.png')
+})
+
+test('cloud storage names cannot inject headers or escape the archive folder', () => {
+    assert.equal(safePathComponent('a/b\\c"d\r\ne.jpg'), 'a_b_c_d__e.jpg')
+    assert.equal(safePathComponent('..'), '_')
+    assert.equal(safePathComponent(' . '), '_')
+    const evil = { name: '../../etc/passwd"; x="y\n', mimeType: 'image/png' }
+    const chain = { name: '..', parent: { name: 'Root/..', parent: null } }
+    const entry = formatFileName({ imageFormat: 'original', videoFormat: 'original' }, evil, chain)
+    assert.equal(entry, 'Root_../_/.._.._etc_passwd_; x=_y_')
+    assert.ok(entry.split('/').every(part => part !== '..' && part !== '.'), 'no traversal component')
+    const swapped = formatFileName({ imageFormat: 'jpg', videoFormat: 'original' }, evil, null)
+    assert.equal(swapped, '.._..jpg')
+    assert.doesNotMatch(swapped + entry, /[\/"\r\n]{2}|["\r\n]/)
+})
+
+test('a listing MIME type is kept only when the content cannot be identified and it is not active content', () => {
+    assert.equal(resolveMimeType({ ext: 'png', mime: 'image/png' }, 'text/html'), 'image/png')
+    assert.equal(resolveMimeType({ ext: 'webp', mime: 'image/webp' }, null), 'image/webp')
+    assert.equal(resolveMimeType(null, 'text/csv'), 'text/csv')
+    assert.equal(resolveMimeType(undefined, 'application/pdf'), 'application/pdf')
+    for (const active of ['text/html', 'TEXT/HTML', 'image/svg+xml', 'application/javascript', 'application/xml']) assert.equal(resolveMimeType(null, active), 'application/octet-stream')
+    assert.equal(resolveMimeType(null, null), 'application/octet-stream')
+    assert.equal(resolveMimeType(null, ''), 'application/octet-stream')
 })

@@ -63,6 +63,16 @@ export async function tmpFile() {
 	return join(dir, uuid())
 }
 
+// Listing types a browser would execute if the object were opened directly from
+// the assets bucket; when the content cannot be identified, these fall back to a
+// download instead of being trusted.
+const ACTIVE_CONTENT_MIMETYPES = new Set(['text/html', 'application/xhtml+xml', 'image/svg+xml', 'application/javascript', 'text/javascript', 'application/xml', 'text/xml'])
+
+export function resolveMimeType(detected: { ext: string, mime: string } | null | undefined, listed: string | null | undefined): string {
+	if (detected) return detected.ext === 'webp' ? 'image/webp' : detected.mime
+	return listed && !ACTIVE_CONTENT_MIMETYPES.has(listed.toLowerCase()) ? listed : 'application/octet-stream'
+}
+
 export async function updateFileContent(file: AssetFile): Promise<void> {
 	const size = parseInt(file.size, 10) || 0
 	if (!(await reserveStorage(size))) {
@@ -86,7 +96,7 @@ async function uploadFileContent(file: AssetFile, size: number): Promise<void> {
 			logger.error(`Failed to detect file type (asset file id: ${file.id}): ${error.message}`)
 			return null;
 		})
-		file.mimeType = fileType?.ext === 'webp' ? 'image/webp' : (fileType?.mime ?? file.mimeType ?? 'application/octet-stream')
+		file.mimeType = resolveMimeType(fileType, file.mimeType)
 
 		await assetsS3().fPutObject(assetsS3Bucket(), file.originalStorageKey, contentPath, {
 			'Content-Type': file.mimeType,
