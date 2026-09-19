@@ -3,10 +3,10 @@ title: Dropbox
 description: Create a Dropbox app, obtain a refresh token, and choose between a member's folder and the Business team space.
 sidebar:
   order: 2
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
-The Dropbox driver (`server/src/asset-updater/dropbox.ts`) lists the whole Dropbox recursively every 5 minutes and downloads file contents on demand, using an app key, an app secret and a long-lived refresh token. Nothing is written to Dropbox.
+The Dropbox driver (`server/src/asset-updater/dropbox.ts`) lists the Dropbox, or one folder of it, recursively every 5 minutes and downloads file contents on demand, using an app key, an app secret and a long-lived refresh token. Nothing is written to Dropbox. It behaves like the [OneDrive driver](onedrive.md) and gives the same tree: one top-level folder when a folder is pointed at, the same skipped items, the same protections around deletion.
 
 ## Variables
 
@@ -17,6 +17,7 @@ The Dropbox driver (`server/src/asset-updater/dropbox.ts`) lists the whole Dropb
 | `DROPBOX_APP_SECRET` | The app secret |
 | `DROPBOX_REFRESH_TOKEN` | A refresh token obtained once through the OAuth flow, see below |
 | `DROPBOX_USE_TEAM_ROOT` | `false` (default) to sync the connected member's home folder, `true` to sync the Business team space |
+| `DROPBOX_ROOT_PATH` | Empty (default) for the whole Dropbox, or a folder such as `/Marketing/Assets` to sync only that subtree. Either way there is one top-level asset folder, like `ONEDRIVE_DRIVE`. |
 
 ## 1. Create the app
 
@@ -61,23 +62,27 @@ The startup log line `Dropbox account` prints the email, root type and both name
 
 ## What gets synced
 
-- Every folder and file, recursively, from the root. Entries whose name starts with a dot are skipped.
-- Files are matched by Dropbox id, so renames and moves update the existing asset. Dropbox's `content_hash` is stored as the checksum, but the current sync does not compare it, so a file replaced with new content is only re-downloaded when the daily integrity check finds a different size. See [Integrity check](../deployment/integrity-check.md).
-- MIME types at listing time come from the file extension; the real type is detected from the content when the file is downloaded.
-- Folders that appear only as parents of listed items (which can happen with team folders) are created as placeholders with an external id of the form `generated_/path`, so the tree is always connected.
-
-## Empty listing protection
-
-If a listing returns no folders and no files, the driver logs `Dropbox listing is empty, skipping sync to avoid deleting all assets` and does nothing. The usual causes are an App Folder app, a token for the wrong account, or files that live in the team space while `DROPBOX_USE_TEAM_ROOT` is `false`.
+- Every folder and file, recursively, from `DROPBOX_ROOT_PATH` (or the whole Dropbox when it is empty). All pages are read first, then folders are upserted parents first, then files.
+- There is always exactly one top-level asset folder. With `DROPBOX_ROOT_PATH` set, the pointed folder is read with `filesGetMetadata` and is that folder. Without it, the whole Dropbox is represented by a folder named `Dropbox` (external id `dropbox-root`), and files sitting directly at the Dropbox root live in it. Everything else hangs under the root by folder path.
+- Skipped items: any entry with a dot-prefixed component anywhere in its path (the hidden folder and its content), names containing a NUL byte, files of size 0, folders with no non-empty file below them (empty folders are not displayed), and deleted entries.
+- Files are matched by Dropbox id, so renames and moves update the existing asset. Dropbox's `content_hash` is the checksum: a file replaced with new content is marked `outdated` and downloaded again on the next run. See [Integrity check](../deployment/integrity-check.md) for the daily size comparison.
+- MIME types at listing time come from the file extension; the real type is detected from the content when the file is downloaded, and the extension type is kept when the content cannot be identified.
+- If the listing contains no folder and no file, the run logs `Dropbox listing is empty, skipping sync to avoid deleting all assets` and stops. The usual causes are an App Folder app, a token for the wrong account, a wrong `DROPBOX_ROOT_PATH`, or files that live in the team space while `DROPBOX_USE_TEAM_ROOT` is `false`.
+- If any folder or file fails to upsert (after up to three attempts on a database deadlock), the error is logged with the item, the run ends as `failed to update assets` and the deletion pass is skipped.
+- Otherwise anything not returned by the listing is marked `pending_deletion` and removed by the per-minute deletion job.
 
 ## Token expiry during a run
 
-A `401` from Dropbox during listing or download makes the driver refresh the access token and recursively retry. There is no explicit retry bound, so repeated `401`s can continue until another failure. Check credentials, token revocation and permissions rather than assuming a single retry.
+A `401` from Dropbox during listing, metadata or download makes the driver refresh the access token once and retry that call once. A second `401` surfaces as the run's error. Check credentials, token revocation and permissions.
+
+## Guarantees the tests lock
+
+The [OneDrive guarantees](onedrive.md#guarantees-the-tests-lock) apply to Dropbox in the same terms, with `content_hash` in place of `eTag`, "dot-prefixed component in the path" in place of "dot-prefixed name", "folder with no non-empty file below it" in place of "size 0", and the `Dropbox` folder standing in for the drive root when no path is pointed at. `server/test/dropbox.cjs` (listing to upsert plan) and `server/test/dropbox-sync.cjs` (a library run through one sync with a stubbed SDK) fail when any of them changes. Change them only for a confirmed critical bug or a security hazard, name it in the commit, and update this section.
 
 :::note
 Dropbox's `files/list_folder` with `recursive: true` on a very large account can take several minutes per run. The next run is scheduled 5 minutes after the previous one ends, not on a fixed clock.
 :::
 
-If fetching a page of the Dropbox listing fails, the sync stops before checking which assets to delete. If saving an individual file or folder fails, however, the driver logs the error and continues. That item may then be missing from the list of assets to keep and be marked for deletion. Check these individual errors even when the final log says the sync succeeded.
+If fetching a page of the Dropbox listing fails, the sync stops before checking which assets to delete, and so does any failed folder or file, see above.
 
 The Dropbox SDK returns each download in memory as `fileBinary` before the driver writes it to disk. Allow enough memory for several downloads at once.
