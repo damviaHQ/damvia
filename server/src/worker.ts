@@ -12,7 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import PgBoss from "pg-boss"
+import { PgBoss, type WorkOptions } from "pg-boss"
 import { AssetFile, AssetFileStatus } from "./entity/asset-file"
 import { CollectionInvitation } from "./entity/collection-invitation"
 import { Download, DownloadStatus } from "./entity/download"
@@ -34,9 +34,27 @@ import {
 	sendUserApprovedEmail
 } from "./services/mailer"
 
-const queueInitializers: ((enableWorker: boolean) => Promise<any>)[] = []
+const PGBOSS_SCHEMA = 'pgboss'
+export const LEGACY_PGBOSS_SCHEMA = 'pgboss_legacy_v10'
+// pg-boss 11 dropped the migrations from the v10 layout (schema version 24),
+// so pg-boss 12 refuses to start against it. Anything below this version is
+// retired at boot and its pending jobs are replayed into the fresh schema.
+const FIRST_MIGRATABLE_PGBOSS_VERSION = 25
 
-export const boss = new PgBoss(process.env.DATABASE_URL ?? 'postgresql://dam:dam@localhost/dam')
+const queueInitializers: ((enableWorker: boolean) => Promise<any>)[] = []
+const registeredQueues: { name: string, cron?: string }[] = []
+
+// Only the worker process supervises queues and fires cron schedules; the API
+// process and the CLI just send jobs. index.ts passes the same flag to
+// startQueues() for the work() and schedule() registrations.
+const enableWorker = process.env.ENABLE_WORKER === 'true'
+
+export const boss = new PgBoss({
+	connectionString: process.env.DATABASE_URL ?? 'postgresql://dam:dam@localhost/dam',
+	schema: PGBOSS_SCHEMA,
+	supervise: enableWorker,
+	schedule: enableWorker,
+})
 
 boss.on('error', (error) => {
 	logger.error('worker error', { error })
@@ -46,10 +64,11 @@ type CreateQueueOptions<T> = {
 	name: string
 	processor: (data: T) => any
 	cron?: string
-	workerOptions?: PgBoss.WorkOptions
+	workerOptions?: WorkOptions
 }
 
 export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQueueOptions<T>) {
+	registeredQueues.push({ name, cron })
 	queueInitializers.push(async (enableWorker) => {
 		await boss.createQueue(name)
 
@@ -69,7 +88,7 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 						queue: job.name,
 						jobId: job.id,
 						error: error.message,
-						stacktrace: error.stacktrace,
+						stacktrace: error.stack,
 					})
 					throw error
 				})
@@ -79,18 +98,13 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 
 	return {
 		async push(data: T, opts?: { uniqueKey: string }) {
-			await boss.send({
-				name,
-				data: data as any,
-				options: {
-					retryBackoff: true,
-					singletonKey: opts?.uniqueKey,
-				},
+			await boss.send(name, data as object, {
+				retryBackoff: true,
+				singletonKey: opts?.uniqueKey,
 			})
 		},
 		async bulkPush(jobs: { data: T, uniqueKey?: string }[]) {
-			await boss.insert(jobs.map((job) => ({
-				name,
+			await boss.insert(name, jobs.map((job) => ({
 				data: job.data as object,
 				retryBackoff: true,
 				singletonKey: job?.uniqueKey,
@@ -99,10 +113,66 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 	}
 }
 
+type SqlRunner = { query(sql: string, parameters?: unknown[]): Promise<any> }
+type JobInserter = { insert(name: string, jobs: { data?: object, retryBackoff?: boolean, singletonKey?: string }[]): Promise<unknown> }
+
+function isUndefinedTable(error: any): boolean {
+	return (error?.code ?? error?.driverError?.code) === '42P01'
+}
+
+// Returns the installed pg-boss schema version, or null when pg-boss has never
+// run against this database (no version table).
+export async function installedPgBossVersion(db: SqlRunner = dataSource): Promise<number | null> {
+	try {
+		const rows = await db.query(`SELECT version FROM ${PGBOSS_SCHEMA}.version LIMIT 1`)
+		return rows.length ? Number(rows[0].version) : null
+	} catch (error) {
+		if (isUndefinedTable(error)) return null
+		throw error
+	}
+}
+
+// Renames a pg-boss schema that pg-boss 12 cannot migrate so start() creates a
+// fresh one. Returns true when a schema was retired. The old schema is kept for
+// inspection; the upgrading guide tells operators when to drop it.
+export async function retireLegacyPgBossSchema(db: SqlRunner = dataSource): Promise<boolean> {
+	const version = await installedPgBossVersion(db)
+	if (version === null || version >= FIRST_MIGRATABLE_PGBOSS_VERSION) return false
+	const taken = await db.query(`SELECT 1 FROM pg_namespace WHERE nspname = $1`, [LEGACY_PGBOSS_SCHEMA])
+	if (taken.length) {
+		throw new Error(`The ${PGBOSS_SCHEMA} schema is at pg-boss version ${version}, which this release cannot migrate, and ${LEGACY_PGBOSS_SCHEMA} already exists. Drop or rename ${LEGACY_PGBOSS_SCHEMA}, then start the server again.`)
+	}
+	await db.query(`ALTER SCHEMA ${PGBOSS_SCHEMA} RENAME TO ${LEGACY_PGBOSS_SCHEMA}`)
+	logger.warn('pg-boss schema retired', { version, renamedTo: LEGACY_PGBOSS_SCHEMA })
+	return true
+}
+
+// Re-enqueues the jobs that were still waiting in a retired schema. Cron
+// queues are skipped: schedule() registers them again on the next tick.
+export async function replayLegacyPgBossJobs(queueNames: string[], target: JobInserter = boss, db: SqlRunner = dataSource): Promise<Record<string, number>> {
+	const rows: { name: string, data: object | null, singleton_key: string | null }[] = await db.query(
+		`SELECT name, data, singleton_key FROM ${LEGACY_PGBOSS_SCHEMA}.job WHERE state IN ('created', 'retry') AND name = ANY($1) ORDER BY created_on`,
+		[queueNames],
+	)
+	const counts: Record<string, number> = {}
+	for (const name of queueNames) {
+		const jobs = rows.filter((row) => row.name === name)
+		if (!jobs.length) continue
+		await target.insert(name, jobs.map((job) => ({ data: job.data ?? undefined, retryBackoff: true, singletonKey: job.singleton_key ?? undefined })))
+		counts[name] = jobs.length
+	}
+	return counts
+}
+
 export async function startQueues({ enableWorker }: { enableWorker: boolean }) {
+	const retired = await retireLegacyPgBossSchema()
 	await boss.start()
 	for (const initializer of queueInitializers) {
 		await initializer(enableWorker)
+	}
+	if (retired) {
+		const replayed = await replayLegacyPgBossJobs(registeredQueues.filter((queue) => !queue.cron).map((queue) => queue.name))
+		logger.warn('pg-boss legacy jobs replayed', { replayed, keptSchema: LEGACY_PGBOSS_SCHEMA, note: 'Drop the legacy schema once the upgrade is verified.' })
 	}
 }
 

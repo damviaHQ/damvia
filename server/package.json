@@ -31,7 +31,7 @@
     "minio": "^8.0.7",
     "nodemailer": "^10.0.10",
     "pg": "^8.23.0",
-    "pg-boss": "^10.2.0",
+    "pg-boss": "^12.33.2",
     "promise-parallel-throttle": "^3.5.0",
     "reflect-metadata": "^0.2.2",
     "sharp": "^0.35.4",
