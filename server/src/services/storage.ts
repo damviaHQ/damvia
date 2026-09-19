@@ -54,7 +54,7 @@ function listBucket(client: MinioClient, bucket: string, prefix: string): Promis
 		client.listObjects(bucket, prefix, true)
 			.on('data', (item) => {
 				if (item.name) {
-					objects.push({ name: item.name, size: item.size, lastModified: item.lastModified })
+					objects.push({ name: item.name, size: item.size ?? 0, lastModified: item.lastModified ?? new Date(0) })
 				}
 			})
 			.on('error', reject)

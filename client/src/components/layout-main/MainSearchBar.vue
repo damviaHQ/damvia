@@ -13,7 +13,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { PopoverContent, Popover } from "@/components/ui/popover"
@@ -26,7 +25,7 @@ import { PopoverAnchor } from "reka-ui"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import { LocationQuery, useRoute, useRouter } from "vue-router"
 
-const sentenceChoiceClasses = 'flex min-h-9 max-w-full cursor-pointer items-center justify-between gap-2 bg-neutral-50 px-2 py-1 text-left text-base font-medium text-neutral-600 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+const sentenceChoiceClasses = 'flex h-8 min-w-0 max-w-full cursor-pointer items-center justify-between gap-1.5 bg-neutral-50 px-2 text-left text-body font-medium text-neutral-700 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 const LOCAL_STORAGE_SEARCH_OPTIONS_KEY = 'damvia_search_options'
 
 const router = useRouter()
@@ -239,19 +238,19 @@ function clearText() {
           <button v-if="text" type="button" aria-label="Clear search text" class="grid size-6 cursor-pointer place-items-center text-neutral-500 hover:text-neutral-900" @click="clearText"><X class="size-4" aria-hidden="true" /></button>
         </form>
       </PopoverAnchor>
-      <PopoverContent data-search-options align="start" :side-offset="6" class="client-search-popover w-[min(720px,calc(100vw-24px))] p-4" @open-auto-focus.prevent @close-auto-focus.prevent @interact-outside="handleInteractOutside" @escape-key-down="close">
-        <div class="flex flex-wrap items-center gap-2 text-base font-medium text-neutral-600" data-search-sentence>
-          <span>I</span>
-          <div class="relative min-w-0">
+      <PopoverContent data-search-options align="start" :side-offset="6" class="client-search-popover w-[min(760px,calc(100vw-24px))] p-3" @open-auto-focus.prevent @close-auto-focus.prevent @interact-outside="handleInteractOutside" @escape-key-down="close">
+        <div class="flex min-w-0 flex-nowrap items-center gap-2 text-body font-medium text-neutral-600" data-search-sentence>
+          <span class="shrink-0">I</span>
+          <div class="relative min-w-0 shrink">
             <Label for="search-mode" class="sr-only">Search mode</Label>
             <button id="search-mode" type="button" aria-label="Search mode" :aria-pressed="options.exactMatch" :title="options.exactMatch ? 'Switch to multiple references' : 'Switch to an exact term'" :class="sentenceChoiceClasses" @click="setExactMatch(!options.exactMatch)">
-              <span class="min-w-0 max-w-[300px] truncate">{{ options.exactMatch ? "search an exact term in" : "search multiple references of" }}</span>
+              <span class="min-w-0 truncate">{{ options.exactMatch ? "search an exact term in" : "search multiple references of" }}</span>
             </button>
           </div>
-          <div ref="assetTypeSelect" class="relative min-w-0" @keydown.esc="closeAssetTypeSelect">
+          <div ref="assetTypeSelect" class="relative min-w-0 shrink" @keydown.esc="closeAssetTypeSelect">
             <Label for="search-asset-types" class="sr-only">Asset types</Label>
             <button id="search-asset-types" ref="assetTypeToggle" type="button" aria-label="Asset types" :aria-expanded="isAssetTypeSelectOpen" aria-controls="search-asset-types-options" :class="sentenceChoiceClasses" @click="isAssetTypeSelectOpen = !isAssetTypeSelectOpen">
-              <span class="min-w-0 max-w-[300px] truncate">{{ selectedAssetTypes.length ? selectedAssetTypes.map((assetType) => assetType!.name).join(', ') : 'any asset type' }}</span>
+              <span class="min-w-0 truncate">{{ selectedAssetTypes.length ? selectedAssetTypes.map((assetType) => assetType!.name).join(', ') : 'any asset type' }}</span>
               <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
             </button>
             <div v-if="isAssetTypeSelectOpen" id="search-asset-types-options" class="absolute z-20 mt-1 flex min-w-full flex-col gap-1 border border-input bg-white p-1 shadow-md">
@@ -261,11 +260,11 @@ function clearText() {
               </label>
             </div>
           </div>
-          <span>in</span>
-          <div ref="searchScopeSelect" class="relative min-w-0" @keydown.esc="closeSearchScopeSelect">
+          <span class="shrink-0">in</span>
+          <div ref="searchScopeSelect" class="relative min-w-0 shrink" @keydown.esc="closeSearchScopeSelect">
             <Label for="search-scope" class="sr-only">Search scope</Label>
             <button id="search-scope" ref="searchScopeToggle" type="button" aria-label="Search scope" :aria-expanded="isSearchScopeSelectOpen" aria-controls="search-scope-options" :class="sentenceChoiceClasses" @click="isSearchScopeSelectOpen = !isSearchScopeSelectOpen">
-              <span class="min-w-0 max-w-[300px] truncate">{{ (searchScopeOptions as any)[options.searchScope] ?? 'all files and collections' }}</span>
+              <span class="min-w-0 truncate">{{ (searchScopeOptions as any)[options.searchScope] ?? 'all files and collections' }}</span>
               <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
             </button>
             <div v-if="isSearchScopeSelectOpen" id="search-scope-options" class="absolute z-20 mt-1 flex min-w-full flex-col gap-1 border border-input bg-white p-1 shadow-md">
@@ -274,7 +273,7 @@ function clearText() {
           </div>
         </div>
 
-        <div v-if="recent.length" class="mt-4 border-t border-neutral-200 pt-3">
+        <div v-if="recent.length" class="mt-3 border-t border-neutral-200 pt-2">
           <div class="mb-1 flex items-center justify-between">
             <span class="text-caption font-semibold uppercase tracking-[.08em] text-neutral-500">Recent searches</span>
             <button type="button" class="cursor-pointer text-caption text-neutral-500 hover:text-neutral-900" @click="forgetRecent">Clear</button>
@@ -290,15 +289,12 @@ function clearText() {
           </ul>
         </div>
 
-        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3">
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-2">
           <p class="text-caption text-[color:var(--dv-text-secondary)]">
-            <template v-if="options.exactMatch">Press Enter to find that exact text.</template>
-            <template v-else>Paste several references separated by spaces, then press Enter.</template>
+            <template v-if="options.exactMatch">Type the exact text above and press Enter.</template>
+            <template v-else>Type or paste references above, separated by spaces, and press Enter.</template>
           </p>
-          <div class="flex items-center gap-3">
-            <button v-if="hasStoredOptions" type="button" class="cursor-pointer text-caption text-neutral-500 hover:text-red-600" @click="resetOptions">Reset to default</button>
-            <Button type="button" class="px-6" @click="search()">Search</Button>
-          </div>
+          <button v-if="hasStoredOptions" type="button" class="cursor-pointer text-caption text-neutral-500 hover:text-red-600" @click="resetOptions">Reset options to default</button>
         </div>
       </PopoverContent>
     </Popover>

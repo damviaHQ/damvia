@@ -13,17 +13,20 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Brackets, In, SelectQueryBuilder } from "typeorm"
-import { validate as isUuid } from "uuid"
 import { CollectionFile } from "../entity/collection-file"
 import { ProductAttribute } from "../entity/product-attribute"
 import { User } from "../entity/user"
 import { dataSource } from "../env"
 import { userCollectionFilesQuery } from "./collection"
 
+const UUID_PATTERN = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/i
+const isUuid = (value: string) => UUID_PATTERN.test(value)
+
 export type SearchSort = 'relevance' | 'name' | 'newest'
 
 export type SearchInput = {
 	query?: string | null
+	extensions?: string[] | null
 	collectionId?: string | null
 	assetTypes?: string[] | null
 	productViews?: string[] | null
@@ -34,7 +37,7 @@ export type SearchInput = {
 }
 
 // A facet dimension left out of the predicate set so its counts show what selecting it would add.
-export type SearchDimension = 'assetTypes' | 'fileTypes' | 'productViews' | `attribute:${string}`
+export type SearchDimension = 'assetTypes' | 'fileTypes' | 'extensions' | 'productViews' | `attribute:${string}`
 
 export type SearchContext = {
 	searchableAttributes: ProductAttribute[]
@@ -58,6 +61,13 @@ export const fileTypeConditions: Record<string, string> = {
 	document: `asset_file.mime_type IN (${documentMimeTypes.map((type) => `'${type}'`).join(', ')})`,
 	video: "(asset_file.mime_type ILIKE 'video/%' OR asset_file.mime_type = 'application/mp4')",
 	image: "asset_file.mime_type ILIKE 'image/%'",
+}
+
+// The extension as typed in the file name, lower case and without the dot; null when the name has none.
+export const fileExtensionExpression = "NULLIF(lower(substring(asset_file.name from '\\.([^.]+)$')), '')"
+
+export function normalizeExtension(value: string) {
+	return value.trim().toLowerCase().replace(/^\./, '')
 }
 
 export const fileTypeExpression = `CASE WHEN ${fileTypeConditions.image} THEN 'image' WHEN ${fileTypeConditions.video} THEN 'video' WHEN ${fileTypeConditions.document} THEN 'document' ELSE 'other' END`
@@ -138,6 +148,12 @@ export function buildSearchQuery(
 			})
 		})
 
+	if (exclude !== 'extensions' && input.extensions?.length) {
+		query.andWhere(`${fileExtensionExpression} IN (:...extensions)`, {
+			extensions: input.extensions.map(normalizeExtension).filter((value) => value),
+		})
+	}
+
 	if (exclude !== 'fileTypes' && input.fileTypes?.length) {
 		const conditions = input.fileTypes.filter((type) => Object.prototype.hasOwnProperty.call(fileTypeConditions, type)).map((type) => fileTypeConditions[type])
 		if (conditions.length) {
@@ -177,6 +193,7 @@ export function applySearchOrder(query: SelectQueryBuilder<CollectionFile>, inpu
 export type SearchFacets = {
 	assetTypes: Record<string, number>
 	fileTypes: Record<string, number>
+	extensions: Record<string, number>
 	productViews: Record<string, number>
 	attributes: Record<string, Record<string, number>>
 }
@@ -200,9 +217,10 @@ async function countBy(query: SelectQueryBuilder<CollectionFile>, expression: st
 
 // Counts run over the whole result set, each dimension with its own filter left out.
 export async function searchFacets(user: User, input: SearchInput, context: SearchContext): Promise<SearchFacets> {
-	const [assetTypes, fileTypes, productViews, ...attributes] = await Promise.all([
+	const [assetTypes, fileTypes, extensions, productViews, ...attributes] = await Promise.all([
 		countBy(buildSearchQuery(user, input, context, 'assetTypes'), 'asset_file.asset_type_id'),
 		countBy(buildSearchQuery(user, input, context, 'fileTypes'), fileTypeExpression),
+		countBy(buildSearchQuery(user, input, context, 'extensions'), fileExtensionExpression),
 		countBy(buildSearchQuery(user, input, context, 'productViews').andWhere('asset_type.is_related_to_products IS TRUE'), 'asset_file.product_view'),
 		...context.facetableAttributes.map((attribute) =>
 			countBy(
@@ -211,5 +229,5 @@ export async function searchFacets(user: User, input: SearchInput, context: Sear
 			).then((counts) => [attribute.id, counts] as const)
 		),
 	])
-	return { assetTypes, fileTypes, productViews, attributes: Object.fromEntries(attributes) }
+	return { assetTypes, fileTypes, extensions, productViews, attributes: Object.fromEntries(attributes) }
 }

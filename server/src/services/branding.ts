@@ -58,9 +58,7 @@ export async function processClientLogo(userId: string, uploadId: string) {
         const object = await mainS3().statObject(mainS3Bucket(), key)
         staged = object
         if (object.size < 1 || object.size > MAX_LOGO_BYTES) throw new Error('size')
-        // minio 7.1.3 typings omit the getOpts argument its runtime accepts.
-        const client = mainS3() as unknown as { getObject(bucket: string, key: string, opts: { versionId?: string }): Promise<Readable> }
-        const stream = await client.getObject(mainS3Bucket(), key, staged.versionId ? { versionId: staged.versionId } : {})
+        const stream = await mainS3().getObject(mainS3Bucket(), key, staged.versionId ? { versionId: staged.versionId } : {})
         const chunks: Buffer[] = []
         let bytes = 0
         for await (const chunk of stream) {

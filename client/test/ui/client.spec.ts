@@ -194,7 +194,8 @@ test('collection modals share field spacing and respond to one token change', as
   expect(errors).toEqual([])
 })
 
-test('search page shows the panel with counts, the toolbar and the not-found terms', async ({ page }) => {
+test('search page shows the panel with counts, the toolbar and the not-found terms', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   const files = (responses['collection.findById'] as any).files.map((file: any) => ({ ...file, assetTypeId: 'type-0' }))
@@ -236,6 +237,9 @@ test('search page shows the panel with counts, the toolbar and the not-found ter
   await panel.getByRole('button', { name: 'Clear all filters (2)', exact: true }).click()
   await expect(page).not.toHaveURL(/asset_types/)
   await expect(page).toHaveURL(/q=sand\+zzz/)
+  await panel.getByRole('button', { name: 'Copy the list', exact: true }).click()
+  await expect(page.getByText('1 reference copied, one per line')).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('zzz')
   await panel.getByRole('button', { name: 'Remove them', exact: true }).click()
   await expect(page).toHaveURL(/q=sand(&|$)/)
   await page.screenshot({ path: '/private/tmp/claude-501/-Users-arnaud-Documents-Github-damvia/769748be-582c-42d5-a4c4-22d86d85089a/scratchpad/search-page.png' })

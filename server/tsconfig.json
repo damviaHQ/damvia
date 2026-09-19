@@ -1,16 +1,21 @@
 {
   "compilerOptions": {
-    "lib": ["es5", "es6", "es2021"],
-    "target": "es5",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "rootDir": "./src",
     "outDir": "./dist",
+    "useDefineForClassFields": false,
     "esModuleInterop": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "sourceMap": true,
     "declaration": true,
+    "strict": false,
     "strictNullChecks": true,
     "skipLibCheck": true
-  }
+  },
+  "include": ["src"]
 }

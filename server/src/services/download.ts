@@ -14,10 +14,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { userCollectionFilesQuery } from './collection'
 import { User } from '../entity/user'
-import archiver from 'archiver'
+import { ZipArchive } from 'archiver'
 import ffmpeg from "fluent-ffmpeg"
 import { randomUUID } from "node:crypto"
 import { createWriteStream } from "node:fs"
+import { finished } from "node:stream/promises"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -70,9 +71,11 @@ export async function createDownloadArchive({ em, download }: CreateDownloadArch
 				"Content-Disposition": `attachment; filename="${formatFileName(download, collectionFile.assetFile, null)}"`,
 			})
 		} else {
-			const archive = archiver('zip', { zlib: { level: 0 } })
+			const archive = new ZipArchive({ zlib: { level: 0 } })
 			const archiveFile = join(workingDirectory, 'archive.zip')
-			archive.pipe(createWriteStream(archiveFile))
+			const archiveOutput = createWriteStream(archiveFile)
+			const archiveWritten = finished(archiveOutput)
+			archive.pipe(archiveOutput)
 			await Throttle.all(collectionFiles.map((collectionFile) => async () => {
 				const outputFile = await transformFile({ workingDirectory, download, assetFile: collectionFile.assetFile })
 				await em.getTreeRepository(Collection).findAncestorsTree(collectionFile.collection)
@@ -81,6 +84,7 @@ export async function createDownloadArchive({ em, download }: CreateDownloadArch
 				})
 			}), { maxInProgress: 25 })
 			await archive.finalize()
+			await archiveWritten
 			await assetsS3().fPutObject(assetsS3Bucket(), download.storageKey, archiveFile)
 		}
 	} finally {

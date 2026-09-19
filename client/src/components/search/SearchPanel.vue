@@ -88,10 +88,43 @@ const backTarget = computed(() =>
   form.value.collectionId ? { name: "collection", params: { id: form.value.collectionId } } : { name: "home" }
 )
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[character] as string))
+}
+
+// Last resort when the page is not served over HTTPS and the clipboard API is missing.
+function copyWithSelection(text: string) {
+  const area = document.createElement("textarea")
+  area.value = text
+  area.setAttribute("readonly", "")
+  area.style.position = "fixed"
+  area.style.opacity = "0"
+  document.body.appendChild(area)
+  area.select()
+  const copied = document.execCommand("copy")
+  document.body.removeChild(area)
+  if (!copied) {
+    throw new Error("copy rejected")
+  }
+}
+
+// One reference per line, plus a single-column table, so a spreadsheet pastes it as a column.
 async function copyMissing() {
+  const rows = missing.value
+  const text = rows.join("\r\n")
+  const html = `<table>${rows.map((row) => `<tr><td>${escapeHtml(row)}</td></tr>`).join("")}</table>`
   try {
-    await navigator.clipboard.writeText(missing.value.join("\n"))
-    toast.success("Missing references copied")
+    if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/plain": new Blob([text], { type: "text/plain" }),
+        "text/html": new Blob([html], { type: "text/html" }),
+      })])
+    } else if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      copyWithSelection(text)
+    }
+    toast.success(`${rows.length} ${rows.length === 1 ? "reference" : "references"} copied, one per line`)
   } catch (_) {
     toast.error("Could not copy to the clipboard")
   }
@@ -122,7 +155,7 @@ function removeMissing() {
       <div v-if="missing.length" role="status" class="mx-3 grid gap-1 border border-[var(--dv-color-warning)]/30 bg-[var(--dv-color-warning-soft)] px-3 py-1.5 text-body text-[var(--dv-color-warning)]">
         <p><strong class="font-semibold">{{ missing.length }} of {{ terms.length }}</strong> not found: <span class="break-words">{{ missing.join(", ") }}</span></p>
         <div class="flex flex-wrap gap-3">
-          <button type="button" class="flex cursor-pointer items-center gap-1 text-caption font-medium underline-offset-2 hover:underline" @click="copyMissing"><Copy class="size-3.5" aria-hidden="true" /> Copy the list</button>
+          <button type="button" class="flex cursor-pointer items-center gap-1 text-caption font-medium underline-offset-2 hover:underline" title="One per line, ready to paste into a spreadsheet column" @click="copyMissing"><Copy class="size-3.5" aria-hidden="true" /> Copy the list</button>
           <button type="button" class="flex cursor-pointer items-center gap-1 text-caption font-medium underline-offset-2 hover:underline" @click="removeMissing"><Trash2 class="size-3.5" aria-hidden="true" /> Remove them</button>
         </div>
       </div>

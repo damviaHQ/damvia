@@ -12,7 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import 'dotenv/config'
+import './load-env'
 import "reflect-metadata"
 import { Client as MinioClient } from 'minio'
 import { readFile, statfs } from "node:fs/promises"
@@ -106,6 +106,7 @@ export function mailTransporter(): Transporter {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       } : undefined,
+    }, {
       headers: {
         'X-PM-Message-Stream': 'outbound',
       },

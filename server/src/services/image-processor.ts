@@ -17,7 +17,7 @@ import { existsSync } from "node:fs"
 import { readFile, writeFile, rm } from "node:fs/promises"
 import { join } from "node:path"
 import sharp from "sharp"
-import { v4 as uuid } from 'uuid'
+import { randomUUID } from 'node:crypto'
 import { AssetFile } from "../entity/asset-file"
 
 declare module 'libreoffice-convert' {
@@ -177,7 +177,7 @@ export async function convertOfficeToPng(
                 
                 try {
                     const tempDir = await tmpDir();
-                    const tempInputPath = join(tempDir, `input_${uuid()}.${extension}`);
+                    const tempInputPath = join(tempDir, `input_${randomUUID()}.${extension}`);
                     await writeFile(tempInputPath, docBuffer);
                     
                     await new Promise<void>((resolve, reject) => {
@@ -192,7 +192,7 @@ export async function convertOfficeToPng(
                         });
                     });
                     
-                    const pdfFilename = `input_${uuid()}.pdf`;
+                    const pdfFilename = `input_${randomUUID()}.pdf`;
                     const generatedPdfPath = join(tempDir, pdfFilename);
                     
                     if (existsSync(generatedPdfPath)) {

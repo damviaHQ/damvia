@@ -19,7 +19,7 @@ import {mkdir, mkdtemp, rm} from "node:fs/promises"
 import {tmpdir} from "node:os"
 import {join} from "node:path"
 import sharp from "sharp"
-import {v4 as uuid} from 'uuid'
+import { randomUUID } from 'node:crypto'
 import {AssetFile, AssetFileStatus} from "../entity/asset-file"
 import {AssetFolder, AssetFolderStatus} from "../entity/asset-folder"
 import {AssetSource} from "../entity/asset-source"
@@ -61,7 +61,7 @@ export async function tmpDir() {
 export async function tmpFile() {
 	const dir = await tmpDir()
 	await mkdir(dir, { recursive: true })
-	return join(dir, uuid())
+	return join(dir, randomUUID())
 }
 
 // Listing types a browser would execute if the object were opened directly from
