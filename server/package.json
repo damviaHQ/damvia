@@ -6,6 +6,7 @@
     "dev": "ENABLE_WORKER=true nodemon --exec ts-node src/index.ts",
     "cli": "ts-node src/cli.ts",
     "typeorm": "typeorm-ts-node-commonjs",
+    "test": "npm run build && node --test --test-concurrency=1 test/*.cjs",
     "test:security": "npm run build && node --test test/security.cjs"
   },
   "dependencies": {
