@@ -3,7 +3,7 @@ title: Roles and access
 description: The four user roles, email verification and account approval, and the exact rule that decides which collections and files a user can see or edit.
 sidebar:
   order: 3
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 This page gives you the access model as the server enforces it: roles, account approval, regions and groups, the collection visibility rule, edit rights and guest invitations.
@@ -14,7 +14,7 @@ This page gives you the access model as the server enforces it: roles, account a
 | --- | --- | --- | --- |
 | `admin` | Set by another admin | Every public collection, including drafts, plus own collections | Everything: settings, menu, collections, pages, assets, asset types, licenses, users, groups, regions, authorized domains, products, attributes |
 | `manager` | Set by an admin | Same as a member | Users of their own region: list, approve, edit, delete, assign groups. Cannot grant `admin` or `manager`, cannot edit, approve or delete an admin or another manager, cannot change their own role or region |
-| `member` | Default role at sign-up | Public non-draft collections allowed by their region and groups, own collections, invited collections | Their own private collections, favorites, downloads, invitations on collections they own |
+| `member` | Default role at sign-up | Public non-draft collections allowed by their region and groups, own collections, invited collections | Their own private collections, favorites (files and collections), downloads, invitations on collections they own |
 | `guest` | Created automatically by an invitation | Only invited collections, collections limited to a group they belong to, and their own | Client exposes downloads and hides collection editing/menu; API also permits creation and management of own collections. Favorites are refused server-side |
 
 The admin area (`Back to the DAM` sidebar) shows all sections to admins and only the Users section to managers.
@@ -62,7 +62,7 @@ See [Collections and sharing](../administration/collections-and-sharing.md) and 
 
 Any approved user who can edit a collection can invite an email address to it with an expiry date and optionally send the `mailer/invitation` email. If the address matches an existing user, that user gains access through rule 5 with their current role. If not, a guest account is created with `name` and `company` set to `NA`, the inviter's region, no groups, and both `emailVerified` and `approved` set to `true`.
 
-A newly created guest has no password. Invitation JWT links and the magic-link flow provide the initial login, including when passwordless mode is off. In the client, a guest sees the collections they can access (other than their own) instead of the menu, lands on the first of them, and can select and download files. The favorites endpoints reject guests server-side (`userMember`), and the "add to collection" action is hidden. Removing the invitation, or letting it expire, removes that invitation access path; other group/owner grants and already issued S3 links remain independent; deleting a user also deletes every invitation addressed to their email.
+A newly created guest has no password. Invitation JWT links and the magic-link flow provide the initial login, including when passwordless mode is off. In the client, a guest sees the collections they can access (other than their own) instead of the menu, lands on the first of them, and can select and download files. The favorites endpoints, for files and for collections, reject guests server-side (`userMember`); the star buttons, the "add to collection" action and the `/collections` page listing a member's own collections are hidden from them. Removing the invitation, or letting it expire, removes that invitation access path; other group/owner grants and already issued S3 links remain independent; deleting a user also deletes every invitation addressed to their email.
 
 ## Authorized domains
 

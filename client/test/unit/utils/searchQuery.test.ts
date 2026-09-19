@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { parseSearchQuery, queryValueToArray } from '@/utils/searchQuery.ts'
+import { activeFilters, clearFilterQuery, parseQueryParts, parseSearchQuery, patchSearchQuery, queryValueToArray, toggleQueryValue } from '@/utils/searchQuery.ts'
 
 describe('search query parsing', () => {
   test('query values become string arrays', () => {
@@ -25,13 +25,14 @@ describe('search query parsing', () => {
 
   test('route query maps onto the search input with defaults', () => {
     expect(parseSearchQuery({}, 'all')).toEqual({
-      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], productViews: [], fileTypes: [], searchScope: 'all', exactMatch: false, attributes: {},
+      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], productViews: [], fileTypes: [], searchScope: 'all', exactMatch: false, attributes: {}, sort: undefined,
     })
     expect(parseSearchQuery({
-      q: 'red hat', page: '2', from_collection: 'c1', asset_types: 't1', product_views: ['front', 'back'], file_types: 'image', search_scope: 'current', exact_match: 'true',
+      q: 'red hat', page: '2', from_collection: 'c1', asset_types: 't1', product_views: ['front', 'back'], file_types: 'image', search_scope: 'current', exact_match: 'true', sort: 'newest',
     }, 'all')).toEqual({
-      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], productViews: ['front', 'back'], fileTypes: ['image'], searchScope: 'current', exactMatch: true, attributes: {},
+      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], productViews: ['front', 'back'], fileTypes: ['image'], searchScope: 'current', exactMatch: true, attributes: {}, sort: 'newest',
     })
+    expect(parseSearchQuery({ sort: 'random' }, 'all').sort).toBeUndefined()
     expect(parseSearchQuery({ exact_match: 'yes', page: 'x' }, 'all')).toMatchObject({ exactMatch: false, page: NaN })
   })
 
@@ -39,5 +40,32 @@ describe('search query parsing', () => {
     expect(parseSearchQuery({ 'attributes[color]': 'red', 'attributes[size]': ['s', 'm'], 'attributes[': 'x', 'attributes[]': 'y' }, 'all').attributes)
       .toEqual({ color: ['red'], size: ['s', 'm'] })
     expect(parseSearchQuery({ 'attributes[color]': 'red' }, 'all').attributes).toEqual({ color: ['red'] })
+  })
+
+  test('typed or pasted references split on whitespace and commas', () => {
+    expect(parseQueryParts(' a,b  c\n d ')).toEqual(['a', 'b', 'c', 'd'])
+    expect(parseQueryParts(undefined)).toEqual([])
+  })
+
+  test('patching the query drops empty values and resets the page', () => {
+    expect(patchSearchQuery({ q: 'a', page: '3', file_types: 'image' }, { file_types: [], sort: 'name' })).toEqual({ q: 'a', sort: 'name' })
+    expect(toggleQueryValue({ asset_types: ['t1'] }, 'asset_types', 't2')).toEqual({ asset_types: ['t1', 't2'] })
+    expect(toggleQueryValue({ asset_types: ['t1', 't2'], page: '2' }, 'asset_types', 't1')).toEqual({ asset_types: ['t2'] })
+    expect(toggleQueryValue({ asset_types: 't1' }, 'asset_types', 't1')).toEqual({})
+  })
+
+  test('clearing filters keeps the terms, scope and mode', () => {
+    expect(clearFilterQuery({ q: 'a', exact_match: 'true', search_scope: 'current', from_collection: 'c', asset_types: 't', product_views: 'v', file_types: 'image', 'attributes[color]': 'red', sort: 'name' }))
+      .toEqual({ q: 'a', exact_match: 'true', search_scope: 'current', from_collection: 'c', sort: 'name' })
+  })
+
+  test('active filters list every selected value with its group', () => {
+    const form = parseSearchQuery({ asset_types: 't1', file_types: ['image', 'video'], 'attributes[color]': 'red' }, 'all')
+    expect(activeFilters(form)).toEqual([
+      { key: 'asset_types', value: 't1', group: 'asset_types' },
+      { key: 'file_types', value: 'image', group: 'file_types' },
+      { key: 'file_types', value: 'video', group: 'file_types' },
+      { key: 'attributes[color]', value: 'red', group: 'attribute', attributeId: 'color' },
+    ])
   })
 })

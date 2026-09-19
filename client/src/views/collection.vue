@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import CollectionFavoriteButton from "@/components/collection/CollectionFavoriteButton.vue"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionDialogEdit from "@/components/collection/CollectionDialogEdit.vue"
 import CollectionDialogShare from "@/components/collection/CollectionDialogShare.vue"
@@ -224,6 +225,7 @@ function openMemberDialog() {
         </div>
       </div>
       <div class="collection__header-actions flex items-center gap-1">
+        <CollectionFavoriteButton v-if="!isEditing" :collection="collection" />
         <Button aria-label="Remove selected assets" v-if="canRemoveFiles" @click="removeSelectedFiles" type="button" variant="ghost" size="icon">
           <Trash2 class="text-neutral-500 hover:text-neutral-800" />
         </Button>

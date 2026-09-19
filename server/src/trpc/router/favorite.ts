@@ -12,17 +12,50 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { userCollectionFilesQuery } from '../../services/collection'
+import { userCollectionFilesQuery, userCollectionsQuery } from '../../services/collection'
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 import { ActivityEvent, ActivityEventType } from "../../entity/activity-event"
 import { ProductAttribute } from "../../entity/product-attribute"
+import { UserCollectionFavorite } from "../../entity/user-collection-favorite"
 import { UserFavorite } from "../../entity/user-favorite"
 import { dataSource } from "../../env"
 import { authMiddleware, publicProcedure, router, userApproved, userMember } from "../index"
-import { formatCollectionFile } from "./collection"
+import { formatCollectionFile, formatCollection } from "./collection"
 
 export default router({
+    listCollections: publicProcedure
+        .use(authMiddleware(userApproved, userMember))
+        .query(async ({ ctx }) => {
+            const collections = await userCollectionsQuery(ctx.user)
+                .innerJoin(UserCollectionFavorite, 'favorite', 'favorite.collection_id = collection.id AND favorite.user_id = :favoriteUserId', { favoriteUserId: ctx.user.id })
+                .orderBy('collection.name', 'ASC')
+                .addOrderBy('collection.id', 'ASC')
+                .getMany()
+            return Promise.all(collections.map(collection => formatCollection({ collection, user: ctx.user })))
+        }),
+    addCollection: publicProcedure
+        .use(authMiddleware(userApproved, userMember))
+        .input(z.object({ collectionId: z.string().uuid() }))
+        .mutation(async ({ input, ctx }) => {
+            const collection = await userCollectionsQuery(ctx.user)
+                .andWhere('collection.id = :collectionId', { collectionId: input.collectionId })
+                .getOne()
+            if (!collection) {
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+            }
+            await dataSource.getRepository(UserCollectionFavorite).createQueryBuilder()
+                .insert().values({ userId: ctx.user.id, collectionId: collection.id }).orIgnore().execute()
+        }),
+    removeCollection: publicProcedure
+        .use(authMiddleware(userApproved, userMember))
+        .input(z.object({ collectionId: z.string().uuid() }))
+        .mutation(async ({ input, ctx }) => {
+            await dataSource.getRepository(UserCollectionFavorite).delete({
+                userId: ctx.user.id,
+                collectionId: input.collectionId,
+            })
+        }),
 	list: publicProcedure
 		.use(authMiddleware(userApproved, userMember))
 		.query(async ({ ctx }) => {

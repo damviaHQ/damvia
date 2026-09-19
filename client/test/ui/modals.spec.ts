@@ -79,7 +79,7 @@ test('client dialogs and nested content have readable headings and contained lay
       expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
     }
   }
-  for (const [button, screenshot] of [['Search assets', 'search'], ['Collection settings', 'edit'], ['Share collection', 'share'], ['Create collection', 'create']]) {
+  for (const [button, screenshot] of [['Collection settings', 'edit'], ['Share collection', 'share'], ['Create collection', 'create']]) {
     await page.getByRole('button', { name: button, exact: true }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await capture(screenshot)

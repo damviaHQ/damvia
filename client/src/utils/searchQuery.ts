@@ -16,6 +16,18 @@ import type { LocationQuery, LocationQueryValue } from 'vue-router'
 
 const attributeKey = /^attributes\[(.+)]$/
 
+export const SEARCH_SORTS = ['relevance', 'name', 'newest'] as const
+export type SearchSort = typeof SEARCH_SORTS[number]
+
+export const FILE_TYPE_OPTIONS = [
+  { id: 'image', label: 'Images' },
+  { id: 'video', label: 'Videos' },
+  { id: 'document', label: 'Documents' },
+] as const
+
+// Filter keys that "Clear all filters" resets; the terms, scope and mode stay.
+export const FILTER_KEYS = ['asset_types', 'product_views', 'file_types'] as const
+
 export function queryValueToArray(query: LocationQueryValue | LocationQueryValue[] | undefined): string[] {
   if (!query) {
     return []
@@ -23,6 +35,15 @@ export function queryValueToArray(query: LocationQueryValue | LocationQueryValue
     return [query]
   }
   return query.filter((value): value is string => typeof value === 'string')
+}
+
+// Splits pasted or typed references on any whitespace or comma.
+export function parseQueryParts(query: string | null | undefined): string[] {
+  return (query ?? '')
+    .replace(/[\s,]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter((part) => part)
 }
 
 export function parseSearchQuery(query: LocationQuery, defaultSearchScope: string) {
@@ -34,6 +55,7 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: strin
       })
       .filter((value): value is [string, string[]] => value !== null)
   )
+  const sort = SEARCH_SORTS.find((value) => value === query.sort)
 
   return {
     query: query.q as string,
@@ -45,5 +67,53 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: strin
     searchScope: (query.search_scope as string) ?? defaultSearchScope,
     exactMatch: query.exact_match === "true",
     attributes,
+    sort,
   }
+}
+
+export type SearchForm = ReturnType<typeof parseSearchQuery>
+
+export type QueryPatch = Record<string, LocationQueryValue | LocationQueryValue[] | undefined>
+
+// Merges a change into the current route query. Empty values drop the key and any change resets the page.
+export function patchSearchQuery(query: LocationQuery, patch: QueryPatch): LocationQuery {
+  const next: LocationQuery = { ...query }
+  delete next.page
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+      delete next[key]
+    } else {
+      next[key] = value
+    }
+  }
+  return next
+}
+
+export function toggleQueryValue(query: LocationQuery, key: string, value: string): LocationQuery {
+  const current = queryValueToArray(query[key])
+  const values = current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value]
+  return patchSearchQuery(query, { [key]: values })
+}
+
+export function clearFilterQuery(query: LocationQuery): LocationQuery {
+  const patch: QueryPatch = {}
+  for (const key of Object.keys(query)) {
+    if ((FILTER_KEYS as readonly string[]).includes(key) || attributeKey.test(key)) {
+      patch[key] = undefined
+    }
+  }
+  return patchSearchQuery(query, patch)
+}
+
+export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'product_views' | 'file_types' | 'attribute', attributeId?: string }
+
+export function activeFilters(form: SearchForm): ActiveFilter[] {
+  return [
+    ...form.assetTypes.map((value) => ({ key: 'asset_types', value, group: 'asset_types' as const })),
+    ...form.productViews.map((value) => ({ key: 'product_views', value, group: 'product_views' as const })),
+    ...form.fileTypes.map((value) => ({ key: 'file_types', value, group: 'file_types' as const })),
+    ...Object.entries(form.attributes).flatMap(([attributeId, values]) =>
+      values.map((value) => ({ key: `attributes[${attributeId}]`, value, group: 'attribute' as const, attributeId }))
+    ),
+  ]
 }

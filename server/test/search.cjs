@@ -19,7 +19,7 @@ const harness = require('./lib/helpers.cjs')
 const { db, state, save, makeUser, makeCollection, makeFolder, makeFile } = harness
 const { CollectionFile, AssetType, Product, ProductAttribute } = harness.entities
 const { caller } = harness
-let fixtures, root, child, color, related, unrelated, colorAttr
+let fixtures, root, child, color, related, unrelated, colorAttr, sizeAttr
 const names = result => result.results.map(file => file.name).sort()
 const searchAs = input => caller(fixtures.member).collection.search(input)
 before(async () => {
@@ -31,13 +31,15 @@ before(async () => {
     related = await save(AssetType, { name: 'Packshot', isRelatedToProducts: true, defaultDisplay: 'grid', listDisplayItems: [] })
     unrelated = await save(AssetType, { name: 'Document', isRelatedToProducts: false, defaultDisplay: 'grid', listDisplayItems: [] })
     colorAttr = await save(ProductAttribute, { name: 'color', searchable: true, facetable: true, viewable: true })
-    await save(ProductAttribute, { name: 'size', searchable: false, facetable: true, viewable: true })
+    sizeAttr = await save(ProductAttribute, { name: 'size', searchable: false, facetable: true, viewable: true })
     const product = await save(Product, { productKey: 'SKU-1', primaryKeyName: 'SKU', metaData: { color: 'red', size: 'M' } })
+    const blue = await save(Product, { productKey: 'SKU-2', primaryKeyName: 'SKU', metaData: { color: 'navy', size: 'M' } })
     const files = [
         [rootFolder, root, { name: 'shirt-red.png', mimeType: 'image/png' }],
         [rootFolder, root, { name: 'hat.mp4', mimeType: 'video/mp4', assetTypeId: related.id, productView: 'front' }],
         [rootFolder, root, { name: 'spec.pdf', mimeType: 'application/pdf', assetTypeId: unrelated.id, productView: 'front' }],
         [childFolder, child, { name: 'notes.txt', mimeType: 'text/plain', productId: product.id }],
+        [childFolder, child, { name: 'blue-cap.png', mimeType: 'image/png', productId: blue.id, assetTypeId: related.id }],
     ]
     for (const [folder, collection, extra] of files) {
         const file = await makeFile(folder, extra)
@@ -59,30 +61,69 @@ test('token mode matches any word in file names and searchable attributes; exact
     assert.deepEqual(names(await searchAs({ query: 'red   hat', exactMatch: true })), [])
     assert.deepEqual(names(await searchAs({ query: 'shirt-red', exactMatch: true })), ['shirt-red.png'])
     assert.deepEqual(names(await searchAs({ query: 'M' })), ['hat.mp4'])
-    assert.equal((await searchAs({})).total, 4)
+    assert.deepEqual(names(await searchAs({ query: 'navy' })), ['blue-cap.png'])
+    assert.equal((await searchAs({})).total, 5)
 })
 
 test('attribute filters apply by attribute id and empty lists are ignored', async () => {
     assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['red'] } })), ['notes.txt'])
+    assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['navy'] } })), ['blue-cap.png'])
     assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['blue'] } })), [])
-    assert.equal((await searchAs({ attributes: { [colorAttr.id]: [] } })).total, 4)
-    assert.equal((await searchAs({ attributes: { [colorAttr.id]: null } })).total, 4)
+    assert.equal((await searchAs({ attributes: { [colorAttr.id]: [] } })).total, 5)
+    assert.equal((await searchAs({ attributes: { [colorAttr.id]: null } })).total, 5)
+    assert.equal((await searchAs({ attributes: { 'not-a-uuid': ['red'] } })).total, 5)
+})
+
+test('values of one attribute are alternatives while different attributes narrow each other', async () => {
+    assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['red', 'navy'] } })), ['blue-cap.png', 'notes.txt'])
+    assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['red'], [sizeAttr.id]: ['M'] } })), ['notes.txt'])
+    assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['red'], [sizeAttr.id]: ['L'] } })), [])
+})
+
+test('facet counts cover the whole result set and leave out their own filter', async () => {
+    const all = (await searchAs({})).facets
+    assert.deepEqual(all.fileTypes, { image: 2, video: 1, document: 1, other: 1 })
+    assert.deepEqual(all.assetTypes, { [related.id]: 2, [unrelated.id]: 1 })
+    assert.deepEqual(all.productViews, { front: 1 })
+    assert.equal(all.productViews.front, (await searchAs({ productViews: ['front'] })).total)
+    assert.deepEqual(all.attributes[colorAttr.id], { red: 1, navy: 1 })
+    assert.deepEqual(all.attributes[sizeAttr.id], { M: 2 })
+    const filtered = (await searchAs({ fileTypes: ['video'], attributes: { [colorAttr.id]: ['navy'] } })).facets
+    assert.deepEqual(filtered.fileTypes, { image: 1 })
+    assert.deepEqual(filtered.attributes[colorAttr.id], {})
+    assert.deepEqual(filtered.assetTypes, {})
+    const scoped = (await searchAs({ searchScope: 'current', collectionId: child.id })).facets
+    assert.deepEqual(scoped.attributes[colorAttr.id], { red: 1, navy: 1 })
+    assert.deepEqual(scoped.fileTypes, { image: 1, other: 1 })
+    const guest = (await caller(fixtures.guest).collection.search({})).facets
+    assert.deepEqual(guest.fileTypes, {})
+})
+
+test('results are sorted by relevance, name or date with a stable order', async () => {
+    const ordered = result => result.results.map(file => file.name)
+    assert.deepEqual(ordered(await searchAs({ query: 'red cap' })).slice(0, 1), ['blue-cap.png'])
+    assert.deepEqual(ordered(await searchAs({ query: 'shirt red' })), ['shirt-red.png', 'notes.txt'])
+    assert.deepEqual(ordered(await searchAs({ query: 'shirt red', sort: 'name' })), ['notes.txt', 'shirt-red.png'])
+    assert.deepEqual(ordered(await searchAs({})), ['blue-cap.png', 'hat.mp4', 'notes.txt', 'shirt-red.png', 'spec.pdf'])
+    await db.query(`UPDATE asset_files SET updated_at = now() + interval '1 day' WHERE name = 'spec.pdf'`)
+    assert.deepEqual(ordered(await searchAs({ sort: 'newest' })).slice(0, 1), ['spec.pdf'])
 })
 
 test('search scope limits results to one collection or to its subtree', async () => {
     assert.deepEqual(names(await searchAs({ searchScope: 'current', collectionId: root.id })), ['hat.mp4', 'shirt-red.png', 'spec.pdf'])
-    assert.deepEqual(names(await searchAs({ searchScope: 'current', collectionId: child.id })), ['notes.txt'])
-    assert.equal((await searchAs({ searchScope: 'current_with_sub', collectionId: root.id })).total, 4)
-    assert.equal((await searchAs({ searchScope: 'all', collectionId: child.id })).total, 4)
+    assert.deepEqual(names(await searchAs({ searchScope: 'current', collectionId: child.id })), ['blue-cap.png', 'notes.txt'])
+    assert.equal((await searchAs({ searchScope: 'current_with_sub', collectionId: root.id })).total, 5)
+    assert.equal((await searchAs({ searchScope: 'all', collectionId: child.id })).total, 5)
 })
 
 test('file type, asset type and product view filters narrow results and unknown file types are ignored', async () => {
     assert.deepEqual(names(await searchAs({ fileTypes: ['document'] })), ['spec.pdf'])
     assert.deepEqual(names(await searchAs({ fileTypes: ['video'] })), ['hat.mp4'])
-    assert.deepEqual(names(await searchAs({ fileTypes: ['image'] })), ['shirt-red.png'])
-    assert.deepEqual(names(await searchAs({ fileTypes: ['image', 'video'] })), ['hat.mp4', 'shirt-red.png'])
-    assert.equal((await searchAs({ fileTypes: ['archive'] })).total, 4)
-    assert.deepEqual(names(await searchAs({ assetTypes: [related.id] })), ['hat.mp4'])
+    assert.deepEqual(names(await searchAs({ fileTypes: ['image'] })), ['blue-cap.png', 'shirt-red.png'])
+    assert.deepEqual(names(await searchAs({ fileTypes: ['image', 'video'] })), ['blue-cap.png', 'hat.mp4', 'shirt-red.png'])
+    assert.equal((await searchAs({ fileTypes: ['archive'] })).total, 5)
+    assert.equal((await searchAs({ fileTypes: ['constructor', '__proto__'] })).total, 5)
+    assert.deepEqual(names(await searchAs({ assetTypes: [related.id] })), ['blue-cap.png', 'hat.mp4'])
     assert.deepEqual(names(await searchAs({ productViews: ['front'] })), ['hat.mp4'])
 })
 
@@ -127,5 +168,8 @@ test('searchNotFound returns only the terms without a visible match in the reque
     assert.deepEqual(await notFound({ query: ['shirt', 'zzz', 'NOTES'] }), ['zzz'])
     assert.deepEqual((await notFound({ query: ['shirt', 'notes'], searchScope: 'current', collectionId: child.id })), ['shirt'])
     assert.deepEqual(await notFound({ query: ['shirt'], assetTypes: [related.id] }), ['shirt'])
+    assert.deepEqual(await notFound({ query: ['navy', 'zzz'] }), ['zzz'])
+    assert.deepEqual(await notFound({ query: ['navy'], fileTypes: ['video'] }), ['navy'])
+    assert.deepEqual(await notFound({ query: ['hat'], fileTypes: ['toString'] }), [])
     assert.deepEqual(await notFound({ query: [] }), [])
 })

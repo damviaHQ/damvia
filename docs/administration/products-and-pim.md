@@ -67,13 +67,13 @@ A matching file whose key has no product row gets `product_id` set to null, whic
 
 `/admin/products/attributes` lists attributes with `Attribute Key`, `Display Name`, `Filter in Search`, `Visible in Product List` and `Searchable`. The form offers `Select an Attribute *` from `productAttribute.listAvailable`, which returns the distinct `meta_data` keys of all products, then `Change Display Name`, `Add filter in search` (`facetable`), `Visible in Product List` (`viewable`) and `Searchable`. Ticking `facetable` forces `viewable` on both in the form and on the server.
 
-How each flag is used by `collection.search` in `server/src/trpc/router/collection.ts`:
+How each flag is used by `collection.search` (`server/src/trpc/router/collection.ts`, predicates in `server/src/services/search.ts`):
 
-- **searchable**: every word of the query is matched with `ILIKE` against `asset_file.name` and against `product.meta_data['<name>']` for each searchable attribute; with `exactMatch` the whole query is matched once.
-- **facetable**: `productAttribute.listFacets` returns each facetable attribute with the distinct values found in products. The client sends the chosen values as `attributes`, and the server adds `product.meta_data[<name>] IN (...)` conditions, ORed across attributes.
+- **searchable**: every word of the query is matched with `ILIKE` against `asset_file.name` and against `product.meta_data['<name>']` for each searchable attribute; with `exactMatch` the whole query is matched once. `collection.searchNotFound` uses the same columns to tell the user which typed references matched nothing; the search panel marks those terms and offers to copy or remove them.
+- **facetable**: `productAttribute.listFacets` returns each facetable attribute with the distinct values found in products. The search panel shows one collapsible checkbox group per facetable attribute, each value with the number of files it would leave in the current results (values with no file are greyed out). The client sends the chosen values as `attributes`, and the server adds one `product.meta_data[<name>] IN (...)` condition per attribute: values of the same attribute are alternatives, and choosing values in two attributes narrows the results to files matching both. The counts come from `collection.search`'s `facets`, described in [API](../contributing/api.md).
 - **viewable**: `formatCollectionFile` returns the product's viewable attributes with each file, so they can be shown in details and as list columns configured on the [asset type](./asset-types.md).
 
-A product view filter only matches files whose asset type has `is_related_to_products` set, so tag your packshot folders with such a type. Results are paginated 300 per page.
+A product view filter only matches files whose asset type has `is_related_to_products` set, so tag your packshot folders with such a type. Results are paginated 300 per page and sorted by relevance when there is a query (`sort` accepts `name` and `newest` too).
 
 ## Reproducible import fixture
 

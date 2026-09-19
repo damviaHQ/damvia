@@ -25,6 +25,8 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/trpc/router/asset.ts`, `entity/asset-file.ts`, `entity/asset-folder.ts` | `administration/assets-tree.md` |
 | `server/src/trpc/router/menu-item.ts`, `page.ts`, `services/page.ts`, `entity/menu-item.ts`, `page.ts`, `page-block.ts` | `administration/menu-and-pages.md` |
 | `server/src/trpc/router/pim.ts`, `product-attributes.ts`, `entity/product.ts`, `product-attribute.ts` | `administration/products-and-pim.md` |
+| `server/src/services/search.ts`, `trpc/router/collection.ts` (`search`, `searchNotFound`), `client/src/components/search/*`, `client/src/components/layout-main/MainSearchBar.vue`, `client/src/views/search.vue`, `client/src/composables/useSearchState.ts` | `administration/products-and-pim.md`, `administration/asset-types.md`, `contributing/api.md`, `contributing/design-system.md` |
+| `server/src/trpc/router/favorite.ts`, `entity/user-favorite.ts`, `entity/user-collection-favorite.ts`, `client/src/composables/useCollectionFavorites.ts`, `client/src/views/favorites.vue`, `client/src/views/my-collections.vue` | `contributing/api.md`, `contributing/data-model.md`, `introduction/roles-and-access.md` |
 | `server/src/trpc/router/download.ts`, `services/download.ts`, `entity/download.ts` | `administration/downloads.md` |
 | `server/src/trpc/router/settings.ts` | `configuration/branding.md` |
 | `server/src/services/storage.ts`, `trpc/router/dashboard.ts`, `entity/storage-usage.ts` | `administration/dashboard.md`, `deployment/operations.md`, `configuration/server-env.md`, `deployment/integrity-check.md` |

@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
+import CollectionFavoriteButton from "@/components/collection/CollectionFavoriteButton.vue"
 import CollectionDropdownActions from "@/components/collection/CollectionDropdownActions.vue"
 import { RouterOutput } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
@@ -27,7 +28,7 @@ import { EyeOff, Folder } from "lucide-vue-next"
 import { computed, ref } from "vue"
 import { RouteLocationRaw } from "vue-router"
 
-type Collection = RouterOutput["collection"]["findById"][number]
+type Collection = RouterOutput["collection"]["findById"]
 
 const props = defineProps<{
   collections: Collection[]
@@ -175,7 +176,8 @@ const table = useVueTable({
                 </div>
               </router-link>
             </div>
-            <div v-if="cell.column.id === 'actions'" class="collection-list-collections__actions-container pr-2 flex items-center justify-end absolute top-0 right-0 bottom-0 [background-color:inherit] opacity-0 [transition:opacity_0.2s_ease-in-out]">
+            <div v-if="cell.column.id === 'actions'" class="collection-list-collections__actions-container pr-2 flex items-center justify-end gap-2 absolute top-0 right-0 bottom-0 [background-color:inherit] opacity-0 [transition:opacity_0.2s_ease-in-out]">
+              <CollectionFavoriteButton :collection="cell.row.original" />
               <CollectionDropdownActions :collection="cell.row.original"
                 @update:open="(isOpen) => (openDropdownId = isOpen ? row.id : null)" />
             </div>

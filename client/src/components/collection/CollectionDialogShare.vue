@@ -32,6 +32,7 @@ import { useQueryClient } from "@tanstack/vue-query"
 import dayjs from "dayjs"
 import { Copy, Link, Send, XCircle } from "lucide-vue-next"
 import { computed, onMounted, ref } from "vue"
+import { useRouter } from "vue-router"
 
 type Collection = RouterOutput["collection"]["findById"]
 type Invitation = Collection["invitations"][number]
@@ -39,6 +40,7 @@ type Invitation = Collection["invitations"][number]
 const props = defineProps<{ modelValue: boolean; collection: Collection }>()
 const emit = defineEmits<{ (e: "update:modelValue", isOpen: boolean): void }>()
 const toast = useGlobalToast()
+const router = useRouter()
 const queryClient = useQueryClient()
 const form = ref<{ email?: string; expiresAt?: string }>({})
 const formErrors = ref<Record<string, string>>({})
@@ -90,7 +92,7 @@ async function createInvitation(sendEmail: boolean) {
 }
 
 async function copyInvitationLink(email: string) {
-  const url = new URL(window.location.href)
+  const url = new URL(router.resolve({ name: 'collection', params: { id: props.collection.id } }).href, window.location.origin)
   const searchParams = new URLSearchParams()
   searchParams.set(
     "auth_params",

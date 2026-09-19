@@ -116,11 +116,13 @@ Sidebar navigation and selection status use `text-body`, which resolves to the s
 
 Client menus use Lucide, matching the dashboard menu: 16px icons, default 2px strokes, 20px icon slots and an 8px label gap for primary rows. Shared client menu geometry lives in `client/src/components/layout-main/navigationStyles.ts`; recursive tree rows keep their compact geometry and 16px nesting so location guides stay aligned. Toolbar action icons remain a separate 24px role.
 
+On the search route the same sidebar hosts the search panel (`client/src/components/search/`) instead of the menu: the section titles reuse `sidebarSectionTitleClasses`, facet rows are 32px `ui/checkbox` rows with a count on the right, and the "Back to" link reuses `sidebarRowClasses`. Filters that would leave no result stay visible but disabled. Above the results a sticky toolbar holds the result sentence, a file type switch with counts, the sort select and removable chips for the active filters; below it the results use the collection grid and list components.
+
 ### Checkboxes
 
 Use `ui/checkbox/Checkbox.vue` for checked, unchecked, disabled and indeterminate states (`modelValue: true | false | "indeterminate"`). CollectionCheckbox only maps legacy selection states to that component; it must not define its own visuals. Search asset-type options use the same component. The `checkbox-surface` Tailwind utility owns size, border, background and shape; the tree-select adapter consumes it because that dependency owns its internal checkbox markup. Partial selection uses a minus, and Space toggles the focused control.
 
-Search modal options form a readable sentence ("I … in …"). Preserve this interaction when changing shared styles; technical labels remain accessible names rather than visible form headings.
+Search options form a readable sentence ("I … in …") inside the popover that opens under the top-bar search input. Preserve this interaction when changing shared styles; technical labels remain accessible names rather than visible form headings.
 
 ## Typography and icon sizing after Tailwind 4
 

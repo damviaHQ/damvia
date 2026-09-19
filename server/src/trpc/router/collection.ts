@@ -29,6 +29,7 @@ import {
 	userCollectionFilesQuery,
 	userCollectionsQuery
 } from "../../services/collection"
+import { applySearchOrder, buildSearchQuery, loadSearchContext, searchFacets } from "../../services/search"
 import { collectionSynchronizationQueue } from "../../worker"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 import invitationRouter, { formatInvitation } from "./collection/invitation"
@@ -206,95 +207,17 @@ export default router({
 			searchScope: z.string().optional().nullable(),
 			exactMatch: z.boolean().optional().nullable(),
 			attributes: z.record(z.string().array().nullable()).nullable().optional(),
+			sort: z.enum(['relevance', 'name', 'newest']).optional().nullable(),
 		}))
 		.query(async ({ input, ctx }) => {
-			const searchableAttributes = await dataSource.getRepository(ProductAttribute).findBy({
-				searchable: true
-			})
-
-			let query = userCollectionFilesQuery(ctx.user)
-			searchableAttributes.forEach((attribute, index) => query.setParameter(`attribute${index}`, attribute.name))
-			const tokens = input.query?.trim() ? input.query.trim().split(/\s+/) : []
-			if (input.query && input.exactMatch) {
-				const queryParts = [
-					'asset_file.name ILIKE :query',
-					...searchableAttributes.map((attribute, index) => `(product.meta_data -> :attribute${index}) ILIKE :query`),
-				]
-				query.andWhere(`(${queryParts.join(' OR ')})`, { query: `%${input.query}%` })
-			} else if (tokens.length) {
-				query.andWhere(new Brackets((baseQuery) =>
-					tokens.reduce((q, value, index) => {
-						const queryKey = `query${index}`
-						const where = index === 0 ? q.where : q.orWhere
-						const queryParts = [
-							`asset_file.name ILIKE :${queryKey}`,
-							...searchableAttributes.map((attribute, index) => `(product.meta_data -> :attribute${index}) ILIKE :${queryKey}`),
-						]
-						return where.call(q, `(${queryParts.join(' OR ')})`, { [queryKey]: `%${value}%` })
-					}, baseQuery),
-				))
-			}
-
-			if (input.assetTypes?.length) {
-				query.andWhere('asset_file.asset_type_id IN (:...assetTypeIds)', { assetTypeIds: input.assetTypes })
-			}
-
-			if (input.productViews?.length) {
-				query.andWhere('asset_file.product_view IN (:...productViews)', { productViews: input.productViews })
-			}
-
-			if (input.searchScope === 'current_with_sub') {
-				query.andWhere('collection.mpath ILIKE :collectionPath', { collectionPath: `%${input.collectionId}.%` })
-			} else if (input.searchScope === 'current' && input.collectionId) {
-				query.andWhere('collection.id = :collectionId', { collectionId: input.collectionId })
-			}
-
-			const inputAttributes = input.attributes ?? {}
-			const attributesKeys = Object.keys(inputAttributes).filter((key) => (inputAttributes[key]?.length ?? 0) > 0)
-			if (attributesKeys.length) {
-				const attributes = await dataSource.getRepository(ProductAttribute).findBy({
-					id: In(attributesKeys),
-				})
-				query.andWhere(new Brackets((baseQuery) =>
-					attributes.reduce((q, attribute, index) => {
-						const attrKey = `attributekey${index}`
-						const attrValue = `attributevalue${index}`
-						const where = index === 0 ? q.where : q.orWhere
-						return where.call(q, `product.meta_data[:${attrKey}] IN (:...${attrValue})`, {
-							[attrKey]: attribute.name,
-							[attrValue]: inputAttributes[attribute.id],
-						})
-					}, baseQuery)
-				))
-			}
-
-			if (input.productViews?.length) {
-				query.andWhere('asset_type.is_related_to_products IS TRUE')
-			}
-
-			if (input.fileTypes?.length) {
-				const documentMimeTypes = [
-					'application/msword', // .doc
-					'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-					'application/pdf', // .pdf
-					'application/vnd.ms-powerpoint', // .ppt
-					'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
-					'application/vnd.ms-excel', // .xls
-					'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-				]
-				const fileTypeQueries = {
-					document: `asset_file.mime_type IN (${documentMimeTypes.map((type) => `'${type}'`).join(', ')})`,
-					video: "asset_file.mime_type ILIKE 'video/%' OR asset_file.mime_type = 'application/mp4'",
-					image: "asset_file.mime_type ILIKE 'image/%'",
-				}
-				const queries = input.fileTypes.map((type) => fileTypeQueries[type]).filter((q) => q)
-				if (queries.length) {
-					query.andWhere(`(${queries.join(' OR ')})`)
-				}
-			}
+			const context = await loadSearchContext(input)
+			const query = applySearchOrder(buildSearchQuery(ctx.user, input, context), input, context, input.sort)
 
 			const perPage = 300
-			const [results, total] = await query.skip(Math.max((input.page - 1) * perPage, 0)).take(perPage).getManyAndCount()
+			const [[results, total], facets] = await Promise.all([
+				query.offset(Math.max((input.page - 1) * perPage, 0)).limit(perPage).getManyAndCount(),
+				searchFacets(ctx.user, input, context),
+			])
 			const totalPages = Math.ceil(total / perPage)
 			const searchTerm = input.query?.trim().toLowerCase()
 			if (searchTerm && input.page === 1) {
@@ -315,6 +238,7 @@ export default router({
 				totalPages,
 				previousPage: input.page > 1 ? input.page - 1 : null,
 				nextPage: totalPages > input.page ? input.page + 1 : null,
+				facets,
 				results: await Promise.all(results.map(file => formatCollectionFile({ file, productAttributes }))),
 			}
 		}),
@@ -324,21 +248,22 @@ export default router({
 			query: z.string().array(),
 			collectionId: z.string().nullable().optional(),
 			assetTypes: z.string().array().optional().nullable(),
+			productViews: z.string().array().optional().nullable(),
+			fileTypes: z.string().array().optional().nullable(),
 			searchScope: z.string().optional().nullable(),
 		}))
 		.query(async ({ input, ctx }) => {
-			const visible = userCollectionFilesQuery(ctx.user).select('asset_file.name', 'name')
-			if (input.assetTypes?.length) visible.andWhere('asset_file.asset_type_id IN (:...types)', { types: input.assetTypes })
-			if (input.searchScope === 'current_with_sub') {
-				visible.andWhere('collection.mpath LIKE :path', { path: `%${input.collectionId}.%` })
-			} else if (input.searchScope === 'current' && input.collectionId) {
-				visible.andWhere('collection.id = :collectionId', { collectionId: input.collectionId })
-			}
+			// A term counts as found when a visible file name or a searchable attribute contains it.
+			const scope = { ...input, query: null, attributes: null }
+			const context = await loadSearchContext(scope)
+			const visible = buildSearchQuery(ctx.user, scope, context).select('asset_file.name', 'name')
+			context.searchableAttributes.forEach((_, index) => visible.addSelect(`product.meta_data -> :attribute${index}`, `attr${index}`))
 			const [sql, parameters] = visible.getQueryAndParameters()
 			const shifted = sql.replace(/\$(\d+)/g, (_, n) => `$${Number(n) + 1}`)
+			const columns = ['visible.name', ...context.searchableAttributes.map((_, index) => `visible."attr${index}"`)]
 			const result = await dataSource.query(`
 				SELECT tag FROM unnest($1::text[]) AS terms(tag)
-				WHERE NOT EXISTS (SELECT 1 FROM (${shifted}) AS visible WHERE visible.name ILIKE '%' || tag || '%')
+				WHERE NOT EXISTS (SELECT 1 FROM (${shifted}) AS visible WHERE ${columns.map((column) => `${column} ILIKE '%' || tag || '%'`).join(' OR ')})
 			`, [input.query, ...parameters])
 			return result.map((row) => row.tag) as string[]
 		}),

@@ -15,7 +15,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import MainLinkTree from "@/components/layout-main/MainLinkTree.vue"
 import MainMenuTree from "@/components/layout-main/MainMenuTree.vue"
-import { menuIconClasses, menuIconSlotClasses, sidebarRowClasses } from "@/components/layout-main/navigationStyles"
+import { menuIconClasses, menuIconSlotClasses, sidebarRowClasses, sidebarSectionTitleClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "@/components/layout-main/navigationStyles"
+import SearchPanel from "@/components/search/SearchPanel.vue"
+import { useMyCollections } from "@/composables/useMyCollections"
 import MainTopbar from "@/components/layout-main/MainTopbar.vue"
 import { Button } from "@/components/ui/button"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -25,7 +27,7 @@ import { useQuery } from "@tanstack/vue-query"
 import sortBy from "lodash/sortBy"
 import { ChevronDown, ChevronRight, Plus, Menu, X, Star } from "lucide-vue-next"
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 
 const SIDEBAR_WIDTH_KEY = "damvia.sidebarWidth"
 const SIDEBAR_MIN = 240
@@ -86,6 +88,11 @@ onBeforeUnmount(() => {
 })
 
 const route = useRoute()
+const isSearchRoute = computed(() => route.name === "search")
+// The search panel needs room for counts and long attribute values.
+const SEARCH_SIDEBAR_MIN = 320
+const asideWidth = computed(() => isSearchRoute.value ? Math.max(sidebarWidth.value, SEARCH_SIDEBAR_MIN) : sidebarWidth.value)
+const router = useRouter()
 const mobileNavOpen = ref(false)
 watch(() => route.fullPath, () => { mobileNavOpen.value = false })
 const isDialogCreateCollectionOpen = ref<boolean>(false)
@@ -93,19 +100,10 @@ const isDialogCreateCollectionOpen = ref<boolean>(false)
 type Collection = RouterOutput["collection"]["tree"][number]
 
 const globalStore = useGlobalStore()
-const { data: collections } = useQuery({
-  queryKey: ["collection", "tree"],
-  queryFn: () => trpc.collection.tree.query(),
-})
+const { data: collections, myCollections } = useMyCollections()
 const { data: menuItems } = useQuery({
   queryKey: ["menu-items"],
   queryFn: () => trpc.menuItem.list.query(),
-})
-
-const myCollections = computed(() => {
-  return collections.value
-    ?.filter((c: Collection) => c.ownerId === globalStore.user?.id && !c.public)
-    .sort((a: Collection, b: Collection) => a.name.localeCompare(b.name))
 })
 
 const publicCollections = computed(() => {
@@ -229,45 +227,62 @@ const openCollections = computed(() => {
   return []
 })
 
-const myCollectionsActive = computed(
-  () =>
-    myCollections.value?.some((c: Collection) => openCollections.value?.includes(c.id)) ??
-    false
+const activeMyCollectionIndex = computed(() =>
+  myCollections.value.findIndex((collection: Collection) => openCollections.value.includes(collection.id))
 )
-const isMyCollectionsTabOpen = ref<boolean>(false)
+const myCollectionsActive = computed(() => activeMyCollectionIndex.value >= 0)
+const isMyCollectionsTabOpen = ref(false)
 
-watch([myCollectionsActive], () => {
-  isMyCollectionsTabOpen.value = myCollectionsActive.value
-})
+watch([myCollectionsActive, () => route.fullPath], () => {
+  if (myCollectionsActive.value || route.name === "my-collections") {
+    isMyCollectionsTabOpen.value = true
+  }
+}, { immediate: true })
 const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/collection/CollectionDialogCreate.vue"))
 </script>
 
 <template>
   <div class="dashboard-layout flex h-dvh w-full overflow-hidden bg-white pt-[88px] md:pt-[72px]">
     <a href="#main-content" class="sr-only fixed left-3 top-3 z-50 bg-white px-3 py-2 text-sm font-medium text-neutral-950 focus:not-sr-only">Skip to content</a>
-    <Button class="fixed left-3 top-[22px] z-20 size-11 md:hidden" variant="ghost" size="icon" :aria-expanded="mobileNavOpen" aria-controls="client-navigation" :aria-label="mobileNavOpen ? 'Close navigation' : 'Open navigation'" @click="mobileNavOpen = !mobileNavOpen"><X v-if="mobileNavOpen" /><Menu v-else /></Button>
+    <Button class="fixed left-3 top-[22px] z-20 size-11 md:hidden" variant="ghost" size="icon" :aria-expanded="mobileNavOpen" aria-controls="client-navigation" :aria-label="mobileNavOpen ? (isSearchRoute ? 'Close search filters' : 'Close navigation') : (isSearchRoute ? 'Open search filters' : 'Open navigation')" @click="mobileNavOpen = !mobileNavOpen"><X v-if="mobileNavOpen" /><Menu v-else /></Button>
     <TooltipProvider :delay-duration="0" :disable-hoverable-content="true">
-      <aside id="client-navigation" class="relative shrink-0 overflow-y-auto border-r border-neutral-200 bg-neutral-50 px-3 py-5 max-md:fixed max-md:inset-y-[88px] max-md:left-0 max-md:z-15 max-md:w-[min(320px,calc(100vw-32px))]!" :class="mobileNavOpen ? 'block' : 'max-md:hidden'" :style="{ width: sidebarWidth + 'px' }" @keydown.esc="mobileNavOpen = false">
+      <aside id="client-navigation" class="relative shrink-0 overflow-y-auto border-r border-neutral-200 bg-neutral-50 px-3 py-5 max-md:fixed max-md:inset-y-[88px] max-md:left-0 max-md:z-15 max-md:w-[min(320px,calc(100vw-32px))]!" :class="mobileNavOpen ? 'block' : 'max-md:hidden'" :style="{ width: asideWidth + 'px' }" @keydown.esc="mobileNavOpen = false">
         <div role="separator" aria-orientation="vertical" aria-label="Resize sidebar" :aria-valuenow="sidebarWidth" :aria-valuemin="SIDEBAR_MIN" :aria-valuemax="SIDEBAR_MAX" tabindex="0" class="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize select-none hover:bg-neutral-300 focus-visible:bg-neutral-300 max-md:hidden" :class="isResizing && 'bg-neutral-300'" @mousedown="startResize" @keydown="onResizeKeydown" />
-        <nav aria-label="Collections">
+        <SearchPanel v-if="isSearchRoute" />
+        <nav v-else aria-label="Collections">
           <div v-if="globalStore.user?.role !== 'guest'" class="mb-4 grid gap-1">
             <router-link :to="{ name: 'favorites' }" :class="sidebarRowClasses" active-class="bg-neutral-200/70 text-neutral-950">
               <span :class="menuIconSlotClasses"><Star :class="menuIconClasses" /></span><span>Favorites</span>
             </router-link>
-            <div class="flex items-center gap-1">
-              <button v-if="myCollections?.length" type="button" class="flex-1" :class="sidebarRowClasses" :aria-expanded="isMyCollectionsTabOpen" @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen">
-                <span :class="menuIconSlotClasses"><ChevronDown v-if="isMyCollectionsTabOpen" :class="menuIconClasses" /><ChevronRight v-else :class="menuIconClasses" /></span><span>My collections</span>
-              </button>
-              <div v-else class="flex-1" :class="sidebarRowClasses">
-                <span :class="menuIconSlotClasses" aria-hidden="true" /><span>My collections</span>
+            <div>
+              <div class="relative flex items-center gap-1">
+                <Button v-if="myCollections.length" type="button" variant="ghost"
+                  :aria-expanded="isMyCollectionsTabOpen" aria-controls="my-collections-tree"
+                  :aria-label="`${isMyCollectionsTabOpen ? 'Collapse' : 'Expand'} My collections`"
+                  class="peer absolute left-px top-2 z-10 size-5 min-h-0 shrink-0 border-none p-0.5 hover:bg-neutral-200"
+                  @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen">
+                  <ChevronDown v-if="isMyCollectionsTabOpen" :class="menuIconClasses" />
+                  <ChevronRight v-else :class="menuIconClasses" />
+                </Button>
+                <router-link :to="{ name: 'my-collections' }" :class="[treeRowClasses, 'flex-1 peer-hover:bg-neutral-200 peer-hover:text-neutral-900']" :active-class="treeActiveRowClasses">
+                  <span :class="menuIconSlotClasses" aria-hidden="true" /><span class="min-w-0 truncate">My collections</span>
+                </router-link>
+                <Button variant="ghost" size="icon" aria-label="Create collection" class="size-7 p-1.5 [&_svg]:size-4" @click="isDialogCreateCollectionOpen = true"><Plus :class="menuIconClasses" /></Button>
               </div>
-              <Button variant="ghost" size="icon" aria-label="Create collection" class="size-7 p-1.5 [&_svg]:size-4" @click="isDialogCreateCollectionOpen = true"><Plus :class="menuIconClasses" /></Button>
-            </div>
-            <div v-if="isMyCollectionsTabOpen && myCollections?.length" class="ml-4 border-l border-neutral-200 pl-2">
-              <MainLinkTree v-for="collection in myCollections" :key="collection.id" :item="collection" :open-items="openCollections ?? []" route-name="collection" />
+              <div v-if="isMyCollectionsTabOpen && myCollections.length" id="my-collections-tree" class="children-container relative pl-4">
+                <span v-if="myCollectionsActive" aria-hidden="true" data-tree-connector :class="treeConnectorStartClasses" />
+                <div v-for="(collection, index) in myCollections" :key="collection.id" class="relative">
+                  <span v-if="myCollectionsActive && index <= activeMyCollectionIndex" aria-hidden="true" data-tree-connector
+                    class="pointer-events-none absolute -left-[5px] top-0 w-px bg-[#d4d4d4]"
+                    :class="index === activeMyCollectionIndex ? 'h-[18px]' : 'h-full'" />
+                  <span v-if="index === activeMyCollectionIndex" aria-hidden="true" data-tree-connector
+                    class="pointer-events-none absolute -left-[5px] top-[18px] h-px w-[6px] bg-[#d4d4d4]" />
+                  <MainLinkTree :item="collection" :open-items="openCollections" route-name="collection" />
+                </div>
+              </div>
             </div>
           </div>
-          <div v-if="globalStore.user?.role !== 'guest'" class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[.08em] text-neutral-500">Library</div>
+          <div v-if="globalStore.user?.role !== 'guest'" class="mb-2" :class="sidebarSectionTitleClasses">Library</div>
           <MainLinkTree v-if="globalStore.user?.role === 'guest'" v-for="collection in publicCollections" :key="collection.id" :item="collection" :open-items="openCollections ?? []" route-name="collection" />
           <MainMenuTree v-else-if="menuItems" v-for="item in sortBy(menuItems, 'position')" :key="item.id" :item="item" :open-items="openCollections ?? []" route-name="collection" />
         </nav>
@@ -275,6 +290,6 @@ const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/c
     </TooltipProvider>
     <MainTopbar />
     <main id="main-content" tabindex="-1" class="client-workspace min-w-0 flex-1 overflow-auto p-5 focus:outline-none"><slot /></main>
-    <CollectionDialogCreate v-model="isDialogCreateCollectionOpen" />
+    <CollectionDialogCreate v-model="isDialogCreateCollectionOpen" @created="router.push({ name: 'collection', params: { id: $event.id } })" />
   </div>
 </template>

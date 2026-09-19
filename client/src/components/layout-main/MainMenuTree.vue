@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { menuIconClasses, menuIconSlotClasses, treeRowClasses, treeConnectorStartClasses } from "./navigationStyles"
+import { menuIconClasses, menuIconSlotClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "./navigationStyles"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsTruncated } from "@/composables/useIsTruncated"
@@ -104,7 +104,7 @@ function handleLinkClick(event: MouseEvent) {
           @click.exact="handleLinkClick" @mouseenter="onRowEnter" @mouseleave="onRowLeave" @focus="onRowEnter" @blur="onRowLeave"
           :class="[
             'layout-menu-tree__item peer-hover:bg-neutral-200 peer-hover:text-neutral-900', treeRowClasses,
-            isActiveItem && 'layout-menu-tree__item--active bg-neutral-100 text-neutral-900! font-bold!'
+            isActiveItem && ['layout-menu-tree__item--active', treeActiveRowClasses]
           ]">
           <div :class="menuIconSlotClasses" />
           <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.collectionName }}</div>
@@ -113,7 +113,7 @@ function handleLinkClick(event: MouseEvent) {
           @click.exact="handleLinkClick" @mouseenter="onRowEnter" @mouseleave="onRowLeave" @focus="onRowEnter" @blur="onRowLeave"
           :class="[
             'layout-menu-tree__item', treeRowClasses,
-            isActiveItem ? 'layout-menu-tree__item--active bg-neutral-100 text-neutral-900! font-bold!' : ''
+            isActiveItem ? ['layout-menu-tree__item--active', treeActiveRowClasses] : ''
           ]">
           <div :class="menuIconSlotClasses" />
           <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.pageName }}</div>

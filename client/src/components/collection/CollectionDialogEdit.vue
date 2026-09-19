@@ -80,6 +80,7 @@ function handleFileUploaded(event: Event) {
 async function deleteCollection() {
   await trpc.collection.remove.mutate(props.collection.id)
   emit("update:modelValue", false)
+  queryClient.invalidateQueries({ queryKey: ["collection-favorites"] })
   queryClient.invalidateQueries({ queryKey: ["collection", "tree"] })
   queryClient.invalidateQueries({ queryKey: ["collection", "ListPrivateCollections"] })
   queryClient.invalidateQueries({ queryKey: ["menu-items"] })
@@ -124,6 +125,7 @@ async function onSubmit() {
     }
     const collection = await trpc.collection.update.mutate(updateData)
 
+    queryClient.invalidateQueries({ queryKey: ["collection-favorites"] })
     queryClient.invalidateQueries({ queryKey: ["collection"] })
     queryClient.invalidateQueries({ queryKey: ["menu-items"] })
     emit("update:modelValue", false)

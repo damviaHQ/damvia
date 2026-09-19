@@ -40,7 +40,7 @@ A type is therefore effectively a property of a subtree, and the way to type a s
 
 Two places read the flags:
 
-- **Default search state.** `MainSearchBar.vue` builds the initial `assetTypes` filter from the types where `includeInSearchByDefault` is true. Users can change the selection, and the client remembers their options in local storage.
+- **Default search state.** The top-bar search input opens a panel of options on focus (`MainSearchBar.vue`): the search mode, the asset types and the scope, worded as a sentence, plus the last 8 searches. The initial `assetTypes` filter is built from the types where `includeInSearchByDefault` is true. Users can change the selection; the client remembers their options in local storage under `damvia_search_options` and the recent searches under `damvia.recentSearches`. On the results page the left column replaces the menu with the search panel (`client/src/components/search/SearchPanel.vue`): terms, mode, scope, then an **Asset type** checkbox group where each type shows how many files it would leave in the results. A file type switch (all, images, videos, documents) with the same counts sits above the results.
 - **Server filter.** `collection.search` in `server/src/trpc/router/collection.ts` adds `asset_file.asset_type_id IN (...)` when the request carries asset type ids. When the request also filters by product views, it adds `asset_type.is_related_to_products IS TRUE`, so only files of product-related types match a product view filter.
 
 Product views themselves come from the file name matching `PRODUCT_MATCHING_REGEX`; see [Products and PIM](./products-and-pim.md).

@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import { gridClasses, gridCardClasses, gridPreviewClasses } from './gridStyles'
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionDropdownActions from "@/components/collection/CollectionDropdownActions.vue"
+import CollectionFavoriteButton from "@/components/collection/CollectionFavoriteButton.vue"
 import CollectionThumbnail from "@/components/collection/CollectionThumbnail.vue"
 import { RouterOutput } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
@@ -23,7 +24,7 @@ import { Folder } from "lucide-vue-next"
 import { ref } from "vue"
 import { RouteLocationRaw } from "vue-router"
 
-type Collection = RouterOutput["collection"]["findById"][number]
+type Collection = RouterOutput["collection"]["findById"]
 
 defineProps<{
   collections: Collection[]
@@ -61,7 +62,8 @@ function handleSelection(event: Event, collection: Collection) {
         <Folder class="size-5 shrink-0 text-neutral-500" />
         <router-link :to="generateRoute(collection)" class="min-w-0 flex-1 truncate text-sm text-neutral-600 hover:text-neutral-950" :title="collection.name">{{ collection.name }}</router-link>
         <span v-if="collection.draft" class="text-xs text-neutral-500">Draft</span>
-        <div v-if="collection.canEdit" class="shrink-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="elementsOpen[collection.id] ? 'opacity-100' : 'opacity-0'">
+        <CollectionFavoriteButton :collection="collection" />
+        <div class="flex shrink-0 items-center group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="elementsOpen[collection.id] ? 'opacity-100' : 'opacity-0'">
           <CollectionDropdownActions :collection="collection" @update:open="elementsOpen[collection.id] = $event" />
         </div>
       </div>

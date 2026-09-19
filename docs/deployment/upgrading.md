@@ -3,7 +3,7 @@ title: Upgrading
 description: Pull, build, restart; migrations run on their own at startup.
 sidebar:
   order: 6
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 To upgrade an instance, rebuild the server image and client files, then deploy them together. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
@@ -78,6 +78,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1789776000000-host-controlled-branding` | Drops `admin_branding`: the host decides with `ADMIN_CLIENT_LOGO` instead |
 | `1789862400000-track-invitation-creator` | `invited_by_id` on `collection_invitations`, filled with the collection owner for existing invitations |
 | `1789948800000-activity-events` | `activity_events` table with its four indexes, feeding Insights; `last_login_at` on `users` |
+| `1790035200000-collection-favorites` | `user_collection_favorites` table (each user's starred collections) with its index on `collection_id`; starts empty |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.
 

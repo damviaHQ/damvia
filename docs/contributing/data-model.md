@@ -3,7 +3,7 @@ title: Data model
 description: Every TypeORM entity with its table, key columns, relations and enums, the three materialized-path trees, the database triggers, and how to write a migration.
 sidebar:
   order: 3
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 This page maps the code in `server/src/entity/` and `server/src/migrations/` so you can add a column, a table or a trigger without surprises. What each object means for an administrator is in [Core concepts](../introduction/concepts.md).
@@ -37,6 +37,7 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 | `User` (`user.ts`) | `users` | `name`, `company`, `email` (unique), `emailVerified`, `emailVerificationCode`, `password`, `resetPasswordToken` (hash), `resetPasswordExpiresAt` (`timestamptz`), `authVersion`, `role`, `approved`, `maintenanceContact`, `lastLoginAt` (`timestamptz`, written by `user.me`), `regionId` | `region`, `userGroups` (cascade insert), `favorites`, `invitations`. Enum `UserRole`: `admin`, `manager`, `member`, `guest` (default) |
 | `UserGroup` (`user-group.ts`) | `user_groups` | `userId`, `groupId` | Join table; both sides cascade on delete |
 | `UserFavorite` (`user-favorite.ts`) | `user_favorites` | Composite primary key `userId` + `collectionFileId` | Both sides cascade on delete |
+| `UserCollectionFavorite` (`user-collection-favorite.ts`) | `user_collection_favorites` | Composite primary key `userId` + `collectionId`, `createdAt` (`timestamptz`) | `user`, `collection`, both cascade on delete; index `idx_user_collection_favorites_collection` on `collection_id` |
 | `AuthorizedDomain` (`authorized-domain.ts`) | `authorized_domains` | `domain`, `detail` | No relations declared |
 | `StorageUsage` (`storage-usage.ts`) | `storage_usage` | Single row, `id` = 1: `usedBytes`, `reservedBytes` (`bigint`, read as strings), `measuredAt`, `alertLevel`, `diskAlertLevel`, `quotaReachedAt`, `orphanObjects`, `orphanBytes`, `orphansRemovedAt` | No relations. Written by `services/storage.ts` only: the measure job rewrites `usedBytes` and clears `reservedBytes` only when `pgboss.job` has no active `asset/update-content` job (pg-boss must therefore share `DATABASE_URL`), `asset/update-content` reserves and commits sizes with conditional `UPDATE` statements |
 | `ActivityEvent` (`activity-event.ts`) | `activity_events` | `userId`, `type`, `assetFileId`, `collectionId` (all three nullable), `metadata` (`jsonb`: `downloadId` and `downloadType` for downloads, `query` and `total` for searches, `invitationId` for shares), `createdAt` (`timestamptz`) | `user`, `assetFile`, `collection`, each `ON DELETE SET NULL` so an event outlives what it names. Enum `ActivityEventType`: `login`, `asset_view`, `asset_download`, `search`, `collection_share`, `favorite`. Append-only: inserted by the routers where the action happens, read with raw SQL by `trpc/router/analytics.ts`, deleted by `services/analytics.ts` |

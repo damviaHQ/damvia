@@ -26,6 +26,7 @@ const router = createRouter({
 		{ name: 'password-update', path: '/password-update', component: () => import('@/views/auth/auth-password-update.vue'), meta: { layout: 'auth', title: 'Update password' } },
 		{ name: 'home', path: '/', component: () => import('@/views/home.vue'), meta: { layout: 'main', title: 'Home' } },
 		{ name: 'page', path: '/pages/:id', component: () => import('@/views/page.vue'), meta: { layout: 'main', title: 'Page' } },
+		{ name: 'my-collections', path: '/collections', component: () => import('@/views/my-collections.vue'), meta: { layout: 'main', title: 'My collections' } },
 		{ name: 'collection', path: '/collections/:id', component: () => import('@/views/collection.vue'), meta: { layout: 'main', title: 'Collection' } },
 		{ name: 'collection-404', path: '/collections/:id/404', component: () => import('@/views/collection-404.vue'), meta: { layout: 'main', title: 'Collection not found' } },
 		{ name: 'search', path: '/search', component: () => import('@/views/search.vue'), meta: { layout: 'main', title: 'Search' } },

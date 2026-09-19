@@ -104,8 +104,8 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 |---|---|---|---|
 | `tree` | query | `userApproved` | Collections visible to the user, as a tree |
 | `treeAdmin` | query | `userAdmin` | Public collection tree for the admin screen |
-| `search` | query | `userApproved` | Files matching text, asset types, product facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored |
-| `searchNotFound` | query | `userApproved` | Returns the search terms that matched no file name in the same scope |
+| `search` | query | `userApproved` | Files matching text, asset types, product facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored. Values of one attribute are alternatives, different attributes narrow each other. `sort` is `relevance` (default with a query: files matching more words first, then names starting with a word), `name` or `newest`; the order is stable across pages. The response carries `facets`: counts per asset type, file type (`image`, `video`, `document`, `other`), product view and facetable attribute value, computed over the whole result set with the dimension's own filter left out |
+| `searchNotFound` | query | `userApproved` | Returns the search terms found neither in a visible file name nor in a searchable attribute, within the same scope, asset type, product view and file type filters |
 | `findById` | query | `userApproved` | One collection with files, children, invitations |
 | `lastAddedFiles` | query | `userApproved` | 10 most recent collection files, optionally under one collection |
 | `create` | mutation | `userApproved` | New collection; `public` is forced to `false` for non-admins, so only admins create public ones |
@@ -136,6 +136,9 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `license.create`, `update`, `remove` | mutation | `userAdmin` | CRUD |
 | `favorite.list` | query | `userApproved`, `userMember` | The caller's favourite collection files |
 | `favorite.add`, `favorite.remove` | mutation | `userApproved`, `userMember` | Toggle a favourite |
+| `favorite.listCollections` | query | `userApproved`, `userMember` | The caller's favourite collections, limited to those currently visible to them, ordered by name |
+| `favorite.addCollection` | mutation | `userApproved`, `userMember` | Stars a collection; `NOT_FOUND` when the collection is not visible to the caller, idempotent when already starred. Unlike `favorite.add`, it records no activity event |
+| `favorite.removeCollection` | mutation | `userApproved`, `userMember` | Unstars a collection; a no-op when it was not starred |
 | `download.list` | query | `userApproved` | The caller's `ready`, `preparing` and `failed` downloads, plus those `expired` in the last month |
 | `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` at or above 10,000,000,000 bytes); `email` type pushes `download/create-archive` |
 

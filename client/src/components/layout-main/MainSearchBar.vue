@@ -13,505 +13,291 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
-import Modal from "@/components/Modal.vue"
-import { Button } from "@/components/ui/button"
+import { PopoverContent, Popover } from "@/components/ui/popover"
 import { RouterOutput, trpc } from "@/services/server.ts"
+import { clearRecentSearches, listRecentSearches, rememberSearch, type RecentSearch } from "@/utils/recentSearches"
+import { parseQueryParts, queryValueToArray } from "@/utils/searchQuery"
 import { useQuery } from "@tanstack/vue-query"
-import {
-  ChevronDown,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-vue-next"
-import { computed, nextTick, onMounted, onUnmounted, ref, Ref, watch } from "vue"
-import { LocationQuery, LocationQueryValue, useRoute, useRouter } from "vue-router"
+import { ChevronDown, History, Search, SlidersHorizontal, X } from "lucide-vue-next"
+import { PopoverAnchor } from "reka-ui"
+import { computed, onMounted, onUnmounted, ref, watch } from "vue"
+import { LocationQuery, useRoute, useRouter } from "vue-router"
 
-const sentenceChoiceClasses = 'flex min-h-9 max-w-full items-center justify-between gap-2 bg-neutral-50 px-2 py-1 text-left text-base font-medium text-neutral-600 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+const sentenceChoiceClasses = 'flex min-h-9 max-w-full cursor-pointer items-center justify-between gap-2 bg-neutral-50 px-2 py-1 text-left text-base font-medium text-neutral-600 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+const LOCAL_STORAGE_SEARCH_OPTIONS_KEY = 'damvia_search_options'
+
 const router = useRouter()
 const route = useRoute()
 const { data: assetTypes } = useQuery({
   queryKey: ["asset-types"],
   queryFn: () => trpc.assetType.list.query(),
 })
+
 const currentCollectionId = computed(() => {
   if (route.name === "search") {
-    return route.query.from_collection ?? null
+    return (route.query.from_collection as string | undefined) ?? null
   } else if (route.name === "collection") {
-    return route.params.id
+    return route.params.id as string
   }
   return null
 })
-
-function parseQueryParts(query: string) {
-  return query
-    .replace(/[ \t\n\s\r,]+/gm, " ")
-    .trim()
-    .split(" ")
-    .filter((v) => v)
-}
-const searchInput: Ref<HTMLInputElement | null> = ref(null) // Auto focus when modal opens
-const isModalOpen = ref(false)
-const currentQuery = computed((): string | string[] => {
-  if (route.name === "search") {
-    if (route.query.exact_match === "true") {
-      return (route.query.q as string) ?? ""
-    }
-    return parseQueryParts((route.query.q as string) ?? "")
-  }
-  return route.query.exact_match === "true" ? "" : []
-})
-
 const searchScopeOptions = computed(() => {
   const globalOptions = { all: "all files and collections" }
   const collectionOptions = {
     current_with_sub: "current and sub collections",
     current: "current collection",
   }
-  return currentCollectionId.value
-    ? { ...collectionOptions, ...globalOptions }
-    : globalOptions
+  return currentCollectionId.value ? { ...collectionOptions, ...globalOptions } : globalOptions
 })
 
-const isSearchCleared = ref(false)
-const filesNotFoundQuery = computed(() => {
-  if (route.name !== "search") {
+type SearchOptions = { assetTypes: string[]; searchScope: string; exactMatch: boolean }
+
+function readStoredOptions(): SearchOptions | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch (_) {
     return null
   }
-
-  return {
-    query: parseQueryParts((route.query.q as string) ?? ""),
-    assetTypes: handleRouteQueryArray(route.query.asset_types),
-    searchScope:
-      (route.query.search_scope as string) ?? Object.keys(searchScopeOptions.value)[0],
-    collectionId: route.query.from_collection as string | null,
-  }
-})
-const filesNotFoundEnabled = computed(
-  () =>
-    isSearchCleared.value === false &&
-    route.query.exact_match !== "true" &&
-    Array.isArray(filesNotFoundQuery.value?.query) &&
-    filesNotFoundQuery.value.query.length > 0
-)
-const filesNotFound = useQuery({
-  queryKey: computed(() => ["files-not-found", filesNotFoundQuery.value]),
-  enabled: filesNotFoundEnabled,
-  queryFn: () => trpc.collection.searchNotFound.query(filesNotFoundQuery.value!),
-})
-
-function handleRouteQueryArray(
-  query: LocationQueryValue | LocationQueryValue[]
-): string[] {
-  if (!query) {
-    return []
-  } else if (!Array.isArray(query)) {
-    return [query]
-  }
-  return query as string[]
 }
 
-const LOCAL_STORAGE_SEARCH_OPTIONS_KEY = 'damvia_search_options'
-const hasSearchOptions = ref(!!localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY))
-const requestClearSearchOptions = ref(false)
-
-type SearchState = { query: string | string[]; assetTypes: string[]; searchScope: string; exactMatch: boolean }
-
-function getDefaultSearchState(): SearchState {
+function defaultOptions(): SearchOptions {
   return {
-    query: Array.isArray(currentQuery.value) ? currentQuery.value : [],
     assetTypes: (assetTypes.value ?? [])
-        .filter((assetType: any) => assetType.includeInSearchByDefault)
-        .map((assetType: any) => assetType.id),
+      .filter((assetType: any) => assetType.includeInSearchByDefault)
+      .map((assetType: any) => assetType.id),
     searchScope: Object.keys(searchScopeOptions.value)[0],
     exactMatch: false,
   }
 }
 
-function getInitialSearchQuery(): SearchState {
+// On the results page the bar mirrors the URL; elsewhere it starts from the remembered options.
+function initialOptions(): SearchOptions {
   if (route.name === "search") {
     return {
-      query: currentQuery.value,
-      assetTypes: handleRouteQueryArray(route.query.asset_types),
-      searchScope:
-          (route.query.search_scope as string) ?? Object.keys(searchScopeOptions.value)[0],
+      assetTypes: queryValueToArray(route.query.asset_types),
+      searchScope: (route.query.search_scope as string) ?? Object.keys(searchScopeOptions.value)[0],
       exactMatch: route.query.exact_match === "true",
     }
   }
-
-  let searchOptions: any = localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
-  if (searchOptions) {
-    searchOptions = JSON.parse(searchOptions)
-    return {
-      query: currentQuery.value,
-      assetTypes: searchOptions?.assetTypes ?? [],
-      searchScope: searchOptions?.searchScope ?? "all",
-      exactMatch: searchOptions?.exactMatch ?? false,
-    }
-  }
-
-  return getDefaultSearchState()
-}
-const searchQuery = ref(getInitialSearchQuery())
-
-watch(
-  () => assetTypes.value,
-  () => {
-    searchQuery.value = getInitialSearchQuery()
-  }
-)
-watch(
-  () => route.query,
-  () => {
-    if (route.name === "search") {
-      searchQuery.value = getInitialSearchQuery()
-      searchQueryValue.value = ""
-    }
-  }
-)
-watch(
-  () => isModalOpen.value,
-  () => {
-    searchQuery.value = getInitialSearchQuery()
-    searchQueryValue.value = ""
-  }
-)
-
-function removeQueryPart(index: number) {
-  if (!Array.isArray(searchQuery.value.query)) {
-    return
-  }
-
-  searchQuery.value = {
-    ...searchQuery.value,
-    query: searchQuery.value.query.filter((_, currentIndex) => currentIndex !== index),
-  }
+  const stored = readStoredOptions()
+  return stored
+    ? { assetTypes: stored.assetTypes ?? [], searchScope: stored.searchScope ?? "all", exactMatch: stored.exactMatch ?? false }
+    : defaultOptions()
 }
 
-const selectedAssetTypes = computed(() => {
-  return searchQuery.value.assetTypes
-    .map((id) => assetTypes.value?.find((assetType) => assetType.id === id))
-    .filter((v) => v)
-})
-const isAssetTypeSelectOpen = ref(false)
-function toggleAssetType(assetType: RouterOutput["assetType"]["list"][number]) {
-  searchQuery.value = {
-    ...searchQuery.value,
-    assetTypes: searchQuery.value.assetTypes.includes(assetType.id)
-      ? searchQuery.value.assetTypes.filter((id) => id !== assetType.id)
-      : [...searchQuery.value.assetTypes, assetType.id],
-  }
-}
+const options = ref<SearchOptions>(initialOptions())
+const text = ref(route.name === "search" ? ((route.query.q as string) ?? "") : "")
+const hasStoredOptions = ref(!!readStoredOptions())
+const recent = ref<RecentSearch[]>(listRecentSearches())
+const isOpen = ref(false)
+const input = ref<HTMLInputElement | null>(null)
+const anchor = ref<HTMLElement | null>(null)
 
-const isSearchScopeSelectOpen = ref(false)
-function setSearchScope(searchScope: string) {
-  searchQuery.value = {
-    ...searchQuery.value,
-    searchScope,
-  }
-  isSearchScopeSelectOpen.value = false
-}
-
-const searchQueryValue = ref("")
-function handleKeydown(event: KeyboardEvent) {
-  if (event.code.toLowerCase() === "backspace" && searchQueryValue.value === "") {
-    removeQueryPart(searchQuery.value.query.length - 1)
-    return
-  } else if (["space", "enter", "comma"].includes(event.code.toLowerCase())) {
-    event.preventDefault()
-    if (searchQueryValue.value) {
-      searchQuery.value = {
-        ...searchQuery.value,
-        query: [...searchQuery.value.query, searchQueryValue.value],
-      }
-    } else if (event.code.toLowerCase() === "enter") {
-      search()
-    }
-    searchQueryValue.value = ""
-    return
-  }
-}
-
-function search() {
-  if (searchQueryValue.value && !searchQuery.value.exactMatch) {
-    searchQuery.value = {
-      ...searchQuery.value,
-      query: [...searchQuery.value.query, searchQueryValue.value],
-    }
-    searchQueryValue.value = ""
-  }
-
-  let routeQuery: LocationQuery = {}
+watch(() => assetTypes.value, () => { options.value = initialOptions() })
+watch(() => route.query, () => {
   if (route.name === "search") {
-    routeQuery = { ...route.query }
-  } else if (route.name === "collection") {
-    routeQuery.from_collection = route.params.id
+    options.value = initialOptions()
+    text.value = (route.query.q as string) ?? ""
   }
-  routeQuery.q = Array.isArray(searchQuery.value.query)
-    ? searchQuery.value.query.join(" ")
-    : searchQuery.value.query
-  routeQuery.asset_types = searchQuery.value.assetTypes
-  routeQuery.search_scope = searchQuery.value.searchScope
-  routeQuery.exact_match = "true"
-  if (!searchQuery.value.exactMatch) {
-    delete routeQuery.exact_match
-  }
+})
 
-  localStorage.setItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY, JSON.stringify({
-    assetTypes: searchQuery.value.assetTypes,
-    searchScope: searchQuery.value.searchScope,
-    exactMatch: searchQuery.value.exactMatch || false,
-  }))
-  hasSearchOptions.value = true
-  if (requestClearSearchOptions.value) {
-    localStorage.removeItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
-  }
-  router.push({ name: "search", query: routeQuery })
-  searchQueryValue.value = ""
-  isModalOpen.value = false
-  isSearchCleared.value = false
-}
-
-function resetSearch() {
-  searchQuery.value = {
-    ...searchQuery.value,
-    query: searchQuery.value.exactMatch ? "" : [],
-  }
-  searchQueryValue.value = ""
-  isSearchCleared.value = true
-}
-
-function setExactMatch(enabled: boolean) {
-  const newValue = { ...searchQuery.value, exactMatch: enabled }
-  if (newValue.exactMatch && Array.isArray(newValue.query)) {
-    newValue.query = [...newValue.query, searchQueryValue.value]
-      .filter((v) => v)
-      .join(" ")
-    searchQueryValue.value = ""
-  } else if (!newValue.exactMatch && !Array.isArray(newValue.query)) {
-    newValue.query = parseQueryParts(newValue.query)
-  }
-  searchQuery.value = newValue
-}
-
-function handlePaste(event: ClipboardEvent) {
-  event.preventDefault()
-  const clipboardData = event.clipboardData?.getData("text/plain") ?? ""
-  searchQuery.value = {
-    ...searchQuery.value,
-    query: [...searchQuery.value.query, ...parseQueryParts(clipboardData)],
-  }
-}
-
-function isContainingElement(el: HTMLElement, child: HTMLElement) {
-  for (
-    let current: HTMLElement | null = child;
-    current;
-    current = current.parentElement
-  ) {
-    if (current === el) {
-      return true
-    }
-  }
-  return false
-}
-
+const selectedAssetTypes = computed(() =>
+  options.value.assetTypes
+    .map((id) => assetTypes.value?.find((assetType) => assetType.id === id))
+    .filter((assetType) => assetType)
+)
+const isAssetTypeSelectOpen = ref(false)
+const isSearchScopeSelectOpen = ref(false)
 const assetTypeSelect = ref<HTMLElement | null>(null)
 const searchScopeSelect = ref<HTMLElement | null>(null)
 const assetTypeToggle = ref<HTMLElement | null>(null)
 const searchScopeToggle = ref<HTMLElement | null>(null)
-function closeAssetTypeSelect(event: KeyboardEvent) {
-  if (!isAssetTypeSelectOpen.value) {
-    return
+
+function toggleAssetType(assetType: RouterOutput["assetType"]["list"][number]) {
+  options.value = {
+    ...options.value,
+    assetTypes: options.value.assetTypes.includes(assetType.id)
+      ? options.value.assetTypes.filter((id) => id !== assetType.id)
+      : [...options.value.assetTypes, assetType.id],
   }
+}
+function setSearchScope(searchScope: string) {
+  options.value = { ...options.value, searchScope }
+  isSearchScopeSelectOpen.value = false
+}
+function setExactMatch(exactMatch: boolean) {
+  options.value = { ...options.value, exactMatch }
+}
+function closeAssetTypeSelect(event: KeyboardEvent) {
+  if (!isAssetTypeSelectOpen.value) return
   event.stopPropagation()
   isAssetTypeSelectOpen.value = false
   assetTypeToggle.value?.focus()
 }
 function closeSearchScopeSelect(event: KeyboardEvent) {
-  if (!isSearchScopeSelectOpen.value) {
-    return
-  }
+  if (!isSearchScopeSelectOpen.value) return
   event.stopPropagation()
   isSearchScopeSelectOpen.value = false
   searchScopeToggle.value?.focus()
 }
 function handleDocumentClick(event: Event) {
-  const target = event.target as HTMLDivElement
-  if (assetTypeSelect.value && !isContainingElement(assetTypeSelect.value, target)) {
+  const target = event.target as Node
+  if (assetTypeSelect.value && !assetTypeSelect.value.contains(target)) {
     isAssetTypeSelectOpen.value = false
   }
-  if (searchScopeSelect.value && !isContainingElement(searchScopeSelect.value, target)) {
+  if (searchScopeSelect.value && !searchScopeSelect.value.contains(target)) {
     isSearchScopeSelectOpen.value = false
   }
 }
+onMounted(() => document.addEventListener("click", handleDocumentClick))
+onUnmounted(() => document.removeEventListener("click", handleDocumentClick))
 
-const editingIndex = ref<number | null>(null)
-
-function startEditing(index: number) {
-  editingIndex.value = index
-  nextTick(() => {
-    const input = document.getElementById(`edit-input-${index}`)
-    if (input) {
-      (input as HTMLInputElement).focus()
-    }
-  })
+function open() {
+  isOpen.value = true
 }
-
-function saveEdit(index: number, newValue: string) {
-  if (Array.isArray(searchQuery.value.query)) {
-    const newTags = newValue
-      .trim()
-      .split(/\s+/)
-      .filter((tag) => tag !== "")
-    if (newTags.length > 1) {
-      // If user added space replace the edited tag with multiple new tags
-      searchQuery.value.query.splice(index, 1, ...newTags)
-    } else if (newTags.length === 1) {
-      // Replace with a single new tag
-      searchQuery.value.query[index] = newTags[0]
-    } else {
-      // Remove the tag if it's empty after trimming
-      searchQuery.value.query.splice(index, 1)
-    }
+function close() {
+  isOpen.value = false
+  isAssetTypeSelectOpen.value = false
+  isSearchScopeSelectOpen.value = false
+}
+// Clicks on the input itself must not count as clicking outside the popover.
+function handleInteractOutside(event: CustomEvent) {
+  const target = (event.detail as any)?.originalEvent?.target as Node | undefined
+  if (target && anchor.value?.contains(target)) {
+    event.preventDefault()
+    return
   }
-  editingIndex.value = null
+  close()
 }
 
-function clearSearchOptions() {
-  searchQuery.value = getDefaultSearchState()
-  searchQueryValue.value = ""
-  requestClearSearchOptions.value = true
-}
-
-watch(isModalOpen, (newValue) => {
-  requestClearSearchOptions.value = false
-  if (newValue) {
-    nextTick(() => {
-      if (searchInput.value) {
-        searchInput.value.focus()
-      }
-    })
+function search(value = text.value) {
+  const query = options.value.exactMatch ? value.trim() : parseQueryParts(value).join(" ")
+  let routeQuery: LocationQuery = {}
+  if (route.name === "search") {
+    routeQuery = { ...route.query }
+    delete routeQuery.page
+  } else if (route.name === "collection") {
+    routeQuery.from_collection = route.params.id as string
   }
-})
+  routeQuery.q = query
+  routeQuery.asset_types = options.value.assetTypes
+  routeQuery.search_scope = options.value.searchScope
+  if (options.value.exactMatch) {
+    routeQuery.exact_match = "true"
+  } else {
+    delete routeQuery.exact_match
+  }
+  try {
+    localStorage.setItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY, JSON.stringify(options.value))
+    hasStoredOptions.value = true
+  } catch (_) { /* storage unavailable */ }
+  recent.value = rememberSearch({ query, exactMatch: options.value.exactMatch })
+  text.value = query
+  close()
+  input.value?.blur()
+  router.push({ name: "search", query: routeQuery })
+}
 
-onMounted(() => {
-  document.addEventListener("click", handleDocumentClick)
-})
-
-onUnmounted(() => {
-  document.removeEventListener("click", handleDocumentClick)
-})
+function useRecent(entry: RecentSearch) {
+  options.value = { ...options.value, exactMatch: entry.exactMatch }
+  search(entry.query)
+}
+function forgetRecent() {
+  clearRecentSearches()
+  recent.value = []
+}
+function resetOptions() {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY)
+  } catch (_) { /* storage unavailable */ }
+  hasStoredOptions.value = false
+  options.value = defaultOptions()
+}
+function clearText() {
+  text.value = ""
+  input.value?.focus()
+}
 </script>
 
 <template>
   <div class="dashboard-layout-search-bar__container relative flex min-w-0 items-center gap-1">
-    <button type="button" class="group flex h-10 min-w-0 items-center gap-2.5 border border-neutral-200 bg-neutral-50 px-3 text-left transition-colors hover:border-neutral-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-ring md:w-[360px]" @click="isModalOpen = true" aria-label="Search assets">
-      <Search class="size-4 shrink-0 text-neutral-500" />
-      <span class="truncate text-[length:var(--dv-field-label-size)] text-neutral-500 max-md:hidden">{{ (Array.isArray(currentQuery) ? currentQuery.join(', ') : currentQuery) || 'Search assets' }}</span>
-    </button>
-    <button type="button" aria-label="Search filters" class="search-filter-trigger flex size-9 items-center justify-center text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900" @click.prevent="router.push({ name: 'search' })">
-      <SlidersHorizontal class="cursor-pointer text-neutral-500 hover:text-neutral-800" width="18" />
+    <Popover :open="isOpen">
+      <PopoverAnchor as-child>
+        <form ref="anchor" role="search" class="group flex h-10 min-w-0 items-center gap-2.5 border border-neutral-200 bg-neutral-50 px-3 transition-colors focus-within:border-neutral-400 focus-within:bg-white hover:border-neutral-300 md:w-[360px]" @submit.prevent="search()">
+          <Search class="size-4 shrink-0 text-neutral-500" aria-hidden="true" />
+          <input ref="input" v-model="text" type="search" name="q" aria-label="Search assets" placeholder="Search files or references" autocomplete="off" enterkeyhint="search" class="h-full min-w-0 flex-1 bg-transparent text-[length:var(--dv-field-label-size)] text-neutral-900 outline-hidden placeholder:text-[color:var(--dv-text-secondary)] [&::-webkit-search-cancel-button]:hidden max-md:w-9" :aria-expanded="isOpen" @focus="open" @click="open" @keydown.esc.prevent="close(); input?.blur()" />
+          <button v-if="text" type="button" aria-label="Clear search text" class="grid size-6 cursor-pointer place-items-center text-neutral-500 hover:text-neutral-900" @click="clearText"><X class="size-4" aria-hidden="true" /></button>
+        </form>
+      </PopoverAnchor>
+      <PopoverContent data-search-options align="start" :side-offset="6" class="client-search-popover w-[min(720px,calc(100vw-24px))] p-4" @open-auto-focus.prevent @close-auto-focus.prevent @interact-outside="handleInteractOutside" @escape-key-down="close">
+        <div class="flex flex-wrap items-center gap-2 text-base font-medium text-neutral-600" data-search-sentence>
+          <span>I</span>
+          <div class="relative min-w-0">
+            <Label for="search-mode" class="sr-only">Search mode</Label>
+            <button id="search-mode" type="button" aria-label="Search mode" :aria-pressed="options.exactMatch" :title="options.exactMatch ? 'Switch to multiple references' : 'Switch to an exact term'" :class="sentenceChoiceClasses" @click="setExactMatch(!options.exactMatch)">
+              <span class="min-w-0 max-w-[300px] truncate">{{ options.exactMatch ? "search an exact term in" : "search multiple references of" }}</span>
+            </button>
+          </div>
+          <div ref="assetTypeSelect" class="relative min-w-0" @keydown.esc="closeAssetTypeSelect">
+            <Label for="search-asset-types" class="sr-only">Asset types</Label>
+            <button id="search-asset-types" ref="assetTypeToggle" type="button" aria-label="Asset types" :aria-expanded="isAssetTypeSelectOpen" aria-controls="search-asset-types-options" :class="sentenceChoiceClasses" @click="isAssetTypeSelectOpen = !isAssetTypeSelectOpen">
+              <span class="min-w-0 max-w-[300px] truncate">{{ selectedAssetTypes.length ? selectedAssetTypes.map((assetType) => assetType!.name).join(', ') : 'any asset type' }}</span>
+              <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
+            </button>
+            <div v-if="isAssetTypeSelectOpen" id="search-asset-types-options" class="absolute z-20 mt-1 flex min-w-full flex-col gap-1 border border-input bg-white p-1 shadow-md">
+              <label v-for="assetType in assetTypes" :key="assetType.id" class="flex cursor-pointer items-center gap-2 px-2 py-2 text-body text-foreground hover:bg-neutral-100">
+                <Checkbox :model-value="options.assetTypes.includes(assetType.id)" :aria-label="assetType.name" @update:model-value="toggleAssetType(assetType)" />
+                <span class="whitespace-nowrap">{{ assetType.name }}</span>
+              </label>
+            </div>
+          </div>
+          <span>in</span>
+          <div ref="searchScopeSelect" class="relative min-w-0" @keydown.esc="closeSearchScopeSelect">
+            <Label for="search-scope" class="sr-only">Search scope</Label>
+            <button id="search-scope" ref="searchScopeToggle" type="button" aria-label="Search scope" :aria-expanded="isSearchScopeSelectOpen" aria-controls="search-scope-options" :class="sentenceChoiceClasses" @click="isSearchScopeSelectOpen = !isSearchScopeSelectOpen">
+              <span class="min-w-0 max-w-[300px] truncate">{{ (searchScopeOptions as any)[options.searchScope] ?? 'all files and collections' }}</span>
+              <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
+            </button>
+            <div v-if="isSearchScopeSelectOpen" id="search-scope-options" class="absolute z-20 mt-1 flex min-w-full flex-col gap-1 border border-input bg-white p-1 shadow-md">
+              <button v-for="[value, name] in Object.entries(searchScopeOptions)" :key="value" type="button" class="flex cursor-pointer items-center whitespace-nowrap px-2 py-2 text-body text-neutral-700 hover:bg-neutral-100" @click="setSearchScope(value)">{{ name }}</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="recent.length" class="mt-4 border-t border-neutral-200 pt-3">
+          <div class="mb-1 flex items-center justify-between">
+            <span class="text-caption font-semibold uppercase tracking-[.08em] text-neutral-500">Recent searches</span>
+            <button type="button" class="cursor-pointer text-caption text-neutral-500 hover:text-neutral-900" @click="forgetRecent">Clear</button>
+          </div>
+          <ul class="grid gap-px">
+            <li v-for="entry in recent" :key="`${entry.exactMatch}-${entry.query}`">
+              <button type="button" class="flex h-8 w-full cursor-pointer items-center gap-2 px-2 text-left text-body text-neutral-800 hover:bg-neutral-100" @click="useRecent(entry)">
+                <History class="size-4 shrink-0 text-neutral-400" aria-hidden="true" />
+                <span class="min-w-0 flex-1 truncate">{{ entry.query }}</span>
+                <span v-if="entry.exactMatch" class="text-caption text-[color:var(--dv-text-secondary)]">exact</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-3">
+          <p class="text-caption text-[color:var(--dv-text-secondary)]">
+            <template v-if="options.exactMatch">Press Enter to find that exact text.</template>
+            <template v-else>Paste several references separated by spaces, then press Enter.</template>
+          </p>
+          <div class="flex items-center gap-3">
+            <button v-if="hasStoredOptions" type="button" class="cursor-pointer text-caption text-neutral-500 hover:text-red-600" @click="resetOptions">Reset to default</button>
+            <Button type="button" class="px-6" @click="search()">Search</Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+    <button v-if="route.name !== 'search'" type="button" aria-label="Search filters" title="Open the search page with filters" class="search-filter-trigger flex size-9 cursor-pointer items-center justify-center text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900" @click.prevent="search('')">
+      <SlidersHorizontal class="size-[18px]" aria-hidden="true" />
     </button>
   </div>
-  <modal v-if="isModalOpen" @close="isModalOpen = false">
-    <div class="search-bar__modal w-full min-w-0">
-      <div class="search-bar__modal-title flex flex-wrap items-center gap-2 mb-5 text-base font-medium text-neutral-600" data-search-sentence>
-        <span>I</span>
-        <div class="search-bar__modal-select relative min-w-0">
-          <Label for="search-mode" class="sr-only">Search mode</Label>
-          <button id="search-mode" type="button" aria-label="Search mode" :aria-pressed="searchQuery.exactMatch" :title="searchQuery.exactMatch ? 'Switch to multiple references' : 'Switch to an exact term'" class="search-bar__modal-select-control" :class="sentenceChoiceClasses" @click="setExactMatch(!searchQuery.exactMatch)">
-            <div
-              class="min-w-0 max-w-[300px] truncate">
-              {{
-                searchQuery.exactMatch
-                  ? "search an exact term in"
-                  : "search multiple references of"
-              }}
-            </div>
-          </button>
-        </div>
-        <div class="search-bar__modal-select relative min-w-0" ref="assetTypeSelect" @keydown.esc="closeAssetTypeSelect">
-          <Label for="search-asset-types" class="sr-only">Asset types</Label>
-          <button id="search-asset-types" ref="assetTypeToggle" aria-label="Asset types" :aria-expanded="isAssetTypeSelectOpen" aria-controls="search-asset-types-options" class="search-bar__modal-select-control" :class="sentenceChoiceClasses" @click="isAssetTypeSelectOpen = !isAssetTypeSelectOpen">
-            <div
-              class="min-w-0 max-w-[300px] truncate">
-              {{ selectedAssetTypes.length ? selectedAssetTypes.map((assetType) => assetType!.name).join(', ') : 'any asset type' }}
-            </div>
-            <ChevronDown class="size-4 shrink-0" />
-          </button>
-          <div v-if="isAssetTypeSelectOpen" id="search-asset-types-options" class="search-bar__modal-select-content absolute z-20 mt-1 flex min-w-full flex-col gap-1 bg-white p-1 shadow-md border border-input">
-            <label v-for="assetType in assetTypes" :key="assetType.id" class="flex cursor-pointer items-center gap-2 px-2 py-2 text-body text-foreground hover:bg-neutral-100">
-              <Checkbox :model-value="searchQuery.assetTypes.includes(assetType.id)" :aria-label="assetType.name" @update:model-value="toggleAssetType(assetType)" />
-              <span>{{ assetType.name }}</span>
-            </label>
-          </div>
-        </div>
-        <span>in</span>
-        <div class="search-bar__modal-select relative min-w-0" ref="searchScopeSelect" @keydown.esc="closeSearchScopeSelect">
-          <Label for="search-scope" class="sr-only">Search scope</Label>
-          <button id="search-scope" ref="searchScopeToggle" aria-label="Search scope" :aria-expanded="isSearchScopeSelectOpen" aria-controls="search-scope-options" class="search-bar__modal-select-control" :class="sentenceChoiceClasses" @click="isSearchScopeSelectOpen = !isSearchScopeSelectOpen">
-            <div
-              class="min-w-0 max-w-[300px] truncate">
-              {{ (searchScopeOptions as any)[searchQuery.searchScope] ?? 'all' }}
-            </div>
-            <ChevronDown class="size-4 shrink-0" />
-          </button>
-          <div v-if="isSearchScopeSelectOpen" id="search-scope-options" class="search-bar__modal-select-content absolute z-20 mt-1 flex min-w-full flex-col gap-1 bg-white p-1 shadow-md border border-input">
-            <button v-for="[value, name] in Object.entries(searchScopeOptions)" :key="value"
-              class="search-bar__modal-select-option flex text-base items-center p-[0.2em] border-none text-neutral-500 hover:bg-neutral-100 bg-transparent cursor-pointer [&:last-child]:mb-0 [&_>_svg]:mr-2 [&_>_svg]:pointer-events-none" @click="setSearchScope(value)">
-              {{ name }}
-            </button>
-          </div>
-        </div>
-      </div>
-      <Label for="search-terms" class="mb-[var(--dv-field-gap)]">Search terms</Label>
-      <div class="search-bar__modal-query flex min-h-[var(--dv-control-height)] flex-wrap gap-2 border border-input bg-background px-[var(--dv-control-padding-x)] py-[var(--dv-control-padding-y)] max-h-[300px] overflow-x-auto focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
-        <template v-if="Array.isArray(searchQuery.query)">
-          <div v-for="(element, index) in searchQuery.query" :key="index"
-            class="tags [&:focus-within]:ring-neutral-400 flex items-center bg-neutral-50 text-neutral-500 font-medium ring-2 ring-neutral-200 hover:ring-neutral-300 text-base px-[0.2em] py-0.5 max-w-[260px] overflow-clip cursor-pointer whitespace-nowrap"
-            @dblclick="startEditing(index)">
-            <button v-if="editingIndex !== index" type="button" :aria-label="`Edit ${element}`" class="text-sm pl-[0.5em] pr-[0.2em] cursor-pointer" @click="startEditing(index)">
-              {{ element }}
-            </button>
-            <input v-else :id="`edit-input-${index}`" :value="element" :aria-label="`Edit ${element}`"
-              class="text-sm pl-[0.5em] pr-[0.2em] bg-transparent border-none outline-hidden"
-              @blur="saveEdit(index, ($event.target as HTMLInputElement).value)" @keyup.enter="saveEdit(index, ($event.target as HTMLInputElement).value)" />
-            <button type="button" :aria-label="`Remove ${element}`" @click.stop="removeQueryPart(index)">
-              <X aria-hidden="true" class="w-4 h-4 text-neutral-600 hover:text-red-400 ml-1" />
-            </button>
-          </div>
-          <input id="search-terms" class="search-bar__modal-query-input flex-1 [min-width:120px] p-0 [background:transparent] border-0 font-medium text-[length:var(--dv-field-label-size)] leading-[var(--dv-field-line-height)] [&::placeholder]:text-neutral-400 [&::placeholder]:text-[length:var(--dv-field-label-size)] [&::placeholder]:font-normal [&:focus]:[outline:none]" type="text"
-            placeholder="Paste multiple product references or files separated by spaces." @keydown="handleKeydown"
-            @paste="handlePaste" v-model="searchQueryValue" ref="searchInput" />
-        </template>
-        <input v-else id="search-terms" class="search-bar__modal-query-input flex-1 [min-width:120px] p-0 [background:transparent] border-0 font-medium text-[length:var(--dv-field-label-size)] leading-[var(--dv-field-line-height)] [&::placeholder]:text-neutral-400 [&::placeholder]:text-[length:var(--dv-field-label-size)] [&::placeholder]:font-normal [&:focus]:[outline:none]" type="text"
-          placeholder="Search for a reference or a file name" ref="searchInput" :value="searchQuery.query" @keydown.enter="search"
-          @input="searchQuery = { ...searchQuery, query: ($event.target as HTMLInputElement).value }" />
-      </div>
-      <div class="search-bar__modal-actions mt-5 pt-2 gap-2 flex flex-wrap items-center justify-end">
-        <div v-if="filesNotFoundEnabled && filesNotFound.data?.value?.length" class="search-bar__modal-missing-items text-center text-neutral-600 [font-size:14px] mb-2">
-          <div>No file found for those items:</div>
-          <div>{{ filesNotFound.data.value.join(", ") }}</div>
-        </div>
-        <Button type="button" @click="search" class="order-2 px-8">Search</Button>
-        <div class="order-1 mr-auto flex items-center gap-4">
-          <Button
-            type="button" variant="ghost" @click="resetSearch"
-            class="bg-transparent text-neutral-500 hover:bg-transparent hover:text-red-500 text-sm p-0 mt-1.5"
-          >
-            Clear search
-          </Button>
-          <Button
-            v-if="hasSearchOptions && !requestClearSearchOptions" @click="clearSearchOptions"
-            type="button" variant="ghost"
-            class="bg-transparent text-neutral-500 hover:bg-transparent hover:text-red-500 text-sm p-0 mt-1.5"
-          >
-            Reset to default
-          </Button>
-        </div>
-      </div>
-    </div>
-  </modal>
 </template>
