@@ -3,7 +3,7 @@ title: Requirements
 description: "What you need before installing Damvia: runtime, services, a cloud storage app, and the media tools that make previews."
 sidebar:
   order: 1
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 Damvia is a Node.js server, a static single-page client, and three services it depends on. This page lists what to have ready; [Local setup](./local-setup.md) walks through running it on one machine, and [Deployment](../deployment/index.md) through running it for real.
@@ -34,6 +34,7 @@ Damvia does not host uploads. It mirrors one of:
 |---|---|
 | Dropbox (personal or Business) | A Dropbox app with a refresh token. For a Business team space, `DROPBOX_USE_TEAM_ROOT=true`. See [Dropbox](../integrations/dropbox.md). |
 | OneDrive for Business | An Azure app registration with application permissions on Microsoft Graph, and the user whose drive to sync. See [OneDrive](../integrations/onedrive.md). |
+| Google Drive | A service account with the Drive API enabled, and the folder to sync shared with it. See [Google Drive](../integrations/google-drive.md). |
 
 Exactly one provider is active per instance (`ASSET_UPDATER`).
 

@@ -66,6 +66,12 @@ Run the same commands before opening a pull request. There is no ESLint or Prett
 | `auth-invariants.cjs` | Walks every tRPC procedure: everything outside a short public allowlist must reject an anonymous caller, and an unverified account may reach only the account-management procedures |
 | `access.cjs` | The visibility matrix of `userCollectionsQuery` and `userCollectionFilesQuery` for every role and collection state, and that both builders agree |
 | `sync.cjs` | Folder and file upserts, inheritance of licence and asset type, queued synchronisations, folder deletion, `synchronizeCollection` |
+| `dropbox.cjs` | The Dropbox listing to upsert plan: pointed folder as the top row, parent by path, `content_hash` checksum, hidden paths and empty folders skipped, a synthetic `Dropbox` root when no path is pointed at; needs no database |
+| `dropbox-sync.cjs` | A library run through one Dropbox sync with a stubbed SDK: nothing changed on an identical listing, `DROPBOX_ROOT_PATH`, one token refresh on `401`, empty listings, failed items, download errors. Same change policy as the OneDrive suites |
+| `google-drive.cjs` | The Google Drive listing to upsert plan: pointed folder as the top row, parents by id, `md5Checksum` checksum, Google-native documents, shortcuts, hidden and empty items skipped; needs no database |
+| `google-drive-sync.cjs` | A library run through one Google Drive sync with a stubbed client: nothing changed on an identical listing, folder-by-folder pagination, empty listings, failed items, download errors. Same change policy as the other driver suites |
+| `onedrive.cjs` | The OneDrive listing to upsert plan: root kept as the top folder, parent ids preserved, `eTag` checksum, skipped item kinds, parents-first order; needs no database |
+| `onedrive-sync.cjs` | A production-shaped OneDrive library run through one sync with a stubbed Graph client: nothing re-parented, re-downloaded or deleted; guards for empty listings, failed items, startup and download errors. These two suites lock the guarantees in [OneDrive](../integrations/onedrive.md); change them only for a confirmed critical bug or a security hazard |
 | `search.cjs` | Token and exact search, attribute, scope, file type and asset type filters, pagination, search activity events, `searchNotFound` |
 | `download.cjs` | Single-file and archive downloads, entry names, access refusals |
 | `users.cjs` | Sign-up approval and default groups, password-less mode, session tokens |

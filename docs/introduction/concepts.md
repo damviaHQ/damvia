@@ -3,7 +3,7 @@ title: Core concepts
 description: The objects an administrator manipulates in Damvia, where each one comes from, and how they relate.
 sidebar:
   order: 2
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 This page describes the domain model behind the admin screens: what an asset, a collection, a page or a product is, and which of them you control versus which are mirrored. Access rules are in [Roles and access](./roles-and-access.md).
@@ -26,7 +26,7 @@ This page describes the domain model behind the admin screens: what an asset, a 
 
 ## Asset folders and asset files mirror the storage
 
-An asset folder or asset file is one entry of the cloud storage, identified by its `externalId` (the Dropbox or OneDrive item id). Folders form a tree using a materialized path.
+An asset folder or asset file is one entry of the cloud storage, identified by its `externalId` (the Dropbox, OneDrive or Google Drive item id). Folders form a tree using a materialized path.
 
 File `status` values are `creating` (just discovered, content not fetched yet), `up_to_date`, `outdated` (flagged for re-fetch, today only by the daily integrity check) and `pending_deletion`. Folder `status` values are `up_to_date` and `pending_deletion`. The `asset/process-deletion` job deletes `pending_deletion` rows, their S3 objects and any collection bound to the folder.
 

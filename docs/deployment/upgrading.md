@@ -37,8 +37,11 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
 
 ## OneDrive in this upgrade
 
-- The OneDrive driver now stores Graph's `cTag` instead of `eTag` as the file checksum. On the first run after the upgrade every OneDrive file gets a new checksum, is marked `outdated` and is downloaded again once, with its thumbnail rebuilt. Plan for the download volume and, with `STORAGE_QUOTA` set, for the temporary reservations.
-- Startup now validates the drive with a Graph call; a wrong `ONEDRIVE_*` value stops the server instead of failing silently every 5 minutes. See [OneDrive](../integrations/onedrive.md).
+- The OneDrive driver keeps the same tree and the same `eTag` checksum as before, so the upgrade re-parents, re-downloads and deletes nothing. Before upgrading, note the top-level rows with `SELECT name, external_id FROM asset_folders WHERE parent_id IS NULL;` and check after the first run that they are unchanged.
+- The driver now reads all delta pages before writing, upserts parents before children, stops on an empty listing, and skips the deletion pass when any item failed. A run that used to abort on a OneNote notebook or another non-file item now skips that item.
+- Startup logs a `OneDrive drive` check; a Graph error there no longer stops the server. See [OneDrive](../integrations/onedrive.md).
+- A Google Drive driver is available (`ASSET_UPDATER=googledrive`), see [Google Drive](../integrations/google-drive.md). Nothing changes for existing instances.
+- The Dropbox driver was rebuilt on the same model. Without `DROPBOX_ROOT_PATH` the library now hangs under one folder named `Dropbox`, so the first run re-parents every top-level folder under it (their mirrored collections are queued for synchronisation, nothing is deleted), empty folders are no longer stored, placeholder folders (`generated_/...`) are no longer created and are marked for deletion on the first run, and a changed `content_hash` now re-downloads the file. See [Dropbox](../integrations/dropbox.md).
 
 ## Storage plan in this upgrade
 

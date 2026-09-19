@@ -3,7 +3,7 @@ title: Integrity check
 description: What the daily integrity check compares between the database and the assets bucket, and when to run it by hand.
 sidebar:
   order: 8
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 The integrity check is the repair tool for the assets bucket. It runs every day at 05:00 UTC as the `system/integrity-check` job and on demand with `npm run cli -- check-integrity`. Both call `integrityCheck()` in `server/src/services/system.ts`.
@@ -12,7 +12,7 @@ The integrity check is the repair tool for the assets bucket. It runs every day 
 
 1. Loads every asset file from the database and lists every object under `asset-file/` in the assets bucket.
 2. Keeps an asset file as healthy only if its object exists, the object's size equals the `size` recorded from the cloud storage listing, **and** the row's status is `up_to_date`.
-3. Sets every other asset file to `outdated`, saves them, and pushes one `asset/update-content` job per file. The worker downloads the content from Dropbox or OneDrive again, uploads it, rebuilds the WebP thumbnail and sets `up_to_date`.
+3. Sets every other asset file to `outdated`, saves them, and pushes one `asset/update-content` job per file. The worker downloads the content from the cloud storage again, uploads it, rebuilds the WebP thumbnail and sets `up_to_date`.
 4. Recomputes `sample_file_ids` for every collection: the first four collection files with a thumbnail, prioritising files in the collection itself, then descendant files by creation date. These are the four images in a collection's thumbnail mosaic.
 5. Lists `asset-file/` and `downloads/` again and deletes orphan objects: an original or thumbnail whose asset file row no longer exists, and an archive whose download row is gone, `expired` or `failed`. Only objects last modified more than 24 hours ago are deleted, so a file whose upload is in progress is never touched. The count and the bytes freed are logged as `storage.orphans-removed` and shown on the [dashboard](../administration/dashboard.md).
 

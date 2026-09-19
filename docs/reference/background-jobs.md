@@ -3,7 +3,7 @@ title: Background jobs
 description: Every queue and cron the worker runs, what triggers it, and what it does.
 sidebar:
   order: 3
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. Every API process connects pg-boss and can queue jobs; jobs are processed inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
@@ -25,7 +25,7 @@ All queues are declared in `server/src/worker.ts`. The push helpers set `retryBa
 
 | Queue | Pushed by | What it does |
 |---|---|---|
-| `asset/update-content` | Cloud sync (`upsertFile`), integrity check, `storage/measure-usage`, "Retry pending files" on the dashboard | Does nothing unless the file is `creating` or `outdated`, so duplicate jobs are harmless. With `STORAGE_QUOTA` set, reserves the file's size against the plan first; a file that does not fit ends the job without a retry and is logged as `storage.quota-exceeded`. Otherwise downloads the file from Dropbox or OneDrive, detects its MIME type, uploads the original to `asset-file/{id}`, generates a WebP thumbnail, reads width and height, sets status `up_to_date` and adds the size to `storage_usage`. An S3 upload failure fails the job, so it is retried and the file keeps its status. Processes 10 jobs at a time (`batchSize: 10`). |
+| `asset/update-content` | Cloud sync (`upsertFile`), integrity check, `storage/measure-usage`, "Retry pending files" on the dashboard | Does nothing unless the file is `creating` or `outdated`, so duplicate jobs are harmless. With `STORAGE_QUOTA` set, reserves the file's size against the plan first; a file that does not fit ends the job without a retry and is logged as `storage.quota-exceeded`. Otherwise downloads the file from the cloud storage driver, detects its MIME type, uploads the original to `asset-file/{id}`, generates a WebP thumbnail, reads width and height, sets status `up_to_date` and adds the size to `storage_usage`. An S3 upload failure fails the job, so it is retried and the file keeps its status. Processes 10 jobs at a time (`batchSize: 10`). |
 | `collection/synchronization` | Linking a collection to an asset folder | Mirrors the folder's sub-tree into the collection tree. One job at a time. |
 | `download/create-archive` | `download.create` with type `email` | Checks current access, builds the file or zip archive, uploads it to `downloads/{id}`, then pushes `mailer/download-ready`. If access is no longer allowed, marks the download `failed` without retrying or sending a ready email. One job at a time. |
 | `mailer/email-verification` | Sign-up, "resend verification" | Sends the `email-verification` template with the `?verificationCode=` link. |
@@ -40,7 +40,7 @@ Template contents are configured in [Email templates](../configuration/email-tem
 
 ## The cloud sync is not a queue
 
-The 5-minute loop that lists Dropbox or OneDrive and upserts folders and files runs in `server/src/index.ts` with a plain `setTimeout`, in **every** API process, whether or not `ENABLE_WORKER` is set. It is the sync that pushes `asset/update-content` jobs; only the download and processing of file contents goes through pg-boss. See [Integrations](../integrations/index.md).
+The 5-minute loop that lists the cloud storage and upserts folders and files runs in `server/src/index.ts` with a plain `setTimeout`, in **every** API process, whether or not `ENABLE_WORKER` is set. It is the sync that pushes `asset/update-content` jobs; only the download and processing of file contents goes through pg-boss. See [Integrations](../integrations/index.md).
 
 ## Reading job failures in the logs
 

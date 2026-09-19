@@ -3,7 +3,7 @@ title: Storage drivers
 description: "Add a cloud storage provider: the AssetUpdater base class, the upsertFolder and upsertFile contract, the deletion sweep, and the checklist for a new driver."
 sidebar:
   order: 6
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 This page describes what a storage driver must do so that a third provider can be added next to Dropbox and OneDrive. How the two existing drivers are configured is in [Dropbox](../integrations/dropbox.md) and [OneDrive](../integrations/onedrive.md); what happens to a file once it is known is in [Assets tree](../administration/assets-tree.md).
@@ -58,6 +58,10 @@ The Dropbox driver guards the empty case: when the listing yields no folder and 
 
 Whatever a driver skips (both skip names starting with `.`) is deleted from Damvia if it existed before.
 
+### Guard the sweep
+
+Because the sweep deletes whatever the run did not list, a driver must refuse to reach it when the listing cannot be trusted: return early on an empty listing, and end the run with an error when any upsert failed. All three drivers do this through a pure planner (`one-drive-items.ts`, `dropbox-entries.ts`, `google-drive-items.ts`) that turns the listing into folder and file upserts, and their behaviour is locked by `server/test/onedrive-sync.cjs`, `server/test/dropbox-sync.cjs` and `server/test/google-drive-sync.cjs`; see the guarantees in [OneDrive](../integrations/onedrive.md), [Dropbox](../integrations/dropbox.md) and [Google Drive](../integrations/google-drive.md). A new driver should copy that pattern before its first sweep against real data.
+
 ## fetchFileContent returns a temporary file the caller deletes
 
 `fetchFileContent(file)` must resolve with an absolute path. Use `tmpFile()` from `services/asset.ts`, which returns a fresh uuid-named path inside a `dam-asset` directory created once with `mkdtemp` in the OS temp directory. Write the download there and return the path; `updateFileContent` detects the MIME type, uploads the original, builds the thumbnail, and removes the file in a `finally`. If the download fails, remove the temp file yourself before rethrowing, as the OneDrive driver does; the caller wraps the error as `Failed to fetch file content (asset file id: ...)` and the job is retried.
@@ -65,6 +69,9 @@ Whatever a driver skips (both skip names starting with `.`) is deleted from Damv
 The lookup key is `file.externalId`: it must be enough to fetch the content (an item id for OneDrive; Dropbox passes it as `path` to `filesDownload`, which accepts ids).
 
 ## The driver is chosen by ASSET_UPDATER
+
+`server/src/asset-updater/google-drive.ts` is the most recent driver and the shortest complete example of the pattern: a pure planner, a paginated listing, the two guards, a streamed download.
+
 
 `assetUpdater()` in `server/src/env.ts` lazily instantiates the driver from `process.env.ASSET_UPDATER`: `dropbox` builds `DropboxAssetUpdater(DROPBOX_APP_KEY, DROPBOX_APP_SECRET, DROPBOX_REFRESH_TOKEN, DROPBOX_USE_TEAM_ROOT === 'true')`, `onedrive` builds `OneDriveAssetUpdater(ONEDRIVE_TENANT_ID, ONEDRIVE_CLIENT_ID, ONEDRIVE_CLIENT_SECRET, ONEDRIVE_USER, ONEDRIVE_DRIVE)`, anything else throws `Provide a valid asset updater`.
 

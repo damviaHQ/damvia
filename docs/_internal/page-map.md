@@ -13,6 +13,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/cli.ts`, `server/src/services/system.ts` | `reference/cli.md`, `deployment/integrity-check.md` |
 | `server/src/asset-updater/dropbox.ts` | `integrations/dropbox.md` |
 | `server/src/asset-updater/one-drive.ts` | `integrations/onedrive.md` |
+| `server/src/asset-updater/google-drive.ts` | `integrations/google-drive.md` |
 | `server/src/asset-updater/base.ts`, `services/asset.ts` (upsert, deletion, thumbnails, product assignment) | `administration/assets-tree.md`, `administration/products-and-pim.md` |
 | `server/src/services/image-processor.ts` | `administration/assets-tree.md`, `getting-started/index.md` (system packages) |
 | `server/src/services/mailer.ts`, `server/mailconfig.json` | `configuration/email-templates.md`, `integrations/smtp.md` |

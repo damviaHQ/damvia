@@ -2,8 +2,8 @@
 title: Object storage
 description: The two S3 buckets Damvia writes to, the URL syntax that configures them, and what browsers need to reach.
 sidebar:
-  order: 5
-lastUpdated: 2026-09-16
+  order: 6
+lastUpdated: 2026-09-19
 ---
 
 Damvia keeps its own copy of every asset in S3-compatible object storage, next to the previews it generates and the archives users download. It uses the MinIO client library and the S3 API. MinIO is the development configuration; other providers require validation of endpoint addressing, signatures, CORS and the operations below. API compatibility alone is not a tested support guarantee.

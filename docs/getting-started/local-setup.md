@@ -44,7 +44,7 @@ cp .env.template .env
 
 The template's defaults already match the compose stack (database, MinIO, MailHog). Fill in:
 
-- `ASSET_UPDATER` and the matching `DROPBOX_*` or `ONEDRIVE_*` variables. See [Dropbox](../integrations/dropbox.md) or [OneDrive](../integrations/onedrive.md); the refresh token or app registration is the only step that takes real time.
+- `ASSET_UPDATER` and the matching `DROPBOX_*`, `ONEDRIVE_*` or `GOOGLE_DRIVE_*` variables. See [Dropbox](../integrations/dropbox.md), [OneDrive](../integrations/onedrive.md) or [Google Drive](../integrations/google-drive.md); the refresh token, app registration or service account is the only step that takes real time.
 - `APP_SECRET`: any long random string, for example `openssl rand -hex 32`.
 - `PRODUCT_MATCHING_REGEX` if your file names encode product keys; otherwise leave the example, it is harmless.
 

@@ -3,7 +3,7 @@ title: What is Damvia
 description: Damvia is a self-hosted Digital Asset Management layer that sits on top of your Dropbox or OneDrive and adds access control, collections, pages and product search.
 sidebar:
   order: 1
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 This page explains what Damvia does, who it is built for, what it deliberately does not do, and what it is made of. Read it before [Getting started](../getting-started/index.md) to decide whether it fits your setup.
@@ -16,8 +16,9 @@ Damvia is a Digital Asset Management (DAM) application that works on top of a cl
 | --- | --- | --- |
 | Dropbox | `dropbox` | Lists the app's root folder recursively. Set `DROPBOX_USE_TEAM_ROOT=true` to sync a Dropbox Business team space instead of the member's home folder. |
 | OneDrive for Business | `onedrive` | Uses the Microsoft Graph delta endpoint for the drive set in `ONEDRIVE_USER` and `ONEDRIVE_DRIVE`. |
+| Google Drive | `googledrive` | Uses a service account to list the folder set in `GOOGLE_DRIVE_FOLDER_ID`, on My Drive or a shared drive. |
 
-Every 5 minutes the server walks the storage and mirrors its folder tree into Postgres as asset folders and asset files. Entries whose name starts with `.` are skipped (OneDrive also skips empty files). A folder or file that disappeared from the listing is marked `pending_deletion` and removed by the `asset/process-deletion` job, which runs every minute.
+Every 5 minutes the server walks the storage and mirrors its folder tree into Postgres as asset folders and asset files. Entries whose name starts with `.`, empty files and empty folders are skipped. A folder or file that disappeared from the listing is marked `pending_deletion` and removed by the `asset/process-deletion` job, which runs every minute.
 
 For each new file, and each file the daily integrity check re-queues, the `asset/update-content` queue downloads the original into Damvia's own assets bucket and generates a WebP thumbnail. Thumbnails are produced for:
 

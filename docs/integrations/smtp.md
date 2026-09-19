@@ -2,8 +2,8 @@
 title: SMTP
 description: Configure outgoing email with any SMTP provider; Postmark is the one the code is tuned for.
 sidebar:
-  order: 4
-lastUpdated: 2026-09-16
+  order: 5
+lastUpdated: 2026-09-19
 ---
 
 Damvia sends plain-text emails through Nodemailer over SMTP. There is no HTTP mail API integration and no HTML. Every message is sent by a worker job, so a working SMTP setup also needs a process with `ENABLE_WORKER=true`.
