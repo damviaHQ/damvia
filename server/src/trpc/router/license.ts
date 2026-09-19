@@ -53,10 +53,10 @@ export default router({
 		)
 		.mutation(async ({ input }) => {
 			const license = new License()
-			license.name = input.name
-			license.details = input.details
-			license.usageFrom = input.usageFrom
-			license.usageTo = input.usageTo
+			license.name = input.name ?? ''
+			license.details = input.details ?? null
+			license.usageFrom = input.usageFrom ?? null
+			license.usageTo = input.usageTo ?? null
 			license.scopes = input.scopes
 			license.allowedRegionIds = input.allowedRegionIds
 			await dataSource.getRepository(License).save(license)
@@ -81,10 +81,10 @@ export default router({
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'License not found.' })
 			}
 
-			license.name = input.name
-			license.details = input.details
-			license.usageFrom = input.usageFrom
-			license.usageTo = input.usageTo
+			license.name = input.name ?? license.name
+			license.details = input.details ?? null
+			license.usageFrom = input.usageFrom ?? null
+			license.usageTo = input.usageTo ?? null
 			license.scopes = input.scopes
 			license.allowedRegionIds = input.allowedRegionIds
 			await dataSource.getRepository(License).save(license)

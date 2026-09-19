@@ -28,7 +28,7 @@ export class License {
 	@Column()
 	name: string
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	details: string | null
 
 	@Column({ type: 'date', nullable: true })

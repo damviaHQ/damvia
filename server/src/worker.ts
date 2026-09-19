@@ -61,7 +61,7 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 			await boss.schedule(name, cron)
 		}
 
-		await boss.work<T>(name, workerOptions, (jobs) =>
+		await boss.work<T>(name, workerOptions ?? {}, (jobs) =>
 			Promise.all(jobs.map(async (job) =>
 				processor(job.data).catch((error) => {
 					logger.error('job', {
@@ -123,7 +123,7 @@ export const mailerLogInQueue = createQueue<{ userId: string }>({
 export const mailerResetPasswordQueue = createQueue<{ userId: string, token: string }>({
 	name: 'mailer/password-reset',
 	processor: (data) =>
-		dataSource.getRepository(User).findOneBy({ id: data.userId })
+		dataSource.getRepository(User).findOneByOrFail({ id: data.userId })
 			.then((user) => sendResetPasswordEmail(user, data.token))
 })
 

@@ -59,10 +59,10 @@ export class AssetFile {
 	@Column({ type: 'bigint' })
 	size: string
 
-	@Column({ nullable: true })
+	@Column({ type: 'integer', nullable: true })
 	height: number | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'integer', nullable: true })
 	width: number | null
 
 	@Column()
@@ -78,25 +78,25 @@ export class AssetFile {
 	@OneToMany(() => CollectionFile, (r) => r.assetFile)
 	collectionFiles: CollectionFile[]
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	assetTypeId: string | null
 
 	@ManyToOne(() => AssetType)
 	assetType: AssetType | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	licenseId: string | null
 
 	@ManyToOne(() => License)
 	license: License | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	productId: string | null
 
 	@ManyToOne(() => Product, (product) => product.assetFiles)
 	product: Product | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	productView: string | null
 
 	@CreateDateColumn()

@@ -45,7 +45,7 @@ export class Collection {
 	@Column()
 	name: string
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	description: string | null
 
 	@Column()
@@ -56,7 +56,7 @@ export class Collection {
 	@Index()
 	draft: boolean
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	@Index()
 	assetFolderId: string | null
 
@@ -64,7 +64,7 @@ export class Collection {
 	@JoinColumn()
 	assetFolder: AssetFolder | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	@Index()
 	parentId: string | null
 
@@ -83,14 +83,14 @@ export class Collection {
 	@OneToMany(() => CollectionInvitation, (invitation) => invitation.collection)
 	invitations: CollectionInvitation[]
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	@Index()
 	ownerId: string | null
 
 	@ManyToOne(() => User)
-	owner: User
+	owner: User | null
 
-	@Column({ name: 'mpath', update: false, insert: false, nullable: true, default: '' })
+	@Column({ type: 'varchar', name: 'mpath', update: false, insert: false, nullable: true, default: '' })
 	path?: string | null
 
 	@Column({ default: 0, update: false, insert: false })

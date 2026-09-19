@@ -88,7 +88,13 @@ export function isProduction() {
   return process.env.NODE_ENV === 'production'
 }
 
-let _mailTransporter = null
+function requireEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error(`${name} must be set`)
+  return value
+}
+
+let _mailTransporter: Transporter | null = null
 export function mailTransporter(): Transporter {
   if (!_mailTransporter) {
     _mailTransporter = createTransport({
@@ -127,10 +133,10 @@ export function appURL() {
   return process.env.APP_URL ?? 'http://localhost:5173'
 }
 
-let _mainS3 = null
+let _mainS3: MinioClient | null = null
 export function mainS3(): MinioClient {
   if (!_mainS3) {
-    const s3URL = new URL(process.env.MAIN_S3_URL)
+    const s3URL = new URL(requireEnv('MAIN_S3_URL'))
     _mainS3 = new MinioClient({
       endPoint: s3URL.hostname,
       port: parseInt(s3URL.port || (s3URL.protocol === 'https:' ? '443' : '80'), 10),
@@ -142,18 +148,18 @@ export function mainS3(): MinioClient {
   return _mainS3
 }
 
-let _mainS3Bucket = null
+let _mainS3Bucket: string | null = null
 export function mainS3Bucket(): string {
   if (!_mainS3Bucket) {
-    _mainS3Bucket = new URL(process.env.MAIN_S3_URL).pathname.slice(1)
+    _mainS3Bucket = new URL(requireEnv('MAIN_S3_URL')).pathname.slice(1)
   }
   return _mainS3Bucket
 }
 
-let _assetsS3 = null
+let _assetsS3: MinioClient | null = null
 export function assetsS3(): MinioClient {
   if (!_assetsS3) {
-    const s3URL = new URL(process.env.ASSETS_S3_URL)
+    const s3URL = new URL(requireEnv('ASSETS_S3_URL'))
     _assetsS3 = new MinioClient({
       endPoint: s3URL.hostname,
       port: parseInt(s3URL.port || (s3URL.protocol === 'https:' ? '443' : '80'), 10),
@@ -165,31 +171,31 @@ export function assetsS3(): MinioClient {
   return _assetsS3
 }
 
-let _assetsS3Bucket = null
+let _assetsS3Bucket: string | null = null
 export function assetsS3Bucket(): string {
   if (!_assetsS3Bucket) {
-    _assetsS3Bucket = new URL(process.env.ASSETS_S3_URL).pathname.slice(1)
+    _assetsS3Bucket = new URL(requireEnv('ASSETS_S3_URL')).pathname.slice(1)
   }
   return _assetsS3Bucket
 }
 
-let _assetUpdater = null
+let _assetUpdater: AssetUpdater | null = null
 export function assetUpdater(): AssetUpdater {
   if (!_assetUpdater) {
     if (process.env.ASSET_UPDATER === 'dropbox') {
       _assetUpdater = new DropboxAssetUpdater(
-        process.env.DROPBOX_APP_KEY,
-        process.env.DROPBOX_APP_SECRET,
-        process.env.DROPBOX_REFRESH_TOKEN,
+        requireEnv('DROPBOX_APP_KEY'),
+        requireEnv('DROPBOX_APP_SECRET'),
+        requireEnv('DROPBOX_REFRESH_TOKEN'),
         process.env.DROPBOX_USE_TEAM_ROOT === 'true',
       )
     } else if (process.env.ASSET_UPDATER === 'onedrive') {
       _assetUpdater = new OneDriveAssetUpdater(
-        process.env.ONEDRIVE_TENANT_ID,
-        process.env.ONEDRIVE_CLIENT_ID,
-        process.env.ONEDRIVE_CLIENT_SECRET,
-        process.env.ONEDRIVE_USER,
-        process.env.ONEDRIVE_DRIVE,
+        requireEnv('ONEDRIVE_TENANT_ID'),
+        requireEnv('ONEDRIVE_CLIENT_ID'),
+        requireEnv('ONEDRIVE_CLIENT_SECRET'),
+        requireEnv('ONEDRIVE_USER'),
+        requireEnv('ONEDRIVE_DRIVE'),
       )
     } else {
       throw new Error('Provide a valid asset updater')
@@ -198,7 +204,8 @@ export function assetUpdater(): AssetUpdater {
   return _assetUpdater
 }
 
-let _mailConfig = null
+type MailTemplateConfig = { from: string, subject: string, body: string }
+let _mailConfig: Record<string, MailTemplateConfig> | null = null
 if (process.env.MAILCONFIG) {
   _mailConfig = JSON.parse(Buffer.from(process.env.MAILCONFIG, 'base64').toString('utf-8'))
 } else {
@@ -209,6 +216,7 @@ if (process.env.MAILCONFIG) {
       process.exit(1)
     })
 }
-export function mailConfig() {
+export function mailConfig(): Record<string, MailTemplateConfig> {
+  if (!_mailConfig) throw new Error('Mail configuration is not loaded')
   return _mailConfig
 }

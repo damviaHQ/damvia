@@ -493,7 +493,7 @@ export default class DropboxAssetUpdater extends AssetUpdater {
       try {
         file = await upsertFile({
           externalId: entry.id,
-          externalChecksum: (entry as files.FileMetadata).content_hash,
+          externalChecksum: (entry as files.FileMetadata).content_hash ?? '',
           folderExternalId,
           name: fileName,
           size: (entry as files.FileMetadata).size,

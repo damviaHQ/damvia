@@ -494,10 +494,10 @@ export async function generateTextSvgThumbnail(
                 .filename { font-family: sans-serif; font-size: 18px; font-weight: bold; }
             </style>
             <text x="20" y="40" class="filename">${file.name.replace(/[<>&"']/g, c => {
-                return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c];
+                return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' } as Record<string, string>)[c];
             })}</text>
             <text x="20" y="80" class="content">${truncatedContent.replace(/[<>&"']/g, c => {
-                return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c];
+                return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' } as Record<string, string>)[c];
             })}</text>
         </svg>`;
         

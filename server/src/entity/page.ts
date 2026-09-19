@@ -33,10 +33,10 @@ export class Page {
 	@PrimaryGeneratedColumn("uuid")
 	id: string
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	name: string | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	@Index({ unique: true, where: "collection_id IS NOT NULL" })
 	collectionId: string | null
 

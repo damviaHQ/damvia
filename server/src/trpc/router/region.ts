@@ -63,9 +63,13 @@ export default router({
 			}),
 		)
 		.mutation(async ({ input }) => {
+			const defaultGroup = await dataSource.getRepository(Group).findOneBy({ id: input.defaultGroupId })
+			if (!defaultGroup) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found.' })
+			}
 			const region = new Region()
 			region.name = input.name
-			region.defaultGroup = await dataSource.getRepository(Group).findOneBy({ id: input.defaultGroupId })
+			region.defaultGroup = defaultGroup
 			await dataSource.getRepository(Region).save(region)
 			return formatRegion(region, 0, 0)
 		}),
@@ -84,8 +88,12 @@ export default router({
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'Region not found.' })
 			}
 
+			const defaultGroup = await dataSource.getRepository(Group).findOneBy({ id: input.defaultGroupId })
+			if (!defaultGroup) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found.' })
+			}
 			region.name = input.name
-			region.defaultGroup = await dataSource.getRepository(Group).findOneBy({ id: input.defaultGroupId })
+			region.defaultGroup = defaultGroup
 			await dataSource.getRepository(Region).save(region)
 		}),
 	remove: publicProcedure

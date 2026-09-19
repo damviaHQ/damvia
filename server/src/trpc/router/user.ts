@@ -114,9 +114,10 @@ export default router({
 					message: passwordLessAuth() ? 'User not found.' : 'Invalid email or password.',
 				})
 			} else if (usePasswordAuthentication) {
-				if (!user.password.startsWith('scrypt$')) {
+				const password = user.password ?? ''
+				if (!password.startsWith('scrypt$')) {
 					await dataSource.getRepository(User).update(
-						{ id: user.id, password: user.password },
+						{ id: user.id, password },
 						{ password: await hashPassword(input.password) },
 					)
 				}

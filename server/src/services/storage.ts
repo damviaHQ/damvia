@@ -202,9 +202,8 @@ export async function getStorageStatus(viewerEmail: string) {
 	const usage = await dataSource.getRepository(StorageUsage).findOneByOrFail({ id: 1 })
 	const quotaBytes = storageQuota()
 	const usedBytes = Number(usage.usedBytes)
-	let disk = null
-	if (serverAlertEmails().includes(viewerEmail.toLowerCase())) {
-		disk = {
+	const disk = serverAlertEmails().includes(viewerEmail.toLowerCase())
+		? {
 			...await diskUsage(),
 			blockedFiles: usage.quotaReachedAt
 				? await dataSource.getRepository(AssetFile).countBy({ status: In([AssetFileStatus.CREATING, AssetFileStatus.OUTDATED]) })
@@ -213,7 +212,7 @@ export async function getStorageStatus(viewerEmail: string) {
 			orphanBytes: Number(usage.orphanBytes),
 			orphansRemovedAt: usage.orphansRemovedAt,
 		}
-	}
+		: null
 	return {
 		usedBytes,
 		quotaBytes,

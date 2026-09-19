@@ -39,13 +39,13 @@ export class CollectionInvitation {
 	@Column()
 	email: string
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	userId: string | null
 
 	@ManyToOne(() => User, (user) => user.invitations, { onDelete: 'CASCADE' })
-	user: User
+	user: User | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	invitedById: string | null
 
 	@ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })

@@ -54,9 +54,9 @@ export default router({
 		.mutation(async ({ input }) => {
 			const assetType = new AssetType()
 			assetType.name = input.name
-			assetType.description = input.description
-			assetType.isRelatedToProducts = input.isRelatedToProducts
-			assetType.includeInSearchByDefault = input.includeInSearchByDefault
+			assetType.description = input.description ?? null
+			assetType.isRelatedToProducts = input.isRelatedToProducts ?? false
+			assetType.includeInSearchByDefault = input.includeInSearchByDefault ?? false
 			assetType.defaultDisplay = input.defaultDisplay
 			assetType.listDisplayItems = input.listDisplayItems
 			await dataSource.getRepository(AssetType).save(assetType)
@@ -82,9 +82,9 @@ export default router({
 			}
 
 			assetType.name = input.name
-			assetType.description = input.description
-			assetType.isRelatedToProducts = input.isRelatedToProducts
-			assetType.includeInSearchByDefault = input.includeInSearchByDefault
+			assetType.description = input.description ?? null
+			assetType.isRelatedToProducts = input.isRelatedToProducts ?? assetType.isRelatedToProducts
+			assetType.includeInSearchByDefault = input.includeInSearchByDefault ?? assetType.includeInSearchByDefault
 			assetType.defaultDisplay = input.defaultDisplay
 			assetType.listDisplayItems = input.listDisplayItems
 			await dataSource.getRepository(AssetType).save(assetType)

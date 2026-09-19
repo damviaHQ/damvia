@@ -40,10 +40,12 @@ export async function createUser(opts: CreateUserOptions) {
 	const user = new User()
 	user.name = opts.name
 	user.company = opts.company
-	user.region = await dataSource.getRepository(Region).findOne({
+	const region = await dataSource.getRepository(Region).findOne({
 		where: { id: opts.regionId },
 	})
-	if (user.region?.defaultGroupId) {
+	if (!region) throw new Error(`Region ${opts.regionId} not found`)
+	user.region = region
+	if (user.region.defaultGroupId) {
 		const userGroup = new UserGroup()
 		userGroup.groupId = user.region.defaultGroupId
 		user.userGroups = [userGroup]
@@ -52,6 +54,7 @@ export async function createUser(opts: CreateUserOptions) {
 	user.role = UserRole.MEMBER
 	user.emailVerificationCode = randomBytes(12).toString('hex')
 	if (!passwordLessAuth()) {
+		if (opts.password === null) throw new Error('A password is required')
 		user.password = await hashPassword(opts.password)
 	}
 
@@ -75,9 +78,11 @@ export async function createGuestUser(opts: CreateGuestUserOptions) {
 	const user = new User()
 	user.name = 'NA'
 	user.company = 'NA'
-	user.region = await dataSource.getRepository(Region).findOne({
+	const region = await dataSource.getRepository(Region).findOne({
 		where: { id: opts.regionId },
 	})
+	if (!region) throw new Error(`Region ${opts.regionId} not found`)
+	user.region = region
 	user.userGroups = []
 	user.email = opts.email
 	user.approved = true

@@ -23,7 +23,7 @@ export class ProductAttribute {
     @Column({ unique: true })
     name: string
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     displayName: string | null
 
     @Column({ default: false })

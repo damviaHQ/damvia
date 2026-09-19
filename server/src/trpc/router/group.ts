@@ -58,13 +58,17 @@ export default router({
 			}
 
 			const defaultGroup = await dataSource.getRepository(Group).findOneBy({ default: true })
-			if (defaultGroup.id === group.id) {
+			if (defaultGroup?.id === group.id) {
 				return
 			}
 
-			defaultGroup.default = false
 			group.default = true
-			await dataSource.getRepository(Group).save([defaultGroup, group])
+			if (defaultGroup) {
+				defaultGroup.default = false
+				await dataSource.getRepository(Group).save([defaultGroup, group])
+			} else {
+				await dataSource.getRepository(Group).save(group)
+			}
 		}),
 	update: publicProcedure
 		.use(authMiddleware(userAdmin))

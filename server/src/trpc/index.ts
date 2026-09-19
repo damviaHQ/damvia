@@ -44,10 +44,11 @@ export const publicProcedure = t.procedure
 export const authMiddleware =
 	(...chain: ((u: User) => boolean)[]) =>
 		middleware((opts) => {
-			if (!opts.ctx.user || !chain.every((h) => h(opts.ctx.user))) {
+			const user = opts.ctx.user
+			if (!user || !chain.every((h) => h(user))) {
 				throw new TRPCError({ code: 'UNAUTHORIZED' })
 			}
-			return opts.next()
+			return opts.next({ ctx: { user } })
 		})
 export const userApproved = (u: User) => u?.approved && u?.emailVerified
 export const userAdmin = (u: User) => userApproved(u) && u?.role === UserRole.ADMIN

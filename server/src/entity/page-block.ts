@@ -68,11 +68,6 @@ export class PageBlock {
 	updatedAt: Date
 
 	constructor(opts?: { pageId: string, type: PageBlockType, column: number, row: number, width: number, data?: any }) {
-		this.pageId = opts?.pageId
-		this.type = opts?.type
-		this.column = opts?.column
-		this.row = opts?.row
-		this.width = opts?.width
-		this.data = opts?.data
+		if (opts) Object.assign(this, opts)
 	}
 }

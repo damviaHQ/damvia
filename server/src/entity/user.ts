@@ -53,14 +53,14 @@ export class User {
 	@Column({ nullable: false, default: false })
 	emailVerified: boolean
 
-	@Column({ nullable: true })
-	emailVerificationCode: string
+	@Column({ type: 'varchar', nullable: true })
+	emailVerificationCode: string | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	password: string | null
 
-	@Column({ nullable: true })
-	resetPasswordToken: string
+	@Column({ type: 'varchar', nullable: true })
+	resetPasswordToken: string | null
 
 	@Column({ type: 'timestamptz', nullable: true })
 	resetPasswordExpiresAt: Date | null

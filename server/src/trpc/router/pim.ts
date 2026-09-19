@@ -150,7 +150,7 @@ export default router({
       })
     )
     .mutation(async ({ input: { primaryKeyName, data } }) => {
-      const log = { newProducts: [], updatedProducts: [] }
+      const log: { newProducts: string[], updatedProducts: string[] } = { newProducts: [], updatedProducts: [] }
       const productRepository = dataSource.getRepository(Product)
       const allProducts = await productRepository.find()
       const existingPrimaryKeyName = allProducts[0]?.primaryKeyName || primaryKeyName
@@ -177,22 +177,22 @@ export default router({
           continue
         }
 
-        let product = await productRepository.findOne({ where: { productKey: primaryKeyValue } })
-        if (product) {
+        const existing = await productRepository.findOne({ where: { productKey: primaryKeyValue } })
+        if (existing) {
           let updated = false
           allCsvKeys.forEach(key => {
-            if (key !== primaryKeyName && (row[key] !== product.metaData[key] || (row[key] === "" && product.metaData[key] !== ""))) {
-              product.metaData[key] = row[key] || ""
+            if (key !== primaryKeyName && (row[key] !== existing.metaData[key] || (row[key] === "" && existing.metaData[key] !== ""))) {
+              existing.metaData[key] = row[key] || ""
               updated = true
             }
           })
 
           if (updated) {
-            await productRepository.save(product)
-            log.updatedProducts.push(product.productKey)
+            await productRepository.save(existing)
+            log.updatedProducts.push(existing.productKey)
           }
         } else {
-          product = new Product()
+          const product = new Product()
           product.productKey = primaryKeyValue
           product.primaryKeyName = existingPrimaryKeyName || primaryKeyName
           product.metaData = {}

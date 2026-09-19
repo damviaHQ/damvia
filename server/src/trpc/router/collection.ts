@@ -75,7 +75,7 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		sampleFiles: await Promise.all(
 			collection.sampleFileIds
 				.map((fileId) => (opts.sampleFiles ?? []).find((sample) => sample.id === fileId))
-				.filter((file) => file)
+				.filter((file): file is CollectionFile => !!file)
 				.map((file) => formatCollectionFile({ file }))
 		),
 		thumbnailURL: collection.hasThumbnail
@@ -104,7 +104,7 @@ export async function buildTree({ collections, user, parent, sampleFiles }: Buil
 	}
 
 	return await Promise.all(currentCollections.map(async (current) => {
-		current.parent = parent
+		current.parent = parent ?? null
 		return {
 			...await formatCollection({ collection: current, user, sampleFiles }),
 			children: await buildTree({ collections, user, parent: current, sampleFiles })
@@ -305,7 +305,7 @@ export default router({
 						SELECT 1 FROM activity_events
 						WHERE user_id = $1 AND type = 'search' AND metadata ->> 'query' = $4 AND created_at > now() - interval '1 minute'
 					)
-				`, [ctx.user.id, ['current', 'current_with_sub'].includes(input.searchScope) ? input.collectionId : null, JSON.stringify({ query: searchTerm, total }), searchTerm])
+				`, [ctx.user.id, ['current', 'current_with_sub'].includes(input.searchScope ?? '') ? input.collectionId : null, JSON.stringify({ query: searchTerm, total }), searchTerm])
 			}
 			const productAttributes = await dataSource.getRepository(ProductAttribute).find()
 
@@ -416,7 +416,7 @@ export default router({
 		.mutation(async ({ input, ctx }) => {
 			const collection = new Collection()
 			collection.name = input.name
-			collection.description = input.description
+			collection.description = input.description ?? null
 			if (input.parentId) {
 				collection.parent = await dataSource.getRepository(Collection).findOneBy({
 					id: input.parentId,
@@ -429,7 +429,7 @@ export default router({
 				collection.public = false
 				collection.draft = false
 			}
-			collection.owner = collection.public ? undefined : ctx.user
+			collection.owner = collection.public ? null : ctx.user
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
 				await syncCollectionMenuItems(em, collection)
@@ -455,7 +455,7 @@ export default router({
 
 			const collection = new Collection()
 			collection.name = assetFolder.name
-			collection.description = input.description
+			collection.description = input.description ?? null
 			collection.assetFolder = assetFolder
 			if (input.parentId) {
 				collection.parent = await dataSource.getRepository(Collection).findOneBy({
@@ -465,7 +465,7 @@ export default router({
 			}
 			collection.public = collection.parent?.public ?? input.public ?? false
 			collection.draft = collection.parent?.draft ?? input.draft ?? false
-			collection.owner = collection.public ? undefined : ctx.user
+			collection.owner = collection.public ? null : ctx.user
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
 				await collectionSynchronizationQueue.push({ collectionId: collection.id })
@@ -533,7 +533,7 @@ export default router({
 			}
 
 			collection.name = input.name
-			collection.description = input.description
+			collection.description = input.description ?? null
 			collection.draft = input.draft ?? false
 			collection.hasThumbnail = input.hasThumbnail ?? collection.hasThumbnail
 			if (!collection.public && !collection.ownerId) {
@@ -621,7 +621,7 @@ export default router({
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
-			const collections = []
+			const collections: Collection[] = []
 			for (const value of input.items.filter((v) => v.type === 'collection')) {
 				const found = await userCollectionsQuery(ctx.user)
 					.andWhere({ path: ILike(`%${value.id}.%`) })
@@ -672,7 +672,7 @@ export default router({
 		.mutation(async ({ input, ctx }) => {
 			const collection = new Collection()
 			collection.name = input.name
-			collection.description = input.description
+			collection.description = input.description ?? null
 			if (input.parentId) {
 				collection.parent = await dataSource.getRepository(Collection).findOneBy({
 					id: input.parentId,

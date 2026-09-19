@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
-import { In, Not } from "typeorm"
+import { In, Not, IsNull } from "typeorm"
 import { z } from "zod"
 import { Collection } from "../../entity/collection"
 import { MenuItem, MenuItemType } from "../../entity/menu-item"
@@ -50,7 +50,7 @@ export function buildMenuItemTree({ menuItems, userCollectionIds, parentId = nul
 		.filter((current) => current.parentId === parentId)
 		.map((current) => {
 			const children = buildMenuItemTree({ menuItems, userCollectionIds, parentId: current.id })
-			const isCurrentVisible = current.type !== MenuItemType.COLLECTION || userCollectionIds.includes(current.collectionId)
+			const isCurrentVisible = current.type !== MenuItemType.COLLECTION || userCollectionIds.includes(current.collectionId ?? '')
 			if (isCurrentVisible || children.length > 0) {
 				return {
 					...formatMenuItem(current),
@@ -100,10 +100,10 @@ export default router({
 				menuItem.parentId = parent.id
 				menuItem.parent = parent
 			}
-			menuItem.position = await dataSource.getRepository(MenuItem).countBy({ parentId: menuItem.parentId ?? null })
+			menuItem.position = await dataSource.getRepository(MenuItem).countBy({ parentId: menuItem.parentId ?? IsNull() })
 
 			if (input.type === MenuItemType.COLLECTION) {
-				const collection = await dataSource.getRepository(Collection).findOneBy({ id: input.collectionId })
+				const collection = input.collectionId ? await dataSource.getRepository(Collection).findOneBy({ id: input.collectionId }) : null
 				if (!collection) {
 					throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
 				}
@@ -126,7 +126,7 @@ export default router({
 					addChildren(menuItem, tree)
 				}
 			} else if (input.type === MenuItemType.PAGE) {
-				const page = await dataSource.getRepository(Page).findOneBy({ id: input.pageId })
+				const page = input.pageId ? await dataSource.getRepository(Page).findOneBy({ id: input.pageId }) : null
 				if (!page) {
 					throw new TRPCError({ code: 'NOT_FOUND', message: 'Page not found.' })
 				}

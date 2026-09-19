@@ -24,6 +24,11 @@ import { AssetFolder } from "../entity/asset-folder"
 import { tmpFile, upsertFile, upsertFolder } from "../services/asset"
 import AssetUpdater from "./base"
 
+function field<T>(value: T | null | undefined, name: string): T {
+	if (value === null || value === undefined) throw new Error(`OneDrive item without ${name}`)
+	return value
+}
+
 export default class OneDriveAssetUpdater extends AssetUpdater {
 	private readonly credential: ClientSecretCredential
 	private readonly authProvider: TokenCredentialAuthenticationProvider
@@ -47,13 +52,13 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 	async initialize() { }
 
 	async fetchUpdates() {
-		let nextLink = `/users/${this.user}/drive/${this.drive}/delta`
+		let nextLink: string | undefined = `/users/${this.user}/drive/${this.drive}/delta`
 		const syncFolderIds: string[] = []
 		const syncFileIds: string[] = []
 		while (nextLink) {
 			const res = await this.graphClient.api(nextLink).get() as PageCollection
 			for (const item of res.value as DriveItem[]) {
-				if (item.name.startsWith('.') || item.size === 0) {
+				if (!item.name || item.name.startsWith('.') || item.size === 0) {
 					continue
 				}
 
@@ -96,19 +101,19 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 	private async upsertItem(item: DriveItem): Promise<AssetFolder | AssetFile> {
 		if (item.folder !== undefined) {
 			return upsertFolder({
-				externalId: item.id,
-				parentExternalId: item.parentReference.id,
-				name: item.name,
+				externalId: field(item.id, 'id'),
+				parentExternalId: field(item.parentReference?.id, 'parentReference.id'),
+				name: field(item.name, 'name'),
 			})
 		}
 
 		return upsertFile({
-			externalId: item.id,
-			externalChecksum: item.eTag,
-			folderExternalId: item.parentReference.id,
-			name: item.name,
-			size: item.size,
-			mimeType: item.file.mimeType,
+			externalId: field(item.id, 'id'),
+			externalChecksum: field(item.eTag, 'eTag'),
+			folderExternalId: field(item.parentReference?.id, 'parentReference.id'),
+			name: field(item.name, 'name'),
+			size: field(item.size, 'size'),
+			mimeType: field(item.file?.mimeType, 'file.mimeType'),
 		})
 	}
 }

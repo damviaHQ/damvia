@@ -9,8 +9,9 @@ export async function integrityCheck() {
 	await new Promise((resolve, reject) => {
 		assetsS3().listObjects(assetsS3Bucket(), 'asset-file/')
 			.on('data', (item) => {
+				if (!item.name) return
 				const assetFile = assetFilesByStorageKeyToSync[item.name]
-				if (parseInt(assetFile?.size, 0) === item.size && assetFile?.status === AssetFileStatus.UP_TO_DATE) {
+				if (assetFile && parseInt(assetFile.size, 10) === item.size && assetFile.status === AssetFileStatus.UP_TO_DATE) {
 					delete assetFilesByStorageKeyToSync[item.name];
 				}
 			})

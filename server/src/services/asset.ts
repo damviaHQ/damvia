@@ -49,7 +49,7 @@ import {
 
 const fileTypeModule = loadEsm<typeof import('file-type')>('file-type')
 
-let _tmpDir = null
+let _tmpDir: string | null = null
 export async function tmpDir() {
 	if (!_tmpDir) {
 		_tmpDir = await mkdtemp(join(tmpdir(), 'dam-asset'))
@@ -92,7 +92,7 @@ async function uploadFileContent(file: AssetFile, size: number): Promise<void> {
 			'Content-Type': file.mimeType,
 		})
 
-		let thumbnailPath = null
+		let thumbnailPath: string | null = null
 		try {
 			thumbnailPath = await generateFileThumbnail(file, contentPath)
 			if (thumbnailPath) {
@@ -139,8 +139,8 @@ export async function generateFileThumbnail(file: AssetFile, contentPath: string
 	const isOfficeDoc = isFileType(file, LIBREOFFICE_EXTENSIONS, LIBREOFFICE_MIMETYPES);
 	const isFont = isFileType(file, FONT_EXTENSIONS, FONT_MIMETYPES);
 
-	let pngPath = null;
-	let thumbnailPath = null;
+	let pngPath: string | null = null;
+	let thumbnailPath: string | null = null;
 
 	try {
 		if (isVideo) {
@@ -238,10 +238,10 @@ export async function extractDimensions(file: AssetFile, contentPath: string): P
 					limitInputPixels: 0,
 					pages: 1
 				}).metadata();
-				return { width: meta.width, height: meta.height };
+				return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
 			} else {
 				const meta = await sharp(contentPath).metadata();
-				return { width: meta.width, height: meta.height };
+				return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
 			}
 		} catch (error) {
 			return null;
@@ -298,8 +298,8 @@ export async function upsertFolder(opts: UpsertFolderOptions): Promise<AssetFold
 	const parentChanged = previousParent?.id !== folder.parent?.id
 
 	if (!alreadyExists || parentChanged) {
-		folder.licenseId = folder.parent?.licenseId
-		folder.assetTypeId = folder.parent?.assetTypeId
+		folder.licenseId = folder.parent?.licenseId ?? null
+		folder.assetTypeId = folder.parent?.assetTypeId ?? null
 	}
 
 	await dataSource.getRepository(AssetFolder).save(folder)
@@ -358,12 +358,14 @@ export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
 	const previousFolder = file.folder
 	file.name = opts.name
 	file.size = opts.size.toString()
-	file.folder = await dataSource.getRepository(AssetFolder).findOne({
+	const folder = await dataSource.getRepository(AssetFolder).findOne({
 		where: { externalId: opts.folderExternalId },
 		relations: { collections: true },
 	})
-	file.licenseId = file.folder?.licenseId
-	file.assetTypeId = file.folder?.assetTypeId
+	if (!folder) throw new Error(`Folder ${opts.folderExternalId} not found`)
+	file.folder = folder
+	file.licenseId = folder.licenseId
+	file.assetTypeId = folder.assetTypeId
 	file.mimeType = opts.mimeType
 	const checksumChanged = file.externalChecksum !== opts.externalChecksum
 	file.externalChecksum = opts.externalChecksum
@@ -395,9 +397,9 @@ export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
 export async function deleteFile(fileId: string): Promise<void> {
 	const file = await dataSource.getRepository(AssetFile).findOneBy({ id: fileId })
 	if (!file) return
+	const storageKeys = [file.originalStorageKey, file.thumbnailStorageKey]
 	await dataSource.transaction(async (em) => {
 		await em.getRepository(CollectionFile).delete({ assetFileId: file.id })
-	const storageKeys = [file.originalStorageKey, file.thumbnailStorageKey]
 		await em.getRepository(AssetFile).remove(file)
 		await assetsS3().removeObjects(assetsS3Bucket(), storageKeys)
 	})

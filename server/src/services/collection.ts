@@ -12,7 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { Brackets, EntityManager, SelectQueryBuilder } from "typeorm"
+import { Brackets, EntityManager, SelectQueryBuilder, IsNull } from "typeorm"
 import { Collection } from "../entity/collection"
 import { CollectionFile } from "../entity/collection-file"
 import { MenuItem, MenuItemType } from "../entity/menu-item"
@@ -119,7 +119,7 @@ export async function syncCollectionMenuItems(em: EntityManager, collection: Col
 	}
 
 	if (!collection.parentId) {
-		const count = await em.getRepository(MenuItem).countBy({ collectionId: collection.id, parentId: null })
+		const count = await em.getRepository(MenuItem).countBy({ collectionId: collection.id, parentId: IsNull() })
 		if (count > 0) {
 			return []
 		}
@@ -129,7 +129,7 @@ export async function syncCollectionMenuItems(em: EntityManager, collection: Col
 		where: { collectionId: collection.parentId },
 		relations: { children: true },
 	}) : []
-	const newMenuItem = (parentId: string, position: number) => {
+	const newMenuItem = (parentId: string | null, position: number) => {
 		const menuItem = new MenuItem()
 		menuItem.type = MenuItemType.COLLECTION
 		menuItem.parentId = parentId
@@ -165,7 +165,7 @@ export async function synchronizeCollection(em: EntityManager, collectionId: str
 			assetFolder: { children: true },
 		},
 	})
-	if (!collection) {
+	if (!collection?.assetFolder) {
 		return
 	}
 
@@ -217,7 +217,7 @@ export async function synchronizeCollection(em: EntityManager, collectionId: str
 export async function removeCollection(em: EntityManager, collectionId: string) {
 	const collection = await em.getRepository(Collection).findOneBy({ id: collectionId })
 	await em.getRepository(Collection).delete({ id: collectionId })
-	if (collection.hasThumbnail) {
+	if (collection?.hasThumbnail) {
 		await mainS3().removeObjects(mainS3Bucket(), [collection.thumbnailStorageKey])
 	}
 }

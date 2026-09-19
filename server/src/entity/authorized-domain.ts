@@ -23,7 +23,7 @@ export class AuthorizedDomain {
 	@Column()
 	domain: string
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	detail: string | null
 
 	@CreateDateColumn()

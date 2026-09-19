@@ -51,19 +51,19 @@ export class AssetFolder {
 	@Column({ unique: true })
 	externalId: string
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	parentId: string | null
 
 	@TreeParent()
 	parent: AssetFolder | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	assetTypeId: string | null
 
 	@ManyToOne(() => AssetType)
 	assetType: AssetType | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	licenseId: string | null
 
 	@ManyToOne(() => License)

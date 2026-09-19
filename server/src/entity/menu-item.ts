@@ -49,22 +49,22 @@ export class MenuItem {
 	@Column("simple-json", { nullable: true })
 	data: any
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	collectionId: string | null
 
 	@ManyToOne(() => Collection, { onDelete: 'CASCADE' })
 	collection: Collection | null
 
-	@Column({ nullable: true, })
+	@Column({ type: 'varchar', nullable: true, })
 	pageId: string | null
 
 	@ManyToOne(() => Page, { onDelete: 'CASCADE' })
 	page: Page | null
 
-	@Column({ name: 'mpath', update: false, insert: false, nullable: true, default: '' })
+	@Column({ type: 'varchar', name: 'mpath', update: false, insert: false, nullable: true, default: '' })
 	path?: string | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	parentId: string | null
 
 	@TreeParent({ onDelete: 'CASCADE' })

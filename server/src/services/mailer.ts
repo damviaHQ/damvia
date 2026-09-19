@@ -31,7 +31,7 @@ async function renderTemplate(template: string, context: object): Promise<string
 
 export async function sendEmailVerificationEmail(user: User) {
 	const url = new URL(appURL())
-	url.searchParams.set('verificationCode', user.emailVerificationCode)
+	url.searchParams.set('verificationCode', user.emailVerificationCode ?? '')
 	const config = mailConfig()['email-verification']
 	await mailTransporter().sendMail({
 		from: config.from,
@@ -123,6 +123,7 @@ export async function sendDownloadReady(download: Download) {
 export async function sendInvitation(invitation: CollectionInvitation) {
 	const url = new URL(appURL())
 	url.pathname = `/collections/${invitation.collectionId}`
+	if (!invitation.user) throw new Error('Invitation has no user')
 	url.searchParams.set('dam_token', await generateAuthToken(invitation.user))
 
 	const config = mailConfig()['invitation']

@@ -32,7 +32,7 @@ export class ActivityEvent {
 	@PrimaryGeneratedColumn("uuid")
 	id: string
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	userId: string | null
 
 	@ManyToOne(() => User, { onDelete: 'SET NULL' })
@@ -41,13 +41,13 @@ export class ActivityEvent {
 	@Column({ enum: ActivityEventType })
 	type: ActivityEventType
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	assetFileId: string | null
 
 	@ManyToOne(() => AssetFile, { onDelete: 'SET NULL' })
 	assetFile: AssetFile | null
 
-	@Column({ nullable: true })
+	@Column({ type: 'varchar', nullable: true })
 	collectionId: string | null
 
 	@ManyToOne(() => Collection, { onDelete: 'SET NULL' })
