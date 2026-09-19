@@ -214,15 +214,16 @@ export default router({
 
 			let query = userCollectionFilesQuery(ctx.user)
 			searchableAttributes.forEach((attribute, index) => query.setParameter(`attribute${index}`, attribute.name))
+			const tokens = input.query?.trim() ? input.query.trim().split(/\s+/) : []
 			if (input.query && input.exactMatch) {
 				const queryParts = [
 					'asset_file.name ILIKE :query',
 					...searchableAttributes.map((attribute, index) => `(product.meta_data -> :attribute${index}) ILIKE :query`),
 				]
 				query.andWhere(`(${queryParts.join(' OR ')})`, { query: `%${input.query}%` })
-			} else if (input.query) {
+			} else if (tokens.length) {
 				query.andWhere(new Brackets((baseQuery) =>
-					input.query.replaceAll(/\s+/gm, ' ').split(' ').reduce((q, value, index) => {
+					tokens.reduce((q, value, index) => {
 						const queryKey = `query${index}`
 						const where = index === 0 ? q.where : q.orWhere
 						const queryParts = [
@@ -248,7 +249,8 @@ export default router({
 				query.andWhere('collection.id = :collectionId', { collectionId: input.collectionId })
 			}
 
-			const attributesKeys = Object.keys(input.attributes ?? {}).filter((key) => input.attributes[key].length > 0)
+			const inputAttributes = input.attributes ?? {}
+			const attributesKeys = Object.keys(inputAttributes).filter((key) => (inputAttributes[key]?.length ?? 0) > 0)
 			if (attributesKeys.length) {
 				const attributes = await dataSource.getRepository(ProductAttribute).findBy({
 					id: In(attributesKeys),
@@ -260,7 +262,7 @@ export default router({
 						const where = index === 0 ? q.where : q.orWhere
 						return where.call(q, `product.meta_data[:${attrKey}] IN (:...${attrValue})`, {
 							[attrKey]: attribute.name,
-							[attrValue]: input.attributes[attribute.id],
+							[attrValue]: inputAttributes[attribute.id],
 						})
 					}, baseQuery)
 				))
