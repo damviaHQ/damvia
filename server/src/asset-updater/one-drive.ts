@@ -20,19 +20,16 @@ import {
 import { DriveItem } from '@microsoft/microsoft-graph-types'
 import { writeFile, rm as removeFile } from "node:fs/promises"
 import { AssetFile } from "../entity/asset-file"
-import { AssetFolder } from "../entity/asset-folder"
+import { logger } from "../env"
 import { tmpFile, upsertFile, upsertFolder } from "../services/asset"
 import AssetUpdater from "./base"
-
-function field<T>(value: T | null | undefined, name: string): T {
-	if (value === null || value === undefined) throw new Error(`OneDrive item without ${name}`)
-	return value
-}
+import { planDriveItems } from "./one-drive-items"
 
 export default class OneDriveAssetUpdater extends AssetUpdater {
 	private readonly credential: ClientSecretCredential
 	private readonly authProvider: TokenCredentialAuthenticationProvider
 	private readonly graphClient: GraphClient
+	private rootId: string | null = null
 
 	constructor(
 		private readonly tenantId: string,
@@ -49,27 +46,62 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 		this.graphClient = GraphClient.initWithMiddleware({ authProvider: this.authProvider })
 	}
 
-	async initialize() { }
+	async initialize() {
+		const root = await this.graphClient.api(`/users/${this.user}/drive/${this.drive}`).get() as DriveItem
+		if (!root.id) throw new Error('OneDrive drive root without id')
+		this.rootId = root.id
+		logger.info('OneDrive drive', {
+			user: this.user,
+			drive: this.drive,
+			rootId: root.id,
+			rootName: root.name,
+			childCount: root.folder?.childCount,
+		})
+	}
 
 	async fetchUpdates() {
+		if (!this.rootId) await this.initialize()
+		const rootId = this.rootId!
+
+		const items: DriveItem[] = []
 		let nextLink: string | undefined = `/users/${this.user}/drive/${this.drive}/delta`
-		const syncFolderIds: string[] = []
-		const syncFileIds: string[] = []
 		while (nextLink) {
 			const res = await this.graphClient.api(nextLink).get() as PageCollection
-			for (const item of res.value as DriveItem[]) {
-				if (!item.name || item.name.startsWith('.') || item.size === 0) {
-					continue
-				}
-
-				const asset = await this.upsertItem(item)
-				if (asset instanceof AssetFolder) {
-					syncFolderIds.push(asset.id)
-				} else if (asset instanceof AssetFile) {
-					syncFileIds.push(asset.id)
-				}
-			}
+			items.push(...(res.value as DriveItem[]))
 			nextLink = res['@odata.nextLink']
+		}
+		logger.info(`Fetched ${items.length} entries from OneDrive`)
+
+		const plan = planDriveItems(items, rootId)
+		if (plan.folders.length === 0 && plan.files.length === 0) {
+			logger.warn('OneDrive listing is empty, skipping sync to avoid deleting all assets. Check ONEDRIVE_USER, ONEDRIVE_DRIVE and the application permissions.')
+			return
+		}
+
+		const syncFolderIds: string[] = []
+		const syncFileIds: string[] = []
+		let failed = 0
+
+		for (const folder of plan.folders) {
+			try {
+				syncFolderIds.push((await upsertFolder(folder)).id)
+			} catch (error) {
+				failed += 1
+				logger.error('Error processing OneDrive folder', { error: error.message, stack: error.stack, entry: folder })
+			}
+		}
+
+		for (const file of plan.files) {
+			try {
+				syncFileIds.push((await upsertFile(file)).id)
+			} catch (error) {
+				failed += 1
+				logger.error('Error processing OneDrive file', { error: error.message, stack: error.stack, entry: file })
+			}
+		}
+
+		if (failed > 0) {
+			throw new Error(`${failed} OneDrive item(s) failed to sync, skipping the deletion pass`)
 		}
 
 		const [allAssetFolderIds, allAssetFileIds] = await Promise.all([
@@ -93,27 +125,8 @@ export default class OneDriveAssetUpdater extends AssetUpdater {
 			await writeFile(originalFilePath, stream)
 			return originalFilePath
 		} catch (error) {
-			await removeFile(originalFilePath)
+			await removeFile(originalFilePath, { force: true })
 			throw error
 		}
-	}
-
-	private async upsertItem(item: DriveItem): Promise<AssetFolder | AssetFile> {
-		if (item.folder !== undefined) {
-			return upsertFolder({
-				externalId: field(item.id, 'id'),
-				parentExternalId: field(item.parentReference?.id, 'parentReference.id'),
-				name: field(item.name, 'name'),
-			})
-		}
-
-		return upsertFile({
-			externalId: field(item.id, 'id'),
-			externalChecksum: field(item.eTag, 'eTag'),
-			folderExternalId: field(item.parentReference?.id, 'parentReference.id'),
-			name: field(item.name, 'name'),
-			size: field(item.size, 'size'),
-			mimeType: field(item.file?.mimeType, 'file.mimeType'),
-		})
 	}
 }

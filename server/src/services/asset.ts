@@ -86,7 +86,7 @@ async function uploadFileContent(file: AssetFile, size: number): Promise<void> {
 			logger.error(`Failed to detect file type (asset file id: ${file.id}): ${error.message}`)
 			return null;
 		})
-		file.mimeType = fileType?.ext === 'webp' ? 'image/webp' : (fileType?.mime ?? 'application/octet-stream')
+		file.mimeType = fileType?.ext === 'webp' ? 'image/webp' : (fileType?.mime ?? file.mimeType ?? 'application/octet-stream')
 
 		await assetsS3().fPutObject(assetsS3Bucket(), file.originalStorageKey, contentPath, {
 			'Content-Type': file.mimeType,
@@ -107,6 +107,7 @@ async function uploadFileContent(file: AssetFile, size: number): Promise<void> {
 				await assetsS3().removeObjects(assetsS3Bucket(), [file.thumbnailStorageKey])
 			}
 		} catch (error) {
+			logger.warn('asset.thumbnail-failed', { assetFileId: file.id, error: error.message })
 		}
 
 		try {
@@ -116,6 +117,7 @@ async function uploadFileContent(file: AssetFile, size: number): Promise<void> {
 				file.height = dimensions.height
 			}
 		} catch (error) {
+			logger.warn('asset.dimensions-failed', { assetFileId: file.id, error: error.message })
 		}
 
 		file.status = AssetFileStatus.UP_TO_DATE

@@ -35,6 +35,11 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
 - Events older than `ANALYTICS_RETENTION_DAYS` (365 by default) are deleted every night. Set the variable before the upgrade if the instance's privacy policy requires a shorter period.
 - The client must be rebuilt with the server: it is the client that reports file views.
 
+## OneDrive in this upgrade
+
+- The OneDrive driver now stores Graph's `cTag` instead of `eTag` as the file checksum. On the first run after the upgrade every OneDrive file gets a new checksum, is marked `outdated` and is downloaded again once, with its thumbnail rebuilt. Plan for the download volume and, with `STORAGE_QUOTA` set, for the temporary reservations.
+- Startup now validates the drive with a Graph call; a wrong `ONEDRIVE_*` value stops the server instead of failing silently every 5 minutes. See [OneDrive](../integrations/onedrive.md).
+
 ## Storage plan in this upgrade
 
 - The migration creates the `storage_usage` table with its single row. The first measurement runs at the next half hour; open the [dashboard](../administration/dashboard.md) and click "Measure now" to fill it right away.
