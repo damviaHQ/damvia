@@ -36,7 +36,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { trpc } from "@/services/server.ts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { createColumnHelper, getCoreRowModel, useVueTable } from "@tanstack/vue-table"
-import { onClickOutside, onKeyStroke } from "@vueuse/core"
+import { onKeyStroke } from "@vueuse/core"
 import {
   Blocks,
   EllipsisVertical,
@@ -362,6 +362,10 @@ function applyColumnFilter(column: string, value: string) {
   activeCell.value = null
 }
 
+function applyColumnFilterEvent(column: string, event: Event) {
+  if (event.target instanceof HTMLInputElement) applyColumnFilter(column, event.target.value)
+}
+
 function handleFilterKeydown(event: KeyboardEvent, column: string) {
   if (event.key === "Enter") {
     activeFilter.value = { column, value: columnFilters.value[column] || "" }
@@ -547,7 +551,7 @@ onUnmounted(() => {
       <div class="flex items-center gap-5">
         <div class="admin-heading"><h1>Records</h1></div>
         <Button as-child variant="outline"><router-link :to="{ name: 'admin-product-attributes' }"><Blocks class="w-4 h-4 mr-2" />Attributes</router-link></Button>
-        <Button v-if="data.products.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
+        <Button v-if="data?.products.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
           class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
           <Filter class="w-5 h-5" />
           {{ showFilters ? "Hide Filters" : "Show Filters" }}
@@ -565,7 +569,7 @@ onUnmounted(() => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem :disabled="!data.products.length" @select="deleteError = ''; showDeleteDialog = true">
+            <DropdownMenuItem :disabled="!data?.products.length" @select="deleteError = ''; showDeleteDialog = true">
               <PackageX class="mr-2 h-4 w-4" /><span>Remove all records</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -592,7 +596,7 @@ onUnmounted(() => {
       </Pagination>
     </div>
     
-    <section v-if="!data.products.length" class="dv-panel admin-empty">
+    <section v-if="!data?.products.length" class="dv-panel admin-empty">
       <h2>{{ Object.keys(columnFilters).length ? 'No matching records' : 'No records yet' }}</h2>
       <p>{{ Object.keys(columnFilters).length ? 'Clear the filters to see your record list.' : 'Import a CSV file to add your records.' }}</p>
       <Button v-if="Object.keys(columnFilters).length" variant="outline" @click="clearFilters">Clear filters</Button>
@@ -615,7 +619,7 @@ onUnmounted(() => {
                   :placeholder="`Filter`"
                   :aria-label="`Filter ${column.column.columnDef.header}`"
                   v-model="columnFilters[column.id || '']"
-                  @input="(e) => e.target instanceof HTMLInputElement && applyColumnFilter(column.id || '', e.target.value)"
+                  @input="(e) => applyColumnFilterEvent(column.id || '', e)"
                   @keydown="(e) => handleFilterKeydown(e, column.id || '')"
                   class="filter-input" 
                 />

@@ -532,6 +532,7 @@ watch(() => props.modelValue, (newValue) => {
                   value: 'email',
                   description:
                     'A link to the file is sent to your email and saved in My Downloads for 7 days.',
+                  disabled: false,
                 },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"

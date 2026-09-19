@@ -57,7 +57,7 @@ const { data: productAttributeNames } = useQuery({
   queryKey: ["products", "available-attributes"],
   queryFn: () => trpc.productAttribute.listAvailable.query(),
 })
-const { status, data: productAttributes, error } = useQuery({
+const { data: productAttributes } = useQuery({
   queryKey: ["products", "attributes"],
   queryFn: () => trpc.productAttribute.list.query(),
 })

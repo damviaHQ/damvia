@@ -59,7 +59,7 @@ async function copyUrlToClipboard(url: string) {
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="download__container  flex flex-col gap-4">
-    <Table v-if="downloads?.length > 0" class="text-[13px] [&_td]:px-3 [&_td]:py-3 [&_th]:px-3">
+    <Table v-if="downloads && downloads.length > 0" class="text-[13px] [&_td]:px-3 [&_td]:py-3 [&_th]:px-3">
       <TableHeader>
         <TableRow>
           <TableHead>Created</TableHead>

@@ -43,6 +43,7 @@ import {
   HardDrive,
   Server,
 } from "lucide-vue-next"
+import type { AcceptableValue } from "reka-ui"
 import { computed, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
@@ -147,12 +148,12 @@ function onSubmit() {
     .catch((error) => toast.error((error as Error).message))
 }
 
-function onAssetTypeChange(value: string) {
-  form.value.assetTypeId = value
+function onAssetTypeChange(value: AcceptableValue) {
+  form.value.assetTypeId = String(value)
 }
 
-function onLicenseChange(value: string) {
-  form.value.licenseId = value
+function onLicenseChange(value: AcceptableValue) {
+  form.value.licenseId = String(value)
 }
 
 

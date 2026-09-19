@@ -46,7 +46,7 @@ const form = ref<{ name: string; collectionId?: string; draft: boolean }>({
   draft: false,
 })
 
-const { isPending, error, mutate } = useMutation({
+const { isPending, mutate } = useMutation({
   mutationFn() {
     return trpc.collection.create.mutate({
       name: form.value.name!,

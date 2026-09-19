@@ -54,7 +54,7 @@ async function resendEmail() {
     toast.success("Email has been resent. Please check your inbox.")
     isCooldown.value = true
   } catch (error) {
-    toast.error(error.message || "Failed to resend email. Please try again.")
+    toast.error(error instanceof Error && error.message ? error.message : "Failed to resend email. Please try again.")
   }
 }
 

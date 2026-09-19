@@ -374,7 +374,7 @@ function openMemberDialog() {
         <Label :for="`search-facet-${facet.id}`">{{ facet.displayName || facet.name }}</Label>
         <treeselect :input-id="`search-facet-${facet.id}`" :model-value="form.attributes[facet.id] ?? []" :clearable="true" :multiple="true"
           @update:modelValue="handleSetQuery(`attributes[${facet.id}]`, $event)"
-          :options="facet.values.map((value: string) => ({ label: value, id: value })).sort((a, b) => a.label.localeCompare(b.label))" placeholder="All"
+          :options="facet.values.map((value: string) => ({ label: value, id: value })).sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label))" placeholder="All"
           no-options-text="No options available." />
       </FieldGroup>
     </div>

@@ -97,7 +97,7 @@ const { data: collections } = useQuery({
   queryKey: ["collection", "tree"],
   queryFn: () => trpc.collection.tree.query(),
 })
-const { data: menuItems, status } = useQuery({
+const { data: menuItems } = useQuery({
   queryKey: ["menu-items"],
   queryFn: () => trpc.menuItem.list.query(),
 })

@@ -116,7 +116,9 @@ const LOCAL_STORAGE_SEARCH_OPTIONS_KEY = 'damvia_search_options'
 const hasSearchOptions = ref(!!localStorage.getItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY))
 const requestClearSearchOptions = ref(false)
 
-function getDefaultSearchState() {
+type SearchState = { query: string | string[]; assetTypes: string[]; searchScope: string; exactMatch: boolean }
+
+function getDefaultSearchState(): SearchState {
   return {
     query: Array.isArray(currentQuery.value) ? currentQuery.value : [],
     assetTypes: (assetTypes.value ?? [])
@@ -127,7 +129,7 @@ function getDefaultSearchState() {
   }
 }
 
-function getInitialSearchQuery() {
+function getInitialSearchQuery(): SearchState {
   if (route.name === "search") {
     return {
       query: currentQuery.value,
@@ -475,7 +477,7 @@ onUnmounted(() => {
             </button>
             <input v-else :id="`edit-input-${index}`" :value="element" :aria-label="`Edit ${element}`"
               class="text-sm pl-[0.5em] pr-[0.2em] bg-transparent border-none outline-hidden"
-              @blur="saveEdit(index, $event.target.value)" @keyup.enter="saveEdit(index, $event.target.value)" />
+              @blur="saveEdit(index, ($event.target as HTMLInputElement).value)" @keyup.enter="saveEdit(index, ($event.target as HTMLInputElement).value)" />
             <button type="button" :aria-label="`Remove ${element}`" @click.stop="removeQueryPart(index)">
               <X aria-hidden="true" class="w-4 h-4 text-neutral-600 hover:text-red-400 ml-1" />
             </button>

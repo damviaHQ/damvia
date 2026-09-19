@@ -224,7 +224,7 @@ function removeFromSelection(file: { id: string }) {
           <RadioGroup v-model="form.imageFormat">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
-                { name: 'Original (HD)', value: 'original' },
+                { name: 'Original (HD)', value: 'original', disabled: false, tooltip: null },
                 { name: 'PNG', value: 'png' },
                 { name: 'JPG', value: 'jpg' },
                 { name: 'WEBP', value: 'webp' },
@@ -241,7 +241,7 @@ function removeFromSelection(file: { id: string }) {
           <RadioGroup v-model="form.imageFormat">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
-                { name: 'Original (HD)', value: 'original' },
+                { name: 'Original (HD)', value: 'original', disabled: false, tooltip: null },
                 { name: 'PNG', value: 'png', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
                 { name: 'JPG', value: 'jpg', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
                 { name: 'WEBP', value: 'webp', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
@@ -305,6 +305,8 @@ function removeFromSelection(file: { id: string }) {
                   value: 'email',
                   description:
                     'A zip is saved for 7 days in My Downloads. You will receive an email with the link when ready.',
+                  disabled: false,
+                  tooltip: null,
                 },
               ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible [&:focus-within_.tooltip]:opacity-100 [&:focus-within_.tooltip]:visible': option.disabled }">
                 <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"

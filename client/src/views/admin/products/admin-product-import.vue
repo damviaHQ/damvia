@@ -25,7 +25,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -64,7 +63,6 @@ const comparisonResults = ref<
     status: string
   }[]
 >([])
-const allChecked = ref(false)
 const overrideAll = ref(false)
 const selectedOverrides = ref<{ [key: string]: boolean }>({})
 const isComparing = ref(false)
@@ -200,7 +198,6 @@ const handleCsvImport = () => {
       (result) =>
         result.status === "new" ||
         (result.status === "changed" &&
-          result.status !== "duplicate" &&
           (overrideAll.value || selectedOverrides.value[result.new[primaryKeyName.value]]))
     )
     .map((result) => {
@@ -241,10 +238,6 @@ const isNewColumn = (column: string) => {
   return !existingColumns.value.includes(column)
 }
 
-function handleOverrideAll(value: boolean) {
-  overrideAll.value = value
-  // We don't modify selectedOverrides here
-}
 </script>
 
 <template>

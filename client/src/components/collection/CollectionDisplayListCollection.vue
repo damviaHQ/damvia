@@ -65,7 +65,7 @@ const visibleColumns = computed(() => {
       }),
     ].filter(column =>
       collections.value.some(collection => {
-        const value = column.accessorFn?.(collection)
+        const value = column.accessorFn?.(collection, 0)
         return value !== undefined && value !== null && value !== ''
       })
     ),

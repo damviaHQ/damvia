@@ -55,7 +55,7 @@ const { status, data: collection, error } = useQuery({
     try {
       return await trpc.collection.findById.query(route.params.id as string)
     } catch (error) {
-      if (error.message === "Collection not found." || error.message === "Invalid request.") {
+      if (error instanceof Error && (error.message === "Collection not found." || error.message === "Invalid request.")) {
         router.push({ name: "collection-404" })
       } else {
         throw error

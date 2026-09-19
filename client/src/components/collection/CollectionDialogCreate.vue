@@ -45,7 +45,7 @@ const form = ref<{
   collectionId?: string
 }>({ name: '' })
 
-const { isPending, error, mutate } = useMutation({
+const { isPending, mutate } = useMutation({
   mutationFn: (data: { name: string; parentId?: string }) =>
     trpc.collection.createUserCollection.mutate(data),
   onSuccess: (collection) => {
@@ -79,7 +79,7 @@ const collectionOptions = computed(() => {
   }
 
   function formatCollectionArray(collections: RouterOutput["collection"]["ListPrivateCollections"]): any {
-    return collections.map((c) => ({
+    return collections.map((c: RouterOutput["collection"]["ListPrivateCollections"][number]) => ({
       id: c.id,
       label: c.name,
       children: c.children && c.children.length > 0 ? formatCollectionArray(c.children) : undefined,

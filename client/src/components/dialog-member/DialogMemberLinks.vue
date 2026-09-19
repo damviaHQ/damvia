@@ -35,7 +35,7 @@ const { data, status, error } = useQuery({
   queryFn: () => trpc.collection.invitation.getUserInvitations.query(),
 })
 
-const isExpired = computed(() => (link: typeof data.value[0]) => {
+const isExpired = computed(() => (link: NonNullable<typeof data.value>[number]) => {
   return dayjs(link.expiresAt).isBefore(dayjs())
 })
 
@@ -48,7 +48,7 @@ const sortedData = computed(() => {
   })
 })
 
-async function copyInvitationLink(invitation: typeof data.value[0]) {
+async function copyInvitationLink(invitation: NonNullable<typeof data.value>[number]) {
   const url = new URL(window.location.href)
   url.pathname = `/collections/${invitation.collection.id}`
   const searchParams = new URLSearchParams()

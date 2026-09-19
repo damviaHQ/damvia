@@ -53,10 +53,6 @@ const currentCollectionFileId = ref<string | null>(null)
 const hoveredRowId = ref<string | null>(null)
 const copiedCellId = ref<string | null>(null)
 
-function isTextTruncated(element: HTMLElement | null): boolean {
-  if (!element) return false
-  return element.scrollWidth > element.clientWidth
-}
 const haveAccessToFavorites = globalStore.user?.role !== "guest"
 const { data: favorites } = useQuery({
   queryKey: ["favorites"],
@@ -223,7 +219,7 @@ const columns = [
 const getVisibleColumns = computed(() => {
   return columns.filter(column => {
     if (!column.accessorFn) return true
-    return files.value.some(file => column.accessorFn(file) != null && column.accessorFn(file) !== '')
+    return files.value.some((file: File) => column.accessorFn!(file, 0) != null && column.accessorFn!(file, 0) !== '')
   })
 })
 

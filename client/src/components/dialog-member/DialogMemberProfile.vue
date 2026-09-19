@@ -40,7 +40,7 @@ const formSchema = toTypedSchema(z.object({
   company: z.string().min(1).max(80),
   email: z.string().email(),
 }))
-const { handleSubmit, values, setFieldValue } = useForm({
+const { handleSubmit, setFieldValue } = useForm({
   validationSchema: formSchema,
   initialValues: {
     name: '',
@@ -59,7 +59,7 @@ watchEffect(() => {
 
 const updateProfile = handleSubmit(async (values) => {
   const { name, company, email } = values
-  const updatedUser = await trpc.user.updateProfile.mutate({ name, company, email })
+  await trpc.user.updateProfile.mutate({ name, company, email })
   globalStore.fetchUser()
   toast.success("Profile updated successfully")
 })

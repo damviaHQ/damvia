@@ -218,7 +218,7 @@ async function handleSubmit() {
             <div class="form-field flex flex-col gap-2">
               <Label class="form" :id="`${fieldId}-spacing-top`">Spacing top</Label>
               <Slider :model-value="form.data.spacingTop" :thumb-labelledby="`${fieldId}-spacing-top`"
-                @update:model-value="(value) => handleSliderChange('spacingTop', value)" :max="100" :step="5"
+                @update:model-value="(value) => handleSliderChange('spacingTop', value ?? [])" :max="100" :step="5"
                 class="w-full my-2" />
               <div class="form-field-description">
                 {{ form.data.spacingTop?.[0] ? `${form.data.spacingTop[0]}px` : "0px" }}
@@ -226,7 +226,7 @@ async function handleSubmit() {
             </div>
             <div class="form-field  flex flex-col gap-2">
               <Label class="form" :id="`${fieldId}-spacing-bottom`">Spacing bottom</Label>
-              <Slider :model-value="form.data.spacingBottom" :thumb-labelledby="`${fieldId}-spacing-bottom`" @update:model-value="(value) => handleSliderChange('spacingBottom', value)
+              <Slider :model-value="form.data.spacingBottom" :thumb-labelledby="`${fieldId}-spacing-bottom`" @update:model-value="(value) => handleSliderChange('spacingBottom', value ?? [])
                 " :max="100" :step="5" class="w-full my-2" />
               <div class="form-field-description">
                 {{

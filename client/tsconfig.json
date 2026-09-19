@@ -9,7 +9,8 @@
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "server/src/*": ["../server/dist/*"]
     },
     /* Bundler mode */
     "moduleResolution": "bundler",

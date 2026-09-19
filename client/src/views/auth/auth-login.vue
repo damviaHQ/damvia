@@ -25,7 +25,6 @@ import { useGlobalStore } from "@/stores/globalStore"
 import { Mail } from "lucide-vue-next"
 import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { useQueryClient } from "@tanstack/vue-query"
 
 const toast = useGlobalToast()
 const router = useRouter()
@@ -42,7 +41,6 @@ const authParams = ref<{
   collectionId?: string
   collectionName?: string
 }>({})
-const queryClient = useQueryClient()
 
 const isFormValid = computed(() => {
   return emailRegex.test(form.value.email) && acceptedPolicies.value

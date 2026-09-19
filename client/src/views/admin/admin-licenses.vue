@@ -46,7 +46,7 @@ import {useQuery, useQueryClient} from "@tanstack/vue-query"
 import {CirclePlus, PencilLine, Trash2, XIcon} from "lucide-vue-next"
 import {useDateFormatter} from 'reka-ui'
 import {toDate} from 'reka-ui/date'
-import {computed, ref} from 'vue'
+import {computed, ref, type Raw} from 'vue'
 import Treeselect from "vue3-treeselect-ts"
 import {QuillEditor} from "@vueup/vue-quill";
 import "@vueup/vue-quill/dist/vue-quill.snow.css"
@@ -57,7 +57,16 @@ const modalState = ref("closed")
 const queryClient = useQueryClient()
 const locale = ref('en-US')
 const formatter = useDateFormatter(locale.value)
-const form = ref({
+type License = RouterOutput["license"]["list"][number]
+const form = ref<{
+  id: string
+  name: string
+  details: string
+  usageFrom: Raw<CalendarDate> | null
+  usageTo: Raw<CalendarDate> | null
+  scopes: License["scopes"]
+  allowedRegionIds: string[]
+}>({
   id: '',
   name: '',
   details: '',
@@ -95,13 +104,13 @@ function openCreateModal() {
   modalState.value = "creating"
 }
 
-function openEditModal(license: RouterOutput["license"]["list"][number]) {
+function openEditModal(license: License) {
   form.value = {
     id: license.id,
     name: license.name,
     usageFrom: license.usageFrom ? parseDate(license.usageFrom) : null,
     usageTo: license.usageTo ? parseDate(license.usageTo) : null,
-    details: license.details,
+    details: license.details ?? '',
     scopes: license.scopes,
     allowedRegionIds: license.allowedRegionIds,
   }
@@ -274,8 +283,10 @@ async function onModalSubmit(event: Event) {
                   labelledby="usageFrom"
                   :model-value="form.usageFrom"
                   @update:modelValue="(event) => {
-                    form.usageFrom = new CalendarDate(event.year, event.month, event.day)
-                    if (form.usageTo && form.usageFrom.compare(form.usageTo) > 1) {
+                    if (!event) return
+                    const date = new CalendarDate(event.year, event.month, event.day)
+                    form.usageFrom = date
+                    if (form.usageTo && date.compare(form.usageTo) > 1) {
                       form.usageTo = null
                     }
                   }"
@@ -292,8 +303,10 @@ async function onModalSubmit(event: Event) {
                   labelledby="usageTo"
                   :model-value="form.usageTo"
                   @update:modelValue="(event) => {
-                    form.usageTo = new CalendarDate(event.year, event.month, event.day)
-                    if (form.usageFrom && form.usageTo.compare(form.usageFrom) < 1) {
+                    if (!event) return
+                    const date = new CalendarDate(event.year, event.month, event.day)
+                    form.usageTo = date
+                    if (form.usageFrom && date.compare(form.usageFrom) < 1) {
                       form.usageFrom = null
                     }
                   }"

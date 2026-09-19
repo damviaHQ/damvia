@@ -46,7 +46,7 @@ const tabId = ref('private')
 const isCollectionModalOpen = ref(false)
 const selectedCollection = ref<RouterOutput["collection"]["tree"][number] | null>(null)
 
-const { status, data: privateCollections } = useQuery({
+const { data: privateCollections } = useQuery({
   queryKey: ["collection", "ListPrivateCollections"],
   queryFn: () => trpc.collection.ListPrivateCollections.query(),
 })

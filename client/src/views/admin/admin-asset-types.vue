@@ -18,7 +18,6 @@ import { DialogClose } from "@/components/ui/dialog"
 import AdminList from "@/components/admin/AdminList.vue"
 import DisplaySelector from "@/components/DisplaySelector.vue"
 import Loader from "@/components/Loader.vue"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,7 +52,7 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ArrowDown, ArrowUp, CirclePlus, GripVertical, InfoIcon, PencilLine, Trash2 } from "lucide-vue-next"
+import { ArrowDown, ArrowUp, CirclePlus, GripVertical, PencilLine, Trash2 } from "lucide-vue-next"
 import { computed, nextTick, ref } from "vue"
 import Draggable from "vuedraggable"
 
@@ -61,14 +60,14 @@ const toast = useGlobalToast()
 const form = ref<{
   id?: string
   name: string
-  description: string | null
+  description: string
   isRelatedToProducts: boolean
   includeInSearchByDefault: boolean
   defaultDisplay: "grid" | "list"
   listDisplayItems: string[]
 }>({
   name: "",
-  description: null,
+  description: '',
   isRelatedToProducts: false,
   includeInSearchByDefault: false,
   defaultDisplay: "grid",
@@ -121,7 +120,7 @@ function openEditModal(assetType: RouterOutput["assetType"]["list"][number]) {
   form.value = {
     id: assetType.id,
     name: assetType.name,
-    description: assetType.description,
+    description: assetType.description ?? '',
     isRelatedToProducts: assetType.isRelatedToProducts,
     includeInSearchByDefault: assetType.includeInSearchByDefault,
     defaultDisplay: assetType.defaultDisplay,
@@ -133,15 +132,13 @@ function openEditModal(assetType: RouterOutput["assetType"]["list"][number]) {
 async function submitChanges(event: Event) {
   event.preventDefault()
 
-  const action =
-    modalState.value === "creating" ? trpc.assetType.create : trpc.assetType.update
   try {
     const payload = {
       name: form.value.name,
       defaultDisplay: form.value.defaultDisplay,
       listDisplayItems: form.value.listDisplayItems,
       ...(form.value.id && { id: form.value.id }),
-      ...(form.value.description !== null && { description: form.value.description }),
+      description: form.value.description,
       ...(form.value.isRelatedToProducts !== undefined && {
         isRelatedToProducts: form.value.isRelatedToProducts,
       }),
@@ -150,7 +147,8 @@ async function submitChanges(event: Event) {
       }),
     }
 
-    await action.mutate(payload)
+    if (modalState.value === "creating") await trpc.assetType.create.mutate(payload)
+    else await trpc.assetType.update.mutate({ ...payload, id: form.value.id ?? '' })
     await queryClient.invalidateQueries({ queryKey: ["asset-types"] })
     await queryClient.refetchQueries({ queryKey: ["asset-types"] })
     toast.success(modalState.value === "creating" ? "Type created!" : "Type updated!")
@@ -336,7 +334,7 @@ async function onModalSubmit(event: Event) {
                         <ArrowDown class="h-4 w-4 admin-text-secondary" />
                       </Button>
                       <Button type="button" variant="ghost" size="sm"
-                        @click="(event) => toggleAttribute(element, event)"
+                        @click="(event: Event) => toggleAttribute(element, event)"
                         :aria-label="`Remove ${listItems.find(item => item.value === element)?.name ?? element}`">
                         <Trash2 class="h-4 w-4 admin-text-secondary admin-text-primary-hover" />
                       </Button>
@@ -350,7 +348,7 @@ async function onModalSubmit(event: Event) {
                     class="flex items-center justify-between p-1 bg-neutral-100">
                     <span>{{ item.name }}</span>
                     <Button type="button" variant="ghost" size="sm"
-                      @click="(event) => toggleAttribute(item.value, event)"
+                      @click="(event: Event) => toggleAttribute(item.value, event)"
                       :aria-label="`Add ${item.name}`">
                       <CirclePlus class="h-4 w-4 hover:text-green-600" />
                     </Button>
