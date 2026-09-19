@@ -3,7 +3,7 @@ title: Asset types
 description: Categorize files with asset types and control their default display, search inclusion and product linkage.
 sidebar:
   order: 6
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 An asset type labels a family of files (product packshots, marketing visuals, documents) and carries defaults that the client applies whenever a set of files shares that type: grid or list view, which columns the list shows, whether the type is searched by default, and whether its files can be linked to products.
@@ -21,7 +21,7 @@ The `/admin/asset-types` screen (admin only) lists `Name`, `Description`, `Relat
 | `Default Display` | `default_display` | `grid` or `list`, default `grid` |
 | `PIM attributes displayed in List view` | `list_display_items` | Ordered array of column ids |
 
-The list-view items you can add are `size`, `license`, `format`, `dimensions`, `updated_at`, plus every product attribute flagged as viewable (see [Products and PIM](./products-and-pim.md)). Drag to reorder them; the order is the column order.
+The list-view items you can add are `size`, `license`, `format`, `dimensions`, `updated_at`, plus every product attribute flagged as viewable (see [Products and PIM](./products-and-pim.md)). Drag to reorder them, or use the up and down arrow buttons on each column; the order is the column order.
 
 `assetType.list` is available to every approved user because the client needs the types to render collections and the search bar; create, update and remove are admin only. Removing a type sets `asset_type_id` to null on every folder and file that used it.
 

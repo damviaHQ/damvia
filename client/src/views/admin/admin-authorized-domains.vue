@@ -103,7 +103,7 @@ async function onModalSubmit(event: Event) {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="admin-error">
+  <div v-else-if="status === 'error'" class="admin-error" role="alert">
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">

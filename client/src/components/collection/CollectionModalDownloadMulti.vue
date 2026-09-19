@@ -29,6 +29,7 @@ import { useQueryClient } from "@tanstack/vue-query"
 import {CircleHelpIcon, Copyright, FileStack, X} from "lucide-vue-next"
 import { computed, ref, watch, watchEffect } from "vue"
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger} from "@/components/ui/dialog";
+import { FocusScope } from "reka-ui"
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: "update:modelValue", isOpen: boolean): void }>()
@@ -180,11 +181,12 @@ function removeFromSelection(file: { id: string }) {
 </script>
 
 <template>
-  <div v-if="modelValue" class="bg-white fixed top-0 left-0 w-full h-full z-30 py-5 px-7 text-neutral-800">
+  <FocusScope v-if="modelValue" as="div" trapped loop role="dialog" aria-modal="true" aria-labelledby="selected-files-title"
+    class="bg-white fixed top-0 left-0 w-full h-full z-30 py-5 px-7 text-neutral-800" @keydown.esc="$emit('update:modelValue', false)">
     <div class="modal__header flex justify-between items-center mb-4">
       <div class="flex items-center gap-2">
-        <FileStack />
-        <div class="text-[17px] font-semibold">Selected files</div>
+        <FileStack aria-hidden="true" />
+        <h2 id="selected-files-title" class="text-[17px] font-semibold">Selected files</h2>
       </div>
       <Button aria-label="Close selected files" variant="ghost" size="icon" type="button"
         class="text-neutral-800 hover:text-neutral-600 bg-transparent hover:bg-neutral-100"
@@ -197,12 +199,12 @@ function removeFromSelection(file: { id: string }) {
         <div class="file-grid grid [grid-template-columns:repeat(auto-fill,_minmax(190px,_1fr))] gap-2">
           <div v-for="file in res.files" :key="file.id" class="file-item w-full min-w-0">
             <div class="relative flex flex-col items-center max-w-[20%] min-w-[190px] p-1 border border-neutral-200 bg-neutral-50">
-              <div @click="removeFromSelection(file)" class="download-assets-modal__unselect-item cursor-pointer flex absolute top-2 left-2 p-0">
+              <button type="button" :aria-label="`Remove ${file.name}`" @click="removeFromSelection(file)" class="download-assets-modal__unselect-item cursor-pointer flex absolute top-2 left-2 p-0">
                 <X class="w-4 h-4" />
-              </div>
-              <img v-if="file.thumbnailURL" v-lazy="file.thumbnailURL" :alt="file.name"
+              </button>
+              <img v-if="file.thumbnailURL" v-lazy="file.thumbnailURL" alt=""
                 class="w-full h-[150px] object-contain justify-self-start items-start p-2" @load="onImageLoad" />
-              <thumbnailPlaceholder v-else :alt="file.name" @load="onImageLoad" class="fill-neutral-600 h-[150px]" />
+              <thumbnailPlaceholder v-else aria-hidden="true" @load="onImageLoad" class="fill-neutral-600 h-[150px]" />
             </div>
             <div class="w-full flex flex-col gap-1 max-w-full p-1 overflow-hidden text-ellipsis whitespace-nowrap">
               <div class="w-full text-sm text-neutral-800 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
@@ -243,13 +245,14 @@ function removeFromSelection(file: { id: string }) {
                 { name: 'PNG', value: 'png', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
                 { name: 'JPG', value: 'jpg', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
                 { name: 'WEBP', value: 'webp', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
-              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible': option.disabled }">
+              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible [&:focus-within_.tooltip]:opacity-100 [&:focus-within_.tooltip]:visible': option.disabled }">
                 <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`" :disabled="option.disabled"
+                  :aria-describedby="option.disabled && option.tooltip ? `image-format-${option.value}-reason` : undefined"
                   class="border border-primary text-primary shrink-0" />
                 <Label :for="`image-format-${option.value}`" :class="{ 'text-neutral-500': option.disabled }">
                   {{ option.name }}
                 </Label>
-                <div v-if="option.disabled && option.tooltip" class="tooltip absolute [background-color:#4b5563] [color:#e5e7eb] p-2 rounded-none [font-size:0.75rem] [max-width:250px] [z-index:50] [margin-top:-2.5rem] ml-6 [box-shadow:0_4px_6px_-1px_rgba(0,_0,_0,_0.1),_0_2px_4px_-1px_rgba(0,_0,_0,_0.06)]">{{ option.tooltip }}</div>
+                <div v-if="option.disabled && option.tooltip" :id="`image-format-${option.value}-reason`" class="tooltip absolute [background-color:#4b5563] [color:#e5e7eb] p-2 rounded-none [font-size:0.75rem] [max-width:250px] [z-index:50] [margin-top:-2.5rem] ml-6 [box-shadow:0_4px_6px_-1px_rgba(0,_0,_0,_0.1),_0_2px_4px_-1px_rgba(0,_0,_0,_0.06)]">{{ option.tooltip }}</div>
               </div>
             </div>
           </RadioGroup>
@@ -303,8 +306,9 @@ function removeFromSelection(file: { id: string }) {
                   description:
                     'A zip is saved for 7 days in My Downloads. You will receive an email with the link when ready.',
                 },
-              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible': option.disabled }">
+              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible [&:focus-within_.tooltip]:opacity-100 [&:focus-within_.tooltip]:visible': option.disabled }">
                 <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"
+                  :aria-describedby="option.disabled && option.tooltip ? `download-type-${option.value}-reason` : undefined"
                   class="border border-primary text-primary shrink-0" />
                 <div>
                   <Label :for="`download-type-${option.value}`" :class="{ 'text-neutral-500': option.disabled }">
@@ -314,7 +318,7 @@ function removeFromSelection(file: { id: string }) {
                     {{ option.description }}
                   </p>
                 </div>
-                <div v-if="option.disabled && option.tooltip" class="tooltip absolute [background-color:#4b5563] [color:#e5e7eb] p-2 rounded-none [font-size:0.75rem] [max-width:250px] [z-index:50] [margin-top:-2.5rem] ml-6 [box-shadow:0_4px_6px_-1px_rgba(0,_0,_0,_0.1),_0_2px_4px_-1px_rgba(0,_0,_0,_0.06)]">{{ option.tooltip }}</div>
+                <div v-if="option.disabled && option.tooltip" :id="`download-type-${option.value}-reason`" class="tooltip absolute [background-color:#4b5563] [color:#e5e7eb] p-2 rounded-none [font-size:0.75rem] [max-width:250px] [z-index:50] [margin-top:-2.5rem] ml-6 [box-shadow:0_4px_6px_-1px_rgba(0,_0,_0,_0.1),_0_2px_4px_-1px_rgba(0,_0,_0,_0.06)]">{{ option.tooltip }}</div>
               </div>
             </div>
           </RadioGroup>
@@ -380,5 +384,5 @@ function removeFromSelection(file: { id: string }) {
     <div v-else>
       <Loader :text="true" />
     </div>
-  </div>
+  </FocusScope>
 </template>

@@ -34,6 +34,9 @@ onMounted(async () => {
 </script>
 
 <template>
+  <span class="sr-only" role="status" aria-live="polite">
+    {{ status !== 'success' ? '' : hasPreparingDownloads ? 'Preparing files' : newDownloads?.length ? 'Download ready' : '' }}
+  </span>
   <div v-if="status === 'success'">
     <Button variant="ghost" disabled class="flex items-center gap-2" v-if="hasPreparingDownloads">
       Preparing files

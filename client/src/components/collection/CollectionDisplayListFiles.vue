@@ -278,7 +278,7 @@ const table = useVueTable<File>({
               ]" :state="isFileSelected(cell.row.original) ? 'check' : false" />
 
               <div class="collection-list__file-wrapper flex items-center gap-4">
-                <button type="button" :aria-label="`Preview ${cell.row.original.name}`" class="shrink-0 cursor-pointer"
+                <button type="button" :aria-label="`Preview ${cell.row.original.name}`" class="flex shrink-0 cursor-pointer"
                   @click="currentCollectionFileId = row.original.id">
                   <img v-if="cell.row.original.thumbnailURL" v-lazy="cell.row.original.thumbnailURL"
                     :src="cell.row.original.thumbnailURL" alt=""

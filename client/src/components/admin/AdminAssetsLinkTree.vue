@@ -38,15 +38,7 @@ watch(
 )
 
 function handleLinkClick(event: MouseEvent) {
-  const isClickRelatedToArrow = event
-    .composedPath()
-    .some((el) =>
-      (el as HTMLDivElement).classList?.contains("layout-link-tree__icon-wrapper")
-    )
-  if (
-    props.openItems[props.openItems.length - 1] === props.asset.collectionId &&
-    !isClickRelatedToArrow
-  ) {
+  if (props.openItems[props.openItems.length - 1] === props.asset.collectionId) {
     event.preventDefault()
     open.value = !open.value
   }
@@ -55,13 +47,15 @@ function handleLinkClick(event: MouseEvent) {
 
 <template>
   <div class="layout-link-tree__wrapper">
+    <div class="layout-link-tree__row">
+    <button v-if="asset.children?.length > 0" type="button" @click="open = !open" class="layout-link-tree__icon-wrapper"
+      :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${asset.name}`">
+      <ChevronDown v-if="open" class="w-4 h-4" />
+      <ChevronRight v-else class="w-4 h-4" />
+    </button>
+    <div v-else class="w-4 h-4" />
     <router-link :to="{ name: 'admin-assets', params: { id: asset.id } }" @click.exact="handleLinkClick"
       active-class="layout-link-tree__link--active" class="layout-link-tree__link">
-      <button v-if="asset.children?.length > 0" @click.prevent="open = !open" class="layout-link-tree__icon-wrapper">
-        <ChevronDown v-if="open" class="w-4 h-4" />
-        <ChevronRight v-else class="w-4 h-4" />
-      </button>
-      <div v-else class="w-4 h-4" />
       <FolderOpen v-if="open" class="layout-link-tree__folder" />
       <Folder v-else class="layout-link-tree__folder" />
       <TooltipProvider>
@@ -75,6 +69,7 @@ function handleLinkClick(event: MouseEvent) {
         </Tooltip>
       </TooltipProvider>
     </router-link>
+    </div>
     <div v-if="open" class="layout-link-tree__children">
       <AdminAssetsLinkTree v-for="child in asset.children" :key="child.id" :asset="child" :open-items="openItems" />
     </div>
@@ -89,12 +84,23 @@ function handleLinkClick(event: MouseEvent) {
   flex-direction: column;
 }
 
+.layout-link-tree__row {
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+  transition: background .15s ease;
+}
+
+.layout-link-tree__row:hover { background:var(--dv-surface-canvas); }
+.layout-link-tree__row:has(> .layout-link-tree__link--active) { background:var(--dv-action-soft); }
+
 .layout-link-tree__link {
   display: flex;
   align-items: center;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 38px;
-  padding: 6px 8px;
+  padding: 6px 8px 6px 0;
   color: var(--dv-text-secondary);
   font-size: 12px;
   cursor: pointer;

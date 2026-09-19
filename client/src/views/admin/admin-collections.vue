@@ -102,7 +102,7 @@ async function confirmDeleteCollection() {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="admin-error">
+  <div v-else-if="status === 'error'" class="admin-error" role="alert">
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
@@ -146,13 +146,13 @@ async function confirmDeleteCollection() {
         </div>
 
         <div class="flex items-center gap-2 ml-5" @click="stopPropagation">
-          <Button variant="link" @click="handleEditCollection(item.value)"
+          <Button variant="link" @click="handleEditCollection(item.value)" :aria-label="`Edit ${item.value.name}`"
             class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
             <PencilLine class="h-4 w-4" /> Edit
           </Button>
           <AlertDialog>
-            <AlertDialogTrigger as="div">
-              <Button variant="link" @click="handleDeleteCollection(item.value)"
+            <AlertDialogTrigger as-child>
+              <Button variant="link" @click="handleDeleteCollection(item.value)" :aria-label="`Delete ${item.value.name}`"
                 class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
                 <Trash2 class="h-4 w-4" /> Delete
               </Button>
@@ -193,9 +193,3 @@ async function confirmDeleteCollection() {
       @updated="handleCollectionUpdated" />
   </div>
 </template>
-
-<style scoped>
-.tree-item {
-  transition: padding-left 0.2s ease-in-out;
-}
-</style>

@@ -91,26 +91,26 @@ function handleLinkClick(event: MouseEvent) {
 
 <template>
   <div class="layout-link-tree__wrapper flex flex-col relative">
+    <Button type="button" variant="ghost" v-if="item.type === 'collection' && item.hasAccess && item.children?.length > 0" @click="open = !open"
+      :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${item.collectionName}`"
+      class="layout-menu-tree__icon-wrapper peer absolute left-px top-2 z-10 flex cursor-pointer border-none size-5 min-h-0 p-0.5 hover:bg-neutral-200 shrink-0">
+      <ChevronDown v-if="open" :class="menuIconClasses" />
+      <ChevronRight v-else :class="menuIconClasses" />
+    </Button>
     <Tooltip v-if="(item.type === 'collection' && item.hasAccess) || item.type === 'page' || item.type === 'text'"
       :open="tooltipOpen">
       <TooltipTrigger as-child>
         <router-link v-if="item.type === 'collection' && item.hasAccess" :to="{ name: routeName, params: { id: item.collectionId } }"
-          @click.exact="handleLinkClick" @mouseenter="onRowEnter" @mouseleave="onRowLeave"
+          @click.exact="handleLinkClick" @mouseenter="onRowEnter" @mouseleave="onRowLeave" @focus="onRowEnter" @blur="onRowLeave"
           :class="[
-            'layout-menu-tree__item', treeRowClasses,
+            'layout-menu-tree__item peer-hover:bg-neutral-200 peer-hover:text-neutral-900', treeRowClasses,
             isActiveItem && 'layout-menu-tree__item--active bg-neutral-100 text-neutral-900! font-bold!'
           ]">
-          <Button type="button" variant="ghost" v-if="item.children?.length > 0" @click.prevent="open = !open"
-            :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${item.collectionName}`"
-            class="layout-menu-tree__icon-wrapper flex cursor-pointer border-none size-5 min-h-0 p-0.5 hover:bg-neutral-200 relative shrink-0">
-            <ChevronDown v-if="open" :class="menuIconClasses" />
-            <ChevronRight v-else :class="menuIconClasses" />
-          </Button>
-          <div v-else :class="menuIconSlotClasses" />
+          <div :class="menuIconSlotClasses" />
           <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.collectionName }}</div>
         </router-link>
         <router-link v-else-if="item.type === 'page'" :to="{ name: 'page', params: { id: item.pageId } }"
-          @click.exact="handleLinkClick" @mouseenter="onRowEnter" @mouseleave="onRowLeave"
+          @click.exact="handleLinkClick" @mouseenter="onRowEnter" @mouseleave="onRowLeave" @focus="onRowEnter" @blur="onRowLeave"
           :class="[
             'layout-menu-tree__item', treeRowClasses,
             isActiveItem ? 'layout-menu-tree__item--active bg-neutral-100 text-neutral-900! font-bold!' : ''
@@ -119,7 +119,7 @@ function handleLinkClick(event: MouseEvent) {
           <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.pageName }}</div>
         </router-link>
         <a v-else-if="item.type === 'text'" :href="item.data?.url" :target="item.data?.external ? '_blank' : '_self'"
-          @mouseenter="onRowEnter" @mouseleave="onRowLeave"
+          @mouseenter="onRowEnter" @mouseleave="onRowLeave" @focus="onRowEnter" @blur="onRowLeave"
           class="layout-link-tree__link" :class="[treeRowClasses, !item.data?.url && 'pointer-events-none']">
           <span :class="menuIconSlotClasses" /><div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.data?.text }}</div>
         </a>

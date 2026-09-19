@@ -44,8 +44,6 @@ import {
   Filter,
   FilterX,
   PackageX,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-vue-next"
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 
@@ -57,6 +55,7 @@ const isDeleting = ref(false)
 const showDeleteDialog = ref(false)
 const deleteError = ref('')
 const activeCell = ref<{ rowIndex: number; columnId: string } | null>(null)
+const focusedCell = ref<{ rowIndex: number; columnId: string }>({ rowIndex: 0, columnId: "thumbnailURL" })
 const editingValue = ref<string>("")
 const columnFilters = ref<{ [key: string]: string }>({})
 const activeFilter = ref<{ column: string; value: string } | null>(null)
@@ -157,6 +156,22 @@ const table = useVueTable({
   getCoreRowModel: getCoreRowModel(),
 })
 
+const rovingCell = computed(() => {
+  const { rowIndex, columnId } = focusedCell.value
+  const isAvailable =
+    rowIndex < table.getRowModel().rows.length &&
+    table.getAllFlatColumns().some(col => col.id === columnId)
+  return isAvailable ? focusedCell.value : { rowIndex: 0, columnId: "thumbnailURL" }
+})
+
+const activeCellLabel = computed(() => {
+  if (!activeCell.value) return ""
+  const { rowIndex, columnId } = activeCell.value
+  const column = table.getAllFlatColumns().find(col => col.id === columnId)
+  const row = table.getRowModel().rows[rowIndex]
+  return `Edit ${column?.columnDef.header ?? columnId} for record ${row?.original.productKey ?? rowIndex + 1}`
+})
+
 // Save cell value after editing
 function saveCellValue() {
   if (!activeCell.value || isSaving.value) return
@@ -206,8 +221,50 @@ function saveCellValue() {
 
 // Cancel cell editing
 function cancelEditing() {
+  const cell = activeCell.value
   activeCell.value = null
   editorPosition.value = null
+  if (cell) {
+    nextTick(() => focusCell(cell.rowIndex, cell.columnId))
+  }
+}
+
+function focusCell(rowIndex: number, columnId: string) {
+  focusedCell.value = { rowIndex, columnId }
+  nextTick(() => {
+    const cellEl = document.querySelector(`[data-cell="${rowIndex}-${columnId}"]`) as HTMLElement | null
+    cellEl?.focus()
+  })
+}
+
+function handleGridKeydown(event: KeyboardEvent, rowIndex: number, columnId: string) {
+  if (event.target !== event.currentTarget) return
+
+  const flatColumns = table.getAllFlatColumns()
+  const columnIndex = flatColumns.findIndex(col => col.id === columnId)
+  const rowsCount = table.getRowModel().rows.length
+
+  if (event.key === "ArrowUp" && rowIndex > 0) {
+    focusCell(rowIndex - 1, columnId)
+  } else if (event.key === "ArrowDown" && rowIndex < rowsCount - 1) {
+    focusCell(rowIndex + 1, columnId)
+  } else if (event.key === "ArrowLeft" && columnIndex > 0) {
+    focusCell(rowIndex, flatColumns[columnIndex - 1].id || "")
+  } else if (event.key === "ArrowRight" && columnIndex < flatColumns.length - 1) {
+    focusCell(rowIndex, flatColumns[columnIndex + 1].id || "")
+  } else if (event.key === "Enter" || event.key === "F2") {
+    if (columnId === "thumbnailURL") {
+      (event.currentTarget as HTMLElement).querySelector("button")?.click()
+    } else {
+      handleCellClick(rowIndex, columnId)
+    }
+  } else if (event.key === "Escape" && enlargedImage.value) {
+    enlargedImage.value = null
+  } else {
+    return
+  }
+  event.preventDefault()
+  event.stopPropagation()
 }
 
 // Handle cell click to prepare for editing
@@ -219,6 +276,7 @@ function handleCellClick(rowIndex: number, columnId: string) {
 
   editingValue.value = getNestedValue(row.original, columnId) || ""
   activeCell.value = { rowIndex, columnId }
+  focusedCell.value = { rowIndex, columnId }
   
   // Calculate editor position
   nextTick(() => {
@@ -339,7 +397,7 @@ const removeAllProducts = useMutation({
 
 // Image preview functionality
 function handleImageClick(event: MouseEvent, src: string) {
-  const rect = (event.target as HTMLElement).getBoundingClientRect()
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
   enlargedImage.value = {
     src,
     top: rect.top,
@@ -356,6 +414,13 @@ function closeEnlargedImage(event: MouseEvent) {
 // Handle keyboard navigation for spreadsheet-like experience
 onKeyStroke(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Escape'], (e) => {
   if (!activeCell.value) return
+  const target = e.target as HTMLElement
+  if (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLTextAreaElement && !target.classList.contains("floating-cell-input")) ||
+    target.isContentEditable
+  ) return
   
   const { rowIndex, columnId } = activeCell.value
   const columnIndex = table.getAllFlatColumns().findIndex(col => col.id === columnId)
@@ -471,7 +536,7 @@ onUnmounted(() => {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="admin-error">
+  <div v-else-if="status === 'error'" class="admin-error" role="alert">
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page admin-products">
@@ -532,17 +597,11 @@ onUnmounted(() => {
     </section>
     <div v-else class="dv-panel w-full overflow-x-auto flex-grow">
       <div class="data-grid">
-        <table class="spreadsheet-table">
+        <table class="spreadsheet-table" role="grid" aria-label="Records">
           <thead>
             <tr>
-              <th v-for="column in table.getFlatHeaders()" :key="column.id" :class="{ 'sortable': column.id !== 'thumbnailURL' }">
-                <div class="flex items-center justify-between gap-1">
-                  <span>{{ column.column.columnDef.header as string }}</span>
-                  <div class="flex flex-col">
-                    <ChevronUp class="sort-icon w-3 h-3" />
-                    <ChevronDown class="sort-icon w-3 h-3" />
-                  </div>
-                </div>
+              <th v-for="column in table.getFlatHeaders()" :key="column.id">
+                <span>{{ column.column.columnDef.header as string }}</span>
               </th>
             </tr>
             <tr v-show="showFilters">
@@ -576,22 +635,28 @@ onUnmounted(() => {
                   v-for="cell in row.getVisibleCells()" 
                   :key="cell.id"
                   :data-cell="`${rowIndex}-${cell.column.id}`"
+                  :tabindex="rovingCell.rowIndex === rowIndex && rovingCell.columnId === cell.column.id ? 0 : -1"
                   :class="{
                     'cell-editable': isEditableCell(cell.column.id || ''),
                     'cell-active': activeCell?.rowIndex === rowIndex && activeCell?.columnId === cell.column.id,
                     'cell-image': cell.column.id === 'thumbnailURL'
                   }"
                   @click="handleCellClick(rowIndex, cell.column.id || '')"
+                  @focus="focusedCell = { rowIndex, columnId: cell.column.id || '' }"
+                  @keydown="handleGridKeydown($event, rowIndex, cell.column.id || '')"
                 >
                   <!-- Image cell -->
                   <template v-if="cell.column.id === 'thumbnailURL'">
-                    <img 
-                      v-if="cell.getValue()" 
-                      :src="cell.getValue() as string" 
-                      alt="Product image"
-                      @click.stop="handleImageClick($event, cell.getValue() as string)" 
-                      class="product-thumbnail"
-                    />
+                    <button
+                      v-if="cell.getValue()"
+                      type="button"
+                      tabindex="-1"
+                      class="product-thumbnail-button"
+                      :aria-label="`Enlarge image of ${row.original.productKey}`"
+                      @click.stop="handleImageClick($event, cell.getValue() as string)"
+                    >
+                      <img :src="cell.getValue() as string" alt="" class="product-thumbnail" />
+                    </button>
                   </template>
                   
                   <!-- Editable cell -->
@@ -632,6 +697,7 @@ onUnmounted(() => {
             @blur="saveCellValue"
             @keydown.enter.exact.prevent="saveCellValue"
             @keydown.esc.prevent="cancelEditing"
+            :aria-label="activeCellLabel"
             class="floating-cell-input"
             rows="1"
             :style="{
@@ -689,19 +755,6 @@ onUnmounted(() => {
   color: var(--dv-text-secondary);
   text-align: left;
 }
-.spreadsheet-table thead tr:first-child th.sortable {
-  cursor: pointer;
-}
-.spreadsheet-table thead tr:first-child th.sortable:hover {
-  background-color: var(--dv-surface-canvas);
-}
-.spreadsheet-table thead tr:first-child th .sort-icon {
-  color: var(--dv-text-secondary);
-  opacity: 0.5;
-}
-.spreadsheet-table thead tr:first-child th .sort-icon:hover {
-  opacity: 1;
-}
 .spreadsheet-table thead tr:nth-child(2) th {
   padding: 4px 8px;
   background-color: var(--dv-surface-canvas);
@@ -714,10 +767,10 @@ onUnmounted(() => {
   padding: 4px 8px;
   font-size: 12px;
 }
-.spreadsheet-table thead tr:nth-child(2) th .filter-input:focus {
-  outline: none;
+.spreadsheet-table thead tr:nth-child(2) th .filter-input:focus-visible {
+  outline: 2px solid var(--dv-action-primary);
+  outline-offset: -2px;
   border-color: var(--dv-action-primary);
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
 }
 .spreadsheet-table tbody tr {
   height: 32px;
@@ -745,6 +798,10 @@ onUnmounted(() => {
 .spreadsheet-table tbody td.cell-editable:hover {
   background-color: rgba(37, 99, 235, 0.05);
 }
+.spreadsheet-table tbody td:focus-visible {
+  outline: 2px solid var(--dv-action-primary);
+  outline-offset: -2px;
+}
 .spreadsheet-table tbody td.cell-active {
   border: 2px solid var(--dv-action-primary);
   padding: 0;
@@ -753,6 +810,12 @@ onUnmounted(() => {
 .spreadsheet-table tbody td.cell-image {
   width: 60px;
   text-align: center;
+}
+.spreadsheet-table tbody td.cell-image .product-thumbnail-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
 }
 .spreadsheet-table tbody td.cell-image .product-thumbnail {
   max-width: 32px;
@@ -786,13 +849,16 @@ onUnmounted(() => {
   border: none;
   padding: 0 8px;
   background-color: white;
-  outline: none;
   font-size: 14px;
   margin: 0;
   box-sizing: border-box;
   min-height: 32px;
   line-height: 32px;
   display: block;
+}
+.spreadsheet-table tbody td .cell-editor .cell-input:focus-visible {
+  outline: 2px solid var(--dv-action-primary);
+  outline-offset: -2px;
 }
 
 .enlarged-image {
@@ -802,8 +868,13 @@ onUnmounted(() => {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   padding: 8px;
   border-radius: var(--dv-radius-graphic);
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
   transform: translate(25%, 0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .enlarged-image {
+    transition: none;
+  }
 }
 .enlarged-image img {
   max-width: 300px;
@@ -827,7 +898,6 @@ onUnmounted(() => {
   resize: none;
   border: none;
   padding: 4px 8px;
-  outline: none;
   font-size: 14px;
   line-height: 1.5;
   font-family: inherit;
@@ -837,8 +907,9 @@ onUnmounted(() => {
   display: block;
   transition: height 0.1s ease;
 }
-.floating-cell-editor .floating-cell-input:focus {
-  outline: none;
+.floating-cell-editor .floating-cell-input:focus-visible {
+  outline: 2px solid var(--dv-action-primary);
+  outline-offset: -2px;
 }
 .floating-cell-editor .floating-cell-input::-webkit-scrollbar {
   width: 6px;

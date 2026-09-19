@@ -17,7 +17,7 @@ import Item from "@/components/admin/menu-items/Item.vue"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
 import { sortBy } from "lodash"
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import Draggable from "vuedraggable"
 
 type MenuItem = RouterOutput["menuItem"]["list"]
@@ -33,12 +33,22 @@ async function handleSort(items: MenuItem[]) {
   })
   await queryClient.invalidateQueries({ queryKey: ["menu-items"] })
 }
+
+const announcement = ref("")
+async function move(index: number, delta: number) {
+  const items = [...sortedItems.value]
+  const [item] = items.splice(index, 1)
+  items.splice(index + delta, 0, item)
+  await handleSort(items)
+  announcement.value = `Moved to position ${index + delta + 1} of ${items.length}`
+}
 </script>
 
 <template>
   <draggable :model-value="sortedItems" item-key="id" @update:model-value="handleSort($event)">
-    <template #item="{ element: item }">
-      <Item :item="item" :parent="parent" />
+    <template #item="{ element: item, index }">
+      <Item :item="item" :parent="parent" :index="index" :count="sortedItems.length" :move="(delta: number) => move(index, delta)" />
     </template>
   </draggable>
+  <p role="status" class="sr-only">{{ announcement }}</p>
 </template>

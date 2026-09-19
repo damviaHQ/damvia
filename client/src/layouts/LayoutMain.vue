@@ -24,7 +24,7 @@ import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
 import { sortBy } from "lodash"
-import { ChevronDown, ChevronRight, CirclePlus, Menu, X, Star } from "lucide-vue-next"
+import { ChevronDown, ChevronRight, Plus, Menu, X, Star } from "lucide-vue-next"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
@@ -255,12 +255,15 @@ watch([myCollectionsActive], () => {
               <span :class="menuIconSlotClasses"><Star :class="menuIconClasses" /></span><span>Favorites</span>
             </router-link>
             <div class="flex items-center gap-1">
-              <button type="button" class="flex-1" :class="sidebarRowClasses" :aria-expanded="isMyCollectionsTabOpen" @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen">
+              <button v-if="myCollections?.length" type="button" class="flex-1" :class="sidebarRowClasses" :aria-expanded="isMyCollectionsTabOpen" @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen">
                 <span :class="menuIconSlotClasses"><ChevronDown v-if="isMyCollectionsTabOpen" :class="menuIconClasses" /><ChevronRight v-else :class="menuIconClasses" /></span><span>My collections</span>
               </button>
-              <Button variant="ghost" size="icon" aria-label="Create collection" class="size-7 p-1.5 [&_svg]:size-4" @click="isDialogCreateCollectionOpen = true"><CirclePlus :class="menuIconClasses" /></Button>
+              <div v-else class="flex-1" :class="sidebarRowClasses">
+                <span :class="menuIconSlotClasses" aria-hidden="true" /><span>My collections</span>
+              </div>
+              <Button variant="ghost" size="icon" aria-label="Create collection" class="size-7 p-1.5 [&_svg]:size-4" @click="isDialogCreateCollectionOpen = true"><Plus :class="menuIconClasses" /></Button>
             </div>
-            <div v-if="isMyCollectionsTabOpen" class="ml-4 border-l border-neutral-200 pl-2">
+            <div v-if="isMyCollectionsTabOpen && myCollections?.length" class="ml-4 border-l border-neutral-200 pl-2">
               <MainLinkTree v-for="collection in myCollections" :key="collection.id" :item="collection" :open-items="openCollections ?? []" route-name="collection" />
             </div>
           </div>
@@ -271,7 +274,7 @@ watch([myCollectionsActive], () => {
       </aside>
     </TooltipProvider>
     <MainTopbar />
-    <main id="main-content" tabindex="-1" class="client-workspace min-w-0 flex-1 overflow-auto px-5 py-6 md:px-9 md:py-8 focus:outline-none"><slot /></main>
+    <main id="main-content" tabindex="-1" class="client-workspace min-w-0 flex-1 overflow-auto p-5 focus:outline-none"><slot /></main>
     <CollectionDialogCreate v-model="isDialogCreateCollectionOpen" />
   </div>
 </template>

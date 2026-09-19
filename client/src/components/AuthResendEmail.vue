@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import { Button } from '@/components/ui/button'
 import { useGlobalToast } from '@/composables/useGlobalToast'
 import { RotateCcw } from "lucide-vue-next"
-import { onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   onResend: () => Promise<void>
@@ -24,6 +24,7 @@ const props = defineProps<{
 const toast = useGlobalToast()
 const cooldownTime = ref(0)
 const isCooldown = ref(false)
+let interval: ReturnType<typeof setInterval> | undefined
 
 watch(isCooldown, (newValue) => {
   if (newValue) {
@@ -34,7 +35,8 @@ watch(isCooldown, (newValue) => {
 })
 
 function startCooldownTimer() {
-  const interval = setInterval(() => {
+  clearInterval(interval)
+  interval = setInterval(() => {
     cooldownTime.value--
     if (cooldownTime.value <= 0) {
       clearInterval(interval)
@@ -67,11 +69,13 @@ onMounted(() => {
     }
   }
 })
+
+onBeforeUnmount(() => clearInterval(interval))
 </script>
 
 <template>
   <div class="inline-flex items-center gap-1">
-    <RotateCcw v-if="!isCooldown" class="w-4 h-4 text-neutral-400" />
+    <RotateCcw v-if="!isCooldown" aria-hidden="true" class="w-4 h-4 text-neutral-500" />
     <Button variant="link" class="p-0 text-neutral-500" @click="resendEmail" :disabled="isCooldown">
       {{ isCooldown ? `Wait ${cooldownTime}s before resending` : 'resend the email' }}
     </Button>

@@ -88,27 +88,29 @@ function handleLinkClick(event: MouseEvent) {
 
 <template>
   <div>
-    <Tooltip :open="tooltipOpen">
-      <TooltipTrigger as-child>
-        <router-link :to="{ name: routeName, params: { id: item.id } }" @click.exact="handleLinkClick"
-          @mouseenter="onRowEnter" @mouseleave="onRowLeave"
-          active-class="layout-link-tree__item--active border-l-2 ml-[-2px] border-transparent text-neutral-900! font-medium"
-          class="layout-link-tree__item" :class="treeRowClasses">
-          <Button v-if="item.children?.length > 0" @click.prevent="open = !open" variant="ghost" type="button"
-            :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${item.name}`"
-            class="layout-link-tree__icon-wrapper flex cursor-pointer border-none size-5 min-h-0 p-0.5 hover:bg-neutral-200 relative shrink-0">
-            <ChevronDown v-if="open" :class="menuIconClasses" />
-            <ChevronRight v-else :class="menuIconClasses" />
-          </Button>
-          <div v-else :class="menuIconSlotClasses" />
-          <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.name }}</div>
-        </router-link>
-      </TooltipTrigger>
-      <TooltipContent side="right" align="start" :side-offset="6" :align-offset="-2"
-        class="bg-white text-neutral-900 text-body font-medium border-neutral-200 shadow-md px-2 py-1.5 rounded-md max-w-[480px]">
-        {{ item.name }}
-      </TooltipContent>
-    </Tooltip>
+    <div class="relative">
+      <Button v-if="item.children?.length > 0" @click="open = !open" variant="ghost" type="button"
+        :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${item.name}`"
+        class="layout-link-tree__icon-wrapper peer absolute left-px top-2 z-10 flex cursor-pointer border-none size-5 min-h-0 p-0.5 hover:bg-neutral-200 shrink-0">
+        <ChevronDown v-if="open" :class="menuIconClasses" />
+        <ChevronRight v-else :class="menuIconClasses" />
+      </Button>
+      <Tooltip :open="tooltipOpen">
+        <TooltipTrigger as-child>
+          <router-link :to="{ name: routeName, params: { id: item.id } }" @click.exact="handleLinkClick"
+            @mouseenter="onRowEnter" @mouseleave="onRowLeave" @focus="onRowEnter" @blur="onRowLeave"
+            active-class="layout-link-tree__item--active border-l-2 ml-[-2px] border-transparent text-neutral-900! font-medium"
+            class="layout-link-tree__item peer-hover:bg-neutral-200 peer-hover:text-neutral-900" :class="treeRowClasses">
+            <div :class="menuIconSlotClasses" />
+            <div ref="labelRef" class="truncate min-w-0 flex-1">{{ item.name }}</div>
+          </router-link>
+        </TooltipTrigger>
+        <TooltipContent side="right" align="start" :side-offset="6" :align-offset="-2"
+          class="bg-white text-neutral-900 text-body font-medium border-neutral-200 shadow-md px-2 py-1.5 rounded-md max-w-[480px]">
+          {{ item.name }}
+        </TooltipContent>
+      </Tooltip>
+    </div>
     <div v-if="open" class="children-container relative pl-4">
       <span v-if="hasActiveChild" aria-hidden="true" data-tree-connector class="pointer-events-none absolute left-[11px] -top-[18px] h-[18px] w-px bg-[#d4d4d4]" />
       <div v-for="(child, index) in sortedChildren" :key="child.id" class="relative">

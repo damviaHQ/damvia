@@ -3,7 +3,7 @@ title: Menu and pages
 description: Build the navigation menu and compose pages out of blocks, for the home screen and for collections.
 sidebar:
   order: 9
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 The menu is the tree users see in the main layout; pages are block layouts that can be a standalone destination (for example the home page) or the landing view of a collection. Both are administered from the Content Management section.
@@ -30,7 +30,7 @@ Items referencing a collection or a page are deleted with it (`ON DELETE CASCADE
 - **Text/Link**: a `Text`, an optional `URL` and, when a URL is set, `Open in new tab`.
 - **Divider**: `Show a divider line`, `Spacing top` and `Spacing bottom` sliders (0 to 100 px in steps of 5).
 
-Each item's menu offers `Add Item to Collection` (create a child) and, for collection and page items, `Set as Home`. Dragging items calls `menuItem.updatePositions` with the new positions.
+Each item's menu offers `Add Item to Collection` (create a child) and, for collection and page items, `Set as Home`. Items with children expand and collapse from their row. Dragging items, or choosing `Move up` / `Move down` in an item's menu, calls `menuItem.updatePositions` with the new positions of its siblings; a keyboard move announces the new position to screen readers.
 
 ### Home, synchronization and visibility
 
@@ -62,6 +62,8 @@ A row of `pages` has a `name` and an optional `collection_id`. A unique partial 
 ### Editing blocks
 
 The block procedures (`addBlock`, `removeBlock`, `updateLayout`, `updateBlockData`) all resolve the page through `findPage` in `server/src/services/page.ts` and then check `Page.canEdit`: an admin can edit any page; another user can edit only a collection page whose collection they can see and own. `updateLayout` rewrites `column`, `row` and `width` for the listed blocks.
+
+In the editor, each block has a toolbar that appears on hover or when keyboard focus enters the block. Blocks move by dragging them onto the drop zones between rows and columns, or with the toolbar's `Move block up`, `Move block down`, `Move block left` and `Move block right` buttons. Up and down take a block that shares a row into a new row above or below it; a block alone in its row moves past the neighbouring row. Left and right swap it with the neighbouring block in the same row. Both paths call `updateLayout`, and a keyboard move announces the block's new position to screen readers. The delete button asks `Delete this block?` before calling `removeBlock`.
 
 Image and video blocks store their file in the **main** bucket:
 

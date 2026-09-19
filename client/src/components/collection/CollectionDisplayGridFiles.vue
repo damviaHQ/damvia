@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { gridClasses, gridCardClasses, gridPreviewClasses } from './gridStyles'
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionModalGallery from "@/components/collection/CollectionModalDownloadUnique.vue"
@@ -104,14 +105,14 @@ async function remove(file: File) {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-6 p-0.5">
-    <article v-for="file in files" :key="file.id" class="group w-[276px] max-w-full min-w-0">
-      <div class="relative h-[196px] overflow-hidden bg-neutral-100" :class="isFileSelected(file) ? 'outline-2 outline-neutral-500' : ''">
+  <div :class="gridClasses">
+    <article v-for="file in files" :key="file.id" :class="gridCardClasses">
+      <div :class="[gridPreviewClasses, isFileSelected(file) && 'outline-2 outline-neutral-500']">
         <button type="button" class="absolute inset-0 flex size-full items-center justify-center p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-800" :aria-label="`Preview ${file.name}`" @click="currentCollectionFileId = file.id">
           <img v-if="file.thumbnailURL" :src="file.thumbnailURL" :alt="file.name" loading="lazy" class="size-full object-contain" />
           <thumbnailPlaceholder v-else class="h-20 w-auto! fill-neutral-400" aria-hidden="true" />
         </button>
-        <CollectionCheckbox :aria-label="`Select ${file.name}`" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100" :class="isFileSelected(file) ? 'opacity-100' : 'opacity-0'" :state="isFileSelected(file) ? 'check' : false" @click="handleSelection(file)" />
+        <CollectionCheckbox :label="`Select ${file.name}`" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100" :class="isFileSelected(file) ? 'opacity-100' : 'opacity-0'" :state="isFileSelected(file) ? 'check' : false" @click="handleSelection(file)" />
         <div class="absolute right-3 top-3 z-10 flex gap-1">
           <button v-if="removable" type="button" :aria-label="`Remove ${file.name}`" class="grid size-6 place-items-center bg-transparent text-neutral-600 opacity-0 hover:text-red-700 group-hover:opacity-100 group-focus-within:opacity-100" @click="remove(file)"><Trash2 class="size-6" /></button>
           <button v-if="haveAccessToFavorites" type="button" :aria-label="`${isFavorite(file) ? 'Remove from' : 'Add to'} favorites: ${file.name}`" :aria-pressed="isFavorite(file)" class="grid size-6 place-items-center bg-transparent text-[var(--dv-selection-color)] hover:text-neutral-950 group-hover:opacity-100 group-focus-within:opacity-100" :class="isFavorite(file) ? 'opacity-100' : 'opacity-0'" @click="isFavorite(file) ? removeFromFavorite(file) : addToFavorite(file)"><Star class="size-6" :class="isFavorite(file) && 'fill-current'" /></button>

@@ -52,7 +52,7 @@ const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-
 </script>
 
 <template>
-  <div class="client-topbar fixed inset-x-0 top-0 z-10 flex h-[88px] items-center justify-between gap-6 border-b border-neutral-200 bg-white px-6 max-md:pl-16 md:h-[72px]">
+  <header class="client-topbar fixed inset-x-0 top-0 z-10 flex h-[88px] items-center justify-between gap-6 border-b border-neutral-200 bg-white px-6 max-md:pl-16 md:h-[72px]">
     <div class="dashboard-layout-topbar__left flex min-w-0 flex-1 items-center gap-8">
       <router-link :to="{ name: 'home' }">
         <Logo class="w-[124px] shrink-0 max-md:w-[88px]" />
@@ -62,7 +62,7 @@ const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-
         class="dashboard-layout-topbar__selector flex items-center gap-4 border-l border-neutral-200 pl-6 text-body max-md:hidden">
         <div class="flex items-center gap-1.5 font-medium text-neutral-500 mr-2">
           <button class="text-neutral-500 hover:text-neutral-800" @click="globalStore.clearSelection()"
-            title="Clear selection">
+            title="Clear selection" aria-label="Clear selection">
             <SquareX class="size-6 shrink-0" />
           </button>
           <div class="whitespace-nowrap">
@@ -74,11 +74,11 @@ const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-
         </div>
         <div class="flex items-center gap-3.5">
           <button class="text-neutral-500 hover:text-neutral-800" @click="isDownloadAssetModalOpen = true"
-            title="Download selection">
+            title="Download selection" aria-label="Download selection">
             <Download class="size-6 shrink-0" />
           </button>
           <button v-if="globalStore.user?.role !== 'guest'" @click="isAddToCollectionModalOpen = true"
-            title="Add selection to your collection" class="text-neutral-500 hover:text-neutral-800">
+            title="Add selection to your collection" aria-label="Add selection to your collection" class="text-neutral-500 hover:text-neutral-800">
             <Combine class="size-6 shrink-0" />
           </button>
         </div>
@@ -150,7 +150,7 @@ const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  </div>
+  </header>
   <CollectionModalDownloadMulti v-model="isDownloadAssetModalOpen" />
   <CollectionDialogCreate v-model="isCreateCollectionModalOpen" />
   <CollectionDialogAddToCollection v-model="isAddToCollectionModalOpen" />

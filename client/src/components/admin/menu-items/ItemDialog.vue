@@ -29,7 +29,7 @@ import { Slider } from "@/components/ui/slider"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { Dialog as DialogRoot, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader, DialogFooter } from '@/components/ui/dialog'
-import { computed, ref, watch } from "vue"
+import { computed, ref, useId, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
 
 type MenuItem = RouterOutput["menuItem"]["list"]
@@ -40,6 +40,7 @@ const emit = defineEmits<{
   "update:open": [boolean]
 }>()
 const queryClient = useQueryClient()
+const fieldId = useId()
 const isDialogOpen = ref(false)
 const form = ref<{
   id?: string
@@ -186,8 +187,8 @@ async function handleSubmit() {
             </Select>
           </FieldGroup>
           <template v-if="form.type === 'collection'">
-            <div class="form-field">
-              <label class="form">Collection</label>
+            <div class="form-field" role="group" :aria-labelledby="`${fieldId}-collection`">
+              <label class="form" :id="`${fieldId}-collection`">Collection</label>
               <treeselect v-model="form.collectionId" class="mb-075" placeholder="Choose an existing collection"
                 :options="subCollections" :disabled="!!item" />
             </div>
@@ -200,8 +201,8 @@ async function handleSubmit() {
             </div>
           </template>
           <template v-if="form.type === 'page'">
-            <FieldGroup class="form-field">
-              <Label class="form">Page</Label>
+            <FieldGroup class="form-field" role="group" :aria-labelledby="`${fieldId}-page`">
+              <Label class="form" :id="`${fieldId}-page`">Page</Label>
               <treeselect v-model="form.pageId" class="mb-075" placeholder="Page" :options="pageOptions"
                 :disabled="!!item" />
             </FieldGroup>
@@ -214,8 +215,8 @@ async function handleSubmit() {
                 Show a divider line
               </Label>
             </div>
-            <div class="form-field flex flex-col gap-2">
-              <Label class="form">Spacing top</Label>
+            <div class="form-field flex flex-col gap-2" role="group" :aria-labelledby="`${fieldId}-spacing-top`">
+              <Label class="form" :id="`${fieldId}-spacing-top`">Spacing top</Label>
               <Slider :model-value="form.data.spacingTop"
                 @update:model-value="(value) => handleSliderChange('spacingTop', value)" :max="100" :step="5"
                 class="w-full my-2" />
@@ -223,8 +224,8 @@ async function handleSubmit() {
                 {{ form.data.spacingTop?.[0] ? `${form.data.spacingTop[0]}px` : "0px" }}
               </div>
             </div>
-            <div class="form-field  flex flex-col gap-2">
-              <Label class="form">Spacing bottom</Label>
+            <div class="form-field  flex flex-col gap-2" role="group" :aria-labelledby="`${fieldId}-spacing-bottom`">
+              <Label class="form" :id="`${fieldId}-spacing-bottom`">Spacing bottom</Label>
               <Slider :model-value="form.data.spacingBottom" @update:model-value="(value) => handleSliderChange('spacingBottom', value)
                 " :max="100" :step="5" class="w-full my-2" />
               <div class="form-field-description">

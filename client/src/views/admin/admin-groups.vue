@@ -152,7 +152,7 @@ async function onModalSubmit(event: Event) {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="admin-error">
+  <div v-else-if="status === 'error'" class="admin-error" role="alert">
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
@@ -236,8 +236,10 @@ async function onModalSubmit(event: Event) {
           move them to before removing this group.
         </AlertDialogDescription>
       </AlertDialogHeader>
+      <FieldGroup>
+      <Label for="targetGroup">Target group</Label>
       <Select v-model="targetGroupId">
-        <SelectTrigger class="w-[180px]">
+        <SelectTrigger id="targetGroup" class="w-[180px]">
           <SelectValue placeholder="Select Group" />
         </SelectTrigger>
         <SelectContent>
@@ -246,6 +248,7 @@ async function onModalSubmit(event: Event) {
           </SelectItem>
         </SelectContent>
       </Select>
+      </FieldGroup>
       <AlertDialogFooter>
         <AlertDialogCancel @click="showMoveUsersDialog = false">Cancel</AlertDialogCancel>
         <AlertDialogAction @click="moveUsersAndRemoveGroup" :disabled="!targetGroupId">

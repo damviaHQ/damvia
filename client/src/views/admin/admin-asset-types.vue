@@ -53,8 +53,8 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { CirclePlus, GripVertical, InfoIcon, PencilLine, Trash2 } from "lucide-vue-next"
-import { computed, ref } from "vue"
+import { ArrowDown, ArrowUp, CirclePlus, GripVertical, InfoIcon, PencilLine, Trash2 } from "lucide-vue-next"
+import { computed, nextTick, ref } from "vue"
 import Draggable from "vuedraggable"
 
 const toast = useGlobalToast()
@@ -184,6 +184,20 @@ function toggleAttribute(value: string, event: Event) {
   }
 }
 
+const listAnnouncement = ref("")
+async function moveListItem(index: number, delta: number) {
+  const items = [...form.value.listDisplayItems]
+  const [value] = items.splice(index, 1)
+  items.splice(index + delta, 0, value)
+  form.value.listDisplayItems = items
+  listAnnouncement.value = `${listItems.value.find((item) => item.value === value)?.name ?? value} moved to position ${index + delta + 1} of ${items.length}`
+  await nextTick()
+  const row = document.querySelector(`[data-list-column="${CSS.escape(value)}"]`)
+  const button = row?.querySelector<HTMLButtonElement>(`[data-move="${delta < 0 ? "up" : "down"}"]:not(:disabled)`)
+    ?? row?.querySelector<HTMLButtonElement>("[data-move]:not(:disabled)")
+  button?.focus()
+}
+
 function updateDefaultDisplay(value: "grid" | "list") {
   form.value.defaultDisplay = value
 }
@@ -200,7 +214,7 @@ async function onModalSubmit(event: Event) {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="admin-error">
+  <div v-else-if="status === 'error'" class="admin-error" role="alert">
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
@@ -286,8 +300,8 @@ async function onModalSubmit(event: Event) {
               <Label for="includeInSearchByDefault">Search by default</Label>
             </div>
             <div class="flex flex-col gap-2">
-              <Label for="defaultDisplay">Default Display</Label>
-              <DisplaySelector v-model="form.defaultDisplay" @update:model-value="updateDefaultDisplay" />
+              <Label id="defaultDisplay">Default Display</Label>
+              <DisplaySelector aria-labelledby="defaultDisplay" v-model="form.defaultDisplay" @update:model-value="updateDefaultDisplay" />
             </div>
 
           </div>
@@ -295,29 +309,42 @@ async function onModalSubmit(event: Event) {
             <div class="flex flex-col gap-2">
               <Label>List columns</Label>
               <p class="text-sm admin-text-secondary">
-                Add attributes, drag and drop to reorder or click the trash icon to
+                Add attributes, drag and drop or use the arrow buttons to reorder, or click the trash icon to
                 remove.
               </p>
               <div class="modal-attribute-list">
                 <Draggable v-model="form.listDisplayItems" item-key="value" class="space-y-2">
-                  <template #item="{ element }">
-                    <div
+                  <template #item="{ element, index }">
+                    <div :data-list-column="element"
                       class="flex items-center justify-between p-1 border border-neutral-300 hover:border-neutral-800 cursor-grab">
                       <div class="flex items-center gap-2">
-                        <GripVertical class="h-4 w-4 admin-text-secondary" />
+                        <GripVertical class="h-4 w-4 admin-text-secondary" aria-hidden="true" />
                         {{
                           listItems.find((item) => item.value === element)?.name ??
                           element
                         }}
                       </div>
+                      <div class="flex items-center">
+                      <Button type="button" variant="ghost" size="sm" data-move="up" :disabled="index === 0"
+                        @click="moveListItem(index, -1)"
+                        :aria-label="`Move ${listItems.find(item => item.value === element)?.name ?? element} up`">
+                        <ArrowUp class="h-4 w-4 admin-text-secondary" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" data-move="down" :disabled="index === form.listDisplayItems.length - 1"
+                        @click="moveListItem(index, 1)"
+                        :aria-label="`Move ${listItems.find(item => item.value === element)?.name ?? element} down`">
+                        <ArrowDown class="h-4 w-4 admin-text-secondary" />
+                      </Button>
                       <Button type="button" variant="ghost" size="sm"
                         @click="(event) => toggleAttribute(element, event)"
                         :aria-label="`Remove ${listItems.find(item => item.value === element)?.name ?? element}`">
                         <Trash2 class="h-4 w-4 admin-text-secondary admin-text-primary-hover" />
                       </Button>
+                      </div>
                     </div>
                   </template>
                 </Draggable>
+                <p role="status" class="sr-only">{{ listAnnouncement }}</p>
                 <div class="mt-4 space-y-2">
                   <div v-for="item in allListItems.filter((item) => !item.isSelected)" :key="item.value"
                     class="flex items-center justify-between p-1 bg-neutral-100">

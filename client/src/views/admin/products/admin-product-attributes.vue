@@ -76,6 +76,7 @@ const form = ref<{
   searchable: false,
 })
 const modalState = ref<"creating" | "editing" | "closed">("closed")
+const nameError = ref("")
 
 function openCreateModal() {
   form.value = {
@@ -85,6 +86,7 @@ function openCreateModal() {
     viewable: false,
     searchable: false,
   }
+  nameError.value = ""
   modalState.value = "creating"
 }
 
@@ -97,6 +99,7 @@ function openEditModal(productAttribute: ProductAttribute) {
     viewable: productAttribute.viewable,
     searchable: productAttribute.searchable,
   }
+  nameError.value = ""
   modalState.value = "editing"
 }
 
@@ -116,9 +119,11 @@ function submitChanges(event: Event) {
   event.preventDefault()
 
   if (!form.value.name) {
-    toast.error("Please enter a name")
+    nameError.value = "Please enter a name"
+    toast.error(nameError.value)
     return
   }
+  nameError.value = ""
 
   const action: any =
     modalState.value === "creating"
@@ -169,7 +174,7 @@ async function onModalSubmit(event: Event) {
           <TableHead>Filter in Search</TableHead>
           <TableHead>Visible in Record List</TableHead>
           <TableHead>Searchable</TableHead>
-          <TableHead></TableHead>
+          <TableHead><span class="sr-only">Actions</span></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -212,8 +217,9 @@ async function onModalSubmit(event: Event) {
           <div class="flex flex-col gap-6 py-4">
             <FieldGroup >
               <Label for="name">Select an Attribute *</Label>
-              <Select v-model="form.name!" :disabled="modalState === 'editing'" class="w-full">
-                <SelectTrigger id="name" class="w-full">
+              <Select v-model="form.name!" :disabled="modalState === 'editing'" class="w-full" @update:model-value="nameError = ''">
+                <SelectTrigger id="name" class="w-full" :aria-invalid="!!nameError || undefined"
+                  :aria-describedby="nameError ? 'name-error' : undefined">
                   <SelectValue placeholder="Available Attributes..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -223,6 +229,7 @@ async function onModalSubmit(event: Event) {
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <p v-if="nameError" id="name-error" class="admin-form-error" role="alert">{{ nameError }}</p>
             </FieldGroup>
             <FieldGroup >
               <Label for="displayName">Change Display Name</Label>

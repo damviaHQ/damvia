@@ -3,7 +3,7 @@ title: Products and PIM
 description: Import a product catalogue from CSV, link files to products by file name, and turn product columns into search facets.
 sidebar:
   order: 10
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 The PIM section stores a flat product catalogue and links asset files to it by parsing file names. Once linked, product columns can be searched, offered as filters and displayed next to files.
@@ -27,9 +27,9 @@ The PIM section stores a flat product catalogue and links asset files to it by p
 
 `/admin/products/import` (admin only), titled `Import Products from CSV file`, parses the file in the browser with papaparse using `header: true`. The first CSV row must contain column names, with data starting on the second row. The importer does not accept Excel files or files padded with empty rows.
 
-1. `Select a CSV File`.
+1. `Choose CSV file`. The status next to the button changes to `CSV ready for review` once the file is parsed.
 2. Under `2. Select Columns to Import`, untick columns you do not want; a preview shows the first two rows.
-3. Pick the key column in `Select the Primary Key column`.
+3. Pick the key column in `Select the Primary Key column`. Comparing or importing without a key shows the error under the select as well as in a toast.
 4. Under `3. Compare with existing data`, press `Compare now`. `pim.compareCsv` returns one status per row:
 
 | Status | Meaning |
@@ -39,7 +39,7 @@ The PIM section stores a flat product catalogue and links asset files to it by p
 | `unchanged` | A product exists with identical values |
 | `duplicate` | The key appears more than once in the CSV |
 
-5. In `Comparison Results`, tick the changed rows to overwrite or `Override all changes`, then press `Import`. Only `new` rows and selected `changed` rows are sent to `pim.importCsv`.
+5. In `Comparison Results`, changed values are highlighted in yellow and marked with a pencil icon. Tick the changed rows to overwrite or `Override all changes`, then press `Import`. Only `new` rows and selected `changed` rows are sent to `pim.importCsv`.
 
 On the server, `importCsv`:
 
@@ -48,7 +48,7 @@ On the server, `importCsv`:
 - Skips rows with an empty key and logs them.
 - Creates missing products with every CSV column in `meta_data`, and updates changed values on existing ones.
 
-`Remove All Products` on `/admin/products` sets `product_id` to null on every linked file, then deletes all products. Cells can also be edited inline in the products table, which calls `pim.updateProduct` with the full `meta_data`.
+`Remove All Products` on `/admin/products` sets `product_id` to null on every linked file, then deletes all products. Cells can also be edited inline in the products table, which calls `pim.updateProduct` with the full `meta_data`. Click a cell, or Tab into the table, move with the arrow keys and press `Enter` or `F2` to open the editor; `Escape` cancels and returns to the cell. On a picture cell, `Enter` enlarges the image. Columns are not sortable.
 
 ## Files are linked to products by file name
 

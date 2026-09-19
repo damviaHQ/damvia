@@ -321,7 +321,7 @@ function handleOverrideAll(value: boolean) {
               </SelectContent>
             </Select>
           </div>
-          <p v-if="primaryKeyError" id="primary-key-error" class="text-sm text-[var(--dv-color-danger)]" role="alert">
+          <p v-if="primaryKeyError" id="primary-key-error" class="admin-form-error" role="alert">
             {{ primaryKeyError }}
           </p>
           <p class="text-sm admin-text-secondary">

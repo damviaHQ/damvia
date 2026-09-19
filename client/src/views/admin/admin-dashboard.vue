@@ -195,8 +195,8 @@ const approveUser = async (user: { id: string, name: string }) => {
           <span class="admin-text-secondary font-normal text-xl">/ {{ formatStorage(disk.totalBytes) }}</span>
         </p>
         <div class="mt-4">
-          <div class="h-2 bg-neutral-200 overflow-hidden" role="progressbar" aria-label="Server disk used" :aria-valuenow="Math.min(100, diskPercent)">
-            <div class="h-2 transition-all" :class="diskBarColor" :style="{ width: `${Math.min(100, diskPercent)}%` }"></div>
+          <div class="h-2 bg-neutral-200 overflow-hidden" role="progressbar" aria-label="Server disk used" :aria-valuenow="Math.min(100, diskPercent)" aria-valuemin="0" aria-valuemax="100">
+            <div class="h-2 w-full origin-left transition-transform" :class="diskBarColor" :style="{ transform: `scaleX(${Math.min(100, diskPercent) / 100})` }"></div>
           </div>
           <p class="text-sm admin-text-secondary mt-2">{{ diskPercent }}% used, {{ formatStorage(disk.freeBytes) }} free</p>
         </div>

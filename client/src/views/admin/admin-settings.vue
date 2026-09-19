@@ -149,7 +149,7 @@ const removeBackgroundImage = async () => {
         </div>
 
         <div class="flex flex-wrap gap-4">
-          <input type="file" ref="fileInput" @change="handleFileUpload" accept="image/*" class="hidden" />
+          <input type="file" ref="fileInput" @change="handleFileUpload" accept="image/*" class="hidden" aria-label="Choose login background" />
           <Button @click="fileInput?.click()" :disabled="isLoading">
             {{ isLoading ? 'Updating…' : backgroundImageUrl ? 'Replace background' : 'Upload background' }}
           </Button>

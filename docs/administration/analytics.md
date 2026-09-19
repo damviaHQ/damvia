@@ -3,7 +3,7 @@ title: Insights
 description: The admin analytics screen at /admin/analytics with views, downloads, active users, searches and shares over a date range, what each figure counts, and how long events are kept.
 sidebar:
   order: 13
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 Insights, at `/admin/analytics`, tells an admin which files are used, by whom, and what people look for without finding it. The [dashboard](./dashboard.md) answers "is the instance healthy right now"; Insights answers "what happened over the last 30 days". It is rendered for the `admin` role only, and every figure comes from the `analytics` router, gated by `userAdmin`.
@@ -14,7 +14,7 @@ Damvia records activity in the `activity_events` table from the moment the serve
 
 ## Choose the period
 
-The period picker selects the last 7, 30, 90 or 365 days, or a custom range of up to 366 days. Fill both dates and choose **Apply dates**; the end date is included. Reversed dates and future end dates cannot be applied. Reports keep the same period when switching sections. Charts use UTC calendar days.
+The period picker selects the last 7, 30, 90 or 365 days, or a custom range of up to 366 days. Fill both dates and choose **Apply dates**; the end date is included. Reversed dates and future end dates cannot be applied. Reports keep the same period when switching sections. Charts use UTC calendar days. Each line in a chart has its own dash pattern and point shape as well as its colour, and charts do not animate when the operating system asks for reduced motion.
 
 Six reports separate Overview, Asset usage, Users, Search demand, Collections and Library & storage. Overview highlights search terms needing attention and links to the detailed reports. Available activity metrics show their absolute change against the immediately preceding period of the same length. Comparisons use retained events only; missing history is not reconstructed.
 

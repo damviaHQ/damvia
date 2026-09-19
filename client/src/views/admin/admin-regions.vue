@@ -159,7 +159,7 @@ async function onModalSubmit(event: Event) {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="admin-error">
+  <div v-else-if="status === 'error'" class="admin-error" role="alert">
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
@@ -255,7 +255,7 @@ async function onModalSubmit(event: Event) {
           <FieldGroup >
             <Label for="defaultGroup">Default Group *</Label>
             <Select v-model="form.defaultGroupId">
-              <SelectTrigger>
+              <SelectTrigger id="defaultGroup">
                 <SelectValue placeholder="Select a default group" />
               </SelectTrigger>
               <SelectContent>
@@ -283,8 +283,10 @@ async function onModalSubmit(event: Event) {
           Please move your users to another region before removing this region.
         </AlertDialogDescription>
       </AlertDialogHeader>
+      <FieldGroup>
+      <Label for="targetRegion">Target region</Label>
       <Select v-model="targetRegionId">
-        <SelectTrigger class="w-[180px]">
+        <SelectTrigger id="targetRegion" class="w-[180px]">
           <SelectValue placeholder="Select Region" />
         </SelectTrigger>
         <SelectContent>
@@ -294,6 +296,7 @@ async function onModalSubmit(event: Event) {
           </SelectItem>
         </SelectContent>
       </Select>
+      </FieldGroup>
       <AlertDialogFooter>
         <AlertDialogCancel @click="showMoveUsersDialog = false">Cancel</AlertDialogCancel>
         <AlertDialogAction @click="moveUsersAndRemoveRegion" :disabled="!targetRegionId">

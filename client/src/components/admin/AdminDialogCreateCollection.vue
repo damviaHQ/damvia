@@ -148,8 +148,8 @@ async function onSubmit() {
               <Check v-if="form.synchronized" class="w-4 h-4 text-primary ml-auto" />
             </button>
           </div>
-          <FieldGroup v-if="form.synchronized" >
-            <Label>Select a folder from your cloud storage *</Label>
+          <FieldGroup v-if="form.synchronized" role="group" aria-labelledby="assetFolderId">
+            <Label id="assetFolderId">Select a folder from your cloud storage *</Label>
             <treeselect v-model="form.assetFolderId" placeholder="Asset folder" :options="assetFolders"
               :normalizer="(node) => ({ id: node.id, label: node.name })" />
           </FieldGroup>
@@ -157,8 +157,8 @@ async function onSubmit() {
             <Label for="name">Name *</Label>
             <Input id="name" type="text" v-model="form.name" placeholder="Name" class="form-input mb-075" />
           </FieldGroup>
-          <FieldGroup v-if="collectionOptions?.length" >
-            <Label for="collectionId">Select a parent collection</Label>
+          <FieldGroup v-if="collectionOptions?.length" role="group" aria-labelledby="collectionId">
+            <Label id="collectionId">Select a parent collection</Label>
             <treeselect v-model="form.collectionId" class="mb-075" placeholder="Parent collection"
               :options="collectionOptions" :clearable="true" />
           </FieldGroup>
@@ -198,7 +198,7 @@ async function onSubmit() {
   padding: 0.75rem;
   border: 1px solid transparent;
   border-radius: 0;
-  transition: all 0.2s ease-in-out;
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 
 .create-collection-modal__type--active {

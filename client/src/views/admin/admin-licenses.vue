@@ -138,6 +138,12 @@ async function remove(licenseId: string) {
   }
 }
 
+function labelEditor(quill: { root: HTMLElement }) {
+  quill.root.setAttribute('aria-labelledby', 'details')
+  quill.root.setAttribute('role', 'textbox')
+  quill.root.setAttribute('aria-multiline', 'true')
+}
+
 function formatDate(date: CalendarDate | undefined) {
   if (!date) return ''
   return formatter.custom(toDate(date), { dateStyle: "medium" })
@@ -165,7 +171,7 @@ async function onModalSubmit(event: Event) {
     <div v-if="status === 'pending'">
       <Loader :text="true" />
     </div>
-    <div v-else-if="status === 'error'" class="admin-error">
+    <div v-else-if="status === 'error'" class="admin-error" role="alert">
       {{ error?.message }}
     </div>
     <div v-else-if="status === 'success'">
@@ -261,8 +267,8 @@ async function onModalSubmit(event: Event) {
               <Label for="name">Name *</Label>
               <Input id="name" v-model="form.name" placeholder="License name" />
             </FieldGroup>
-            <div class="flex flex-col gap-2">
-              <Label for="usageFrom">Usage From</Label>
+            <div class="flex flex-col gap-2" role="group" aria-labelledby="usageFrom">
+              <Label id="usageFrom">Usage From</Label>
               <div class="flex gap-2">
                 <DatePickerInput
                   :model-value="form.usageFrom"
@@ -278,8 +284,8 @@ async function onModalSubmit(event: Event) {
                 </Button>
               </div>
             </div>
-            <div class="flex flex-col gap-2">
-              <Label for="usageTo">Usage To</Label>
+            <div class="flex flex-col gap-2" role="group" aria-labelledby="usageTo">
+              <Label id="usageTo">Usage To</Label>
               <div class="flex gap-2">
                 <DatePickerInput
                   :model-value="form.usageTo"
@@ -295,19 +301,19 @@ async function onModalSubmit(event: Event) {
                 </Button>
               </div>
             </div>
-            <FieldGroup >
-              <Label for="scopes">Usage Scopes *</Label>
+            <FieldGroup role="group" aria-labelledby="scopes">
+              <Label id="scopes">Usage Scopes *</Label>
               <Treeselect v-model="form.scopes" :options="licenseScopeOptions" :multiple="true"
                 placeholder="Select scopes" />
             </FieldGroup>
-            <FieldGroup >
-              <Label for="allowedRegions">Allowed Regions *</Label>
+            <FieldGroup role="group" aria-labelledby="allowedRegions">
+              <Label id="allowedRegions">Allowed Regions *</Label>
               <Treeselect v-model="form.allowedRegionIds" :options="regionOptions" :multiple="true"
                 placeholder="Select allowed regions" />
             </FieldGroup>
           </div>
           <div class="flex flex-col gap-2 h-full">
-            <Label for="details">Details</Label>
+            <Label id="details">Details</Label>
             <div class="license-details-editor">
               <QuillEditor
                 ref="editor"
@@ -317,6 +323,7 @@ async function onModalSubmit(event: Event) {
                 toolbar="essential"
                 placeholder="Add usage instructions or restrictions…"
                 content-type="html"
+                @ready="labelEditor"
               />
             </div>
           </div>
@@ -365,12 +372,12 @@ async function onModalSubmit(event: Event) {
 
 :deep(.ql-container) {
   height: 100%;
-  border: 1px solid #ccc;
+  border: 1px solid var(--dv-color-line);
   border-top: none;
 }
 
 :deep(.ql-toolbar) {
   background: white;
-  border: 1px solid #ccc;
+  border: 1px solid var(--dv-color-line);
 }
 </style>

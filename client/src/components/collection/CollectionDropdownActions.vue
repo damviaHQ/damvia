@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { RouterOutput } from "@/services/server.ts"
-import { CircleEllipsis, Settings } from "lucide-vue-next"
+import { Ellipsis, Settings } from "lucide-vue-next"
 import { ref } from "vue"
 
 defineEmits<{ "update:open": [boolean] }>()
@@ -31,8 +31,8 @@ const editModalOpen = ref(false)
 
 <template>
   <DropdownMenu v-if="collection.canEdit" @update:open="$emit('update:open', $event)">
-    <DropdownMenuTrigger class="text-neutral-600 cursor-pointer bg-transparent border-none" :aria-label="`Actions for ${collection.name}`">
-      <CircleEllipsis aria-hidden="true" class="w-6 h-6 text-neutral-600 hover:text-neutral-800 fill-neutral-50" />
+    <DropdownMenuTrigger class="flex size-6 items-center justify-center text-neutral-600 cursor-pointer bg-transparent border-none hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-600" :aria-label="`Actions for ${collection.name}`">
+      <Ellipsis aria-hidden="true" class="size-6" />
     </DropdownMenuTrigger>
     <DropdownMenuContent :collision-padding="24" class="w-auto">
       <DropdownMenuItem @click="editModalOpen = true">

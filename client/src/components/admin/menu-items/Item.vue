@@ -26,6 +26,8 @@ import {
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
 import {
+  ArrowDown,
+  ArrowUp,
   BetweenHorizontalStart,
   ChevronDown,
   Ellipsis,
@@ -38,11 +40,12 @@ import {
   Settings,
   Trash,
 } from "lucide-vue-next"
-import { computed, ref } from "vue"
+import { computed, nextTick, ref } from "vue"
 
 type MenuItem = RouterOutput["menuItem"]["list"]
 
-const props = defineProps<{ parent?: MenuItem; item: MenuItem }>()
+const props = defineProps<{ parent?: MenuItem; item: MenuItem; index: number; count: number; move: (delta: number) => Promise<void> }>()
+const actionsTrigger = ref<{ $el: HTMLElement }>()
 const isOpen = ref(false)
 const dropdownOpen = ref(false)
 const activeDialog = ref<"add" | "edit" | null>(null)
@@ -84,6 +87,12 @@ function closeDropdown() {
   dropdownOpen.value = false
 }
 
+async function moveItem(delta: number) {
+  await props.move(delta)
+  await nextTick()
+  actionsTrigger.value?.$el.focus()
+}
+
 function openDialog(type: "add" | "edit") {
   activeDialog.value = type
   closeDropdown()
@@ -93,7 +102,7 @@ function openDialog(type: "add" | "edit") {
 <template>
   <div v-if="props.item">
     <div class="items-tree__item flex w-full items-center border border-gray-200 p-2 mb-2 justify-between">
-      <div class="items-tree__grab">
+      <div class="items-tree__grab" aria-hidden="true">
         <GripVertical class="h-4 w-4 cursor-grab" />
       </div>
       <div class="items-tree__icon-group">
@@ -106,7 +115,9 @@ function openDialog(type: "add" | "edit") {
           <IconCloudSync v-if="item.type === 'collection' && item.synchronized" class="!w-8 !h-8 text-brand-strong" />
         </div>
       </div>
-      <div @click="isOpen = !isOpen" class="flex w-full min-w-[20rem] items-center">
+      <component :is="item.children ? 'button' : 'div'" :type="item.children ? 'button' : undefined"
+        :aria-expanded="item.children ? isOpen : undefined" @click="isOpen = !isOpen"
+        class="flex w-full min-w-[20rem] items-center text-left">
         <ChevronDown v-if="item.children" :class="['w-4 h-4', !isOpen && '-rotate-90']" class="mx-2" />
         <div v-else class="w-4 h-4" />
         <template v-if="props.item?.type === 'collection'">
@@ -121,20 +132,20 @@ function openDialog(type: "add" | "edit") {
         <template v-else-if="props.item?.type === 'divider'">
           <div :key="item" :style="{
             content: ' ',
-            background: item.data.border && '#ccc',
+            background: item.data.border && 'var(--dv-color-line)',
             height: `1px`,
             width: `100px`,
             marginTop: item.data.spacingTop && `${item.data.spacingTop}px`,
             marginBottom: item.data.spacingBottom && `${item.data.spacingBottom}px`,
           }" />
         </template>
-      </div>
+      </component>
       <div v-if="['collection', 'page'].includes(item.type) && item.home" class="items-tree__home-icon">
         <Home class="h-4 w-4" />
       </div>
       <DropdownMenu v-model:open="dropdownOpen">
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Menu item actions">
+          <Button ref="actionsTrigger" variant="ghost" size="icon" aria-label="Menu item actions">
             <Ellipsis class="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -151,6 +162,14 @@ function openDialog(type: "add" | "edit") {
               <span>Edit Item</span>
             </div>
           </DropdownMenuItem>
+          <DropdownMenuItem v-if="index > 0" @select="moveItem(-1)">
+            <ArrowUp class="h-4 w-4 mr-2" />
+            <span>Move up</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem v-if="index < count - 1" @select="moveItem(1)">
+            <ArrowDown class="h-4 w-4 mr-2" />
+            <span>Move down</span>
+          </DropdownMenuItem>
           <DropdownMenuItem v-if="['collection', 'page'].includes(item.type)" @click="setHome(item)">
             <Home class="h-4 w-4 mr-2" />
             <span>Set as Home</span>
@@ -162,16 +181,8 @@ function openDialog(type: "add" | "edit") {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ItemDialog v-if="item.type === 'collection'" :parent="item" v-model:open="isAddDialogOpen">
-        <template #default="{ open }">
-          <div @click="open()" class="hidden">Add Item</div>
-        </template>
-      </ItemDialog>
-      <ItemDialog :item="editedItem" :parent="parent" v-model:open="isEditDialogOpen">
-        <template #default="{ open }">
-          <div @click="open()" class="hidden">Edit</div>
-        </template>
-      </ItemDialog>
+      <ItemDialog v-if="item.type === 'collection'" :parent="item" v-model:open="isAddDialogOpen" />
+      <ItemDialog :item="editedItem" :parent="parent" v-model:open="isEditDialogOpen" />
     </div>
     <div v-if="item.children && isOpen" class="items-tree__children">
       <ItemsTree :items="item.children" :parent="item" />

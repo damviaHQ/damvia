@@ -280,7 +280,7 @@ function getFileExtension(filename: string): string {
             <div class="asset-grid asset-grid--files">
               <article v-for="file in assetFiles" :key="file.id" class="asset-card asset-card--file">
                 <div class="asset-card__thumbnail">
-                  <img :src="file.thumbnailURL ?? thumbnailPlaceholder" :alt="file.name" />
+                  <img :src="file.thumbnailURL ?? thumbnailPlaceholder" alt="" loading="lazy" decoding="async" />
                   <Badge class="asset-card__extension">{{ getFileExtension(file.name).toUpperCase() }}</Badge>
                 </div>
                 <span class="asset-card__copy">
