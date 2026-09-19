@@ -58,4 +58,4 @@ There is no digest, newsletter or notification email beyond these seven, and no 
 2. Watch the server log for a `job` line with `status: failed` and queue `mailer/password-reset` if delivery fails; Nodemailer's error message (authentication, connection, sender rejected) is included.
 3. On success nothing is logged; check the inbox or the provider's activity log.
 
-Failed mail jobs use backoff with two retries after the initial attempt in installed pg-boss 10.2.0. Restarting after correcting SMTP can deliver jobs still eligible for retry; it does not revive permanently failed jobs. Inspect their state and trigger a fresh application action after checking provider logs for prior delivery.
+Failed mail jobs use backoff with two retries after the initial attempt in installed pg-boss 12. Mail is sent with nodemailer 10 over plain SMTP; nothing changes for `SMTP_*`. Restarting after correcting SMTP can deliver jobs still eligible for retry; it does not revive permanently failed jobs. Inspect their state and trigger a fresh application action after checking provider logs for prior delivery.

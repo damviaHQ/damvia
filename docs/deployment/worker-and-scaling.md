@@ -46,7 +46,7 @@ Inside `download/create-archive`, files are transformed 25 at a time.
 
 - One source's full listing is held in memory during its run, then released before the next source starts, so the peak follows the largest source, not their number. Measured on a synthetic OneDrive listing of 100,000 items: 80 MB for the raw listing, 25 MB for the plan derived from it. Size the container at 512 MB for the server plus 2 MB per 1,000 items in the largest source; a 200,000-item source fits in 1 GB. Dropbox file downloads also buffer content in memory.
 - Downloads and conversions use the OS temp directory; see [Server with Docker](./server-docker.md).
-- pg-boss stores jobs in the `pgboss` schema and archives completed ones; the tables grow with activity and pg-boss prunes them on its own schedule.
+- pg-boss stores jobs in the `pgboss` schema and deletes completed ones after seven days; the tables grow with activity and the worker process prunes them on its own schedule. Only the worker process (`ENABLE_WORKER=true`) supervises queues and fires cron schedules.
 
 ## Restarting
 

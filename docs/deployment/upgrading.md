@@ -29,6 +29,14 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
    then copy `client/dist/` to the static host. Deploy the client **after** the server, since the client is built against the server's tRPC types and may call procedures the old server does not have.
 5. Check `docs/reference/environment-variables.md` of the new version (or the diff of `server/.env.template`) for new variables.
 
+## pg-boss 12 in this upgrade
+
+- The server needs **Node 22.12 or newer**: `node:22-bookworm` already resolves to a newer 22.x, but check a host that runs the server outside Docker.
+- pg-boss 11 dropped the migration path from the pg-boss 10 tables. At its first start this version detects a `pgboss` schema older than version 25, renames it to `pgboss_legacy_v10`, lets pg-boss 12 create a fresh `pgboss` schema, and re-enqueues the jobs that were still `created` or `retry` (emails, content processing, collection synchronisation, archives). Cron jobs are registered again on their own. The log shows `pg-boss schema retired` and `pg-boss legacy jobs replayed` with the count per queue.
+- Nothing is dropped. Once the instance runs correctly, free the space with `DROP SCHEMA pgboss_legacy_v10 CASCADE;`. If a schema of that name already exists from an earlier attempt, the server refuses to start and says so; drop or rename it, then start again.
+- Completed jobs are now deleted after seven days instead of being archived; `pgboss.job` keeps the same `name` and `state` columns, so the queries in [Operations](./operations.md) still work.
+- To roll back to the previous release after this migration ran, restore the old tables before starting the old image: `ALTER SCHEMA pgboss RENAME TO pgboss_v12; ALTER SCHEMA pgboss_legacy_v10 RENAME TO pgboss;`. Jobs queued while the new version ran stay in `pgboss_v12`.
+
 ## Insights in this upgrade
 
 - The migration creates an empty `activity_events` table. [Insights](../administration/analytics.md) and the Last Login column of Users fill from the first request after the restart; nothing is rebuilt from earlier downloads.

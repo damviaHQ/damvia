@@ -3,10 +3,10 @@ title: Server with Docker
 description: Build the server image from the repository's Dockerfile and run it with the worker enabled.
 sidebar:
   order: 2
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
-`server/Dockerfile` builds on Node 22 (Debian Bookworm) and includes the media tools, compiled server and sources. The CLI still runs from TypeScript. See [Validation status](../reference/validation-status.md) for completed checks.
+`server/Dockerfile` builds on Node 22 (Debian Bookworm; the server needs 22.12 or newer) and includes the media tools, compiled server and sources. The CLI still runs from TypeScript. See [Validation status](../reference/validation-status.md) for completed checks.
 
 ## What the image contains
 

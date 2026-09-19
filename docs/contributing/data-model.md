@@ -10,8 +10,9 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 
 ## Conventions shared by every entity
 
-- `dataSource` in `server/src/env.ts` uses `SnakeNamingStrategy` from `typeorm-naming-strategies`: a property `assetTypeId` is the column `asset_type_id`, the entity `CollectionFile` mapped with `@Entity('collection_files')` keeps that explicit table name.
+- `dataSource` in `server/src/env.ts` uses the `SnakeNamingStrategy` vendored in `server/src/lib/snake-naming-strategy.ts` (from `typeorm-naming-strategies`, which does not declare TypeORM 1 as a peer): a property `assetTypeId` is the column `asset_type_id`, the entity `CollectionFile` mapped with `@Entity('collection_files')` keeps that explicit table name.
 - `synchronize: false` and `migrationsRun: true`: TypeORM never alters the schema from the entities; every schema change is a migration, applied at startup before Fastify listens.
+- TypeORM 1 rejects `undefined` or `null` values inside a `where` instead of silently matching every row, and refuses `update`/`delete` with empty criteria. Build the `where` conditionally, use `IsNull()`, or use a query builder for a whole-table statement.
 - Every entity except `UserFavorite` and `StorageUsage` has a `uuid` primary key `id` (declared with `@PrimaryColumn()` and `@PrimaryGeneratedColumn("uuid")`, defaulting to `uuid_generate_v4()` in SQL). All but `StorageUsage` have a `createdAt`; all but `UserGroup`, `StorageUsage` and `ActivityEvent` also have an `updatedAt`.
 - Enums are TypeScript string enums stored as plain `character varying` columns (`@Column({ enum: ... })`), not Postgres enum types.
 - Relations are declared with both the foreign-key column (`folderId`) and the object (`folder`), so a query can filter on the id without a join.

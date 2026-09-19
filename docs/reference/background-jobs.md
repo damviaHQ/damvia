@@ -8,7 +8,7 @@ lastUpdated: 2026-09-19
 
 Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. Every API process connects pg-boss and can queue jobs; jobs are processed inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
 
-All queues are declared in `server/src/worker.ts`. The push helpers set `retryBackoff: true`. In installed pg-boss 10.2.0, defaults allow two retries after the initial attempt and expire active jobs after 15 minutes. `uniqueKey` is passed as `singletonKey`, but standard queues without a singleton window do not deduplicate it; no current business caller provides a key.
+All queues are declared in `server/src/worker.ts`. The push helpers set `retryBackoff: true`. In installed pg-boss 12, defaults allow two retries after the initial attempt, expire active jobs after 15 minutes and delete completed jobs after seven days (there is no archive table). `uniqueKey` is passed as `singletonKey`, but standard queues without a singleton window do not deduplicate it; no current business caller provides a key.
 
 ## Scheduled jobs
 
@@ -51,5 +51,5 @@ A file blocked by the storage plan is logged as `storage.quota-exceeded` with th
 An export denied by the access check is handled separately: the archive transaction rolls back, then the worker saves the download as `failed` and logs `download.access-denied`. The queue job finishes without a retry; the download dialog shows the failed result. Other archive errors still follow the normal retry policy. Jobs for downloads already ready, failed or expired do nothing.
 
 :::tip
-pg-boss keeps its tables in the `pgboss` schema of `DATABASE_URL`. `SELECT name, state, count(*) FROM pgboss.job GROUP BY 1, 2;` is the quickest way to see what is queued, active or failed.
+pg-boss keeps its tables in the `pgboss` schema of `DATABASE_URL`. `SELECT name, state, count(*) FROM pgboss.job GROUP BY 1, 2;` is the quickest way to see what is queued, active or failed. Only the process started with `ENABLE_WORKER=true` supervises the queues and fires the cron schedules; API-only processes and the CLI just send jobs. An instance upgraded from pg-boss 10 keeps its old tables in `pgboss_legacy_v10` until you drop them; see [Upgrading](../deployment/upgrading.md#pg-boss-12-in-this-upgrade).
 :::

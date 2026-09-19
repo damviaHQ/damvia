@@ -39,7 +39,7 @@ shadcn-vue components are owned source files, not a runtime package that can sim
 
 Tailwind now runs through `@tailwindcss/vite`. Its CSS entry imports Tailwind and `tw-animate-css`, and explicitly loads the existing custom configuration so tenant build-time brand settings continue to work. Scoped `@apply` blocks reference the shared CSS entry. The 12 Sass blocks used nesting only and were compiled to plain CSS; Sass, autoprefixer and tailwindcss-animate are removed. The invalid negative radius and the input's hard-coded blue focus ring were fixed. Slider tracks and thumbs, badges and alerts follow the square shape contract.
 
-Modern-browser support was explicitly approved: Safari 16.4+, Chrome 111+, Firefox 128+. Node must satisfy `^20.19.0 || >=22.12.0`; use a current Node 22 or 24 in development and builds. The existing Node 22 Docker base was not rebuilt in this task.
+Modern-browser support was explicitly approved: Safari 16.4+, Chrome 111+, Firefox 128+. Node must satisfy `>=22.12.0`; use a current Node 22 or 24 in development and builds. The existing Node 22 Docker base was not rebuilt in this task.
 
 Tenant colour defaults are neutral, with existing `VITE_BRAND_COLOR`, `VITE_BRAND_COLOR_HOVER` and `VITE_BRAND_COLOR_STRONG` settings preserved. Runtime equivalents are `--tenant-brand-color`, `--tenant-brand-hover`, `--tenant-brand-strong`, plus the derived `--tenant-brand-text` and `--tenant-brand-foreground`. Put runtime overrides on the document root so teleported content sees the same values. Semantic neutral action roles remain neutral by default; adding a fully branded tenant action theme requires coordinated foreground/hover/focus overrides and contrast checks, not merely changing one background.
 

@@ -18,7 +18,7 @@ The two application packages have their own `package.json` and `node_modules`. A
 
 | Package | Stack |
 |---|---|
-| `server/` | Node, Fastify 5, tRPC 11, TypeORM 0.3, pg-boss 10, MinIO client, winston, zod |
+| `server/` | Node 22.12+, Fastify 5, tRPC 11, TypeORM 1, pg-boss 12, MinIO client 8, winston, zod 4 |
 | `packages/design-system/` | Framework-independent design tokens, CSS and self-hosted font; proposal only |
 | `client/` | Vue 3, Vite 8, TypeScript, Tailwind 4, shadcn-vue (`components/ui/`), Pinia, TanStack Vue Query, tRPC 11 client, Vitest |
 

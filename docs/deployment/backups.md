@@ -3,7 +3,7 @@ title: Backups
 description: Protect PostgreSQL, the main bucket and configuration together, and rehearse recovery with the matching application version.
 sidebar:
   order: 7
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 A recoverable instance needs a consistent database backup, main-bucket backup, configuration/secrets and the application version that produced them. Re-importing cloud assets does not reconstruct users, permissions or editorial uploads.
@@ -28,7 +28,7 @@ With `DATABASE_URL` supplied securely in the operator environment, the database 
 pg_dump --format=custom "$DATABASE_URL" > damvia-$(date +%F).dump
 ```
 
-The default dump includes `pgboss`. Excluding or dropping that schema loses pending email, content-processing, synchronisation and archive jobs, not just mail. Recreating queues does not reconstruct every lost task. Versioning of a bucket alone is not a separate backup if the same credentials can delete versions.
+The default dump includes `pgboss`. Excluding or dropping that schema loses pending email, content-processing, synchronisation and archive jobs, not just mail. Recreating queues does not reconstruct every lost task. After an upgrade from pg-boss 10 the retired `pgboss_legacy_v10` schema can be excluded once it has been dropped. Versioning of a bucket alone is not a separate backup if the same credentials can delete versions.
 
 ## Restore into an isolated instance first
 
