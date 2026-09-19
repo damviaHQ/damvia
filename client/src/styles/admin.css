@@ -31,8 +31,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin.admin-dialog [role=dialog] { font-family:var(--dv-font-body); }
 .dv-admin .admin-form { display:grid; gap:20px; }
 .dv-admin .admin-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-.dv-admin .admin-form label { font-size:12px; font-weight:550; }
-.dv-admin .admin-form input:not([type=checkbox]), .dv-admin .admin-form select { width:100%; border:1px solid var(--dv-color-line); border-radius:0; background:white; padding:9px 12px; min-height:40px; box-shadow:none; color:var(--dv-text-primary); font-size:13px; }
+.dv-admin .admin-form label { font-size:var(--dv-field-label-size); font-weight:500; line-height:var(--dv-field-line-height); }
+.dv-admin .admin-form input:not([type=checkbox]), .dv-admin .admin-form select { width:100%; border:1px solid var(--dv-color-line); border-radius:0; background:white; padding:var(--dv-control-padding-y) var(--dv-control-padding-x); min-height:var(--dv-control-height); box-shadow:none; color:var(--dv-text-primary); font-size:var(--dv-field-label-size); line-height:var(--dv-field-line-height); }
 .dv-admin .admin-form p { font-size:12px; }
 .dv-admin .admin-form-note { padding:12px 14px; background:var(--dv-surface-canvas); color:var(--dv-text-secondary); border-radius:var(--dv-radius-data); line-height:1.6; }
 .dv-admin .admin-form-footer { display:flex; justify-content:flex-end; gap:10px; padding-top:20px; border-top:1px solid var(--dv-color-line); }
@@ -47,25 +47,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-form select:disabled { opacity:1; color:var(--dv-text-secondary); background:var(--dv-surface-canvas); }
 
 /* Shared administration controls; the portal keeps its own theme. */
-.dv-admin [data-admin-button] { border-radius:0; min-height:36px; height:auto; padding:9px 14px; font-size:13px; font-weight:550; box-shadow:none; text-decoration:none; }
-.dv-admin [data-admin-button=default] { background:var(--dv-color-blue); color:white; }
-.dv-admin [data-admin-button=default]:hover { background:var(--dv-action-hover); color:white; }
-.dv-admin [data-admin-button=outline] { border:1px solid var(--dv-color-line); background:white; color:var(--dv-text-primary); }
-.dv-admin [data-admin-button=link], .dv-admin [data-admin-button=ghost] { color:var(--dv-text-secondary); }
-.dv-admin [data-admin-button=link]:hover, .dv-admin [data-admin-button=ghost]:hover, .dv-admin [data-admin-button=outline]:hover { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
-.dv-admin [data-admin-button]:disabled { opacity:1; color:var(--dv-text-secondary); background:var(--dv-surface-canvas); cursor:not-allowed; }
-.dv-admin :where(input:not([type=checkbox]):not([type=radio]):not([type=file]), textarea, select, [role=combobox]) { border-radius:0; box-shadow:none; border:1px solid var(--dv-color-line); background:white; color:var(--dv-text-primary); min-height:40px; }
-.dv-admin input:focus-visible, .dv-admin textarea:focus-visible, .dv-admin button:focus-visible { outline:2px solid var(--dv-color-blue); outline-offset:3px; }
-.dv-admin [role=menuitem], .dv-admin [role=option], .dv-admin [role=treeitem] { border-radius:0; }
-.dv-admin [data-slot=badge], .dv-admin [role=progressbar], .dv-admin [role=progressbar] > *, .dv-admin [data-chart], .dv-admin [data-chart] > * { border-radius:var(--dv-radius-data); }
-.dv-admin.admin-popover { background:white; color:var(--dv-text-primary); border-color:var(--dv-color-line); }
-.dv-admin.admin-dialog form { min-height:0; }
-.dv-admin.admin-dialog label { font-size:13px; }
 .dv-admin.admin-dialog p { line-height:1.6; }
 .dv-admin .admin-list { overflow:hidden; min-width:0; }
 .dv-admin .admin-list-toolbar, .dv-admin .admin-list-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; padding:18px 22px; font-size:12px; color:var(--dv-text-secondary); }
 .dv-admin .admin-list-toolbar { border-bottom:1px solid var(--dv-color-line); }
-.dv-admin .admin-list-toolbar input { width:min(340px,100%); padding:9px 12px; }
+.dv-admin .admin-list-toolbar input { width:min(340px,100%); padding:var(--dv-control-padding-y) var(--dv-control-padding-x); }
 .dv-admin .admin-list-footer { border-top:1px solid var(--dv-color-line); }
 .dv-admin .admin-resource-page table { background:white; }
 .dv-admin .admin-resource-page th { height:44px; padding:12px 20px; background:var(--dv-surface-canvas); color:var(--dv-text-secondary); font-size:11px; font-weight:550; white-space:nowrap; }
@@ -95,7 +81,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin [data-admin-button=confirmation] { color:white; }
 /* Search inputs inside multi-selects use the outer control's border. */
 .dv-admin .vue-treeselect__input { border:0; min-height:0; background:transparent; box-shadow:none; }
-.dv-admin .vue-treeselect__control { border-radius:0; border-color:var(--dv-color-line); min-height:40px; }
+.dv-admin .vue-treeselect__control { border-radius:0; border-color:var(--dv-color-line); min-height:var(--dv-control-height); }
 .dv-admin .vue-treeselect__input:focus-visible { outline:none; }
 .dv-admin .vue-treeselect:focus-within .vue-treeselect__control { outline:2px solid var(--dv-action-primary); outline-offset:2px; }
 
@@ -112,10 +98,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin.admin-dialog [data-dialog-close]:hover { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
 .dv-admin.admin-dialog [data-dialog-close] svg { width:16px; height:16px; stroke-width:1.6; }
 .dv-admin.admin-dialog form { display:flex; flex-direction:column; gap:22px; height:auto; min-width:0; }
-.dv-admin.admin-dialog :where(label) { font-size:12px; font-weight:550; line-height:1.5; }
-.dv-admin.admin-dialog :where(input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea) { font-size:13px; padding:10px 12px; }
+.dv-admin.admin-dialog :where(label) { font-size:var(--dv-field-label-size); font-weight:500; line-height:var(--dv-field-line-height); }
+.dv-admin.admin-dialog :where(input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea) { font-size:var(--dv-field-label-size); line-height:var(--dv-field-line-height); padding:var(--dv-control-padding-y) var(--dv-control-padding-x); }
 .dv-admin.admin-dialog .vue-treeselect__input { padding:0; border:0; min-height:0; }
-.dv-admin.admin-dialog .form-field { display:flex; flex-direction:column; gap:8px; }
+.dv-admin.admin-dialog .form-field { display:flex; flex-direction:column; gap:var(--dv-field-gap); }
 .dv-admin.admin-dialog [data-dialog-footer], .dv-admin.admin-dialog .admin-form-footer { display:flex; flex-direction:row; flex-wrap:wrap; justify-content:flex-end; align-items:center; gap:10px; position:sticky; bottom:-28px; margin:4px -28px -28px; padding:18px 28px; border-top:1px solid var(--dv-color-line); background:var(--dv-surface-panel); z-index:2; }
 .dv-admin.admin-dialog [data-dialog-footer] > *, .dv-admin.admin-dialog .admin-form-footer > * { margin-top:0; }
 .dv-admin.admin-dialog [data-admin-button=confirmation] { background:var(--dv-color-danger); color:white; }
@@ -146,23 +132,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-theme .user-status-approval { padding:5px 10px; min-height:32px; font-size:12px; }
 
 /* Shared controls must resolve colours inside the admin, including portal roots. */
-.dv-admin :is(input, textarea)::placeholder { color:var(--dv-text-secondary); opacity:1; }
-.dv-admin [data-placeholder] { color:var(--dv-text-secondary); }
-.dv-admin :is(input, textarea, select, [role=combobox]):disabled { color:var(--dv-text-secondary); background:var(--dv-surface-canvas); opacity:1; }
-.dv-admin :is([role=menuitem], [role=menuitemcheckbox], [role=menuitemradio], [role=option]) { color:var(--dv-text-primary); border-radius:0; cursor:pointer; }
-.dv-admin :is([role=menuitem], [role=menuitemcheckbox], [role=menuitemradio], [role=option])[data-highlighted] { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
-.dv-admin :is([role=menuitem], [role=menuitemcheckbox], [role=menuitemradio], [role=option])[data-disabled] { color:var(--dv-text-secondary); opacity:1; cursor:not-allowed; }
-.dv-admin .vue-treeselect__menu { background:var(--dv-surface-panel); color:var(--dv-text-primary); border-color:var(--dv-color-line); border-radius:0; }
-.dv-admin .vue-treeselect__placeholder { color:var(--dv-text-secondary); }
-.dv-admin .vue-treeselect__single-value { color:var(--dv-text-primary); }
-.dv-admin .vue-treeselect__option--highlight { background:var(--dv-surface-canvas); }
-.dv-admin .vue-treeselect__multi-value-item { background:var(--dv-surface-canvas); color:var(--dv-text-primary); border-radius:0; }
-.dv-admin .vue-treeselect__value-remove { color:var(--dv-text-secondary); }
 .dv-admin .create-collection-modal__type:hover { background:var(--dv-surface-canvas); }
 .dv-admin .create-collection-modal__type--active { border-color:var(--dv-action-primary); background:var(--dv-surface-canvas); }
-.dv-admin :is(input:not([type=checkbox]):not([type=radio]):not([type=file]), textarea, select, [role=combobox]) { color:var(--dv-text-primary); background:var(--dv-surface-panel); border-color:var(--dv-color-line); }
-.dv-admin :is(input, textarea, select, [role=combobox]):disabled { color:var(--dv-text-secondary); background:var(--dv-surface-canvas); }
 .dv-admin .block__action-container { background:var(--dv-surface-panel); border-color:var(--dv-color-line); }
 .dv-admin .block__action-container button svg { color:var(--dv-text-secondary); }
 .dv-admin .block__action-container button:hover svg { color:var(--dv-text-primary); }
-.dv-admin input.vue-treeselect__input { border:0; background:transparent; }

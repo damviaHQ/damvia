@@ -13,6 +13,10 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ref } from "vue"
 import { extractErrors, trpc } from "../../services/server.ts"
 
@@ -34,23 +38,24 @@ async function onSubmit(event: Event) {
 
 <template>
   <template v-if="submitted">
-    <div class="heading-2 mb-075">Please check your inbox.</div>
+    <div class="text-xl font-semibold">Please check your inbox.</div>
     <div>You will receive an email to change your password.</div>
   </template>
-  <form v-else @submit="onSubmit">
-    <div v-if="formRootError" class="alert alert-danger mb-075">
+  <form v-else @submit="onSubmit" class="space-y-5">
+    <div v-if="formRootError" role="alert" class="text-sm text-destructive">
       {{ formRootError }}
     </div>
-    <div class="form-field">
-      <input type="email" autocomplete="email" v-model="form.email" placeholder="Email" class="form-input">
-    </div>
-    <div class="flex items-center">
-      <button type="submit" class="btn btn-primary">
+    <FieldGroup>
+      <Label for="reset-email">Email</Label>
+      <Input id="reset-email" type="email" autocomplete="email" v-model="form.email" placeholder="name@domain.com" />
+    </FieldGroup>
+    <div class="flex items-center gap-3">
+      <Button type="submit">
         Reset password
-      </button>
-      <router-link :to="{ name: 'login' }" class="btn btn-outline">
+      </Button>
+      <Button as-child variant="outline"><router-link :to="{ name: 'login' }">
         Log in
-      </router-link>
+      </router-link></Button>
     </div>
   </form>
 </template>

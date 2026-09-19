@@ -7,7 +7,7 @@ import {
   type SelectItemProps,
   SelectItemText,
   useForwardProps,
-} from 'radix-vue'
+} from 'reka-ui'
 import { type HTMLAttributes, computed } from 'vue'
 
 const props = defineProps<SelectItemProps & { class?: HTMLAttributes['class'] }>()
@@ -22,8 +22,8 @@ const forwardedProps = useForwardProps(delegatedProps)
 </script>
 
 <template>
-  <SelectItem v-bind="forwardedProps" class="select-item" :class="cn(
-    'relative flex w-full cursor-default select-none items-center py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+  <SelectItem v-bind="forwardedProps" class="select-item [&[data-highlighted]]:bg-neutral-100 [&[data-highlighted]]:text-neutral-900 [&[data-highlighted]]:cursor-pointer [&[data-state=checked]]:bg-none" :class="cn(
+    'relative flex w-full cursor-pointer select-none items-center py-1.5 pl-8 pr-2 text-[13px] outline-hidden focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:text-muted-foreground data-[disabled]:opacity-100',
     props.class
   )
     ">
@@ -38,15 +38,3 @@ const forwardedProps = useForwardProps(delegatedProps)
     </SelectItemText>
   </SelectItem>
 </template>
-
-<style lang="scss">
-.select-item {
-  &[data-highlighted] {
-    @apply bg-neutral-100 text-neutral-900 cursor-pointer;
-  }
-
-  &[data-state="checked"] {
-    @apply bg-none;
-  }
-}
-</style>

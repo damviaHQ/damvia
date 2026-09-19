@@ -660,8 +660,7 @@ onUnmounted(() => {
   </AlertDialog>
 </template>
 
-<style scoped lang="scss">
-.data-grid {
+<style scoped>.data-grid {
   width: 100%;
   height: 100%;
   overflow: auto;
@@ -674,149 +673,126 @@ onUnmounted(() => {
   border-spacing: 0;
   font-size: 14px;
   table-layout: fixed;
-  
-  thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background-color: var(--dv-surface-canvas);
-    
-    tr:first-child th {
-      height: 36px;
-      border-bottom: 1px solid var(--dv-color-line);
-      background: var(--dv-surface-canvas);
-      padding: 0 8px;
-      font-weight: 500;
-      color: var(--dv-text-secondary);
-      text-align: left;
-      
-      &.sortable {
-        cursor: pointer;
-        
-        &:hover {
-          background-color: var(--dv-surface-canvas);
-        }
-      }
-      
-      .sort-icon {
-        color: var(--dv-text-secondary);
-        opacity: 0.5;
-        
-        &:hover {
-          opacity: 1;
-        }
-      }
-    }
-    
-    tr:nth-child(2) th {
-      padding: 4px 8px;
-      background-color: var(--dv-surface-canvas);
-      border-bottom: 1px solid var(--dv-color-line);
-      
-      .filter-input {
-        width: 100%;
-        border: 1px solid var(--dv-color-line);
-        border-radius: 0;
-        padding: 4px 8px;
-        font-size: 12px;
-        
-        &:focus {
-          outline: none;
-          border-color: var(--dv-action-primary);
-          box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
-        }
-      }
-    }
-  }
-  
-  tbody {
-    tr {
-      height: 32px;
-      background-color: white;
-      transition: background-color 0.1s ease;
-      
-      &:hover {
-        background-color: var(--dv-surface-canvas);
-      }
-      
-      &.row-active {
-        background-color: var(--dv-surface-canvas);
-      }
-    }
-    
-    td {
-      border-bottom: 1px solid var(--dv-color-line);
-      position: relative;
-      padding: 0;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      height: 32px;
-      
-      &.cell-editable {
-        cursor: pointer;
-        
-        &:hover {
-          background-color: rgba(37, 99, 235, 0.05);
-        }
-      }
-      
-      &.cell-active {
-        border: 2px solid var(--dv-action-primary);
-        padding: 0;
-        z-index: 1;
-      }
-      
-      &.cell-image {
-        width: 60px;
-        text-align: center;
-        
-        .product-thumbnail {
-          max-width: 32px;
-          max-height: 32px;
-          width: auto;
-          height: auto;
-          object-fit: contain;
-          cursor: pointer;
-        }
-      }
-      
-      .cell-content {
-        padding: 0 8px;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      
-      .cell-editor {
-        height: 100%;
-        width: 100%;
-        z-index: 2;
-        display: flex;
-        align-items: stretch;
-        padding: 0;
-        margin: 0;
-        
-        .cell-input {
-          width: 100%;
-          height: 100%;
-          border: none;
-          padding: 0 8px;
-          background-color: white;
-          outline: none;
-          font-size: 14px;
-          margin: 0;
-          box-sizing: border-box;
-          min-height: 32px;
-          line-height: 32px;
-          display: block;
-        }
-      }
-    }
-  }
+}
+.spreadsheet-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--dv-surface-canvas);
+}
+.spreadsheet-table thead tr:first-child th {
+  height: 36px;
+  border-bottom: 1px solid var(--dv-color-line);
+  background: var(--dv-surface-canvas);
+  padding: 0 8px;
+  font-weight: 500;
+  color: var(--dv-text-secondary);
+  text-align: left;
+}
+.spreadsheet-table thead tr:first-child th.sortable {
+  cursor: pointer;
+}
+.spreadsheet-table thead tr:first-child th.sortable:hover {
+  background-color: var(--dv-surface-canvas);
+}
+.spreadsheet-table thead tr:first-child th .sort-icon {
+  color: var(--dv-text-secondary);
+  opacity: 0.5;
+}
+.spreadsheet-table thead tr:first-child th .sort-icon:hover {
+  opacity: 1;
+}
+.spreadsheet-table thead tr:nth-child(2) th {
+  padding: 4px 8px;
+  background-color: var(--dv-surface-canvas);
+  border-bottom: 1px solid var(--dv-color-line);
+}
+.spreadsheet-table thead tr:nth-child(2) th .filter-input {
+  width: 100%;
+  border: 1px solid var(--dv-color-line);
+  border-radius: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.spreadsheet-table thead tr:nth-child(2) th .filter-input:focus {
+  outline: none;
+  border-color: var(--dv-action-primary);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+.spreadsheet-table tbody tr {
+  height: 32px;
+  background-color: white;
+  transition: background-color 0.1s ease;
+}
+.spreadsheet-table tbody tr:hover {
+  background-color: var(--dv-surface-canvas);
+}
+.spreadsheet-table tbody tr.row-active {
+  background-color: var(--dv-surface-canvas);
+}
+.spreadsheet-table tbody td {
+  border-bottom: 1px solid var(--dv-color-line);
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  height: 32px;
+}
+.spreadsheet-table tbody td.cell-editable {
+  cursor: pointer;
+}
+.spreadsheet-table tbody td.cell-editable:hover {
+  background-color: rgba(37, 99, 235, 0.05);
+}
+.spreadsheet-table tbody td.cell-active {
+  border: 2px solid var(--dv-action-primary);
+  padding: 0;
+  z-index: 1;
+}
+.spreadsheet-table tbody td.cell-image {
+  width: 60px;
+  text-align: center;
+}
+.spreadsheet-table tbody td.cell-image .product-thumbnail {
+  max-width: 32px;
+  max-height: 32px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  cursor: pointer;
+}
+.spreadsheet-table tbody td .cell-content {
+  padding: 0 8px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.spreadsheet-table tbody td .cell-editor {
+  height: 100%;
+  width: 100%;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  margin: 0;
+}
+.spreadsheet-table tbody td .cell-editor .cell-input {
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: 0 8px;
+  background-color: white;
+  outline: none;
+  font-size: 14px;
+  margin: 0;
+  box-sizing: border-box;
+  min-height: 32px;
+  line-height: 32px;
+  display: block;
 }
 
 .enlarged-image {
@@ -828,14 +804,13 @@ onUnmounted(() => {
   border-radius: var(--dv-radius-graphic);
   transition: all 0.3s ease;
   transform: translate(25%, 0);
-
-  img {
-    max-width: 300px;
-    max-height: 300px;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-  }
+}
+.enlarged-image img {
+  max-width: 300px;
+  max-height: 300px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .floating-cell-editor {
@@ -846,38 +821,32 @@ onUnmounted(() => {
   border: 2px solid var(--dv-action-primary);
   border-radius: 0;
   overflow: visible;
-  
-  .floating-cell-input {
-    width: 100%;
-    resize: none;
-    border: none;
-    padding: 4px 8px;
-    outline: none;
-    font-size: 14px;
-    line-height: 1.5;
-    font-family: inherit;
-    margin: 0;
-    box-sizing: border-box;
-    overflow-y: auto;
-    display: block;
-    transition: height 0.1s ease;
-    
-    &:focus {
-      outline: none;
-    }
-    
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-    
-    &::-webkit-scrollbar-track {
-      background: #f5f5f5;
-    }
-    
-    &::-webkit-scrollbar-thumb {
-      background: #ccc;
-      border-radius: 0;
-    }
-  }
 }
-</style>
+.floating-cell-editor .floating-cell-input {
+  width: 100%;
+  resize: none;
+  border: none;
+  padding: 4px 8px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  margin: 0;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: block;
+  transition: height 0.1s ease;
+}
+.floating-cell-editor .floating-cell-input:focus {
+  outline: none;
+}
+.floating-cell-editor .floating-cell-input::-webkit-scrollbar {
+  width: 6px;
+}
+.floating-cell-editor .floating-cell-input::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+.floating-cell-editor .floating-cell-input::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 0;
+}</style>

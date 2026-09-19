@@ -172,39 +172,36 @@ function openMemberDialog() {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="collection__container p-4">
-    <div class="collection__header flex items-center justify-between mb-4">
-      <div class="flex items-center">
+  <div v-else-if="status === 'success'" class="collection__container">
+    <div class="collection__header mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex min-w-0 flex-1 items-center">
         <div v-if="isEditing">
           <div class="text-neutral-600 font-medium">
             Editing {{ collection.name }} collection
           </div>
         </div>
-        <div v-if="!isEditing && !collection.children?.length && !collection.files?.length"
-          class="font-medium text-neutral-800 text-sm">
-          {{ collection.name }}
-        </div>
-        <div v-if="selection.length > 0" class="collection__selection-container" @mouseenter="isHovered = true"
-          @mouseleave="isHovered = false">
-          <CollectionCheckbox @click="toggleSelection" class="mr-2"
+
+        <div v-if="selection.length > 0" class="collection__selection-container flex items-center text-neutral-500" @mouseenter="isHovered = true"
+          @mouseleave="isHovered = false" @focusin="isHovered = true" @focusout="isHovered = false">
+          <CollectionCheckbox label="Select all items in this collection" @click="toggleSelection" class="mr-2"
             :state="selection.length === maxSelectableItems ? 'check' : 'undetermined'" />
           <button class="text-sm text-neutral-500 bg-transparent border-none cursor-pointer p-0 w-max"
             @click="toggleSelection">
             <span v-if="!isHovered">{{ selection.length }} item{{ selection.length > 1 ? "s" : "" }} selected
-              in
+
             </span>
             <span v-else>
               {{
                 selection.length === maxSelectableItems
-                  ? "Remove Selection in "
-                  : "Select All in"
+                  ? "Clear selection"
+                  : "Select all"
               }}
             </span>
           </button>
-          <ChevronRight class="h-4 w-4 text-neutral-500 mx-2" />
+          <ChevronRight aria-hidden="true" class="mx-2 size-4 shrink-0 text-neutral-500" />
         </div>
         <!-- Select ALL when empty -->
         <button v-if="
@@ -212,36 +209,36 @@ function openMemberDialog() {
           !isEditing &&
           (collection.children?.length || collection.files?.length)
         " @click="toggleSelection"
-          class="flex items-center text-sm gap-1.5 text-neutral-500 bg-transparent border-none cursor-pointer p-0 w-max"
-          @mouseenter="isHovered = true" @mouseleave="isHovered = false">
-          <CollectionCheckbox :state="false" />
-          <span>Select All in</span>
+          class="flex shrink-0 items-center text-sm gap-1.5 text-neutral-500 bg-transparent border-none cursor-pointer p-0 w-max"
+          @mouseenter="isHovered = true" @mouseleave="isHovered = false" @focus="isHovered = true" @blur="isHovered = false">
+          <span aria-hidden="true" class="size-[18px] border border-neutral-400 bg-white" />
+          <span>Select all in</span>
         </button>
-        <ChevronRight v-if="
+        <ChevronRight aria-hidden="true" v-if="
           !selection.length &&
           !isEditing &&
           (collection.children?.length || collection.files?.length)
-        " class="h-4 w-4 text-neutral-500 mx-2" />
-        <div v-if="!isEditing && (collection.children?.length || collection.files?.length)" class="collection__path">
+        " class="mx-2 size-4 shrink-0 text-neutral-500" />
+        <div v-if="!isEditing" class="collection__path flex min-w-0 items-center">
           <PathBreadcrumb :items="breadcrumbItems" />
         </div>
       </div>
-      <div class="collection__header-actions flex items-center gap-0.5">
-        <Button v-if="canRemoveFiles" @click="removeSelectedFiles" type="button" variant="ghost" size="icon">
+      <div class="collection__header-actions flex items-center gap-1">
+        <Button aria-label="Remove selected assets" v-if="canRemoveFiles" @click="removeSelectedFiles" type="button" variant="ghost" size="icon">
           <Trash2 class="text-neutral-500 hover:text-neutral-800" />
         </Button>
-        <Button v-if="collection.canEdit" @click="isEditCollectionModalOpen = true" type="button" variant="ghost"
+        <Button aria-label="Collection settings" v-if="collection.canEdit" @click="isEditCollectionModalOpen = true" type="button" variant="ghost"
           size="icon">
           <Settings class="text-neutral-500 hover:text-neutral-800" />
         </Button>
-        <Button v-if="collection.canEdit && collection.page && !isEditing" @click="isEditing = !isEditing" type="button"
+        <Button aria-label="Edit page" v-if="collection.canEdit && collection.page && !isEditing" @click="isEditing = !isEditing" type="button"
           variant="ghost" size="icon">
           <FilePenLine class="text-neutral-500 hover:text-neutral-800" />
         </Button>
-        <Button v-if="!isEditing" @click="openMemberDialog" type="button" variant="ghost" size="icon">
+        <Button aria-label="Display preferences" v-if="!isEditing" @click="openMemberDialog" type="button" variant="ghost" size="icon">
           <LayoutDashboard class="text-neutral-500 hover:text-neutral-800" />
         </Button>
-        <Button v-if="collection.canEdit && !isEditing" @click="isShareModalOpen = true" type="button" variant="ghost"
+        <Button aria-label="Share collection" v-if="collection.canEdit && !isEditing" @click="isShareModalOpen = true" type="button" variant="ghost"
           size="icon">
           <Link class="text-neutral-500 hover:text-neutral-800" />
         </Button>
@@ -263,32 +260,3 @@ function openMemberDialog() {
     <LayoutDialogMember v-model:open="isMemberDialogOpen" :initial-tab="'display-preferences'" />
   </div>
 </template>
-
-<style scoped>
-.collection__path {
-  display: flex;
-  align-items: center;
-}
-
-.collection__selection-container {
-  @apply flex items-center text-neutral-500;
-}
-
-.collection__selection {
-  cursor: pointer;
-  display: none;
-  background: transparent;
-  border: none;
-}
-
-.collection__selection {
-  padding-inline: 0;
-  padding-right: 0.5rem;
-}
-
-.collection__selection--active,
-.collection__selection--active svg {
-  display: flex;
-}
-
-</style>

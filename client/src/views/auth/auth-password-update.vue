@@ -13,6 +13,10 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { ref } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useGlobalToast } from "@/composables/useGlobalToast"
@@ -47,18 +51,19 @@ async function onSubmit(event: Event) {
 </script>
 
 <template>
-  <form @submit="onSubmit">
-    <div v-if="formRootError" class="alert alert-danger mb-075">
+  <form @submit="onSubmit" class="space-y-5">
+    <div v-if="formRootError" role="alert" class="text-sm text-destructive">
       {{ formRootError }}
     </div>
-    <div class="form-field">
-      <input type="password" autocomplete="new-password" v-model="form.password" placeholder="New password"
-        class="form-input">
-    </div>
-    <div class="flex items-center">
-      <button type="submit" class="btn btn-primary">
+    <FieldGroup>
+      <Label for="new-password">New password</Label>
+      <Input id="new-password" type="password" autocomplete="new-password" v-model="form.password" placeholder="New password"
+        />
+    </FieldGroup>
+    <div class="flex items-center gap-3">
+      <Button type="submit">
         Change password
-      </button>
+      </Button>
     </div>
   </form>
 </template>

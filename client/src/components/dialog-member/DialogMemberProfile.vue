@@ -17,9 +17,8 @@ import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form"
+import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
@@ -52,9 +51,9 @@ const { handleSubmit, values, setFieldValue } = useForm({
 
 watchEffect(() => {
   if (data.value) {
-    setFieldValue('name', data.value.name)
-    setFieldValue('company', data.value.company)
-    setFieldValue('email', data.value.email)
+    setFieldValue('name', data.value.name, false)
+    setFieldValue('company', data.value.company ?? '', false)
+    setFieldValue('email', data.value.email, false)
   }
 })
 
@@ -83,60 +82,50 @@ async function removeAccount() {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="links__container h-full flex flex-col gap-4">
-    <p class="text-sm text-neutral-500">
-      This is the list of all invitations you have created. If a guest cannot access a collection, check if the link has
-      expired. You can navigate to
-      the collection and create a new invitation.
-    </p>
-    <div class="flex flex-col justify-between h-full">
-      <form @submit.prevent="updateProfile" class="flex flex-col items-start gap-4">
+  <div v-else-if="status === 'success'" class="links__container grid gap-6">
+    <div class="grid gap-6">
+      <form @submit.prevent="updateProfile" class="grid w-full max-w-lg gap-5">
         <FormField v-slot="{ componentField }" name="name">
           <FormItem>
-            <FormLabel>
-              <Label for="name">Name</Label>
-            </FormLabel>
+            <FormLabel>Name</FormLabel>
             <FormControl>
-              <Input id="name" v-bind="componentField" />
+              <Input v-bind="componentField" />
             </FormControl>
+            <FormMessage />
           </FormItem>
         </FormField>
         <FormField v-slot="{ componentField }" name="company">
           <FormItem>
-            <FormLabel>
-              <Label for="company">Company</Label>
-            </FormLabel>
+            <FormLabel>Company</FormLabel>
             <FormControl>
-              <Input id="company" v-bind="componentField" />
+              <Input v-bind="componentField" />
             </FormControl>
+            <FormMessage />
           </FormItem>
         </FormField>
         <FormField v-slot="{ componentField }" name="email">
           <FormItem>
-            <FormLabel>
-              <Label for="email">Email</Label>
-            </FormLabel>
+            <FormLabel>Email</FormLabel>
             <FormControl>
-              <Input id="email" v-bind="componentField" :disabled="globalStore?.user?.role !== 'admin'" />
-              <p v-if="globalStore?.user?.role !== 'admin'" class="text-sm text-neutral-500">
-                Please contact an administrator to change your email.
-              </p>
+              <Input v-bind="componentField" :disabled="globalStore?.user?.role !== 'admin'" />
             </FormControl>
+            <FormMessage />
+            <FormDescription v-if="globalStore?.user?.role !== 'admin'">Contact an administrator to change your email.</FormDescription>
           </FormItem>
         </FormField>
-        <Button type="submit" class="mt-6">Update</Button>
+        <Button type="submit" class="justify-self-start">Save changes</Button>
       </form>
-      <div class="profile__alert-container flex flex-col w-[50%] mt-[5rem] gap-4">
-        <Alert variant="destructive" class="flex items-center gap-8">
+      <div class="profile__alert-container w-full max-w-lg pt-2">
+        <Alert variant="destructive" class="border-0 bg-transparent p-0 flex items-start gap-3">
           <div class="flex self-start gap-2">
             <AlertTriangle class="w-6 h-6" />
           </div>
           <div class="flex flex-col gap-2">
             <AlertTitle>
-              Delete your Account
+              Delete account
             </AlertTitle>
             <AlertDescription>
               This action cannot be undone. This will permanently delete your account and remove all your data including
@@ -145,11 +134,11 @@ async function removeAccount() {
             </AlertDescription>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" class="mt-6">Delete Account</Button>
+                <Button variant="destructive" class="mt-2 self-start">Delete account</Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogTitle>Delete your account?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This action cannot be undone. This will permanently delete your account and remove all your data
                     including downloads, shared
@@ -160,7 +149,7 @@ async function removeAccount() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction @click="removeAccount" class="bg-red-600 hover:bg-red-700">Yes, remove my account
+                  <AlertDialogAction @click="removeAccount" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">Yes, remove my account
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

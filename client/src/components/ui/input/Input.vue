@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { controlClasses } from '@/components/ui/field/styles'
 import type { HTMLAttributes } from "vue";
 import { useVModel } from "@vueuse/core";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,7 @@ const modelValue = useVModel(props, "modelValue", emits, {
     v-model="modelValue"
     :class="
       cn(
-        'flex h-10 w-full border border-input border-neutral-400 bg-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-50',
+        controlClasses,
         props.class
       )
     "

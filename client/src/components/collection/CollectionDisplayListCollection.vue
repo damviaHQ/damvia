@@ -129,13 +129,13 @@ const table = useVueTable({
 
 <template>
   <div>
-    <table class="collection-list-collections_table">
+    <table class="border-spacing-0 [&_th]:text-left [&_th]:text-[11px] [&_th]:font-medium [&_th]:text-neutral-500 [&_th]:whitespace-nowrap [&_td]:text-left [&_td]:text-[13px] [&_td]:whitespace-nowrap [&_tbody_tr]:border-b [&_tbody_tr]:border-neutral-100 [&_tbody_tr:hover]:bg-neutral-50 [&_tr:hover_.visible-on-hover]:opacity-100 collection-list-collections_table w-full text-neutral-600 [&_th:not(:last-child)]:pr-5 [&_td:not(:last-child)]:pr-5 [&_th:first-child]:pr-4 [&_th:first-child]:min-w-[200px] [&_td:first-child]:pr-4 [&_td:first-child]:min-w-[200px] [&_th:last-child]:pl-4 [&_th:last-child]:pr-2 [&_td:last-child]:pl-4 [&_td:last-child]:pr-2 [&_thead]:bg-neutral-50 [&_thead]:text-neutral-500 [&_thead]:border-b [&_thead]:border-neutral-200 [&_tbody_tr.hovered]:hover:bg-neutral-100 [&_tbody_tr.hovered_.collection-list-collections\_\_actions-container]:opacity-100 [&_tbody_tr:focus-within_.collection-list-collections\_\_actions-container]:opacity-100 [@media(hover:none)]:[&_.collection-list-collections\_\_actions-container]:opacity-100">
       <thead>
         <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
           <th v-for="header in headerGroup.headers" :key="header.id" :colSpan="header.colSpan"
             class="text-neutral-500 text-sm font-normal whitespace-nowrap">
             <div v-if="header.column.id === 'name'" class="flex items-center gap-4">
-              <CollectionCheckbox v-if="collections.length > 0" @click="toggleGlobalSelection()" :state="selection.length === collections.length
+              <CollectionCheckbox v-if="collections.length > 0" label="Select all" @click="toggleGlobalSelection()" :state="selection.length === collections.length
                 ? 'check'
                 : selection.length > 0
                   ? 'undetermined'
@@ -155,8 +155,8 @@ const table = useVueTable({
           :class="{ hovered: hoveredRowId === row.id || openDropdownId === row.id }"
           class="collection-list__row relative">
           <td v-for="cell in row.getVisibleCells()" :key="cell.id" class="text-neutral-500 text-sm font-medium">
-            <div v-if="cell.column.id === 'name'" class="collection-list-collections__name-container">
-              <CollectionCheckbox v-if="cell.row.original.numberOfFiles > 0" @click="handleSelection(cell.row.original)"
+            <div v-if="cell.column.id === 'name'" class="collection-list-collections__name-container flex items-center gap-4">
+              <CollectionCheckbox v-if="cell.row.original.numberOfFiles > 0" :label="`Select ${cell.row.original.name}`" @click="handleSelection(cell.row.original)"
                 :class="[
                   'collection-list-collections__collection-selection',
                   isCollectionSelected(cell.row.original) &&
@@ -175,7 +175,7 @@ const table = useVueTable({
                 </div>
               </router-link>
             </div>
-            <div v-if="cell.column.id === 'actions'" class="collection-list-collections__actions-container">
+            <div v-if="cell.column.id === 'actions'" class="collection-list-collections__actions-container pr-2 flex items-center justify-end absolute top-0 right-0 bottom-0 [background-color:inherit] opacity-0 [transition:opacity_0.2s_ease-in-out]">
               <CollectionDropdownActions :collection="cell.row.original"
                 @update:open="(isOpen) => (openDropdownId = isOpen ? row.id : null)" />
             </div>
@@ -191,70 +191,3 @@ const table = useVueTable({
     </table>
   </div>
 </template>
-
-<style scoped lang="scss">
-table {
-  border-spacing: 0;
-}
-
-table tr td,
-table tr th {
-  @apply text-neutral-500 text-sm whitespace-nowrap py-2 text-left;
-}
-
-.collection-list-collections_table {
-  @apply w-full text-neutral-600;
-
-  th:not(:last-child),
-  td:not(:last-child) {
-    @apply pr-5;
-  }
-
-  // Name column
-  th:first-child,
-  td:first-child {
-    @apply pr-4 min-w-[200px];
-  }
-
-  // Actions column
-  th:last-child,
-  td:last-child {
-    @apply pl-4 pr-2;
-  }
-
-  thead {
-    @apply bg-neutral-100 text-neutral-500 border-b border-neutral-200;
-  }
-
-  tbody tr.hovered {
-    @apply hover:bg-neutral-100;
-  }
-}
-
-.collection-list-collections__name-container {
-  @apply flex items-center gap-4;
-}
-
-.collection-list-collections__thumbnail-placeholder {
-  @apply h-[120px] fill-neutral-600 w-auto mx-auto my-auto object-cover;
-}
-
-.collection-list-collections__actions-container {
-  @apply pr-2;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  padding-right: 8px;
-  background-color: inherit;
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-}
-
-.collection-list-collections_table tbody tr.hovered .collection-list-collections__actions-container {
-  opacity: 1;
-}
-</style>

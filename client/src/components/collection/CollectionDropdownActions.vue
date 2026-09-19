@@ -31,8 +31,8 @@ const editModalOpen = ref(false)
 
 <template>
   <DropdownMenu v-if="collection.canEdit" @update:open="$emit('update:open', $event)">
-    <DropdownMenuTrigger class="text-neutral-600 cursor-pointer bg-transparent border-none">
-      <CircleEllipsis class="w-6 h-6 text-neutral-600 hover:text-neutral-800 fill-neutral-50" />
+    <DropdownMenuTrigger class="text-neutral-600 cursor-pointer bg-transparent border-none" :aria-label="`Actions for ${collection.name}`">
+      <CircleEllipsis aria-hidden="true" class="w-6 h-6 text-neutral-600 hover:text-neutral-800 fill-neutral-50" />
     </DropdownMenuTrigger>
     <DropdownMenuContent :collision-padding="24" class="w-auto">
       <DropdownMenuItem @click="editModalOpen = true">

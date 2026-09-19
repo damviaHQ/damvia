@@ -23,8 +23,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { collapseBreadcrumb, type BreadcrumbEllipsisNode, type BreadcrumbNode } from '@/utils/breadcrumb'
 import { computed, nextTick, onBeforeUnmount, ref, type ComponentPublicInstance } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import '../../../../packages/design-system/src/tokens.css'
-import '../../../../packages/design-system/src/components.css'
 
 export type PathBreadcrumbItem = BreadcrumbNode & {
   to?: RouteLocationRaw
@@ -94,10 +92,10 @@ onBeforeUnmount(() => labelResizeObserver?.disconnect())
 </script>
 
 <template>
-  <Breadcrumb class="dv-breadcrumb" :data-tone="tone">
-    <BreadcrumbList class="dv-breadcrumb__list">
+  <Breadcrumb class="dv-breadcrumb min-w-0" :data-tone="tone">
+    <BreadcrumbList class="dv-breadcrumb__list m-0 flex-nowrap gap-2 p-0 text-sm leading-5 sm:gap-2">
       <template v-for="(item, index) in collapsed.visibleItems" :key="item.id">
-        <BreadcrumbItem class="dv-breadcrumb__item">
+        <BreadcrumbItem class="dv-breadcrumb__item min-w-0 gap-0">
           <template v-if="isEllipsis(item)">
             <DropdownMenu>
               <DropdownMenuTrigger class="dv-breadcrumb__ellipsis" :aria-label="`Show ${collapsed.hiddenItems.length} hidden path items`">
@@ -128,7 +126,7 @@ onBeforeUnmount(() => labelResizeObserver?.disconnect())
                     :data-breadcrumb-label-id="item.id"
                   >{{ item.label }}</span>
                 </router-link>
-                <BreadcrumbPage v-else class="dv-breadcrumb__current" :tabindex="isLabelTruncated(item.id) ? 0 : undefined">
+                <BreadcrumbPage v-else class="dv-breadcrumb__current font-semibold" :tabindex="isLabelTruncated(item.id) ? 0 : undefined">
                   <span
                     :ref="element => setLabelElement(item.id, element)"
                     class="dv-breadcrumb__label"
@@ -140,7 +138,7 @@ onBeforeUnmount(() => labelResizeObserver?.disconnect())
             </Tooltip>
           </TooltipProvider>
         </BreadcrumbItem>
-        <BreadcrumbSeparator v-if="index < collapsed.visibleItems.length - 1" class="dv-breadcrumb__separator" />
+        <BreadcrumbSeparator v-if="index < collapsed.visibleItems.length - 1" class="dv-breadcrumb__separator shrink-0 [&_svg]:size-4" />
       </template>
     </BreadcrumbList>
   </Breadcrumb>

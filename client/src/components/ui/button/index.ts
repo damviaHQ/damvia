@@ -3,32 +3,26 @@ import { type VariantProps, cva } from 'class-variance-authority'
 export { default as Button } from './Button.vue'
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-none text-[13px] font-medium leading-5 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-100 disabled:bg-muted disabled:text-muted-foreground aria-disabled:cursor-not-allowed',
   {
     variants: {
       variant: {
-        default: 'bg-neutral-800 text-primary-foreground hover:bg-neutral-900',
-        destructive:
-          'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-        outline:
-          'ring-2 ring-inset ring-neutral-600 text-neutral-600 hover:ring-neutral-800 hover:text-neutral-800',
-        secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-muted hover:text-accent-foreground',
-        link: 'text-primary underline-offset-4 hover:underline',
+        default: 'border border-transparent bg-primary text-primary-foreground hover:bg-[var(--dv-action-hover)]',
+        destructive: 'border border-transparent bg-destructive text-destructive-foreground hover:brightness-90',
+        outline: 'border border-border bg-white text-foreground hover:bg-muted',
+        secondary: 'border border-transparent bg-secondary text-secondary-foreground hover:bg-accent',
+        ghost: 'border border-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+        link: 'text-foreground underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-2 px-5 py-[1.3rem]',
-        xs: 'h-7 rounded px-2',
-        sm: 'h-9 rounded-md px-3',
-        lg: 'h-11 rounded-md px-8',
-        icon: 'h-10 w-10',
+        default: 'min-h-9 px-3.5 py-2',
+        xs: 'min-h-7 px-2 py-1 text-xs',
+        sm: 'min-h-8 px-2.5 py-1.5',
+        lg: 'min-h-11 px-5 py-2.5',
+        icon: 'size-10 p-2 [&_svg]:size-6',
       },
     },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
+    defaultVariants: { variant: 'default', size: 'default' },
   },
 )
 

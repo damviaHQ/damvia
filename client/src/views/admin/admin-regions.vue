@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { DialogClose } from "@/components/ui/dialog"
 import AdminList from "@/components/admin/AdminList.vue"
 import Loader from "@/components/Loader.vue"
@@ -247,11 +248,11 @@ async function onModalSubmit(event: Event) {
           </DialogDescription>
         </DialogHeader>
         <div class="flex flex-col gap-4 py-4">
-          <div class="flex flex-col gap-2">
+          <FieldGroup >
             <Label for="name">Name *</Label>
             <Input id="name" v-model="form.name" placeholder="Region name" />
-          </div>
-          <div class="flex flex-col gap-2">
+          </FieldGroup>
+          <FieldGroup >
             <Label for="defaultGroup">Default Group *</Label>
             <Select v-model="form.defaultGroupId">
               <SelectTrigger>
@@ -263,7 +264,7 @@ async function onModalSubmit(event: Event) {
                 </SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </FieldGroup>
         </div>
         <DialogFooter class="items-center">
           <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>

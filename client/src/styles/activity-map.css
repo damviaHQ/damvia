@@ -115,6 +115,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .map-country.selected {
   fill: var(--dv-action-primary);
   fill-opacity: 0.24;
+  stroke: var(--dv-action-primary);
+  stroke-width: 2;
 }
 .map-marker {
   cursor: pointer;
@@ -145,6 +147,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .map-marker:focus-visible .map-marker-core {
   stroke: var(--dv-surface-nav);
   stroke-width: 3px;
+}
+.map-marker.selected .map-marker-core {
+  stroke: var(--dv-surface-nav);
+  stroke-width: 3px;
+  stroke-dasharray: 4 2;
 }
 .map-cluster-dot {
   fill: var(--dv-surface-panel);

@@ -42,8 +42,9 @@ import {
   X,
   CircleHelpIcon,
 } from "lucide-vue-next"
-import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from "vue"
-import {Dialog, DialogContent, DialogTrigger} from "@/components/ui/dialog";
+import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from "vue"
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger} from "@/components/ui/dialog";
+import { FocusScope } from "reka-ui"
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
 type Collection = RouterOutput["collection"]["findById"]
@@ -363,17 +364,21 @@ function truncateFileName(name: string, maxLength: number = 60) {
   return name.slice(0, maxLength - 3) + "..."
 }
 
-const modalRef = ref<HTMLElement | null>(null)
-
 function handleKeyDown(event: KeyboardEvent) {
-  if (modalRef.value && currentFile.value) {
-    if (event.key === "ArrowLeft") {
-      event.preventDefault()
-      changeFile(-1)
-    } else if (event.key === "ArrowRight") {
-      event.preventDefault()
-      changeFile(1)
-    }
+  if (event.defaultPrevented || !currentFile.value) return
+  const target = event.target as HTMLElement | null
+  if (target?.closest('[role="dialog"]:not(.gallery-modal)')) return
+  if (event.key === "Escape") {
+    emit("update:modelValue", null)
+    return
+  }
+  if (target?.closest('input, textarea, select, [role="radio"], [contenteditable="true"]')) return
+  if (event.key === "ArrowLeft") {
+    event.preventDefault()
+    changeFile(-1)
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault()
+    changeFile(1)
   }
 }
 
@@ -391,91 +396,92 @@ watch(currentFile, (file) => {
   trpc.analytics.trackView.mutate({ collectionFileId: file.id }).catch(() => {})
 })
 
-watch(() => props.modelValue, (newValue) => {
-  if (newValue && modalRef.value) {
-    nextTick(() => {
-      modalRef.value?.focus()
-    })
-  }
+function focusModal(event: Event) {
+  event.preventDefault()
+  const container = event.target as HTMLElement
+  container.focus()
+}
 
+watch(() => props.modelValue, (newValue) => {
   if (!newValue) {
     form.value.isAcceptingTerms = false
   }
 })
 
-
 </script>
 
 <template>
-  <div v-if="currentFile" ref="modalRef" tabindex="-1"
-    class="bg-neutral-800 fixed top-0 left-0 w-full h-full z-20 py-5 px-8 text-neutral-200 outline-none">
-    <div class="gallery-modal__header">
+  <FocusScope v-if="currentFile" as="div" trapped loop tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="gallery-modal-title"
+    class="gallery-modal bg-white fixed top-0 left-0 w-full h-full z-30 py-5 px-7 text-neutral-800 outline-hidden" @mount-auto-focus="focusModal">
+    <div class="gallery-modal__header max-md:flex-col max-md:items-start max-md:[&>div:last-child]:w-full flex items-center justify-between mb-4 flex-wrap gap-3">
       <div class="flex items-center">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger>
-              <div class="text-xl font-medium truncate max-w-[300px] md:max-w-[400px]">
-                {{ truncateFileName(currentFile.name) }}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{{ currentFile.name }}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <h2 id="gallery-modal-title">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <span class="block text-[17px] font-semibold truncate max-w-[300px] md:max-w-[400px]">
+                  {{ truncateFileName(currentFile.name) }}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{{ currentFile.name }}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </h2>
 
         <div class="flex items-center gap-6 ml-4">
           <template v-if="haveAccessToFavorites">
             <button v-if="isFavorite(currentFile)" @click="removeFromFavorite(currentFile)" type="button"
-              class="relative">
-              <Star class="w-5 h-5 text-neutral-200 fill-neutral-200" />
+              aria-label="Remove from favorites" class="relative">
+              <Star class="w-5 h-5 text-neutral-800 fill-neutral-600" />
               <StarOff
-                class="w-5 h-5 text-neutral-200 absolute inset-0 opacity-0 hover:opacity-100 transition-opacity fill-neutral-800 bg-neutral-800" />
+                class="w-5 h-5 text-neutral-800 absolute inset-0 opacity-0 hover:opacity-100 transition-opacity fill-white bg-white" />
             </button>
-            <button v-else @click="addToFavorite(currentFile)" type="button" class="block">
-              <Star class="w-5 h-5 text-neutral-200 hover:fill-neutral-200" />
+            <button v-else @click="addToFavorite(currentFile)" type="button" aria-label="Add to favorites" class="block">
+              <Star class="w-5 h-5 text-neutral-800 hover:fill-neutral-600" />
             </button>
           </template>
-          <button v-if="removable" @click="remove(currentFile)" type="button">
-            <Trash2 class="w-5 h-5 text-neutral-200 hover:text-neutral-400" />
+          <button v-if="removable" @click="remove(currentFile)" type="button" aria-label="Remove from collection">
+            <Trash2 class="w-5 h-5 text-neutral-800 hover:text-neutral-500" />
           </button>
         </div>
       </div>
 
       <div class="flex items-center gap-2">
-        <div v-if="hasCollectionPath" class="gallery-modal__breadcrumb">
-          <PathBreadcrumb :items="breadcrumbItems" :head-items="2" :tail-items="3" tone="dark"
+        <div v-if="hasCollectionPath" class="gallery-modal__breadcrumb [&_.dv-breadcrumb]:min-w-0 [&_.dv-breadcrumb]:max-w-full [font-size:0.875rem] [max-width:calc(100%_-_50px)] flex items-center">
+          <PathBreadcrumb :items="breadcrumbItems" :head-items="2" :tail-items="3" tone="light"
             @navigate="$emit('update:modelValue', null)" />
         </div>
 
-        <Button variant="ghost" size="icon" type="button"
-          class="text-neutral-200 hover:text-neutral-300 bg-transparent hover:bg-neutral-700 ml-2"
+        <Button aria-label="Close preview" variant="ghost" size="icon" type="button"
+          class="text-neutral-800 hover:text-neutral-600 bg-transparent hover:bg-neutral-100 ml-2"
           @click="$emit('update:modelValue', null)">
           <X strokeWidth="3" />
         </Button>
       </div>
     </div>
     <div class="flex">
-      <div class="gallery-modal__preview">
-        <div v-if="files.length > 1" class="gallery-modal__navigation">
-          <div class="gallery-modal__previous-file" @click="changeFile(-1)">
+      <div class="gallery-modal__preview relative w-full">
+        <div v-if="files.length > 1" class="gallery-modal__navigation absolute top-0 left-0 right-0 bottom-0 flex justify-between items-center pointer-events-none select-none [z-index:2] [&:hover_.gallery-modal\_\_key-info]:opacity-100 [&:focus-within_.gallery-modal\_\_key-info]:opacity-100">
+          <button type="button" aria-label="Previous file" aria-keyshortcuts="ArrowLeft" class="gallery-modal__previous-file pointer-events-auto cursor-pointer p-4 mr-auto" @click="changeFile(-1)">
             <ChevronLeft strokeWidth="3" class="w-10 h-10" />
-          </div>
-          <div class="gallery-modal__next-file" @click="changeFile(1)">
+          </button>
+          <button type="button" aria-label="Next file" aria-keyshortcuts="ArrowRight" class="gallery-modal__next-file pointer-events-auto cursor-pointer p-4 ml-auto" @click="changeFile(1)">
             <ChevronRight strokeWidth="3" class="w-10 h-10" />
-          </div>
-          <div class="gallery-modal__key-info">
+          </button>
+          <div aria-hidden="true" class="gallery-modal__key-info absolute bottom-4 right-4 flex items-center [background-color:rgba(0,_0,_0,_0.5)] [color:rgba(255,_255,_255,_0.7)] [padding:0.5rem_1rem] [border-radius:9999px] [font-size:0.75rem] opacity-0 [transition:opacity_0.3s_ease] select-none [&_svg]:mr-1">
             <SquareArrowLeft class="w-4 h-4" />
             <SquareArrowRight class="w-4 h-4" />
             <span class="ml-2">Use keyboard to navigate</span>
           </div>
         </div>
-        <div class="gallery-modal__preview-thumbnail-container">
+        <div class="gallery-modal__preview-thumbnail-container flex items-center justify-center [height:calc(100vh_-_90px)] w-full [margin:0_auto]">
           <video v-if="isVideoFile && currentFile.fileURL" :src="currentFile.fileURL" controls
-            class="gallery-modal__preview-thumbnail" />
-          <div v-else-if="isVideoFile && !currentFile.fileURL" class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">
+            class="gallery-modal__preview-thumbnail [max-width:90%] [max-height:90%] object-contain" />
+          <div v-else-if="isVideoFile && !currentFile.fileURL" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">
               {{
                 currentFile.name.toLowerCase().endsWith('.mp4') ? 'MP4 Video' :
                 currentFile.name.toLowerCase().endsWith('.mov') ? 'MOV Video' :
@@ -489,8 +495,8 @@ watch(() => props.modelValue, (newValue) => {
               }} Preview Not Available
             </div>
           </div>
-          <iframe v-else-if="isPdf" :src="`${currentFile.fileURL}#toolbar=0&navpanes=0&scrollbar=1`"
-            class="gallery-modal__preview-thumbnail gallery-modal__pdf-preview"
+          <iframe v-else-if="isPdf" :title="`Preview of ${currentFile.name}`" :src="`${currentFile.fileURL}#toolbar=0&navpanes=0&scrollbar=1`"
+            class="gallery-modal__preview-thumbnail [max-width:90%] [max-height:90%] object-contain gallery-modal__pdf-preview [width:90%] [height:90%] bg-neutral-100 border border-neutral-200 rounded-none"
             width="90%" height="90%" frameborder="0">
           </iframe>
           <img v-else-if="(currentFile.mimeType.startsWith('image/') ||
@@ -503,22 +509,22 @@ watch(() => props.modelValue, (newValue) => {
                           (isFontFile && hasThumbnail))"
                :src="currentFile.thumbnailURL"
                :alt="currentFile.name"
-               class="gallery-modal__preview-thumbnail" />
-          <div v-else-if="isPowerPoint && !hasThumbnail" class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">PowerPoint Preview Not Available</div>
+               class="gallery-modal__preview-thumbnail [max-width:90%] [max-height:90%] object-contain" />
+          <div v-else-if="isPowerPoint && !hasThumbnail" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">PowerPoint Preview Not Available</div>
           </div>
-          <div v-else-if="isWord && !hasThumbnail" class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">Word Document Preview Not Available</div>
+          <div v-else-if="isWord && !hasThumbnail" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">Word Document Preview Not Available</div>
           </div>
-          <div v-else-if="isExcel && !hasThumbnail" class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">Excel Spreadsheet Preview Not Available</div>
+          <div v-else-if="isExcel && !hasThumbnail" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">Excel Spreadsheet Preview Not Available</div>
           </div>
-          <div v-else-if="isTextFile && !hasThumbnail" class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">
+          <div v-else-if="isTextFile && !hasThumbnail" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">
               {{
                 currentFile.name.toLowerCase().endsWith('.html') || currentFile.name.toLowerCase().endsWith('.htm') ? 'HTML File' :
                 currentFile.name.toLowerCase().endsWith('.xml') ? 'XML File' :
@@ -532,9 +538,9 @@ watch(() => props.modelValue, (newValue) => {
               }} Preview Not Available
             </div>
           </div>
-          <div v-else-if="isFontFile && !hasThumbnail" class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">
+          <div v-else-if="isFontFile && !hasThumbnail" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">
               {{
                 currentFile.name.toLowerCase().endsWith('.ttf') ? 'TTF Font' :
                 currentFile.name.toLowerCase().endsWith('.otf') ? 'OTF Font' :
@@ -542,9 +548,9 @@ watch(() => props.modelValue, (newValue) => {
               }} Preview Not Available
             </div>
           </div>
-          <div v-else-if="isVectorFile && !hasThumbnail" class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">
+          <div v-else-if="isVectorFile && !hasThumbnail" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">
               {{
                 currentFile.name.toLowerCase().endsWith('.ai') ? 'Adobe Illustrator' :
                 currentFile.name.toLowerCase().endsWith('.eps') ? 'EPS Vector' :
@@ -552,19 +558,19 @@ watch(() => props.modelValue, (newValue) => {
               }} Preview Not Available
             </div>
           </div>
-          <div v-else-if="isPsd && !hasThumbnail" class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">Photoshop PSD Preview Not Available</div>
+          <div v-else-if="isPsd && !hasThumbnail" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">Photoshop PSD Preview Not Available</div>
           </div>
-          <div v-else class="gallery-modal__placeholder-container">
-            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder" />
-            <div class="gallery-modal__placeholder-filename">No preview available</div>
+          <div v-else class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
+            <component :is="thumbnailPlaceholder" class="gallery-modal__placeholder [&_svg]:size-full [&_path]:fill-current [width:120px] [height:120px] [color:#e0e0e0] opacity-80" />
+            <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">No preview available</div>
           </div>
         </div>
       </div>
-      <div class="gallery-modal__download-container">
+      <div class="gallery-modal__download-container flex flex-col [height:calc(100vh_-_90px)] w-full gap-8 [max-width:320px] border-l border-neutral-200 [padding:0.5rem_1rem] ml-4">
         <div v-if="currentFile.mimeType.startsWith('image/')">
-          <div class="font-medium mb-4 text-lg">Choose an Image format</div>
+          <div class="mb-3 text-[13px] font-semibold">Choose an Image format</div>
           <RadioGroup v-model="form.imageFormat">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
@@ -574,7 +580,7 @@ watch(() => props.modelValue, (newValue) => {
                 { name: 'WEBP', value: 'webp' },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`"
-                  class="border border-brand text-brand min-w-max" />
+                  class="border border-primary text-primary shrink-0" />
                 <Label :for="`image-format-${option.value}`">{{ option.name }}</Label>
               </div>
             </div>
@@ -583,7 +589,7 @@ watch(() => props.modelValue, (newValue) => {
         <div v-if="
           currentFile.mimeType.startsWith('image/') && form.imageFormat !== 'original'
         ">
-          <div class="font-medium mb-4 text-lg">Image quality</div>
+          <div class="mb-3 text-[13px] font-semibold">Image quality</div>
           <RadioGroup v-model="form.imageResolution">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
@@ -604,17 +610,17 @@ watch(() => props.modelValue, (newValue) => {
                 },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`image-quality-${option.value}`"
-                  class="border border-brand text-brand min-w-max" />
+                  class="border border-primary text-primary shrink-0" />
                 <div>
                   <Label :for="`image-quality-${option.value}`">{{ option.name }}</Label>
-                  <p class="text-sm text-neutral-400">{{ option.description }}</p>
+                  <p class="text-sm text-neutral-500">{{ option.description }}</p>
                 </div>
               </div>
             </div>
           </RadioGroup>
         </div>
         <div>
-          <div class="font-medium mb-4 text-lg">Download type</div>
+          <div class="mb-3 text-[13px] font-semibold">Download type</div>
           <RadioGroup v-model="form.downloadType">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
@@ -632,36 +638,37 @@ watch(() => props.modelValue, (newValue) => {
                 },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"
-                  class="border border-brand text-brand min-w-max" />
+                  class="border border-primary text-primary shrink-0" />
                 <div>
                   <Label :for="`download-type-${option.value}`">{{ option.name }}</Label>
-                  <p class="text-sm text-neutral-400">{{ option.description }}</p>
+                  <p class="text-sm text-neutral-500">{{ option.description }}</p>
                 </div>
               </div>
             </div>
           </RadioGroup>
         </div>
         <div v-if="hasLicense">
-          <div class="font-medium mb-4 text-lg">Usage Licensing Agreement</div>
+          <div class="mb-3 text-[13px] font-semibold">Usage Licensing Agreement</div>
           <div class="flex-col gap-1">
-            <div v-if="currentFile.license" class="flex items-center text-neutral-300">
-              <Copyright class="w-4 h-4 mr-4 text-neutral-50" />
+            <div v-if="currentFile.license" class="flex items-center text-neutral-600">
+              <Copyright class="w-4 h-4 mr-4 text-neutral-600" />
               <div>
                 <Dialog v-if="currentFile.license.details">
                   <DialogTrigger as-child>
-                    <button class="flex items-center text-sm mb-1 text-neutral-200">
+                    <button class="flex items-center text-sm mb-1 text-neutral-800">
                       {{ currentFile.license.name }}
                       <CircleHelpIcon class="ml-2 h-4 w-4" />
                     </button>
                   </DialogTrigger>
-                  <DialogContent>
-                    <div class="max-h-[80vh] overflow-auto" v-html="currentFile.license.details" />
+                  <DialogContent class="sm:max-w-[640px] gap-5">
+                      <DialogHeader><DialogTitle>{{ currentFile.license.name }}</DialogTitle><DialogDescription>Usage terms</DialogDescription></DialogHeader>
+                    <div class="text-sm leading-relaxed [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5" v-html="currentFile.license.details" />
                   </DialogContent>
                 </Dialog>
-                <div v-else class="flex items-center text-sm mb-1 text-neutral-200">
+                <div v-else class="flex items-center text-sm mb-1 text-neutral-800">
                   {{ currentFile.license.name }}
                 </div>
-                <div class="text-neutral-300 text-xs">
+                <div class="text-neutral-600 text-xs">
                   {{
                     currentFile.license.scopes
                       .map((scope: string) => scope.toUpperCase())
@@ -671,10 +678,10 @@ watch(() => props.modelValue, (newValue) => {
               </div>
             </div>
             <div class="flex items-center py-6 gap-4">
-              <Checkbox id="terms" v-model:checked="form.isAcceptingTerms"
+              <Checkbox id="terms" v-model="form.isAcceptingTerms"
                 class="border-brand [&>*]:bg-brand [&>*]:text-neutral-800"
                 :class="{ 'border-red-500': hasTermsError }" />
-              <Label for="terms" class="text-sm leading-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              <Label for="terms" class="leading-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 :class="{
                   'text-red-500': hasTermsError,
                   'text-brand': !hasTermsError && form.isAcceptingTerms,
@@ -687,349 +694,17 @@ watch(() => props.modelValue, (newValue) => {
         </div>
         <div>
           <Button @click="download"
-            class="w-full bg-brand text-neutral-800 ring-1 ring-inset ring-brand hover:bg-brand-hover hover:text-neutral-900 hover:ring-brand-hover"
+            class="w-full bg-primary text-primary-foreground hover:bg-[var(--dv-action-hover)]"
             :class="{
-              'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-brand hover:text-brand hover:bg-neutral-800': hasLicense && !form.isAcceptingTerms,
+              'ring ring-neutral-200 bg-white text-neutral-800 hover:ring-brand hover:text-brand hover:bg-white': hasLicense && !form.isAcceptingTerms,
             }" :disabled="isLoading">
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>
-          <div class="mt-2 text-sm text-neutral-300">
+          <div class="mt-2 text-sm text-neutral-600">
             Total Size: {{ formatFileSize(currentFile.size) }}
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </FocusScope>
 </template>
-
-<style scoped lang="scss">
-.dropdown-item-override:hover {
-  @apply bg-neutral-600;
-}
-
-.icon-download {
-  fill: var(--primary-color80);
-  padding-top: 2px;
-}
-
-.gallery-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-@media (max-width: 767px) {
-  .gallery-modal__header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .gallery-modal__header > div:last-child {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-.gallery-modal__header-close {
-  background: transparent;
-  cursor: pointer;
-  border: none;
-}
-
-.gallery-modal__header-close svg {
-  width: 2rem;
-  height: 2rem;
-  stroke-width: 2px;
-  color: #fff;
-}
-
-.gallery-modal__preview {
-  position: relative;
-  width: 100%;
-}
-
-.gallery-modal__navigation {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  pointer-events: none;
-  user-select: none;
-  z-index: 2;
-
-  &:hover .gallery-modal__key-info {
-    opacity: 1;
-  }
-}
-
-.gallery-modal__previous-file,
-.gallery-modal__next-file {
-  pointer-events: auto;
-  cursor: pointer;
-  padding: 1rem;
-}
-
-.gallery-modal__previous-file {
-  margin-right: auto;
-}
-
-.gallery-modal__next-file {
-  margin-left: auto;
-}
-
-.gallery-modal__key-info {
-  position: absolute;
-  bottom: 1rem;
-  right: 1rem;
-  display: flex;
-  align-items: center;
-  background-color: rgba(0, 0, 0, 0.5);
-  color: rgba(255, 255, 255, 0.7);
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  user-select: none;
-
-  svg {
-    margin-right: 0.25rem;
-  }
-}
-
-.gallery-modal__preview-thumbnail-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: calc(100vh - 90px);
-  width: 100%;
-  margin: 0 auto;
-}
-
-.gallery-modal__preview-thumbnail {
-  max-width: 90%;
-  max-height: 90%;
-  object-fit: contain;
-}
-
-.gallery-modal__download-container {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 90px);
-  width: 100%;
-  gap: 2rem;
-  max-width: 320px;
-  border-left: 1px solid #454545;
-  padding: 0.5rem 1rem;
-  margin-left: 1rem;
-}
-
-.gallery-modal__download-option-name {
-  font-size: 17px;
-  font-weight: 600;
-  margin-bottom: 1rem;
-}
-
-.gallery-modal__download-button {
-  border-radius: var(--border-radius);
-  padding: 0.75rem 2rem;
-  width: 100%;
-  display: block;
-  border: none;
-  color: #fff;
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--primary-color15);
-  background: var(--accent-color);
-  cursor: pointer;
-}
-
-.gallery-modal__download-button:hover {
-  background: var(--accent-color);
-}
-
-.gallery-modal__download-button[disabled] {
-  pointer-events: none;
-  opacity: 50%;
-}
-
-.gallery-modal__terms-container {
-  display: flex;
-  align-items: center;
-  color: #9f9f9f;
-  font-size: 14px;
-  gap: 8px;
-  color: var(--primary-color80);
-}
-
-.gallery-modal__terms {
-  border: 2px solid var(--primary-color80);
-  border-radius: var(--border-radius);
-  width: 1.5rem;
-  height: 1.5rem;
-  min-width: 1.5rem;
-  min-height: 1.5rem;
-  cursor: pointer;
-}
-
-.gallery-modal__terms svg {
-  display: none;
-  width: 1.25rem;
-  height: 1.25rem;
-  stroke-width: 2px;
-  color: var(--primary-color80);
-  cursor: pointer;
-}
-
-.gallery-modal__terms--accepted {
-  background: var(--primary-color);
-}
-
-.gallery-modal__terms--accepted,
-.gallery-modal__terms--accepted svg {
-  display: flex;
-}
-
-.gallery-modal__license {
-  display: flex;
-  align-items: center;
-  color: var(--primary-color80);
-}
-
-.gallery-modal__license svg {
-  margin-right: 16px;
-}
-
-.gallery-modal__license-name {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: var(--primary-color80);
-}
-
-.gallery-modal__license-scope {
-  color: var(--primary-color80);
-  font-size: 11px;
-}
-
-.gallery-modal__size {
-  font-size: 14px;
-  color: var(--primary-color80);
-  margin-top: 0.5em;
-}
-
-.gallery-modal__terms-container.error {
-  color: var(--danger-color);
-}
-
-.gallery-modal__pdf-preview {
-  width: 90%;
-  height: 90%;
-  background-color: #f5f5f5;
-  border: 1px solid #454545;
-  border-radius: 4px;
-}
-
-.pdf-fallback {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 2rem;
-  text-align: center;
-}
-
-.pdf-fallback-link {
-  margin-top: 1rem;
-  color: var(--accent-color);
-  text-decoration: underline;
-}
-
-.pdf-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 2rem;
-  text-align: center;
-}
-
-.pdf-loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  border-top-color: var(--accent-color);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.gallery-modal__placeholder-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  width: 100%;
-  gap: 1rem;
-  padding: 2rem;
-}
-
-.gallery-modal__placeholder {
-  width: 120px;
-  height: 120px;
-  color: #e0e0e0;
-  opacity: 0.8;
-}
-
-.gallery-modal__placeholder :deep(svg) {
-  width: 100%;
-  height: 100%;
-}
-
-.gallery-modal__placeholder :deep(path) {
-  fill: currentColor;
-}
-
-.gallery-modal__placeholder-filename {
-  @apply text-neutral-400;
-  font-size: 14px;
-  font-weight: 600;
-  text-align: center;
-  max-width: 80%;
-  word-break: break-word;
-}
-
-.gallery-modal__download-link {
-  margin-top: 1rem;
-  color: var(--accent-color);
-  text-decoration: underline;
-  font-size: 14px;
-}
-
-.gallery-modal__breadcrumb {
-  font-size: 0.875rem;
-  max-width: calc(100% - 50px);
-  display: flex;
-  align-items: center;
-}
-
-.gallery-modal__breadcrumb :deep(.dv-breadcrumb) { min-width:0; max-width:100%; }
-</style>

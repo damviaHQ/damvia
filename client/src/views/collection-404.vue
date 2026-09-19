@@ -18,7 +18,7 @@ import { ArrowLeft } from "lucide-vue-next"
 
 <template>
   <div class="flex flex-col items-center mt-[10vh] h-screen">
-    <svg class="w-[15rem] h-[15rem] fill-neutral-600" clip-rule="evenodd" fill-rule="evenodd" stroke-linejoin="round"
+    <svg aria-hidden="true" class="w-[15rem] h-[15rem] fill-neutral-600" clip-rule="evenodd" fill-rule="evenodd" stroke-linejoin="round"
       stroke-miterlimit="2" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" id="fi_8452928">
       <g id="OUTLINE">
         <path

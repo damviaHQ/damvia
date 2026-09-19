@@ -52,34 +52,34 @@ const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-
 </script>
 
 <template>
-  <div class="fixed top-0 left-0 w-full h-[88px] flex items-center justify-between z-[9] px-4 pl-6 pr-7 shadow">
-    <div class="dashboard-layout-topbar__left flex items-center gap-9">
+  <div class="client-topbar fixed inset-x-0 top-0 z-10 flex h-[88px] items-center justify-between gap-6 border-b border-neutral-200 bg-white px-6 max-md:pl-16 md:h-[72px]">
+    <div class="dashboard-layout-topbar__left flex min-w-0 flex-1 items-center gap-8">
       <router-link :to="{ name: 'home' }">
-        <Logo class="mr-8" />
+        <Logo class="w-[124px] shrink-0 max-md:w-[88px]" />
       </router-link>
       <MainSearchBar />
       <div v-if="globalStore.selection.length > 0"
-        class="dashboard-layout-topbar__selector flex items-center gap-3 px-4 py-3 space-between outline-dashed outline-2 outline-neutral-500 hover:outline-solid hover:outline-neutral-600">
+        class="dashboard-layout-topbar__selector flex items-center gap-4 border-l border-neutral-200 pl-6 text-body max-md:hidden">
         <div class="flex items-center gap-1.5 font-medium text-neutral-500 mr-2">
           <button class="text-neutral-500 hover:text-neutral-800" @click="globalStore.clearSelection()"
             title="Clear selection">
-            <SquareX />
+            <SquareX class="size-6 shrink-0" />
           </button>
           <div class="whitespace-nowrap">
             {{ globalStore.selection.length }} item{{
               globalStore.selection.length > 1 ? "s" : ""
             }}
-            selected in total
+            selected
           </div>
         </div>
         <div class="flex items-center gap-3.5">
           <button class="text-neutral-500 hover:text-neutral-800" @click="isDownloadAssetModalOpen = true"
             title="Download selection">
-            <Download />
+            <Download class="size-6 shrink-0" />
           </button>
           <button v-if="globalStore.user?.role !== 'guest'" @click="isAddToCollectionModalOpen = true"
             title="Add selection to your collection" class="text-neutral-500 hover:text-neutral-800">
-            <Combine />
+            <Combine class="size-6 shrink-0" />
           </button>
         </div>
       </div>
@@ -88,63 +88,63 @@ const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-
       <MainTopbarDownloadNotification />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" type="button" class="p-0">
+          <Button variant="ghost" size="icon" type="button" class="p-0" aria-label="My account">
             <User class="h-6 w-6" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent :collision-padding="40" class="flex flex-col gap-1 w-42 p-5">
-          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuContent :collision-padding="16" align="end" class="w-60 p-1 [&_[role=menuitem]]:min-h-9 [&_[role=menuitem]]:gap-2 [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-body [&_[role=menuitem]]:whitespace-nowrap">
+          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground">My Account</DropdownMenuLabel>
           <DropdownMenuItem class="cursor-pointer" @click="
             showMemberDialog = true
           memberDialogInitialTab = 'profile';
           ">
-            <User class="mr-2 h-4 w-4" />
+            <User class="size-4 shrink-0" />
             <span>Profile</span>
           </DropdownMenuItem>
           <DropdownMenuItem class="cursor-pointer" @click="
             showMemberDialog = true
           memberDialogInitialTab = 'downloads';
           ">
-            <Download class="mr-2 h-4 w-4" />
+            <Download class="size-4 shrink-0" />
             <span>My Downloads</span>
           </DropdownMenuItem>
           <DropdownMenuItem class="cursor-pointer" @click="
             showMemberDialog = true
           memberDialogInitialTab = 'links';
           ">
-            <Link class="mr-2 h-4 w-4" />
+            <Link class="size-4 shrink-0" />
             <span>My Links</span>
           </DropdownMenuItem>
           <DropdownMenuItem class="cursor-pointer" @click="
             showMemberDialog = true
           memberDialogInitialTab = 'display-preferences';
           ">
-            <LayoutDashboard class="mr-2 h-4 w-4" />
+            <LayoutDashboard class="size-4 shrink-0" />
             <span>Display Preferences</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuLabel v-if="globalStore.user?.role === 'manager'">
+          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground" v-if="globalStore.user?.role === 'manager'">
             Manage
           </DropdownMenuLabel>
-          <DropdownMenuLabel v-if="globalStore.user?.role === 'admin'">
+          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground" v-if="globalStore.user?.role === 'admin'">
             Administrate
           </DropdownMenuLabel>
           <DropdownMenuItem v-if="['admin'].includes(globalStore.user?.role ?? '')">
-            <router-link :to="{ name: 'admin-dashboard' }" class="flex items-center">
-              <Settings class="mr-2 h-4 w-4" />
+            <router-link :to="{ name: 'admin-dashboard' }" class="flex w-full items-center gap-2">
+              <Settings class="size-4 shrink-0" />
               <span>Administration</span>
             </router-link>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')">
-            <router-link :to="{ name: 'admin-users' }" class="flex items-center">
-              <Users class="mr-2 h-4 w-4" />
+            <router-link :to="{ name: 'admin-users' }" class="flex w-full items-center gap-2">
+              <Users class="size-4 shrink-0" />
               <span>Manage Users</span>
             </router-link>
           </DropdownMenuItem>
           <DropdownMenuSeparator v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')"
-            class="bg-neutral-400 text-neutral-400 my-3" />
+            class="my-1" />
           <DropdownMenuItem @click="globalStore.logout()" class="cursor-pointer">
-            <LogOut class="mr-2 h-4 w-4" />
+            <LogOut class="size-4 shrink-0" />
             <span>Log out</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -156,27 +156,3 @@ const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-
   <CollectionDialogAddToCollection v-model="isAddToCollectionModalOpen" />
   <LayoutDialogMember v-model:open="showMemberDialog" :initial-tab="memberDialogInitialTab" />
 </template>
-
-<style scoped lang="scss">
-.dashboard-layout-topbar__selection-text {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  font-size: 1rem;
-  color: var(--primary-color50);
-}
-
-.dashboard-layout-topbar__user-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-}
-
-.dashboard-layout-topbar__user-button svg {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-</style>

@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionDisplayGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
 import CollectionDisplayListFiles from "@/components/collection/CollectionDisplayListFiles.vue"
@@ -111,7 +112,7 @@ const assetTypeOptions = computed(() =>
       label: assetType.name,
       id: assetType.id,
     }))
-    .sort((a: {label: string, id: string}, b: {label: string, id: string}) => a.label.localeCompare(b.label))
+    .sort((a, b) => a.label.localeCompare(b.label))
 )
 const searchScopeOptions = computed(() => {
   const globalOptions = [{ label: "Every collections", id: "all" }]
@@ -135,7 +136,7 @@ const productViewOptions = computed(() =>
       label: productView,
       id: productView,
     }))
-    .sort((a: {label: string, id: string}, b: {label: string, id: string}) => a.label.localeCompare(b.label))
+    .sort((a, b) => a.label.localeCompare(b.label))
 )
 
 function handleRouteQueryArray(
@@ -247,20 +248,24 @@ function openMemberDialog() {
 </script>
 
 <template>
-  <div class="flex h-full">
-    <div class="flex-1 overflow-auto p-4">
+  <div class="flex min-h-full gap-8">
+    <div class="min-w-0 flex-1">
+      <h1 class="sr-only">Search</h1>
+      <div role="status" aria-live="polite" class="sr-only">
+        <template v-if="status === 'success' && search">{{ search.total ? `${search.total} result${search.total > 1 ? "s" : ""} found` : "No results found" }}</template>
+      </div>
       <div v-if="status === 'pending'">
         <Loader :text="true" />
       </div>
-      <div v-else-if="status === 'error'" class="alert alert-danger">
+      <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
         {{ error?.message }}
       </div>
-      <div v-else-if="status === 'success'" class="search__back-container">
-        <div class="search__back-wrapper">
+      <div v-else-if="status === 'success'" class="search__back-container flex flex-col w-full">
+        <div class="search__back-wrapper mb-6 flex w-full items-center justify-between gap-4 border-b border-neutral-200 pb-5">
           <div class="flex items-center flex-1">
             <div v-if="search && search.results?.length" class="flex flex-row gap-1.5 items-center"
-              @mouseenter="isHovered = true" @mouseleave="isHovered = false">
-              <CollectionCheckbox @click="toggleSelection" :state="search && selection.length === search.results.length
+              @mouseenter="isHovered = true" @mouseleave="isHovered = false" @focusin="isHovered = true" @focusout="isHovered = false">
+              <CollectionCheckbox label="Select all results" @click="toggleSelection" :state="search && selection.length === search.results.length
                 ? 'check'
                 : selection.length > 0
                   ? 'undetermined'
@@ -304,16 +309,16 @@ function openMemberDialog() {
             </div>
             <!-- Display collection name if inside collection, or every collection -->
             <div>
-              <div v-if="form.searchScope === 'current_with_sub'" class="search__scope-wrapper">
-                <span v-if="search && !search.results.length">No result found</span>
-                <span v-if="!selection.length">in</span> {{ collectionName }} and it's sub
+              <div v-if="form.searchScope === 'current_with_sub'" class="search__scope-wrapper text-sm text-neutral-800 font-medium p-0 bg-transparent border-none cursor-pointer">
+                <span v-if="search && !search.results.length">No results found in </span>
+                <span v-else-if="!selection.length">in </span> {{ collectionName }} and its sub
                 collections
               </div>
-              <div v-else-if="form.searchScope === 'current'" class="search__scope-wrapper">
-                <span v-if="search && !search.results.length">No result found</span>
-                <span v-if="!selection.length">in</span> {{ collectionName }}
+              <div v-else-if="form.searchScope === 'current'" class="search__scope-wrapper text-sm text-neutral-800 font-medium p-0 bg-transparent border-none cursor-pointer">
+                <span v-if="search && !search.results.length">No results found in </span>
+                <span v-else-if="!selection.length">in </span> {{ collectionName }}
               </div>
-              <div v-else class="search__scope-wrapper">
+              <div v-else class="search__scope-wrapper text-sm text-neutral-800 font-medium p-0 bg-transparent border-none cursor-pointer">
                 <span v-if="search && !search.results.length">No result found in any collection</span>
               </div>
             </div>
@@ -323,15 +328,15 @@ function openMemberDialog() {
             <ChevronLeft class="h-4 w-4 text-neutral-500 mx-2" />
             <span class="text-neutral-500">Back to collection</span>
           </Button>
-          <div class="search__path-actions">
-            <Button @click="openMemberDialog" type="button" variant="ghost" size="icon">
+          <div class="search__path-actions ml-auto">
+            <Button @click="openMemberDialog" type="button" variant="ghost" size="icon" aria-label="Display preferences">
               <LayoutDashboard class="text-neutral-500 hover:text-neutral-800" />
             </Button>
           </div>
-          <Button v-if="hideFilters" @click="hideFilters = !hideFilters" variant="ghost" size="icon" type="button">
+          <Button v-if="hideFilters" @click="hideFilters = !hideFilters" variant="ghost" size="icon" type="button" aria-label="Show filters" :aria-expanded="false" aria-controls="search-filters">
             <PanelRightOpen class="text-neutral-500 hover:text-neutral-800" />
           </Button>
-          <Button v-else @click="hideFilters = !hideFilters" variant="ghost" size="icon" type="button">
+          <Button v-else @click="hideFilters = !hideFilters" variant="ghost" size="icon" type="button" aria-label="Hide filters" :aria-expanded="true" aria-controls="search-filters">
             <PanelRightClose class="text-neutral-500 hover:text-neutral-800" />
           </Button>
         </div>
@@ -339,10 +344,10 @@ function openMemberDialog() {
 
       <div>
         <div v-if="searchResults.length >= 1">
-          <div v-for="result in searchResults" :key="result.assetType?.id" class="search__result-group">
-            <div v-if="result.assetType" class="search__asset-type-name">
+          <div v-for="result in searchResults" :key="result.assetType?.id" class="search__result-group mb-6">
+            <h2 v-if="result.assetType" class="search__asset-type-name text-neutral-500 text-sm mb-2">
               {{ result.assetType?.name }}
-            </div>
+            </h2>
             <CollectionDisplayListFiles v-if="
               (
                 globalStore.displayPreferences[result.assetType?.id as never] ??
@@ -354,7 +359,7 @@ function openMemberDialog() {
             <CollectionDisplayGridFiles v-else :files="result.results" />
           </div>
 
-          <div v-if="search && search.totalPages > 1" class="search__pagination">
+          <nav v-if="search && search.totalPages > 1" aria-label="Pagination" class="search__pagination flex items-center gap-4 [&_>_a]:[color:var(--dv-text-secondary)]">
             <router-link v-if="search.previousPage" :to="{
               name: 'search',
               query: { ...$route.query, page: search.previousPage },
@@ -366,195 +371,43 @@ function openMemberDialog() {
               :to="{ name: 'search', query: { ...$route.query, page: search.nextPage } }">
               Next page
             </router-link>
-          </div>
+          </nav>
         </div>
       </div>
     </div>
-    <div v-if="!hideFilters" class="flex flex-col bg-neutral-50 p-4 gap-3 w-64 h-full overflow-y-auto">
-      <div>
-        <Label>Asset Type</Label>
-        <treeselect :model-value="form.assetTypes" @update:modelValue="handleSetQuery('asset_types', $event)"
+    <div v-if="!hideFilters" id="search-filters" class="flex w-60 shrink-0 flex-col gap-5 border-l border-neutral-200 pl-6">
+      <FieldGroup>
+        <Label for="search-assetTypes">Asset Type</Label>
+        <treeselect input-id="search-assetTypes" :model-value="form.assetTypes" @update:modelValue="handleSetQuery('asset_types', $event)"
           :options="assetTypeOptions" :clearable="true" :multiple="true" placeholder="All"
           no-options-text="No asset type available." />
-      </div>
-      <div>
-        <Label>Search scope</Label>
-        <treeselect :model-value="form.searchScope" @update:modelValue="handleSetQuery('search_scope', $event)"
+      </FieldGroup>
+      <FieldGroup>
+        <Label for="search-searchScope">Search scope</Label>
+        <treeselect input-id="search-searchScope" :model-value="form.searchScope" @update:modelValue="handleSetQuery('search_scope', $event)"
           :options="searchScopeOptions" placeholder="" no-options-text="No search scope available."
           :clearable="false" />
-      </div>
-      <div>
-        <Label>Product view</Label>
-        <treeselect :model-value="form.productViews" @update:modelValue="handleSetQuery('product_views', $event)"
+      </FieldGroup>
+      <FieldGroup>
+        <Label for="search-productViews">Product view</Label>
+        <treeselect input-id="search-productViews" :model-value="form.productViews" @update:modelValue="handleSetQuery('product_views', $event)"
           :clearable="true" :multiple="true" :options="productViewOptions" placeholder="All"
           no-options-text="No product views available." />
-      </div>
-      <div>
-        <Label>File type</Label>
-        <treeselect :model-value="form.fileTypes" @update:modelValue="handleSetQuery('file_types', $event)"
+      </FieldGroup>
+      <FieldGroup>
+        <Label for="search-fileTypes">File type</Label>
+        <treeselect input-id="search-fileTypes" :model-value="form.fileTypes" @update:modelValue="handleSetQuery('file_types', $event)"
           :clearable="true" :multiple="true" :options="fileTypeOptions" placeholder="All"
           no-options-text="No file types available." />
-      </div>
-      <div v-for="facet in productFacets">
-        <Label>{{ facet.displayName || facet.name }}</Label>
-        <treeselect :model-value="form.attributes[facet.id] ?? []" :clearable="true" :multiple="true"
+      </FieldGroup>
+      <FieldGroup v-for="facet in productFacets">
+        <Label :for="`search-facet-${facet.id}`">{{ facet.displayName || facet.name }}</Label>
+        <treeselect :input-id="`search-facet-${facet.id}`" :model-value="form.attributes[facet.id] ?? []" :clearable="true" :multiple="true"
           @update:modelValue="handleSetQuery(`attributes[${facet.id}]`, $event)"
-          :options="facet.values.map((value: string) => ({ label: value, id: value })).sort((a: {label: string, id: string}, b: {label: string, id: string}) => a.label.localeCompare(b.label))" placeholder="All"
+          :options="facet.values.map((value: string) => ({ label: value, id: value })).sort((a, b) => a.label.localeCompare(b.label))" placeholder="All"
           no-options-text="No options available." />
-      </div>
+      </FieldGroup>
     </div>
     <LayoutDialogMember v-model:open="isMemberDialogOpen" :initial-tab="'display-preferences'" />
   </div>
 </template>
-
-<style scoped lang="scss">
-.search__filter-container {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.search__filter {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.search__filter>label {
-  color: var(--primary-color50);
-  font-weight: 500;
-  padding-bottom: 4px;
-}
-
-.search__back-container {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-.search__back-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 8px;
-  margin-bottom: 1rem;
-}
-
-.search__back {
-  width: max-content;
-  display: flex;
-  align-items: center;
-  font-size: 15px;
-  margin: 16px 0;
-  padding: 0;
-  gap: 0.4rem;
-  font-weight: 500;
-  color: var(--primary-color50);
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.search__back>svg {
-  height: 1.3rem;
-  padding: 0.1rem;
-  width: 1.3rem;
-  stroke: var(--primary-color50);
-  stroke-width: 1px;
-  border: 1px solid var(--primary-color50);
-  border-radius: var(--border-radius);
-}
-
-.search__back-collection-name {
-  font-weight: 700;
-}
-
-.search__result-group {
-  margin-bottom: 24px;
-}
-
-.search__path-actions {
-  margin-left: auto;
-}
-
-.search__asset-type-name {
-  @apply text-neutral-500 text-sm mb-2;
-}
-
-.search__filter-list-actions {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 2rem;
-  margin-bottom: 0.8rem;
-
-  button {
-    color: var(--primary-color65);
-    font-size: 14px;
-    background: none;
-    border: none;
-    cursor: pointer;
-  }
-}
-
-.search__filter--checkbox {
-  flex-direction: row;
-  align-items: center;
-}
-
-.search__filter--checkbox>label {
-  padding-left: 4px;
-  padding-bottom: 0;
-}
-
-.search__filer-match {
-  margin-bottom: 0px !important;
-}
-
-.search__pagination {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.search__pagination>a {
-  color: var(--primary-color50);
-}
-
-.no-result {
-  color: var(--primary-color50);
-  font-size: 15px;
-  font-weight: 500;
-  text-align: center;
-  margin-top: 24px;
-}
-
-.search__selection-btn,
-.search__selection-text {
-  font-size: 1rem;
-  background: transparent;
-  border: none;
-  color: var(--primary-color50);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  margin-left: 0.5rem;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
-.search__path-item-chevron {
-  width: 0.75rem;
-  height: 0.75rem;
-  stroke-width: 2px;
-  stroke: var(--primary-color50);
-  margin: 0 0.3rem;
-}
-
-.search__scope-wrapper {
-  @apply text-sm text-neutral-800 font-medium p-0 bg-transparent border-none cursor-pointer;
-}
-</style>

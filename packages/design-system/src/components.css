@@ -33,11 +33,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-button--quiet { background: transparent; border-color: transparent; }
 .dv-button--small { min-height: 32px; padding: 5px 10px; font-size: 12px !important; }
 .dv-button--icon { width: 36px; height: 36px; padding: 8px; }
-.dv-input, .dv-select { border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-field); background: var(--dv-surface-panel); color: var(--dv-text-primary); min-height: 38px; padding: 8px 12px; caret-color: var(--dv-action-primary); }
+.dv-input, .dv-select { border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-field); background: var(--dv-surface-panel); color: var(--dv-text-primary); min-height: var(--dv-control-height); padding: var(--dv-control-padding-y) var(--dv-control-padding-x); font-size: var(--dv-field-label-size); line-height: var(--dv-field-line-height); caret-color: var(--dv-action-primary); }
 .dv-input::placeholder { color: var(--dv-text-secondary); opacity: 1; }
 .dv-input { width: 100%; }
 .dv-select { max-width: 100%; }
-.dv-label { display: grid; gap: 7px; font-weight: 550; font-size: 13px; }
+.dv-label { display: grid; gap: var(--dv-field-gap); font-weight: 500; font-size: var(--dv-field-label-size); line-height: var(--dv-field-line-height); }
 .dv-badge { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--dv-radius-data); padding: 3px 8px; white-space: nowrap; font-size: 11px; font-weight: 550; line-height: 1.4; background: var(--dv-surface-canvas); color: var(--dv-text-secondary); }
 .dv-badge svg { width: 12px; height: 12px; }
 .dv-badge--success { color: var(--dv-color-success); background: var(--dv-color-success-soft); }
@@ -79,11 +79,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-breadcrumb__current { color: var(--dv-text-primary, currentColor); font-weight: 600; }
 .dv-breadcrumb__link:focus-visible, .dv-breadcrumb__current:focus-visible, .dv-breadcrumb__ellipsis:focus-visible { outline: 2px solid var(--dv-action-primary, #0044f4); outline-offset: 3px; }
 .dv-breadcrumb__label { display: block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-breadcrumb__current .dv-breadcrumb__label { max-width: none; }
 .dv-breadcrumb__separator { display: inline-flex; flex: 0 0 auto; color: var(--dv-color-muted, currentColor); }
 .dv-breadcrumb__separator svg { width: 13px; height: 13px; }
-.dv-breadcrumb__ellipsis { display: grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--dv-radius-control, 0); background: transparent; color: inherit; cursor: pointer; }
-.dv-breadcrumb__ellipsis:hover { background: var(--dv-surface-canvas, rgb(0 0 0 / .05)); color: var(--dv-text-primary, currentColor); }
-.dv-breadcrumb__ellipsis > span { width: 28px; height: 28px; }
+.dv-breadcrumb__ellipsis { display: grid; place-items: center; flex: 0 0 auto; width: 20px; height: 28px; padding: 0; border: 0; border-radius: var(--dv-radius-control, 0); background: transparent; color: inherit; cursor: pointer; }
+.dv-breadcrumb__ellipsis:hover { background: transparent; color: var(--dv-text-primary, currentColor); }
+.dv-breadcrumb__ellipsis > span { width: 100%; height: 100%; }
 .dv-breadcrumb__menu-link { display: block; width: 100%; max-width: 320px; overflow: hidden; padding: 4px 2px; color: inherit; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
 .dv-breadcrumb__tooltip { max-width: 320px; border: 1px solid rgb(255 255 255 / .14); border-radius: var(--dv-radius-surface); background: var(--dv-color-midnight); color: var(--dv-text-on-dark); font-size: 11px; overflow-wrap: anywhere; }
 .dv-breadcrumb__menu--dark { border-color: #4b5563; border-radius: var(--dv-radius-surface); background: #374151; color: #e5e7eb; }
@@ -91,7 +92,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-breadcrumb__menu--dark .dropdown-item[data-highlighted] { background: #4b5563; color: white; }
 .dv-breadcrumb[data-tone=dark] .dv-breadcrumb__list { color: var(--dv-text-on-dark-secondary, #c2cbe8); }
 .dv-breadcrumb[data-tone=dark] .dv-breadcrumb__link:hover, .dv-breadcrumb[data-tone=dark] .dv-breadcrumb__current { color: white; }
-.dv-breadcrumb[data-tone=dark] .dv-breadcrumb__ellipsis:hover { background: rgb(255 255 255 / .1); color: white; }
+.dv-breadcrumb[data-tone=dark] .dv-breadcrumb__ellipsis:hover { background: transparent; color: white; }
 @media (max-width: 640px) { .dv-breadcrumb__label { max-width: 96px; } }
 .dv-theme .dv-muted { color: var(--dv-text-secondary); }
 .dv-theme .dv-mono { font-family: var(--dv-font-mono); font-size: 12px; }

@@ -13,10 +13,11 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ref, watch } from 'vue'
+import { ref, useId, watch } from 'vue'
 
 const props = defineProps<{
   data: {
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   (e: 'update', data: { data: { presignedUrl?: string, url?: string }, file?: File | null }): void
 }>()
 
+const fieldId = useId()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const file = ref<File | null>(null)
 const previewURL = ref<string | null>(null)
@@ -69,10 +71,10 @@ function updateExternalUrl() {
 
 <template>
   <div class="flex flex-col gap-4">
-    <h1 class="text-lg font-medium">Add a video</h1>
-    <input ref="fileInputRef" type="file" accept="video/*" style="display: none" @change="handleFileUploaded" />
+    <h3 class="text-sm font-semibold">Add a video</h3>
+    <input ref="fileInputRef" type="file" accept="video/*" aria-label="Video file" style="display: none" @change="handleFileUploaded" />
     <video v-if="previewURL" :src="previewURL" class="w-full" controls></video>
-    <button v-else type="button" class="block-editor-modal__dropzone" @click="triggerFileUpload">
+    <button v-else type="button" class="block-editor-modal__dropzone flex items-center justify-center [border:1px_dashed_var(--dv-color-line,_#929292)] [color:var(--dv-text-secondary,_#929292)] [height:60px] w-full" @click="triggerFileUpload">
       Click here to select a file
     </button>
     <div class="mt-1 flex items-center gap-2">
@@ -80,22 +82,10 @@ function updateExternalUrl() {
         {{ previewURL ? 'Change file' : 'Upload file' }}
       </Button>
     </div>
-    <div class="flex flex-col gap-2">
-      <Label for="external-url">External Video URL (optional)</Label>
-      <Input id="external-url" v-model="externalUrl" type="url" placeholder="https://example.com/video.mp4"
+    <FieldGroup>
+      <Label :for="`${fieldId}-url`">External Video URL (optional)</Label>
+      <Input :id="`${fieldId}-url`" v-model="externalUrl" type="url" placeholder="https://example.com/video.mp4"
         @input="updateExternalUrl" />
-    </div>
+    </FieldGroup>
   </div>
 </template>
-
-<style scoped>
-.block-editor-modal__dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--dv-color-line, #929292);
-  color: var(--dv-text-secondary, #929292);
-  height: 60px;
-  width: 100%;
-}
-</style>

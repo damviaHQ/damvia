@@ -1,0 +1,5 @@
+// Shared form geometry. Theme tokens supply the colours in every surface.
+export const fieldGroupClasses = 'grid gap-[var(--dv-field-gap)]'
+export const labelClasses = 'block text-[length:var(--dv-field-label-size)] font-medium leading-[var(--dv-field-line-height)] text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70'
+export const helpClasses = 'text-[length:var(--dv-field-help-size)] leading-[var(--dv-field-line-height)] text-muted-foreground'
+export const controlClasses = 'flex min-h-[var(--dv-control-height)] w-full rounded-none border border-input bg-background px-[var(--dv-control-padding-x)] py-[var(--dv-control-padding-y)] text-[length:var(--dv-field-label-size)] leading-[var(--dv-field-line-height)] text-foreground placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 aria-invalid:border-destructive'

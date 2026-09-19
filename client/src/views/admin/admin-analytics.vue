@@ -329,6 +329,8 @@ const colors = ['--dv-action-primary', '--dv-color-success', '--dv-color-warning
 const muted = tokens.getPropertyValue('--dv-text-secondary').trim()
 const lineColor = tokens.getPropertyValue('--dv-color-line').trim()
 const font = tokens.getPropertyValue('--dv-font-body').trim()
+const pointStyles = ['circle', 'rect', 'triangle', 'rectRot'] as const
+const dashes = [[], [6, 4], [2, 3], [10, 4, 2, 4]]
 const lineData = (series: { label: string; rows: { day: string; count: number }[] }[]) => ({
   labels: rangeDays.value.map(dateLabel),
   datasets: series.map((item, index) => {
@@ -339,6 +341,8 @@ const lineData = (series: { label: string; rows: { day: string; count: number }[
       borderColor: colors[index],
       backgroundColor: index === 0 ? 'rgba(0, 68, 244, 0.045)' : colors[index],
       pointBackgroundColor: colors[index],
+      pointStyle: pointStyles[index],
+      borderDash: dashes[index],
       pointRadius: rangeDays.value.length <= 7 ? 3 : 0,
       pointHoverRadius: 5,
       borderWidth: 2,
@@ -350,6 +354,7 @@ const lineData = (series: { label: string; rows: { day: string; count: number }[
 const chartOptions: ChartOptions<'line'> = {
   responsive: true,
   maintainAspectRatio: false,
+  ...(window.matchMedia('(prefers-reduced-motion: reduce)').matches ? { animation: false as const } : {}),
   interaction: { mode: 'index', intersect: false },
   plugins: {
     legend: {
@@ -357,7 +362,6 @@ const chartOptions: ChartOptions<'line'> = {
       align: 'start',
       labels: {
         usePointStyle: true,
-        pointStyle: 'circle',
         boxWidth: 7,
         boxHeight: 7,
         padding: 24,
@@ -536,7 +540,7 @@ const exportTerms = () =>
           <span>Daily reporting · UTC</span>
         </div>
       </nav>
-      <main class="insights-main" :aria-label="active.label">
+      <section class="insights-main" :aria-label="active.label">
         <header class="report-title">
           <div>
             <h2>{{ active.label }}</h2>
@@ -602,7 +606,7 @@ const exportTerms = () =>
               description="Views, downloads and searches, day by day."
               :empty="!overview.data.value?.series.some((row) => row.views || row.downloads || row.searches)"
               @export="exportCsv('activity', overview.data.value?.series ?? [])"
-              ><Line role="img" aria-label="Daily activity chart. Export CSV for the individual values." :data="activityChart" :options="chartOptions"
+              ><Line role="img" aria-label="Line chart of daily views, downloads and searches. Export CSV for the individual values." :data="activityChart" :options="chartOptions"
             /></InsightsChart>
             <div class="overview-reports">
               <button
@@ -625,7 +629,7 @@ const exportTerms = () =>
               description="Total searches and searches that returned no results."
               :empty="!searches.data.value.volume.length"
               @export="exportCsv('search-volume', searches.data.value.volume)"
-              ><Line role="img" aria-label="Daily activity chart. Export CSV for the individual values." :data="searchChart" :options="chartOptions"
+              ><Line role="img" aria-label="Line chart of daily searches and searches without results. Export CSV for the individual values." :data="searchChart" :options="chartOptions"
             /></InsightsChart>
             <section v-if="searches.data.value.signals.length" class="demand-signals">
               <header>
@@ -701,6 +705,7 @@ const exportTerms = () =>
               </div>
               <div v-if="filteredTerms.length" class="report-table-scroll">
                 <table>
+                  <caption class="sr-only">Search terms</caption>
                   <thead>
                     <tr>
                       <th scope="col">Search term</th>
@@ -783,7 +788,7 @@ const exportTerms = () =>
               description="Views and downloads across your file categories."
               :empty="!assets.data.value.byType.length"
               @export="exportCsv('asset-types', assets.data.value.byType)"
-              ><Bar role="img" aria-label="Views and downloads by asset type. Export CSV for the individual values." :data="typeChart" :options="barOptions"
+              ><Bar role="img" aria-label="Bar chart of views and downloads by asset type. Export CSV for the individual values." :data="typeChart" :options="barOptions"
             /></InsightsChart>
             <InsightsTable
               title="Most downloaded assets"
@@ -857,7 +862,7 @@ const exportTerms = () =>
                   })),
                 )
               "
-              ><Line role="img" aria-label="Daily activity chart. Export CSV for the individual values." :data="usersChart" :options="chartOptions"
+              ><Line role="img" aria-label="Line chart of daily active users, logins and new users. Export CSV for the individual values." :data="usersChart" :options="chartOptions"
             /></InsightsChart>
             <InsightsTable
               title="Top downloaders"
@@ -913,7 +918,7 @@ const exportTerms = () =>
                   })),
                 )
               "
-              ><Line role="img" aria-label="Daily activity chart. Export CSV for the individual values." :data="collectionsChart" :options="chartOptions"
+              ><Line role="img" aria-label="Line chart of collections created and invitations sent each day. Export CSV for the individual values." :data="collectionsChart" :options="chartOptions"
             /></InsightsChart>
             <InsightsTable
               title="Most shared collections"
@@ -939,7 +944,7 @@ const exportTerms = () =>
               description="Files added each day during the selected period."
               :empty="!assets.data.value.growth.length"
               @export="exportCsv('library-growth', assets.data.value.growth)"
-              ><Line role="img" aria-label="Daily activity chart. Export CSV for the individual values." :data="growthChart" :options="chartOptions"
+              ><Line role="img" aria-label="Line chart of files added each day. Export CSV for the individual values." :data="growthChart" :options="chartOptions"
             /></InsightsChart>
             <InsightsTable
               title="Storage by asset type"
@@ -964,7 +969,7 @@ const exportTerms = () =>
             Date ranges include the end date. All charts use UTC.
           </p>
         </template>
-      </main>
+      </section>
     </div>
     <Dialog v-model:open="detailOpen"
       ><DialogContent class="dv-theme dv-admin admin-dialog search-detail-dialog"
@@ -985,7 +990,7 @@ const exportTerms = () =>
             description="Searches for this exact term, including those without results."
             :empty="!detail.data.value.volume.length"
             @export="exportCsv('term-volume', detail.data.value.volume)"
-            ><Line role="img" aria-label="Daily activity chart. Export CSV for the individual values." :data="detailChart" :options="chartOptions"
+            ><Line role="img" aria-label="Line chart of daily searches for this term and searches without results. Export CSV for the individual values." :data="detailChart" :options="chartOptions"
           /></InsightsChart>
           <section class="response-panel">
             <h3>Respond to this demand</h3>
@@ -1034,12 +1039,13 @@ const exportTerms = () =>
             </header>
             <div v-if="detail.data.value.audience.length" class="report-table-scroll">
               <table>
+                <caption class="sr-only">People looking for this content</caption>
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th class="numeric">Searches</th>
-                    <th class="numeric">No results</th>
-                    <th><span class="sr-only">Email</span></th>
+                    <th scope="col">Name</th>
+                    <th scope="col" class="numeric">Searches</th>
+                    <th scope="col" class="numeric">No results</th>
+                    <th scope="col"><span class="sr-only">Email</span></th>
                   </tr>
                 </thead>
                 <tbody>

@@ -12,9 +12,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. */
 import { createApp } from 'vue'
 import App from './App.vue'
-import '../../../packages/design-system/src/tokens.css'
-import '../../../packages/design-system/src/fonts.css'
-import '../../../packages/design-system/src/components.css'
+import '../style.css'
+import '../styles/admin.css'
 import './preview.css'
 
 createApp(App).mount('#app')

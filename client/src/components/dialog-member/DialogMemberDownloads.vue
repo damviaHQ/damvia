@@ -55,52 +55,48 @@ async function copyUrlToClipboard(url: string) {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="download__container  flex flex-col gap-4">
-    <p class="text-sm text-neutral-500 max-w-[80%]">
-      This is a list of all the downloads you have made for the past 30 days.
-      Download links are only valid for 7 days.
-    </p>
-    <Table v-if="downloads?.length > 0">
+    <Table v-if="downloads?.length > 0" class="text-[13px] [&_td]:px-3 [&_td]:py-3 [&_th]:px-3">
       <TableHeader>
         <TableRow>
-          <TableHead>Creation date</TableHead>
-          <TableHead>Expiration date</TableHead>
+          <TableHead>Created</TableHead>
+          <TableHead>Expires</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Number of files</TableHead>
+          <TableHead>Files</TableHead>
           <TableHead></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         <TableRow v-for="download in downloads" :key="download.id"
-          :class="{ 'text-neutral-400': download.status === 'expired' }">
-          <TableCell>{{ dayjs(download.createdAt).format("D MMMM YYYY") }}</TableCell>
-          <TableCell>{{ dayjs(download.expiresAt).format("D MMMM YYYY") }}</TableCell>
+          :class="{ 'text-neutral-500': download.status === 'expired' }">
+          <TableCell class="whitespace-nowrap">{{ dayjs(download.createdAt).format("D MMM YYYY") }}</TableCell>
+          <TableCell class="whitespace-nowrap">{{ dayjs(download.expiresAt).format("D MMM YYYY") }}</TableCell>
           <TableCell>
             <Badge v-if="download.status === 'failed'" variant="destructive">Failed</Badge>
             <span v-else>{{ download.status }}</span>
           </TableCell>
           <TableCell>{{ download.fileCount }}</TableCell>
           <TableCell>
-            <div class="flex gap-2 items-center">
-              <Button v-if="download.url" variant="ghost" as-child>
+            <div class="flex flex-wrap gap-1 items-center">
+              <Button v-if="download.url" variant="ghost" size="sm" as-child>
                 <a :href="download.url" target="_blank">
-                  <Download class="w-4 h-4 mr-2" />
+                  <Download class="size-4" />
                   Download
                 </a>
               </Button>
-              <Button v-else variant="ghost" :disabled="!download.url">
-                <Download class="w-4 h-4 mr-2 opacity-100" />
+              <Button v-else variant="ghost" size="sm" :disabled="!download.url">
+                <Download class="size-4 opacity-100" />
                 Download
               </Button>
               <Button v-if="download.url" variant="ghost" size="sm" @click="copyUrlToClipboard(download.url)">
-                <Link class="w-4 h-4 mr-2" />
+                <Link class="size-4" />
                 Copy URL
               </Button>
-              <Button v-else variant="ghost" :disabled="!download.url">
-                <Link class="w-4 h-4 mr-2" />
+              <Button v-else variant="ghost" size="sm" :disabled="!download.url">
+                <Link class="size-4" />
                 Copy URL
               </Button>
               <Badge v-if="downloadStore?.newDownloads?.some((d) => d.id === download.id)"

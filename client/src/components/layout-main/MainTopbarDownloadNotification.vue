@@ -37,7 +37,7 @@ onMounted(async () => {
   <div v-if="status === 'success'">
     <Button variant="ghost" disabled class="flex items-center gap-2" v-if="hasPreparingDownloads">
       Preparing files
-      <span class="loader-animation"></span>
+      <span class="loader-animation w-5 h-5 border-2 border-dashed rounded-[50%] border-neutral-500 inline-block relative box-border animate-spin"></span>
     </Button>
     <Button variant="ghost" v-else-if="newDownloads && newDownloads.length > 0" @click="toggleMemberDialog"
       class="flex items-center gap-2 text-neutral-500 hover:text-neutral-800">
@@ -47,19 +47,3 @@ onMounted(async () => {
     <LayoutDialogMember v-model:open="showMemberDialog" initial-tab="downloads" />
   </div>
 </template>
-
-<style scoped>
-.loader-animation {
-  @apply w-5 h-5 border-2 border-dashed rounded-[50%] border-neutral-500 inline-block relative box-border animate-spin;
-}
-
-@keyframes rotation {
-  0% {
-    transform: rotate(0deg);
-  }
-
-  100% {
-    transform: rotate(360deg);
-  }
-}
-</style>

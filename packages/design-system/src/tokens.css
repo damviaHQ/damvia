@@ -67,6 +67,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
   --dv-size-section: 17px;
   --dv-size-heading: 32px;
   --dv-size-display: 56px;
+  --dv-field-gap: 8px;
+  --dv-field-label-size: 13px;
+  --dv-field-help-size: 12px;
+  --dv-field-line-height: 20px;
+  --dv-control-height: 40px;
+  --dv-control-padding-x: 12px;
+  --dv-control-padding-y: 8px;
+  --dv-selection-color: var(--dv-action-primary);
 }
 
 /* Admin-only bridge for shared shadcn controls and teleported overlays. */
@@ -90,4 +98,41 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
   --destructive: 352.9412 56.1983% 47.4509%;
   --destructive-foreground: 0.0000 0.0000% 100.0000%;
   --ring: 223.2787 100.0000% 47.8432%;
+}
+
+/* White-label theme: shared geometry and semantics, achromatic brand roles. */
+.dv-theme.dv-neutral {
+  --dv-color-blue: rgb(38 38 38 / 1);
+  --dv-color-blue-hover: rgb(23 23 23 / 1);
+  --dv-color-midnight: rgb(23 23 23 / 1);
+  --dv-color-sky: rgb(238 238 238 / 1);
+  --dv-color-canvas: rgb(250 250 250 / 1);
+  --dv-color-ink: rgb(38 38 38 / 1);
+  --dv-color-muted: rgb(98 98 98 / 1);
+  --dv-color-line: rgb(229 229 229 / 1);
+  --dv-text-on-dark-secondary: rgb(212 212 212 / 1);
+  --dv-text-on-dark-muted: rgb(163 163 163 / 1);
+  --dv-font-body: Inter, system-ui, sans-serif;
+  --dv-selection-color: rgb(82 82 82 / 1);
+  --dv-font-body: var(--tenant-font-family, Inter, system-ui, sans-serif);
+  --background: 0.0000 0.0000% 100.0000%;
+  --foreground: 0.0000 0.0000% 14.9020%;
+  --muted: 0.0000 0.0000% 98.0392%;
+  --muted-foreground: 0.0000 0.0000% 38.4314%;
+  --popover: 0.0000 0.0000% 100.0000%;
+  --popover-foreground: 0.0000 0.0000% 14.9020%;
+  --card: 0.0000 0.0000% 100.0000%;
+  --card-foreground: 0.0000 0.0000% 14.9020%;
+  --border: 0.0000 0.0000% 89.8039%;
+  --input: 0.0000 0.0000% 89.8039%;
+  --primary: 0.0000 0.0000% 14.9020%;
+  --primary-foreground: 0.0000 0.0000% 100.0000%;
+  --secondary: 0.0000 0.0000% 98.0392%;
+  --secondary-foreground: 0.0000 0.0000% 14.9020%;
+  --accent: 0.0000 0.0000% 98.0392%;
+  --accent-foreground: 0.0000 0.0000% 14.9020%;
+  --destructive: 352.9412 56.1983% 47.4509%;
+  --destructive-foreground: 0.0000 0.0000% 100.0000%;
+  --ring: 0.0000 0.0000% 14.9020%;
+  --radius: 0px;
 }

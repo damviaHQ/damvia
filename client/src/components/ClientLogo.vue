@@ -34,8 +34,5 @@ const useUploaded = computed(() => !!logo.value?.imageUrl && !failed.value && (!
 watch(() => logo.value?.imageUrl, () => { failed.value = false })
 </script>
 <template>
- <img :src="useUploaded ? logo!.imageUrl! : defaultLogo" :alt="useUploaded ? (store.env?.appName || 'Brand Logo') : 'Damvia'" :class="{ 'client-logo--uploaded': useUploaded, 'client-logo--default': !useUploaded }" class="client-logo" @error="failed = true" />
+ <img :src="useUploaded ? logo!.imageUrl! : defaultLogo" :alt="useUploaded ? (store.env?.appName || 'Brand Logo') : 'Damvia'" :class="{ 'client-logo--uploaded': useUploaded, 'client-logo--default': !useUploaded, grayscale: !admin && !useUploaded }" class="client-logo [width:140px] h-12 object-contain" @error="failed = true" />
 </template>
-<style scoped>
-.client-logo { width:140px; height:48px; object-fit:contain; }
-</style>

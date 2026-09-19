@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { DialogClose } from "@/components/ui/dialog"
 import AdminList from "@/components/admin/AdminList.vue"
 import { Button } from "@/components/ui/button"
@@ -209,7 +210,7 @@ async function onModalSubmit(event: Event) {
         </DialogHeader>
         <form :aria-busy="saving" @submit="onModalSubmit">
           <div class="flex flex-col gap-6 py-4">
-            <div class="flex flex-col gap-2">
+            <FieldGroup >
               <Label for="name">Select an Attribute *</Label>
               <Select v-model="form.name!" :disabled="modalState === 'editing'" class="w-full">
                 <SelectTrigger id="name" class="w-full">
@@ -222,22 +223,22 @@ async function onModalSubmit(event: Event) {
                   </SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div class="flex flex-col gap-2">
+            </FieldGroup>
+            <FieldGroup >
               <Label for="displayName">Change Display Name</Label>
               <Input id="displayName" v-model="form.displayName!" placeholder="Keep empty for default value"
                 class="w-full" />
-            </div>
+            </FieldGroup>
             <div class="flex items-center space-x-2">
-              <Checkbox id="facetable" v-model:checked="form.facetable" />
+              <Checkbox id="facetable" v-model="form.facetable" />
               <Label for="facetable">Add filter in search</Label>
             </div>
             <div class="flex items-center space-x-2">
-              <Checkbox id="viewable" v-model:checked="form.viewable" :disabled="form.facetable" />
+              <Checkbox id="viewable" v-model="form.viewable" :disabled="form.facetable" />
               <Label for="viewable">Visible in Record List</Label>
             </div>
             <div class="flex items-center space-x-2">
-              <Checkbox id="searchable" v-model:checked="form.searchable" />
+              <Checkbox id="searchable" v-model="form.searchable" />
               <Label for="searchable">Searchable</Label>
             </div>
           </div>

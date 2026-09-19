@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -86,24 +87,24 @@ async function onSubmit(event: Event) {
 <template>
   <form @submit="onSubmit" class="flex flex-col gap-3">
     <div class="text-sm self-end text-neutral-500 mb-3">* Required</div>
-    <div class="space-y-2">
+    <FieldGroup>
       <Label for="name">Name *</Label>
-      <Input id="name" type="text" v-model="form.name" placeholder="Your name" autocomplete="given-name" autofocus />
-      <div v-if="formErrors.name" class="text-sm text-destructive">
+      <Input id="name" type="text" v-model="form.name" placeholder="Your name" autocomplete="name" required :aria-invalid="formErrors.name ? true : undefined" :aria-describedby="formErrors.name ? 'name-error' : undefined" autofocus />
+      <div v-if="formErrors.name" id="name-error" class="text-sm text-destructive">
         {{ formErrors.name }}
       </div>
-    </div>
-    <div class="space-y-2">
+    </FieldGroup>
+    <FieldGroup>
       <Label for="company">Company *</Label>
-      <Input id="company" type="text" v-model="form.company" placeholder="Your company" autocomplete="organization" />
-      <div v-if="formErrors.company" class="text-sm text-destructive">
+      <Input id="company" type="text" v-model="form.company" placeholder="Your company" autocomplete="organization" required :aria-invalid="formErrors.company ? true : undefined" :aria-describedby="formErrors.company ? 'company-error' : undefined" />
+      <div v-if="formErrors.company" id="company-error" class="text-sm text-destructive">
         {{ formErrors.company }}
       </div>
-    </div>
-    <div class="space-y-2">
+    </FieldGroup>
+    <FieldGroup>
       <Label for="region">Region *</Label>
       <Select v-model="form.regionId">
-        <SelectTrigger>
+        <SelectTrigger id="region" aria-required="true" :aria-invalid="formErrors.regionId ? true : undefined" :aria-describedby="formErrors.regionId ? 'region-error' : undefined">
           <SelectValue placeholder="Select a region..." />
         </SelectTrigger>
         <SelectContent>
@@ -112,28 +113,28 @@ async function onSubmit(event: Event) {
           </SelectItem>
         </SelectContent>
       </Select>
-      <div v-if="formErrors.regionId" class="text-sm text-destructive">
+      <div v-if="formErrors.regionId" id="region-error" class="text-sm text-destructive">
         {{ formErrors.regionId }}
       </div>
-    </div>
-    <div class="space-y-2">
+    </FieldGroup>
+    <FieldGroup>
       <Label for="email">Email *</Label>
-      <Input id="email" type="email" v-model="form.email" placeholder="name@example.com" autocomplete="email" />
-      <div v-if="emailError" class="text-sm text-destructive">
+      <Input id="email" type="email" v-model="form.email" placeholder="name@example.com" autocomplete="email" required :aria-invalid="emailError ? true : undefined" :aria-describedby="emailError ? 'email-error' : undefined" />
+      <div v-if="emailError" id="email-error" class="text-sm text-destructive">
         {{ emailError }}
       </div>
-    </div>
-    <div v-if="globalStore.env && !globalStore.env.passwordLessAuthentication" class="space-y-2">
+    </FieldGroup>
+    <FieldGroup v-if="globalStore.env && !globalStore.env.passwordLessAuthentication" >
       <Label for="password">Password *</Label>
       <Input id="password" type="password" v-model="form.password" placeholder="Your password"
-        autocomplete="new-password" />
-      <div v-if="formErrors.password" class="text-sm text-destructive">
+        autocomplete="new-password" required :aria-invalid="formErrors.password ? true : undefined" :aria-describedby="formErrors.password ? 'password-error' : undefined" />
+      <div v-if="formErrors.password" id="password-error" class="text-sm text-destructive">
         {{ formErrors.password }}
       </div>
-    </div>
+    </FieldGroup>
     <div class="flex flex-col pt-5">
       <div class="flex items-center space-x-2 mb-3">
-        <Checkbox id="acceptPolicies" v-model:checked="acceptedPolicies" />
+        <Checkbox id="acceptPolicies" v-model="acceptedPolicies" aria-required="true" />
         <Label for="acceptPolicies">
           I accept the
           <router-link to="/privacy-policy" class="underline">Privacy Policy and Cookie
@@ -141,16 +142,14 @@ async function onSubmit(event: Event) {
         </Label>
       </div>
       <Button type="submit" class="w-full" :disabled="!isFormValid">Sign up</Button>
-      <div v-if="formRootError" class="text-sm font-medium mt-2 text-destructive">
+      <div v-if="formRootError" role="alert" class="text-sm font-medium mt-2 text-destructive">
         {{ formRootError }}
       </div>
       <div class="flex">
-        <Button variant="link" class="px-0">
+        <Button as-child variant="link" class="px-0">
           <router-link :to="{ name: 'login' }">Already have an account? Log in</router-link>
         </Button>
       </div>
     </div>
   </form>
 </template>
-
-<style scoped></style>

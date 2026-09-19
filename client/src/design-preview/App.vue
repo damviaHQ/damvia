@@ -17,8 +17,10 @@ import { CheckCircle2, X } from 'lucide-vue-next'
 import { onUnmounted, ref } from 'vue'
 import logo from '../assets/logo.svg?url'
 import Foundations from './Foundations.vue'
+import ProductionControls from './ProductionControls.vue'
 
 const notice = ref('')
+const neutral = ref(false)
 let noticeTimer: ReturnType<typeof setTimeout>
 
 function notify(message: string) {
@@ -31,16 +33,17 @@ onUnmounted(() => clearTimeout(noticeTimer))
 </script>
 
 <template>
-  <div class="dv-theme design-reference">
+  <div class="dv-theme design-reference" :class="{ 'dv-neutral': neutral }">
     <a class="skip-link" href="#main-content">Skip to content</a>
     <header class="reference-header">
       <div class="reference-header__brand"><img :src="logo" alt="Damvia" /><span>Design system</span></div>
-      <div class="reference-header__meta"><span>Local reference</span><strong>0.1</strong></div>
+      <div class="reference-header__meta"><button class="dv-button" :aria-pressed="neutral" @click="neutral = !neutral">{{ neutral ? 'Neutral client theme' : 'Damvia brand theme' }}</button><span>Local reference</span><strong>0.1</strong></div>
     </header>
     <main id="main-content" tabindex="-1">
+      <ProductionControls :key="String(neutral)" :neutral="neutral" />
       <Foundations @notify="notify" />
     </main>
-    <footer class="reference-footer"><span>Damvia design system</span><span>Tokens and components used by the real admin and website.</span></footer>
+    <footer class="reference-footer"><span>Damvia design system</span><span>One component system. Damvia and neutral client themes.</span></footer>
     <div v-if="notice" class="dv-toast dv-toast--success preview-toast" role="status">
       <CheckCircle2 class="dv-toast__icon" />
       <strong class="dv-toast__title">{{ notice }}</strong>

@@ -1,0 +1,5 @@
+// Match the dashboard's Lucide menu icons. Toolbars use their own action sizes.
+export const menuIconClasses = 'size-4 shrink-0'
+export const menuIconSlotClasses = 'grid size-5 shrink-0 place-items-center'
+export const sidebarRowClasses = 'flex h-9 min-w-0 items-center gap-2 px-3 text-left text-body font-medium text-neutral-600 hover:bg-neutral-200/60 hover:text-neutral-950'
+export const treeRowClasses = 'flex h-9 min-w-0 items-center pl-px pr-2 text-body font-medium no-underline text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900'

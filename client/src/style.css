@@ -12,9 +12,22 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "../../packages/design-system/src/tokens.css";
+@import "../../packages/design-system/src/fonts.css";
+@import "../../packages/design-system/src/components.css" layer(components);
+@import "tw-animate-css";
+@import "./styles/controls.css";
+@config "../tailwind.config.js";
+@source inline("dark");
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --text-body: var(--dv-size-body);
+  --text-body--line-height: 1.5;
+  --text-caption: var(--dv-size-caption);
+  --text-caption--line-height: 1.5;
+}
 
 @layer base {
   :root {
@@ -47,7 +60,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
     --ring: 0 0% 64%;
 
-    --radius: -10.5rem; /*0.5rem*/
+    --radius: 0px;
   }
 
   .dark {
@@ -92,83 +105,5 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
   }
 }
 
-.vue-treeselect__control {
-  @apply border border-neutral-400 pl-1 h-[2.8rem] rounded-none;
-}
-
-.vue-treeselect:not(.vue-treeselect--disabled):not(.vue-treeselect--focused)
-  .vue-treeselect__control:hover,
-.vue-treeselect--open .vue-treeselect__control {
-  @apply border-neutral-800;
-}
-
-.vue-treeselect--open-below .vue-treeselect__menu {
-  @apply bg-popover text-neutral-800 border border-neutral-400 rounded-none shadow-md mt-1;
-}
-
-.vue-treeselect__option--highlight {
-  @apply bg-neutral-100 text-neutral-900 p-1;
-}
-
-.vue-treeselect__option {
-  @apply p-1;
-}
-
-.vue-treeselect .vue-treeselect-helper-hide {
-  display: none;
-}
-
-.vue-treeselect--focused.vue-treeselect--searchable .vue-treeselect__single-value {
-  @apply text-neutral-800;
-}
-
-.vue-treeselect--has-value .vue-treeselect__multi-value {
-  @apply px-1 py-1 mb-0;
-}
-
-.vue-treeselect__control-arrow,
-.vue-treeselect__x {
-  @apply text-neutral-500;
-}
-
-.vue-treeselect.vue-treeselect--focused {
-  @apply border-neutral-600;
-}
-
-.vue-treeselect__placeholder,
-.vue-treeselect__single-value {
-  @apply flex items-center text-neutral-500 text-sm;
-}
-
-.vue-treeselect__single-value {
-  @apply text-neutral-800;
-}
-
-.vue-treeselect__input,
-.vue-treeselect__single-value {
-  @apply px-1.5 py-2.5 text-neutral-600 text-sm rounded-none hover:border-neutral-500;
-}
-
-.vue-treeselect__input:focus {
-  @apply text-neutral-800;
-}
-
-.vue-treeselect__input {
-  @apply pl-0 py-0 text-neutral-600 text-sm rounded-none hover:border-neutral-500;
-}
-
-.vue-treeselect__multi-value-item {
-  @apply !bg-neutral-100 !text-neutral-800 rounded-none inline-table text-sm;
-}
-
-.vue-treeselect__value-remove {
-  @apply text-neutral-500 px-2.5;
-}
-
-.vue-treeselect--single .vue-treeselect__option--selected:hover {
-  @apply bg-neutral-200;
-}
-
-.vue-treeselect--single .vue-treeselect__option--selected {
-  @apply bg-neutral-200;
-}
+/* Empty content for existing navigation connector pseudo-elements. */
+.dv-theme { --dv-empty-content: ""; }

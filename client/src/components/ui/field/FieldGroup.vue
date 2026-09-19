@@ -1,0 +1,9 @@
+<script setup lang="ts">
+import type { HTMLAttributes } from 'vue'
+import { cn } from '@/lib/utils'
+import { fieldGroupClasses } from './styles'
+defineProps<{ class?: HTMLAttributes['class'] }>()
+</script>
+<template>
+  <div :class="cn(fieldGroupClasses, $props.class)"><slot /></div>
+</template>

@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -147,23 +148,23 @@ async function onSubmit() {
               <Check v-if="form.synchronized" class="w-4 h-4 text-primary ml-auto" />
             </button>
           </div>
-          <div v-if="form.synchronized" class="flex flex-col gap-2">
+          <FieldGroup v-if="form.synchronized" >
             <Label>Select a folder from your cloud storage *</Label>
             <treeselect v-model="form.assetFolderId" placeholder="Asset folder" :options="assetFolders"
               :normalizer="(node) => ({ id: node.id, label: node.name })" />
-          </div>
-          <div v-if="!form.synchronized" class="flex flex-col gap-2">
+          </FieldGroup>
+          <FieldGroup v-if="!form.synchronized" >
             <Label for="name">Name *</Label>
             <Input id="name" type="text" v-model="form.name" placeholder="Name" class="form-input mb-075" />
-          </div>
-          <div v-if="collectionOptions?.length" class="flex flex-col gap-2">
+          </FieldGroup>
+          <FieldGroup v-if="collectionOptions?.length" >
             <Label for="collectionId">Select a parent collection</Label>
             <treeselect v-model="form.collectionId" class="mb-075" placeholder="Parent collection"
               :options="collectionOptions" :clearable="true" />
-          </div>
+          </FieldGroup>
           <div>
             <div class="flex items-center gap-2">
-              <Checkbox v-model:checked="form.draft" id="draft" />
+              <Checkbox v-model="form.draft" id="draft" />
               <Label for="draft">Draft</Label>
             </div>
           </div>

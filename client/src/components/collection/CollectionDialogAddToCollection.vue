@@ -29,7 +29,7 @@ import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { ChevronDown, ChevronRight, CirclePlus, Folder, Loader2Icon } from "lucide-vue-next"
-import { TreeItem, TreeRoot } from 'radix-vue'
+import { TreeItem, TreeRoot } from 'reka-ui'
 import {computed, ref} from "vue"
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import CollectionDialogCreatePublic from "@/components/collection/CollectionDialogCreatePublic.vue";
@@ -60,10 +60,6 @@ const usablePublicCollections = computed(() => (publicCollections.value ?? []).f
   (collection: RouterOutput['collection']['findById']) => !collection.synchronized,
 ))
 
-function handleSelect(collection: RouterOutput["collection"]["tree"][number]) {
-  selectedCollection.value = collection
-}
-
 const isLoading = ref(false)
 
 async function addToCollection() {
@@ -93,7 +89,7 @@ async function addToCollection() {
 
 <template>
   <Dialog :open="props.modelValue" @update:open="emit('update:modelValue', $event)">
-    <DialogContent class="sm:max-w-[500px]">
+    <DialogContent class="sm:max-w-[560px] gap-6">
       <DialogHeader>
         <DialogTitle>Add selection to a collection</DialogTitle>
         <DialogDescription>
@@ -101,7 +97,7 @@ async function addToCollection() {
         </DialogDescription>
       </DialogHeader>
       <Tabs v-model="tabId">
-        <div class="mt-4">
+        <div>
           <div class="flex justify-between items-center mb-2">
             <TabsList>
               <TabsTrigger value="private">
@@ -125,6 +121,9 @@ async function addToCollection() {
                 <TreeRoot
                   v-else
                   v-slot="{ flattenItems }"
+                  v-model="selectedCollection"
+                  selection-behavior="replace"
+                  aria-label="Your collections"
                   :items="privateCollections"
                   :get-key="(item) => item.id"
                   :get-children="(item) => item.children"
@@ -134,7 +133,6 @@ async function addToCollection() {
                     :style="{ paddingLeft: `${item.level * 16}px` }" v-bind="item.bind"
                     class="flex items-center py-2 hover:bg-neutral-100 rounded cursor-pointer"
                     :class="{ 'bg-neutral-100': selectedCollection?.id === item.value.id }"
-                    @click="handleSelect(item.value)"
                   >
                     <template v-if="item.value.children && item.value.children.length > 0">
                       <ChevronDown v-if="isExpanded" class="h-4 w-4 mr-2" />
@@ -157,6 +155,9 @@ async function addToCollection() {
                 <TreeRoot
                   v-else
                   v-slot="{ flattenItems }"
+                  v-model="selectedCollection"
+                  selection-behavior="replace"
+                  aria-label="Public collections"
                   :items="usablePublicCollections"
                   :get-key="(item) => item.id"
                   :get-children="(item) => item.children"
@@ -169,7 +170,6 @@ async function addToCollection() {
                     v-bind="item.bind"
                     class="flex items-center py-2 hover:bg-neutral-100 rounded cursor-pointer"
                     :class="{ 'bg-neutral-100': selectedCollection?.id === item.value.id }"
-                    @click="handleSelect(item.value)"
                   >
                     <template v-if="item.value.children && item.value.children.length > 0">
                       <ChevronDown v-if="isExpanded" class="h-4 w-4 mr-2" />
@@ -187,8 +187,8 @@ async function addToCollection() {
           </TabsContent>
         </div>
       </Tabs>
-      <DialogFooter class="mt-4">
-        <Button variant="link" @click="emit('update:modelValue', false)">Cancel</Button>
+      <DialogFooter>
+        <Button type="button" variant="outline" @click="emit('update:modelValue', false)">Cancel</Button>
         <Button @click="addToCollection" :disabled="!selectedCollection || isLoading">
           Add to {{ selectedCollection ? selectedCollection.name : 'Collection' }}
           <Loader2Icon v-if="isLoading" class="h-4 w-4 animate-spin ml-2" />

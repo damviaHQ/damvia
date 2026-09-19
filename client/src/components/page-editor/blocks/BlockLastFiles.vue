@@ -13,10 +13,11 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ref, watch } from 'vue'
+import { ref, useId, watch } from 'vue'
 
 const props = defineProps<{
   data: {
@@ -28,6 +29,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update", value: { data: any }): void
 }>()
+
+const fieldId = useId()
 
 const form = ref({
   layout: props.data.layout || 'user_preferences',
@@ -53,11 +56,11 @@ function updateForm() {
 
 <template>
   <div class="flex flex-col gap-4">
-    <h1 class="text-lg font-medium">Add last files block</h1>
-    <div class="flex flex-col gap-2">
-      <Label>Layout</Label>
+    <h3 class="text-sm font-semibold">Add last files block</h3>
+    <FieldGroup>
+      <Label :for="`${fieldId}-layout`">Layout</Label>
       <Select v-model="form.layout" @update:modelValue="updateForm">
-        <SelectTrigger>
+        <SelectTrigger :id="`${fieldId}-layout`">
           <SelectValue placeholder="Use user preferences" />
         </SelectTrigger>
         <SelectContent>
@@ -66,10 +69,10 @@ function updateForm() {
           <SelectItem value="list">List</SelectItem>
         </SelectContent>
       </Select>
-    </div>
-    <div class="flex flex-col gap-2">
-      <Label>Custom title (optional)</Label>
-      <Input type="text" v-model="form.title" @update:modelValue="updateForm" />
-    </div>
+    </FieldGroup>
+    <FieldGroup>
+      <Label :for="`${fieldId}-title`">Custom title (optional)</Label>
+      <Input :id="`${fieldId}-title`" type="text" v-model="form.title" @update:modelValue="updateForm" />
+    </FieldGroup>
   </div>
 </template>

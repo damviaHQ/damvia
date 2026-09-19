@@ -13,22 +13,22 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import Modal from "@/components/Modal.vue"
 import { Button } from "@/components/ui/button"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 import {
   ChevronDown,
-  Quote,
   Search,
   SlidersHorizontal,
-  Square,
-  SquareCheck,
   X,
 } from "lucide-vue-next"
 import { computed, nextTick, onMounted, onUnmounted, ref, Ref, watch } from "vue"
 import { LocationQuery, LocationQueryValue, useRoute, useRouter } from "vue-router"
 
+const sentenceChoiceClasses = 'flex min-h-9 max-w-full items-center justify-between gap-2 bg-neutral-50 px-2 py-1 text-left text-base font-medium text-neutral-600 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 const router = useRouter()
 const route = useRoute()
 const { data: assetTypes } = useQuery({
@@ -278,18 +278,17 @@ function resetSearch() {
   isSearchCleared.value = true
 }
 
-const isExactSearchSelectOpen = ref(false)
 function setExactMatch(enabled: boolean) {
   const newValue = { ...searchQuery.value, exactMatch: enabled }
   if (newValue.exactMatch && Array.isArray(newValue.query)) {
     newValue.query = [...newValue.query, searchQueryValue.value]
       .filter((v) => v)
       .join(" ")
+    searchQueryValue.value = ""
   } else if (!newValue.exactMatch && !Array.isArray(newValue.query)) {
     newValue.query = parseQueryParts(newValue.query)
   }
   searchQuery.value = newValue
-  isExactSearchSelectOpen.value = false
 }
 
 function handlePaste(event: ClipboardEvent) {
@@ -314,14 +313,10 @@ function isContainingElement(el: HTMLElement, child: HTMLElement) {
   return false
 }
 
-const exactSearchSelect = ref<HTMLElement | null>(null)
 const assetTypeSelect = ref<HTMLElement | null>(null)
 const searchScopeSelect = ref<HTMLElement | null>(null)
 function handleDocumentClick(event: Event) {
   const target = event.target as HTMLDivElement
-  if (exactSearchSelect.value && !isContainingElement(exactSearchSelect.value, target)) {
-    isExactSearchSelectOpen.value = false
-  }
   if (assetTypeSelect.value && !isContainingElement(assetTypeSelect.value, target)) {
     isAssetTypeSelectOpen.value = false
   }
@@ -389,116 +384,97 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="dashboard-layout-search-bar__container relative flex items-center">
-    <button type="button"
-      class="bg-neutral-100 py-3.5 pr-4 pl-3 max-w-80 flex items-center border-none cursor-pointer transition duration-200 ease-in-out ring-2 ring-transparent hover:ring-neutral-500 focus:ring-neutral-500 outline-none group"
-      @click="isModalOpen = true" title="Click to open search box">
-      <Search class="w-7 h-7 search-bar__style text-neutral-400 group-hover:text-neutral-600 mr-[0.5em]" />
-      <div
-        class="search-bar__style flex items-center w-[480px] text-neutral-400 text-sm h-[17px] overflow-hidden whitespace-nowrap group-hover:text-neutral-600 leading-none">
-        {{
-          (Array.isArray(currentQuery) ? currentQuery.join(", ") : currentQuery) ||
-          "Search by references or file names..."
-        }}
-      </div>
+  <div class="dashboard-layout-search-bar__container relative flex min-w-0 items-center gap-1">
+    <button type="button" class="group flex h-10 min-w-0 items-center gap-2.5 border border-neutral-200 bg-neutral-50 px-3 text-left transition-colors hover:border-neutral-300 hover:bg-white focus-visible:outline-2 focus-visible:outline-ring md:w-[360px]" @click="isModalOpen = true" aria-label="Search assets">
+      <Search class="size-4 shrink-0 text-neutral-400" />
+      <span class="truncate text-[length:var(--dv-field-label-size)] text-neutral-500 max-md:hidden">{{ (Array.isArray(currentQuery) ? currentQuery.join(', ') : currentQuery) || 'Search assets' }}</span>
     </button>
-    <div class="absolute right-4 flex items-center justify-center" @click.prevent="router.push({ name: 'search' })">
+    <button type="button" aria-label="Search filters" class="search-filter-trigger flex size-9 items-center justify-center text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900" @click.prevent="router.push({ name: 'search' })">
       <SlidersHorizontal class="cursor-pointer text-neutral-500 hover:text-neutral-800" width="18" />
-    </div>
+    </button>
   </div>
   <modal v-if="isModalOpen" @close="isModalOpen = false">
-    <div class="search-bar__modal">
-      <button type="button" @click="isModalOpen = false" class="search-bar__modal-close">
-        <X class="w-5 h-5 text-neutral-500 hover:text-neutral-800" />
-      </button>
-      <div class="search-bar__modal-title">
-        <Quote class="w-5 h-5 text-transparent fill-neutral-500" />
-        <div>I</div>
-        <div class="search-bar__modal-select" ref="exactSearchSelect">
-          <button class="search-bar__modal-select-control" @click="isExactSearchSelectOpen = !isExactSearchSelectOpen">
+    <div class="search-bar__modal w-full min-w-0">
+      <div class="search-bar__modal-title flex flex-wrap items-center gap-2 mb-5 text-base font-medium text-neutral-600" data-search-sentence>
+        <span>I</span>
+        <div class="search-bar__modal-select relative min-w-0">
+          <Label for="search-mode" class="sr-only">Search mode</Label>
+          <button id="search-mode" type="button" aria-label="Search mode" :aria-pressed="searchQuery.exactMatch" :title="searchQuery.exactMatch ? 'Switch to multiple references' : 'Switch to an exact term'" class="search-bar__modal-select-control" :class="sentenceChoiceClasses" @click="setExactMatch(!searchQuery.exactMatch)">
             <div
-              class="font-medium text-base min-w-[200px] p-[0.1em_0.1em_0.1em_0.3em] max-w-[260px] truncate overflow-clip cursor-pointer">
+              class="min-w-0 max-w-[300px] truncate">
               {{
                 searchQuery.exactMatch
                   ? "search an exact term in"
                   : "search multiple references of"
               }}
             </div>
-            <ChevronDown />
           </button>
-          <div v-if="isExactSearchSelectOpen" class="search-bar__modal-select-content">
-            <button class="search-bar__modal-select-option" @click="setExactMatch(false)">
-              search multiple references
-            </button>
-            <button class="search-bar__modal-select-option" @click="setExactMatch(true)">
-              search an exact term
-            </button>
-          </div>
         </div>
-        <div class="search-bar__modal-select" ref="assetTypeSelect">
-          <button class="search-bar__modal-select-control" @click="isAssetTypeSelectOpen = !isAssetTypeSelectOpen">
+        <div class="search-bar__modal-select relative min-w-0" ref="assetTypeSelect">
+          <Label for="search-asset-types" class="sr-only">Asset types</Label>
+          <button id="search-asset-types" aria-label="Asset types" class="search-bar__modal-select-control" :class="sentenceChoiceClasses" @click="isAssetTypeSelectOpen = !isAssetTypeSelectOpen">
             <div
-              class="font-medium text-base min-w-[200px] p-[0.1em_0.1em_0.1em_0.3em] max-w-[260px] truncate overflow-clip cursor-pointer">
+              class="min-w-0 max-w-[300px] truncate">
               {{ selectedAssetTypes.length ? selectedAssetTypes.map((assetType) => assetType!.name).join(', ') : 'any asset type' }}
             </div>
-            <ChevronDown />
+            <ChevronDown class="size-4 shrink-0" />
           </button>
-          <div v-if="isAssetTypeSelectOpen" class="search-bar__modal-select-content">
-            <button v-for="assetType in assetTypes" :key="assetType.id" class="search-bar__modal-select-option"
-              @click="toggleAssetType(assetType)">
-              <SquareCheck v-if="searchQuery.assetTypes.includes(assetType.id)" />
-              <Square v-else />
-              {{ assetType.name }}
-            </button>
+          <div v-if="isAssetTypeSelectOpen" class="search-bar__modal-select-content absolute z-20 mt-1 flex min-w-full flex-col gap-1 bg-white p-1 shadow-md border border-input">
+            <label v-for="assetType in assetTypes" :key="assetType.id" class="flex cursor-pointer items-center gap-2 px-2 py-2 text-body text-foreground hover:bg-neutral-100">
+              <Checkbox :model-value="searchQuery.assetTypes.includes(assetType.id)" :aria-label="assetType.name" @update:model-value="toggleAssetType(assetType)" />
+              <span>{{ assetType.name }}</span>
+            </label>
           </div>
         </div>
-        <div>in</div>
-        <div class="search-bar__modal-select" ref="searchScopeSelect">
-          <button class="search-bar__modal-select-control" @click="isSearchScopeSelectOpen = !isSearchScopeSelectOpen">
+        <span>in</span>
+        <div class="search-bar__modal-select relative min-w-0" ref="searchScopeSelect">
+          <Label for="search-scope" class="sr-only">Search scope</Label>
+          <button id="search-scope" aria-label="Search scope" class="search-bar__modal-select-control" :class="sentenceChoiceClasses" @click="isSearchScopeSelectOpen = !isSearchScopeSelectOpen">
             <div
-              class="font-medium text-base min-w-[200px] p-[0.1em_0.1em_0.1em_0.3em] max-w-[260px] truncate overflow-clip cursor-pointer">
+              class="min-w-0 max-w-[300px] truncate">
               {{ (searchScopeOptions as any)[searchQuery.searchScope] ?? 'all' }}
             </div>
-            <ChevronDown />
+            <ChevronDown class="size-4 shrink-0" />
           </button>
-          <div v-if="isSearchScopeSelectOpen" class="search-bar__modal-select-content">
+          <div v-if="isSearchScopeSelectOpen" class="search-bar__modal-select-content absolute z-20 mt-1 flex min-w-full flex-col gap-1 bg-white p-1 shadow-md border border-input">
             <button v-for="[value, name] in Object.entries(searchScopeOptions)" :key="value"
-              class="search-bar__modal-select-option" @click="setSearchScope(value)">
+              class="search-bar__modal-select-option flex text-base items-center p-[0.2em] border-none text-neutral-500 hover:bg-neutral-100 bg-transparent cursor-pointer [&:last-child]:mb-0 [&_>_svg]:mr-2 [&_>_svg]:pointer-events-none" @click="setSearchScope(value)">
               {{ name }}
             </button>
           </div>
         </div>
       </div>
-      <div class="search-bar__modal-query">
+      <Label for="search-terms" class="mb-[var(--dv-field-gap)]">Search terms</Label>
+      <div class="search-bar__modal-query flex min-h-[var(--dv-control-height)] flex-wrap gap-2 border border-input bg-background px-[var(--dv-control-padding-x)] py-[var(--dv-control-padding-y)] max-h-[300px] overflow-x-auto focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
         <template v-if="Array.isArray(searchQuery.query)">
           <div v-for="(element, index) in searchQuery.query" :key="index"
-            class="tags flex items-center bg-neutral-50 text-neutral-500 font-medium ring-2 ring-neutral-200 hover:ring-neutral-300 text-base px-[0.2em] py-0.5 max-w-[260px] overflow-clip cursor-pointer whitespace-nowrap"
+            class="tags [&:focus-within]:ring-neutral-400 flex items-center bg-neutral-50 text-neutral-500 font-medium ring-2 ring-neutral-200 hover:ring-neutral-300 text-base px-[0.2em] py-0.5 max-w-[260px] overflow-clip cursor-pointer whitespace-nowrap"
             @click="editingIndex === index ? null : (editingIndex = index)" @dblclick="startEditing(index)">
             <div v-if="editingIndex !== index" class="text-sm pl-[0.5em] pr-[0.2em]">
               {{ element }}
             </div>
             <input v-else :id="`edit-input-${index}`" :value="element"
-              class="text-sm pl-[0.5em] pr-[0.2em] bg-transparent border-none outline-none"
+              class="text-sm pl-[0.5em] pr-[0.2em] bg-transparent border-none outline-hidden"
               @blur="saveEdit(index, $event.target.value)" @keyup.enter="saveEdit(index, $event.target.value)" />
             <button type="button" @click.stop="removeQueryPart(index)">
               <X class="w-4 h-4 text-neutral-600 hover:text-red-400 ml-1" />
             </button>
           </div>
-          <input class="search-bar__modal-query-input" type="text"
+          <input id="search-terms" class="search-bar__modal-query-input flex-1 [min-width:120px] p-0 [background:transparent] border-0 font-medium text-[length:var(--dv-field-label-size)] leading-[var(--dv-field-line-height)] [&::placeholder]:text-neutral-400 [&::placeholder]:text-[length:var(--dv-field-label-size)] [&::placeholder]:font-normal [&:focus]:[outline:none]" type="text" aria-label="References or file names"
             placeholder="Paste multiple product references or files separated by spaces." @keydown="handleKeydown"
             @paste="handlePaste" v-model="searchQueryValue" ref="searchInput" />
         </template>
-        <input v-else class="search-bar__modal-query-input" type="text"
+        <input v-else id="search-terms" class="search-bar__modal-query-input flex-1 [min-width:120px] p-0 [background:transparent] border-0 font-medium text-[length:var(--dv-field-label-size)] leading-[var(--dv-field-line-height)] [&::placeholder]:text-neutral-400 [&::placeholder]:text-[length:var(--dv-field-label-size)] [&::placeholder]:font-normal [&:focus]:[outline:none]" type="text" aria-label="References or file names"
           placeholder="Search for a reference or a file name" ref="searchInput" :value="searchQuery.query"
           @input="searchQuery = { ...searchQuery, query: ($event.target as HTMLInputElement).value }" />
       </div>
-      <div class="search-bar__modal-actions">
-        <div v-if="filesNotFoundEnabled && filesNotFound.data?.value?.length" class="search-bar__modal-missing-items">
+      <div class="search-bar__modal-actions mt-5 pt-2 gap-2 flex flex-wrap items-center justify-end">
+        <div v-if="filesNotFoundEnabled && filesNotFound.data?.value?.length" class="search-bar__modal-missing-items text-center [color:#929292] [font-size:14px] mb-2">
           <div>No file found for those items:</div>
           <div>{{ filesNotFound.data.value.join(", ") }}</div>
         </div>
-        <Button type="button" @click="search" class="px-10 py-5">Search</Button>
-        <div class="flex items-center gap-4 mt-2">
+        <Button type="button" @click="search" class="order-2 px-8">Search</Button>
+        <div class="order-1 mr-auto flex items-center gap-4">
           <Button
             type="button" variant="ghost" @click="resetSearch"
             class="bg-transparent text-neutral-500 hover:bg-transparent hover:text-red-500 text-sm p-0 mt-1.5"
@@ -517,157 +493,3 @@ onUnmounted(() => {
     </div>
   </modal>
 </template>
-
-<style scoped lang="scss">
-.search-bar__style {
-  @apply transition-colors duration-200 ease-in-out;
-}
-
-.search-bar__button {
-  background: var(--primary-color95);
-  padding: 0.875rem 1rem 0.875rem 2.75rem;
-  max-width: 20rem;
-  display: flex;
-  align-items: center;
-  border: none;
-  cursor: pointer;
-  outline: 2px solid transparent;
-  transition: outline 0.2s ease-in-out;
-
-  &:hover {
-    outline: 2px solid var(--primary-color65);
-  }
-}
-
-.search-bar__modal {
-  width: 100vw;
-  max-width: 960px;
-}
-
-.search-bar__modal-close {
-  display: block;
-  margin-left: auto;
-  margin-bottom: 12px;
-  border: none;
-  cursor: pointer;
-  background: transparent;
-}
-
-.search-bar__modal-title {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  white-space: nowrap;
-  gap: 8px;
-  color: var(--primary-color50);
-  font-weight: 500;
-  font-size: 20px;
-  margin-bottom: 19px;
-}
-
-.search-bar__modal-select {
-  position: relative;
-
-  &:hover {
-    @apply ring-2 ring-neutral-400;
-  }
-}
-
-.search-bar__modal-select-control {
-  @apply bg-neutral-50;
-
-  padding: 4px;
-  text-align: left;
-  border: none;
-  display: flex;
-  color: #929292;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.search-bar__modal-select-content {
-  @apply bg-neutral-50;
-
-  display: flex;
-  flex-direction: column;
-  gap: 0.3em;
-  z-index: 20;
-  position: absolute;
-  margin-top: -4px;
-  width: 100%;
-  padding: 0.6em 0.5em;
-  box-shadow: 0 8px 8px rgba(0, 0, 0, 0.1);
-}
-
-.search-bar__modal-select-option {
-  @apply flex text-base items-center p-[0.2em] border-none text-neutral-500 hover:bg-neutral-100 bg-transparent cursor-pointer;
-}
-
-.search-bar__modal-select-option:last-child {
-  margin-bottom: 0;
-}
-
-.search-bar__modal-select-option>svg {
-  @apply mr-2;
-  pointer-events: none;
-}
-
-.search-bar__modal-query {
-  @apply bg-neutral-100;
-
-  display: flex;
-  flex-wrap: wrap;
-  padding: 12px;
-  gap: 8px;
-  max-height: 300px;
-  overflow-x: auto;
-  outline: 2px solid transparent;
-  transition: outline 0.2s ease-in-out;
-
-  &:hover {
-    @apply outline-2 outline-neutral-400;
-  }
-
-  &:focus-within {
-    @apply outline-2 outline-neutral-400;
-  }
-}
-
-.search-bar__modal-query-input {
-  flex: 1;
-  min-width: 120px;
-  padding: 3px 0;
-  background: transparent;
-  border: none;
-  font-weight: 500;
-  font-size: 15px;
-}
-
-.search-bar__modal-query-input::placeholder {
-  @apply text-neutral-400 text-sm font-normal;
-}
-
-.search-bar__modal-query-input:focus {
-  outline: none;
-}
-
-.search-bar__modal-actions {
-  margin: 16px 0;
-  gap: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.search-bar__modal-missing-items {
-  text-align: center;
-  color: #929292;
-  font-size: 14px;
-  margin-bottom: 8px;
-}
-
-.tags:focus-within {
-  @apply ring-neutral-400;
-}
-</style>

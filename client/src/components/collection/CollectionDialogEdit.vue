@@ -13,15 +13,17 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldDescription from "@/components/ui/field/FieldDescription.vue"
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogHeader, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogFooter, DialogHeader, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
-import { EyeOff, ImageMinus, ImageUp, Trash } from "lucide-vue-next"
+import { ImageMinus, ImageUp, Trash } from "lucide-vue-next"
 import { ref, toRefs, watch } from "vue"
 import { useRouter } from "vue-router"
 import SelectGroupInput from "@/components/SelectGroupInput.vue";
@@ -38,6 +40,7 @@ const { collection, modelValue } = toRefs(props)
 const toast = useGlobalToast()
 const router = useRouter()
 const queryClient = useQueryClient()
+const upload = ref<HTMLInputElement | null>(null)
 const form = ref<{
   name?: string;
   description?: string;
@@ -158,89 +161,69 @@ async function clearCustomLayout() {
 
 <template>
   <Dialog :open="modelValue" @update:open="emit('update:modelValue', $event)">
-    <DialogContent class="sm:max-w-[640px] collection-edit-dialog">
+    <DialogContent class="sm:max-w-[640px] collection-edit-dialog gap-6">
       <DialogHeader>
-      <DialogTitle>Edit collection</DialogTitle>
-      <DialogDescription>
-        You can customize the collection name, description, thumbnail and layout.
-      </DialogDescription>
+        <DialogTitle>Edit collection</DialogTitle>
+        <DialogDescription>Manage collection details, visibility and appearance.</DialogDescription>
       </DialogHeader>
-      <div v-if="!collection.synchronized">
-        <Label for="name" class="text-sm font-medium">Name</Label>
-        <Input id="name" v-model="form.name" placeholder="Name" />
-      </div>
-      <div>
-        <Label for="description" class="text-sm font-medium">Description</Label>
-        <Input id="description" v-model="form.description"
-          placeholder="Describe your collection, this is visible in list view." />
-      </div>
-      <div class="flex items-center space-x-2">
-        <Checkbox id="draft" v-model:checked="form.draft" />
-        <Label for="draft" class="flex items-center text-sm font-medium">
-          <EyeOff class="w-4 h-4 mr-2" />
-          Hide <span class="text-sm ml-1 font-normal text-gray-500">
-            (No one can see this collection and assets inside)
-          </span>
-        </Label>
-      </div>
-      <div v-if="collection.canEditLimitedToGroupIds">
-        <Label for="limitedToGroupIds" class="text-sm font-medium">Limit access to the following groups</Label>
-        <SelectGroupInput
-          v-model="form.limitedToGroupIds"
-          id="limitedToGroupIds"
-          placeholder="Select groups..."
-        />
-      </div>
-      <div class="flex flex-col space-y-4">
-        <Label for="thumbnail" class="text-sm font-medium">Custom Thumbnail</Label>
-        <div class="collection-thumbnail-controls flex items-center gap-4">
-          <div class="w-[180px] h-[135px] shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-            <img alt="Collection thumbnail" v-if="form.thumbnailURL" :src="form.thumbnailURL" class="object-cover w-full h-full" />
-            <span v-else class="text-gray-500 text-sm">No Image</span>
+
+      <section class="grid gap-4" aria-labelledby="collection-details-heading">
+        <h3 id="collection-details-heading" class="text-sm font-semibold">Details</h3>
+        <FieldGroup v-if="!collection.synchronized" >
+          <Label for="collection-name">Name</Label>
+          <Input id="collection-name" v-model="form.name" placeholder="Collection name" />
+        </FieldGroup>
+        <FieldGroup>
+          <Label for="collection-description">Description</Label>
+          <Input id="collection-description" v-model="form.description" placeholder="Describe this collection" aria-describedby="collection-description-help" />
+          <FieldDescription id="collection-description-help">Shown in list view.</FieldDescription>
+        </FieldGroup>
+      </section>
+
+      <section class="grid gap-4" aria-labelledby="collection-visibility-heading">
+        <h3 id="collection-visibility-heading" class="text-sm font-semibold">Visibility</h3>
+        <div class="flex items-start gap-3">
+          <Checkbox id="collection-draft" v-model="form.draft" class="mt-0.5" aria-describedby="collection-draft-help" />
+          <div class="grid gap-1">
+            <Label for="collection-draft">Hide collection</Label>
+            <FieldDescription id="collection-draft-help">Hide this collection and its assets from users.</FieldDescription>
           </div>
-          <div class="flex flex-col space-y-2">
-            <div class="flex flex-col items-start gap-3">
-              <input ref="upload" type="file" accept="image/*" style="display: none" @change="handleFileUploaded">
-              <button type="button" @click="$refs.upload?.click()"
-                class="flex items-center text-sm font-medium rounded-md px-2 py-1 text-gray-500 hover:text-gray-700">
-                <ImageUp class="w-5 h-5 mr-2" />
-                Upload Thumbnail
-              </button>
-              <button v-if="form.thumbnailURL" type="button" @click="form.thumbnailURL = null"
-                class="flex items-center text-sm font-medium rounded-md px-2 py-1 text-gray-500 hover:text-gray-700">
-                <ImageMinus class="w-5 h-5 mr-2" />
-                Remove Thumbnail
-              </button>
+        </div>
+        <FieldGroup v-if="collection.canEditLimitedToGroupIds" >
+          <Label for="limitedToGroupIds">Limit access to groups</Label>
+          <SelectGroupInput v-model="form.limitedToGroupIds" id="limitedToGroupIds" placeholder="Select groups..." />
+        </FieldGroup>
+      </section>
+
+      <section class="grid gap-4" aria-labelledby="collection-appearance-heading">
+        <h3 id="collection-appearance-heading" class="text-sm font-semibold">Appearance</h3>
+        <FieldGroup>
+          <Label>Thumbnail</Label>
+          <div class="flex items-center gap-4">
+            <div class="flex h-[90px] w-[120px] shrink-0 items-center justify-center overflow-hidden bg-neutral-100">
+              <img v-if="form.thumbnailURL" :src="form.thumbnailURL" alt="Collection thumbnail" class="size-full object-cover" />
+              <span v-else class="text-xs text-neutral-500">No image</span>
+            </div>
+            <div class="grid justify-items-start gap-2">
+              <input ref="upload" type="file" accept="image/*" class="hidden" aria-label="Collection thumbnail" @change="handleFileUploaded" />
+              <Button type="button" variant="outline" size="sm" @click="upload?.click()"><ImageUp class="size-5" />Upload image</Button>
+              <Button v-if="form.thumbnailURL" type="button" variant="ghost" size="sm" @click="form.thumbnailURL = null"><ImageMinus class="size-5" />Remove image</Button>
             </div>
           </div>
-        </div>
+        </FieldGroup>
+        <FieldGroup class="justify-items-start">
+          <Label>Layout</Label>
+          <FieldDescription>Use a custom layout to arrange images and text.</FieldDescription>
+          <Button v-if="collection.page" type="button" variant="outline" size="sm" @click="clearCustomLayout">Use default layout</Button>
+          <Button v-else type="button" variant="outline" size="sm" @click="setupCustomLayout">Use custom layout</Button>
+        </FieldGroup>
+      </section>
 
-      </div>
-      <div class="flex flex-col gap-2">
-        <Label class="text-sm font-medium">Layout</Label>
-        <p class="text-sm text-gray-500">
-          You can setup custom layout for this collection and override the default layout. You can add Pictures, Text
-          etc.
-        </p>
-        <div>
-          <Button v-if="collection.page" @click="clearCustomLayout">
-            Move back to default layout
-          </Button>
-          <Button v-else @click="setupCustomLayout" variant="outline"> Switch to custom layout </Button>
-        </div>
-      </div>
-      <div class="admin-form-footer flex items-center justify-between gap-2">
-        <Button v-if="!collection.parent?.synchronized" variant="link" @click="deleteCollection"
-          class="text-red-500 hover:text-red-500 hover:bg-red-100">
-          <Trash class="w-4 h-4 mr-2" />
-          Delete collection
-        </Button>
-        <div></div>
-        <div class="flex items-center gap-2">
-          <Button variant="outline" @click="emit('update:modelValue', false)">Cancel</Button>
-          <Button @click="onSubmit">Update</Button>
-        </div>
-      </div>
+      <DialogFooter>
+        <Button v-if="!collection.parent?.synchronized" type="button" variant="ghost" class="mr-auto text-destructive hover:text-destructive" @click="deleteCollection"><Trash class="size-5" />Delete collection</Button>
+        <Button type="button" variant="outline" @click="emit('update:modelValue', false)">Cancel</Button>
+        <Button type="button" @click="onSubmit">Save changes</Button>
+      </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>

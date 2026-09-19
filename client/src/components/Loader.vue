@@ -17,35 +17,9 @@ defineProps<{ text?: boolean }>()
 </script>
 
 <template>
-  <div class="loader__container">
-    <span class="loader-animation"></span>
+  <div role="status" aria-live="polite" class="loader__container flex flex-col items-center gap-4 absolute [top:50%] [left:50%] [color:var(--dv-text-secondary)]">
+    <span class="loader-animation w-10 h-10 border-4 border-dashed rounded-[50%] border-neutral-300 inline-block relative box-border animate-spin"></span>
     <div v-if="text" class="loader-text">Loading</div>
+    <span v-else class="sr-only">Loading…</span>
   </div>
 </template>
-
-<style scoped>
-.loader-animation {
-  @apply w-10 h-10 border-4 border-dashed rounded-[50%] border-neutral-300 inline-block relative box-border animate-spin;
-}
-
-@keyframes rotation {
-  0% {
-    transform: rotate(0deg);
-  }
-
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.loader__container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  color: var(--primary-color35);
-}
-</style>

@@ -22,7 +22,7 @@ import { useGlobalStore } from "@/stores/globalStore"
 import { getFileExtension } from "@/utils/fileExtention"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Star, StarOff, Trash2 } from "lucide-vue-next"
+import { Star, Trash2 } from "lucide-vue-next"
 import { computed, ref } from "vue"
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
@@ -84,7 +84,7 @@ async function removeFromFavorite(file: File) {
 }
 
 async function remove(file: File) {
-  if (!removable) {
+  if (!removable.value) {
     return
   }
 
@@ -101,232 +101,26 @@ async function remove(file: File) {
   }
 }
 
-function onImageLoad(event: Event) {
-  if (
-    event.target &&
-    event.target instanceof HTMLImageElement &&
-    event.target.parentElement?.parentElement?.parentElement
-  ) {
-    event.target.parentElement.parentElement.parentElement.style.maxWidth = `${event.target.clientWidth}px`
-  }
-}
 </script>
 
 <template>
-  <div class="collection-grid-files__root">
-    <div v-if="files?.length" v-for="file in files" :key="file.id" class="collection-grid-files__file" :class="{
-      'collection-grid-files__file-thumbnail-placeholder-container': !file.thumbnailURL,
-    }">
-      <div class="collection-grid-files__hover-area">
-        <CollectionCheckbox @click="handleSelection(file)" :class="[
-          'collection-grid-files__file-selection',
-          isFileSelected(file) && 'collection-grid-files__file-selection--selected',
-        ]" :state="isFileSelected(file) ? 'check' : false" />
-        <div class="collection-grid-files__file-action-container">
-          <button v-if="removable" @click="remove(file)" type="button"
-            class="collection-grid-files__file-action visible-on-hover">
-            <Trash2 />
-          </button>
-          <template v-if="haveAccessToFavorites">
-            <div v-if="isFavorite(file)" class="favorite-button-container">
-              <button @click="removeFromFavorite(file)" type="button"
-                class="collection-grid-files__file-action file-is-favorite">
-                <Star class="text-neutral-600 fill-neutral-50" />
-              </button>
-              <button @click="removeFromFavorite(file)" type="button"
-                class="collection-grid-files__file-action star-off-button">
-                <StarOff />
-              </button>
-            </div>
-            <button v-else @click="addToFavorite(file)" type="button"
-              class="collection-grid-files__file-action visible-on-hover">
-              <Star class="text-neutral-500 fill-neutral-100 hover:fill-neutral-50 hover:text-neutral-800" />
-            </button>
-          </template>
-        </div>
-        <div class="collection-grid-files__file-image-container bg-neutral-100" :class="[
-          isFileSelected(file)
-            ? 'outline outline-2 outline-neutral-500 before:bg-opacity-20'
-            : 'before:bg-opacity-0 group-hover:before:bg-opacity-10',
-          'before:absolute before:inset-0 before:bg-neutral-900 before:transition-opacity',
-        ]">
-          <div class="collection-grid-files__file-overlay" @click="currentCollectionFileId = file.id"></div>
-          <img v-if="file.thumbnailURL" v-lazy="file.thumbnailURL" :src="file.thumbnailURL" :alt="file.name"
-            @load="onImageLoad" class="collection-grid-files__file-thumbnail" />
-          <thumbnailPlaceholder v-else :alt="file.name" class="collection-grid-files__file-thumbnail-placeholder" />
+  <div class="flex flex-wrap gap-6 p-0.5">
+    <article v-for="file in files" :key="file.id" class="group w-[276px] max-w-full min-w-0">
+      <div class="relative h-[196px] overflow-hidden bg-neutral-100" :class="isFileSelected(file) ? 'outline-2 outline-neutral-500' : ''">
+        <button type="button" class="absolute inset-0 flex size-full items-center justify-center p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-800" :aria-label="`Preview ${file.name}`" @click="currentCollectionFileId = file.id">
+          <img v-if="file.thumbnailURL" :src="file.thumbnailURL" :alt="file.name" loading="lazy" class="size-full object-contain" />
+          <thumbnailPlaceholder v-else class="h-20 w-auto! fill-neutral-400" aria-hidden="true" />
+        </button>
+        <CollectionCheckbox :aria-label="`Select ${file.name}`" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100" :class="isFileSelected(file) ? 'opacity-100' : 'opacity-0'" :state="isFileSelected(file) ? 'check' : false" @click="handleSelection(file)" />
+        <div class="absolute right-3 top-3 z-10 flex gap-1">
+          <button v-if="removable" type="button" :aria-label="`Remove ${file.name}`" class="grid size-6 place-items-center bg-transparent text-neutral-600 opacity-0 hover:text-red-700 group-hover:opacity-100 group-focus-within:opacity-100" @click="remove(file)"><Trash2 class="size-6" /></button>
+          <button v-if="haveAccessToFavorites" type="button" :aria-label="`${isFavorite(file) ? 'Remove from' : 'Add to'} favorites: ${file.name}`" :aria-pressed="isFavorite(file)" class="grid size-6 place-items-center bg-transparent text-[var(--dv-selection-color)] hover:text-neutral-950 group-hover:opacity-100 group-focus-within:opacity-100" :class="isFavorite(file) ? 'opacity-100' : 'opacity-0'" @click="isFavorite(file) ? removeFromFavorite(file) : addToFavorite(file)"><Star class="size-6" :class="isFavorite(file) && 'fill-current'" /></button>
         </div>
       </div>
-      <div>
-        <div class="text-neutral-500 text-sm whitespace-nowrap overflow-hidden text-ellipsis mt-[8px] max-w-full">
-          {{ file.name }}
-        </div>
-        <div class="text-xs text-neutral-400">
-          {{ getFileExtension(file.name) }} - {{ formatFileSize(file.size) }}
-        </div>
-      </div>
-    </div>
-    <div v-else-if="placeholder">
-      {{ placeholder }}
-    </div>
-    <CollectionModalGallery v-model="currentCollectionFileId" :collection="collection" :files="$props.files" />
+      <button type="button" class="mt-2.5 block w-full truncate text-left text-sm font-normal text-neutral-800 hover:text-neutral-950" :title="file.name" @click="currentCollectionFileId = file.id">{{ file.name }}</button>
+      <p class="mt-1 text-xs text-neutral-500"><span class="uppercase">{{ getFileExtension(file.name) }}</span><span class="mx-1.5 text-neutral-300">·</span>{{ formatFileSize(file.size) }}</p>
+    </article>
+    <p v-if="!files?.length && placeholder" class="col-span-full py-12 text-center text-sm text-neutral-500">{{ placeholder }}</p>
   </div>
+  <CollectionModalGallery v-model="currentCollectionFileId" :collection="collection" :files="$props.files" />
 </template>
-
-<style scoped lang="scss">
-.collection-grid-files__root {
-  display: flex;
-  flex-wrap: wrap;
-  overflow-x: hidden;
-  padding: 2px;
-  gap: 24px;
-}
-
-.collection-grid-files__file {
-  position: relative;
-  width: 100%;
-  min-width: 276px;
-  max-width: 360px;
-  align-self: center;
-}
-
-.collection-grid-files__file-image-container {
-  position: relative;
-  height: 196px;
-  max-width: 360px;
-  width: auto;
-  display: flex;
-  cursor: pointer;
-
-  img {
-    margin: 0 auto;
-    padding: 0.5rem;
-    max-width: 276px;
-    object-fit: contain;
-  }
-}
-
-.collection-grid-files__file-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  cursor: pointer;
-}
-
-.collection-grid-files__file-thumbnail {
-  display: block;
-  height: 196px;
-  width: auto;
-  cursor: pointer;
-  object-fit: cover;
-}
-
-.collection-grid-files__file-thumbnail-placeholder {
-  display: block;
-  height: 140px;
-  width: auto;
-  cursor: pointer;
-  margin: auto auto;
-  object-fit: cover;
-  fill: var(--primary-color35);
-}
-
-.collection-grid-files__file-thumbnail-placeholder-container {
-  max-width: 190px;
-}
-
-.icon-collection {
-  fill: var(--primary-color50);
-}
-
-.collection-grid-files__file-selection {
-  cursor: pointer;
-  display: none;
-  position: absolute;
-  top: 1rem;
-  left: 0.9rem;
-}
-
-.collection-grid-files__file-selection--selected,
-.collection-grid-files__file-selection--selected svg {
-  display: flex;
-  z-index: 2;
-}
-
-.collection-grid-files__file-image-container-selected {
-  outline: 2px solid var(--primary-color50);
-}
-
-.collection-grid-files__file-action-container {
-  position: absolute;
-  top: 1rem;
-  right: 0.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.collection-grid-files__file:hover .collection-grid-files__file-selection {
-  display: flex;
-  z-index: 2;
-}
-
-.collection-grid-files__file:hover .collection-grid-files__file-action {
-  @apply text-neutral-500 fill-neutral-100;
-  display: flex;
-  z-index: 2;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.collection-grid-files__file-action {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out, color 0.2s ease-in-out;
-
-  &.visible-on-hover {
-    opacity: 0;
-  }
-
-  &.file-is-favorite {
-    opacity: 1;
-  }
-}
-
-.collection-grid-files__file:hover .collection-grid-files__file-action.visible-on-hover {
-  opacity: 1;
-}
-
-.favorite-button-container {
-  z-index: 2;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-}
-
-.star-off-button {
-  position: absolute;
-  top: 0;
-  left: 0;
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-  width: 100%;
-  height: 100%;
-}
-
-.favorite-button-container:hover .star-off-button {
-  opacity: 1;
-}
-</style>

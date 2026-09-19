@@ -249,6 +249,7 @@ watch(metric, () => {
             }"
             role="button"
             tabindex="0"
+            :aria-pressed="cluster.locations.length === 1 ? cluster.locations[0].id === selection : undefined"
             :aria-label="`${cluster.locations.map((row) => row.name).join(', ')}: ${count(cluster.value)} ${metricLabel.toLowerCase()}. ${cluster.locations.length > 1 ? 'Zoom into these locations.' : 'View location details.'}`"
             @pointerdown.stop
             @click.stop="focusCluster(cluster)"
@@ -289,7 +290,7 @@ watch(metric, () => {
             </text>
           </g>
         </svg>
-        <div v-if="hover" class="map-tooltip" role="status">
+        <div v-if="hover" class="map-tooltip" aria-hidden="true">
           <strong>{{
             hover.locations.length === 1
               ? hover.locations[0].name

@@ -20,7 +20,7 @@ import BlockLastFiles from '@/components/page-editor/blocks/BlockLastFiles.vue'
 import BlockText from '@/components/page-editor/blocks/BlockText.vue'
 import BlockVideo from '@/components/page-editor/blocks/BlockVideo.vue'
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import type { Block, BlockType, Collection, Page } from "@/layouts/LayoutPageEditor.vue"
 import { trpc } from "@/services/server.ts"
@@ -200,38 +200,38 @@ async function save() {
 
 <template>
   <Dialog :open="modelValue" @update:open="emit('update:modelValue', $event)">
-    <DialogContent class="admin-dialog--wide block-editor-dialog flex flex-col">
+    <DialogContent class="admin-dialog--wide block-editor-dialog sm:max-w-[960px] flex flex-col gap-6">
       <DialogHeader><DialogTitle>{{ props.block ? 'Edit content block' : 'Add content block' }}</DialogTitle><DialogDescription>Choose the content type and configure what appears on the page.</DialogDescription></DialogHeader>
-      <div class="block-editor-grid">
+      <div class="block-editor-grid grid grid-cols-[240px_minmax(0,1fr)] gap-6">
         <!-- Sidebar with block types -->
-        <div class="block-editor-types">
-          <h3 class="mb-3">Content type</h3>
-          <div class="p-2">
+        <div class="block-editor-types border-r border-neutral-200 pr-4">
+          <h3 class="mb-3 text-sm font-semibold">Content type</h3>
+          <div class="grid gap-1">
             <button v-for="block in blockList" :key="block.type" type="button"
-              class="block-type-option" :aria-pressed="form.type === block.type" :class="{
+              class="block-type-option flex w-full items-start gap-3 p-3 text-left" :aria-pressed="form.type === block.type" :class="{
                 'bg-muted': form.type === block.type,
                 'hover:bg-muted': !props.block,
                 'opacity-50 cursor-not-allowed': !!props.block
               }" @click="selectBlock(block.type)" :disabled="!!props.block">
-              <component :is="block.icon" class="w-6 h-6 mr-3 text-primary" />
-              <div class="text-left">
-                <h3 class="font-medium text-sm">{{ block.name }}</h3>
-                <p class="text-xs text-muted-foreground">{{ block.description }}</p>
-              </div>
+              <component :is="block.icon" class="size-6 shrink-0 text-neutral-600" />
+              <span class="text-left">
+                <span class="block font-medium text-sm">{{ block.name }}</span>
+                <span class="block text-xs text-muted-foreground">{{ block.description }}</span>
+              </span>
             </button>
           </div>
         </div>
 
         <!-- Selected block content -->
         <div class="min-w-0 flex flex-col">
-          <form @submit.prevent="save" class="admin-form">
+          <form @submit.prevent="save" class="admin-form flex min-h-[380px] flex-col gap-5">
             <div v-if="!form.type" class="flex flex-col items-center justify-center flex-grow">
-              <h2 class="text-lg font-medium">Select a block type</h2>
+              <p class="text-lg font-medium">Select a block type</p>
               <p class="text-muted-foreground">Choose a content type to see its settings.</p>
             </div>
 
             <template v-else>
-              <div class="block-editor-fields">
+              <div class="block-editor-fields min-w-0 flex-1">
                 <BlockCollections v-if="form.type === 'collections'" :data="form.data" @update="updateFormData"
                   class="max-h-full" />
                 <BlockFiles v-else-if="form.type === 'files'" :data="form.data" @update="updateFormData"
@@ -246,14 +246,14 @@ async function save() {
                   class="max-h-full" />
               </div>
 
-              <div class="admin-form-footer">
+              <DialogFooter class="admin-form-footer mt-auto">
                 <Button type="button" variant="outline" class="mr-2" @click="emit('update:modelValue', false)">
                   Cancel
                 </Button>
                 <Button type="submit" :disabled="isSaving">
                   {{ isSaving ? 'Saving...' : 'Save' }}
                 </Button>
-              </div>
+              </DialogFooter>
             </template>
           </form>
         </div>
@@ -261,15 +261,3 @@ async function save() {
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-.block-editor-modal__dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--dv-color-line, #929292);
-  color: var(--dv-text-secondary, #929292);
-  height: 60px;
-  width: 100%;
-}
-</style>

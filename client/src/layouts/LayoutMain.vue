@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import CollectionDialogCreate from "@/components/collection/CollectionDialogCreate.vue"
 import MainLinkTree from "@/components/layout-main/MainLinkTree.vue"
 import MainMenuTree from "@/components/layout-main/MainMenuTree.vue"
+import { menuIconClasses, menuIconSlotClasses, sidebarRowClasses } from "@/components/layout-main/navigationStyles"
 import MainTopbar from "@/components/layout-main/MainTopbar.vue"
 import { Button } from "@/components/ui/button"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -23,14 +24,14 @@ import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
 import { sortBy } from "lodash"
-import { ChevronDown, ChevronRight, CirclePlus } from "lucide-vue-next"
+import { ChevronDown, ChevronRight, CirclePlus, Menu, X, Star } from "lucide-vue-next"
 import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
 const SIDEBAR_WIDTH_KEY = "damvia.sidebarWidth"
 const SIDEBAR_MIN = 240
 const SIDEBAR_MAX = 600
-const SIDEBAR_DEFAULT = 320
+const SIDEBAR_DEFAULT = 264
 
 function readStoredWidth(): number {
   const raw = typeof localStorage !== "undefined" ? localStorage.getItem(SIDEBAR_WIDTH_KEY) : null
@@ -71,12 +72,23 @@ function startResize(e: MouseEvent) {
   document.addEventListener("mouseup", onResizeEnd)
 }
 
+function onResizeKeydown(e: KeyboardEvent) {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+  e.preventDefault()
+  sidebarWidth.value = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, sidebarWidth.value + (e.key === "ArrowRight" ? 16 : -16)))
+  try {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth.value))
+  } catch (_) { /* storage unavailable */ }
+}
+
 onBeforeUnmount(() => {
   document.removeEventListener("mousemove", onResizeMove)
   document.removeEventListener("mouseup", onResizeEnd)
 })
 
 const route = useRoute()
+const mobileNavOpen = ref(false)
+watch(() => route.fullPath, () => { mobileNavOpen.value = false })
 const isDialogCreateCollectionOpen = ref<boolean>(false)
 
 type Collection = RouterOutput["collection"]["tree"][number]
@@ -122,11 +134,25 @@ const openCollections = computed(() => {
   const ids: string[] = []
   
   if (route.name === "collection" && route.params.id) {
-    const collection = flattenCollections.value.find((item) => item.id === route.params.id)
+    const currentId = route.params.id as string
+    const findPath = (items: Array<{ id: string; children?: any[] }>, menu = false): string[] | null => {
+      for (const item of items) {
+        const id = menu ? (item as any).collectionId : item.id
+        if (id === currentId) return [currentId]
+        const childPath = findPath(item.children ?? [], menu)
+        if (childPath) return id ? [id, ...childPath] : childPath
+      }
+      return null
+    }
+    const treePath = findPath(collections.value ?? [])
+    const menuPath = findPath(menuItems.value ?? [], true)
+    if (menuPath) return menuPath
+    if (treePath) return treePath
+    const collection = flattenCollections.value.find((item) => item.id === currentId)
     for (let current = collection; current; current = current.parent) {
       ids.push(current.id)
     }
-    return ids.reverse()
+    return ids.length ? ids.reverse() : [currentId]
   }
   
   if (route.name === "page" && route.params.id) {
@@ -211,153 +237,41 @@ const myCollectionsActive = computed(
 )
 const isMyCollectionsTabOpen = ref<boolean>(false)
 
-const activeCollectionIndex = computed(() => {
-  if (!myCollections.value?.length || !isMyCollectionsTabOpen.value) return -1
-  
-  return myCollections.value.findIndex(collection => {
-    const hasActiveChild = (item: Collection): boolean => {
-      if (openCollections.value?.includes(item.id)) return true
-      if (item.children) {
-        return item.children.some(child => hasActiveChild(child))
-      }
-      return false
-    }
-    return hasActiveChild(collection)
-  })
-})
-
-const hasActiveCollection = computed(() => activeCollectionIndex.value >= 0)
-
 watch([myCollectionsActive], () => {
   isMyCollectionsTabOpen.value = myCollectionsActive.value
 })
 </script>
 
 <template>
-  <div class="dashboard-layout flex min-h-screen h-full max-h-screen m-0 pt-[88px] w-full overflow-auto">
+  <div class="dashboard-layout flex h-dvh w-full overflow-hidden bg-white pt-[88px] md:pt-[72px]">
+    <a href="#main-content" class="sr-only fixed left-3 top-3 z-50 bg-white px-3 py-2 text-sm font-medium text-neutral-950 focus:not-sr-only">Skip to content</a>
+    <Button class="fixed left-3 top-[22px] z-20 size-11 md:hidden" variant="ghost" size="icon" :aria-expanded="mobileNavOpen" aria-controls="client-navigation" :aria-label="mobileNavOpen ? 'Close navigation' : 'Open navigation'" @click="mobileNavOpen = !mobileNavOpen"><X v-if="mobileNavOpen" /><Menu v-else /></Button>
     <TooltipProvider :delay-duration="0" :disable-hoverable-content="true">
-    <div class="dashboard-layout__menu relative bg-neutral-100 py-6 px-3 overflow-y-auto max-h-screen shrink-0"
-      :style="{ width: sidebarWidth + 'px' }">
-      <div class="dashboard-layout__resizer" @mousedown="startResize"
-        :class="{ 'dashboard-layout__resizer--active': isResizing }" />
-      <div v-if="globalStore.user?.role !== 'guest'" class="mb-8 overflow-auto">
-        <router-link :to="{ name: 'favorites' }">
-          <Button variant="ghost" type="button"
-            class="flex w-full pl-2.5 items-center justify-between text-sm font-medium no-underline text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200">
-            My Favorites
-          </Button>
-        </router-link>
-        <div class="my-collections-wrapper">
-          <div
-            class="dashboard-layout__menu-collection flex items-center justify-between text-sm font-medium no-underline text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200">
-            <Button variant="ghost" type="button" @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen"
-              class="flex cursor-pointer border-none w-fit gap-1.5 hover:bg-transparent pl-2.5 relative"
-              :class="{ 'pl-1': myCollections?.length }">
-              <ChevronDown v-if="isMyCollectionsTabOpen && myCollections?.length > 0" class="w-4 h-4 min-w-4 min-h-4" />
-              <ChevronRight v-else-if="myCollections?.length > 0" class="w-4 h-4 min-w-4 min-h-4" />
-              My Collections
-              <span v-if="hasActiveCollection" class="active-line-start"></span>
-            </Button>
-            <Button variant="ghost" type="button" size="icon" @click="isDialogCreateCollectionOpen = true"
-              class="flex cursor-pointer border-none w-fit gap-1.5 hover:bg-transparent">
-              <CirclePlus class="w-5 h-5 text-neutral-600 hover:text-neutral-900 mr-3" />
-            </Button>
+      <aside id="client-navigation" class="relative shrink-0 overflow-y-auto border-r border-neutral-200 bg-neutral-50 px-3 py-5 max-md:fixed max-md:inset-y-[88px] max-md:left-0 max-md:z-15 max-md:w-[min(320px,calc(100vw-32px))]!" :class="mobileNavOpen ? 'block' : 'max-md:hidden'" :style="{ width: sidebarWidth + 'px' }" @keydown.esc="mobileNavOpen = false">
+        <div role="separator" aria-orientation="vertical" aria-label="Resize sidebar" :aria-valuenow="sidebarWidth" :aria-valuemin="SIDEBAR_MIN" :aria-valuemax="SIDEBAR_MAX" tabindex="0" class="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize select-none hover:bg-neutral-300 focus-visible:bg-neutral-300 max-md:hidden" :class="isResizing && 'bg-neutral-300'" @mousedown="startResize" @keydown="onResizeKeydown" />
+        <nav aria-label="Collections">
+          <div v-if="globalStore.user?.role !== 'guest'" class="mb-4 grid gap-1">
+            <router-link :to="{ name: 'favorites' }" :class="sidebarRowClasses" active-class="bg-neutral-200/70 text-neutral-950">
+              <span :class="menuIconSlotClasses"><Star :class="menuIconClasses" /></span><span>Favorites</span>
+            </router-link>
+            <div class="flex items-center gap-1">
+              <button type="button" class="flex-1" :class="sidebarRowClasses" :aria-expanded="isMyCollectionsTabOpen" @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen">
+                <span :class="menuIconSlotClasses"><ChevronDown v-if="isMyCollectionsTabOpen" :class="menuIconClasses" /><ChevronRight v-else :class="menuIconClasses" /></span><span>My collections</span>
+              </button>
+              <Button variant="ghost" size="icon" aria-label="Create collection" class="size-7 p-1.5 [&_svg]:size-4" @click="isDialogCreateCollectionOpen = true"><CirclePlus :class="menuIconClasses" /></Button>
+            </div>
+            <div v-if="isMyCollectionsTabOpen" class="ml-4 border-l border-neutral-200 pl-2">
+              <MainLinkTree v-for="collection in myCollections" :key="collection.id" :item="collection" :open-items="openCollections ?? []" route-name="collection" />
+            </div>
           </div>
-          <div v-if="isMyCollectionsTabOpen" :class="[
-            'pl-3',
-            'children-container',
-            'my-collections-children',
-            hasActiveCollection && 'has-active-child'
-          ]" :style="{ '--active-index': activeCollectionIndex }">
-            <MainLinkTree v-if="myCollections" v-for="(collection, index) in myCollections" :key="collection.id" :item="collection"
-              :open-items="openCollections ?? []" route-name="collection" 
-              :class="index === activeCollectionIndex && 'is-active-child'" />
-          </div>
-        </div>
-      </div>
-      <MainLinkTree v-if="globalStore.user?.role === 'guest'" v-for="collection in publicCollections"
-        :key="collection.id" :item="collection" :open-items="openCollections ?? []" route-name="collection" />
-      <MainMenuTree v-else-if="menuItems" v-for="item in sortBy(menuItems, 'position')" :key="item.id" :item="item"
-        :open-items="openCollections ?? []" route-name="collection" />
-    </div>
+          <div v-if="globalStore.user?.role !== 'guest'" class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[.08em] text-neutral-500">Library</div>
+          <MainLinkTree v-if="globalStore.user?.role === 'guest'" v-for="collection in publicCollections" :key="collection.id" :item="collection" :open-items="openCollections ?? []" route-name="collection" />
+          <MainMenuTree v-else-if="menuItems" v-for="item in sortBy(menuItems, 'position')" :key="item.id" :item="item" :open-items="openCollections ?? []" route-name="collection" />
+        </nav>
+      </aside>
     </TooltipProvider>
-    <div class="w-full overflow-auto p-2 min-w-0">
-      <MainTopbar />
-      <slot></slot>
-    </div>
+    <MainTopbar />
+    <main id="main-content" tabindex="-1" class="client-workspace min-w-0 flex-1 overflow-auto px-5 py-6 md:px-9 md:py-8 focus:outline-none"><slot /></main>
     <CollectionDialogCreate v-model="isDialogCreateCollectionOpen" />
   </div>
 </template>
-
-<style scoped lang="scss">
-.dashboard-layout__navigation-logo {
-  display: block;
-  margin: 0 auto 2rem;
-  width: 132px;
-  height: auto;
-}
-
-.dashboard-layout__resizer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 4px;
-  height: 100%;
-  cursor: col-resize;
-  background-color: transparent;
-  transition: background-color 0.15s ease;
-  z-index: 10;
-  user-select: none;
-
-  &:hover,
-  &--active {
-    background-color: rgb(212, 212, 212);
-  }
-}
-
-.my-collections-wrapper {
-  display: flex;
-  flex-direction: column;
-  position: relative;
-}
-
-.children-container {
-  position: relative;
-}
-
-.active-line-start {
-  position: absolute;
-  left: 11px;
-  bottom: -2px; 
-  width: 1px;
-  height: 13px;
-  background-color: rgb(212, 212, 212);
-  z-index: 1;
-}
-
-.children-container.has-active-child::before {
-  content: "";
-  position: absolute;
-  left: 11px; 
-  top: 0;
-  width: 1px;
-  background-color: rgb(212, 212, 212);
-  height: calc(var(--active-index, 0) * 36px + 18px);
-  z-index: 0;
-}
-
-.is-active-child {
-  position: relative;
-}
-
-.is-active-child::before {
-  content: "";
-  position: absolute;
-  left: -1px;
-  top: 18px;
-  width: 5px;
-  height: 1px;
-  background-color: rgb(212, 212, 212);
-  z-index: 1;
-}
-</style>

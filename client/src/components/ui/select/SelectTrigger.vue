@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { controlClasses } from '@/components/ui/field/styles'
 import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-vue-next'
-import { SelectIcon, SelectTrigger, type SelectTriggerProps, useForwardProps } from 'radix-vue'
+import { SelectIcon, SelectTrigger, type SelectTriggerProps, useForwardProps } from 'reka-ui'
 import { type HTMLAttributes, computed } from 'vue'
 
 const props = defineProps<SelectTriggerProps & { class?: HTMLAttributes['class'] }>()
@@ -17,7 +18,7 @@ const forwardedProps = useForwardProps(delegatedProps)
 
 <template>
   <SelectTrigger v-bind="forwardedProps" :class="cn(
-    'flex h-10 w-full items-center justify-between border border-input border-neutral-400 bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+    controlClasses, 'items-center justify-between gap-2 data-placeholder:text-muted-foreground [&>span]:line-clamp-1',
     props.class
   )
     ">

@@ -6,7 +6,7 @@ import {
   type DropdownMenuCheckboxItemProps,
   DropdownMenuItemIndicator,
   useForwardPropsEmits,
-} from 'radix-vue'
+} from 'reka-ui'
 import { Check } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 
@@ -26,7 +26,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
   <DropdownMenuCheckboxItem
     v-bind="forwarded"
     :class=" cn(
-      'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'relative flex cursor-pointer select-none items-center rounded-xs py-1.5 pl-8 pr-2 text-[13px] outline-hidden transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:text-muted-foreground data-[disabled]:opacity-100',
       props.class,
     )"
   >

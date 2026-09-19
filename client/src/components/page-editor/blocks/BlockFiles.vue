@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -20,7 +21,7 @@ import type { Collection } from "@/layouts/LayoutPageEditor.vue"
 import type { RouterOutput } from "@/services/server.ts"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import Treeselect from "vue3-treeselect-ts"
 
 const props = defineProps<{
@@ -50,6 +51,8 @@ watch(() => props.data, (newData) => {
 const emit = defineEmits<{
   (e: "update", value: { data: any }): void
 }>()
+
+const fieldId = useId()
 
 const { data: collections } = useQuery({
   queryKey: ["collection", "tree"],
@@ -82,11 +85,11 @@ function updateForm() {
 
 <template>
   <div class="flex flex-col gap-4">
-    <h1 class="text-lg font-medium">Add files block</h1>
-    <div class="flex flex-col gap-2">
-      <Label>Layout</Label>
+    <h3 class="text-sm font-semibold">Add files block</h3>
+    <FieldGroup>
+      <Label :for="`${fieldId}-layout`">Layout</Label>
       <Select v-model="form.layout" @update:modelValue="updateForm">
-        <SelectTrigger>
+        <SelectTrigger :id="`${fieldId}-layout`">
           <SelectValue placeholder="Use user preferences" />
         </SelectTrigger>
         <SelectContent>
@@ -95,15 +98,15 @@ function updateForm() {
           <SelectItem value="list">List</SelectItem>
         </SelectContent>
       </Select>
-    </div>
-    <div class="flex flex-col gap-2">
-      <Label>Custom title (optional)</Label>
-      <Input type="text" v-model="form.title" @update:modelValue="updateForm" />
-    </div>
-    <div class="flex flex-col gap-2">
-      <Label>Use custom collection</Label>
+    </FieldGroup>
+    <FieldGroup>
+      <Label :for="`${fieldId}-title`">Custom title (optional)</Label>
+      <Input :id="`${fieldId}-title`" type="text" v-model="form.title" @update:modelValue="updateForm" />
+    </FieldGroup>
+    <FieldGroup role="group" :aria-labelledby="`${fieldId}-collection`">
+      <Label :id="`${fieldId}-collection`">Use custom collection</Label>
       <Treeselect v-model="form.collectionId" class="mb-075" placeholder="By default it uses current collection files"
         :options="collectionOptions" :clearable="true" @update:modelValue="updateForm" />
-    </div>
+    </FieldGroup>
   </div>
 </template>

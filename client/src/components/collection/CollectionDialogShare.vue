@@ -13,10 +13,13 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogFooter,
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -28,7 +31,7 @@ import { extractErrors, RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
 import { isAfter, startOfTomorrow } from "date-fns"
 import dayjs from "dayjs"
-import { Calendar, CalendarClock, Copy, Link, Mail, Send, XCircle } from "lucide-vue-next"
+import { Copy, Link, Send, XCircle } from "lucide-vue-next"
 import { computed, onMounted, ref } from "vue"
 
 type Collection = RouterOutput["collection"]["findById"]
@@ -126,38 +129,36 @@ onMounted(() => {
 
 <template>
   <Dialog :open="modelValue" @update:open="emit('update:modelValue', $event)">
-    <DialogContent class="sm:max-w-[600px]">
-      <DialogTitle>Share Collection</DialogTitle>
-      <DialogDescription class="text-sm text-gray-500">
-        Share this collection with others by creating a link that can be used to access
-        the collection. Send it by mail or copy it to your clipboard to share manually.
+    <DialogContent class="sm:max-w-[600px] gap-6">
+      <DialogHeader>
+      <DialogTitle>Share collection</DialogTitle>
+      <DialogDescription>
+        Invite someone by email or copy a link to this collection.
       </DialogDescription>
-      <div class="flex flex-col gap-6 w-full mt-5">
+      </DialogHeader>
+      <div class="flex flex-col gap-6 w-full">
         <div class="flex flex-col gap-2 w-full">
           <form @submit.prevent="createInvitation(true)" class="flex flex-col gap-4 w-full">
-            <div class="flex w-full items-center justify-between gap-2">
+            <div class="grid grid-cols-[minmax(0,1fr)_180px] items-start gap-4">
 
-              <div class="flex flex-col flex-grow gap-2 w-full">
-                <Label for="email" class="flex items-center gap-1 text-sm font-medium text-gray-700">
-                  <Mail class="w-4 h-4 mr-1" />Guest Email Address
+              <FieldGroup>
+                <Label for="email" class="flex items-center gap-1 ">
+                  Guest email
                 </Label>
                 <Input id="email" v-model="form.email" type="email" placeholder="Enter guest email" required />
-              </div>
+              </FieldGroup>
 
-              <div class="flex flex-col gap-2 w-1/2">
-                <Label for="expiresAt" class="flex items-center gap-1 text-sm font-medium text-gray-700">
-                  <CalendarClock class="w-4 h-4 mr-1" />Expiry Date
+              <FieldGroup class="min-w-0">
+                <Label for="expiresAt" class="flex items-center gap-1 ">
+                  Expiry date
                 </Label>
                 <div class="relative w-full">
                   <Input id="expiresAt" v-model="form.expiresAt" type="date"
-                    :min="new Date().toISOString().split('T')[0]" required class="w-full pr-8" />
-                  <Calendar
-                    class="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-500 pointer-events-none" />
+                    :min="new Date().toISOString().split('T')[0]" required class="w-full" />
                 </div>
-
-              </div>
+              </FieldGroup>
             </div>
-            <div class="flex flex-col gap-2 w-full">
+            <div v-if="formErrors.expiresAt || formErrors.email" class="grid gap-2">
               <p v-if="formErrors.expiresAt" class="mt-1 text-sm text-red-600">
                 {{ formErrors.expiresAt }}
               </p>
@@ -171,7 +172,7 @@ onMounted(() => {
                 <Send class="w-4 h-4 mr-2" />
                 Send Invite
               </Button>
-              <Button type="button" @click="createInvitation(false)">
+              <Button type="button" variant="outline" @click="createInvitation(false)">
                 <Copy class="w-4 h-4 mr-2" />
                 Copy Link
               </Button>
@@ -179,8 +180,8 @@ onMounted(() => {
           </form>
         </div>
 
-        <div>
-          <p class="text-md font-semibold mb-4">Invitations</p>
+        <section class="grid gap-3">
+          <h3 class="text-sm font-semibold">Invitations</h3>
           <div v-if="invitations.length === 0" class="text-sm text-gray-500">
             No invitations yet. Create one to share this collection.
           </div>
@@ -205,20 +206,9 @@ onMounted(() => {
               </div>
             </div>
           </ScrollArea>
-        </div>
+        </section>
       </div>
+      <DialogFooter><Button type="button" variant="outline" @click="emit('update:modelValue', false)">Close</Button></DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
-
-<style scoped>
-input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  cursor: pointer;
-}
-</style>

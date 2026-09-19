@@ -44,8 +44,8 @@ function getBlockStyle(blocks: any[], block: any) {
 
 <template>
   <div v-if="page" class="page__container p-4">
-    <div class="page__block-row">
-      <div v-for="row in rows" :key="row.value" class="page__block-col">
+    <div class="page__block-row flex flex-col gap-4">
+      <div v-for="row in rows" :key="row.value" class="page__block-col flex flex-row gap-4">
         <block v-for="block in row.columns" :key="block.id" :block="block" :page="page"
           :style="getBlockStyle(row.columns, block)"
           :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
@@ -55,27 +55,7 @@ function getBlockStyle(blocks: any[], block: any) {
   <div v-else-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
     {{ error?.message }}
   </div>
 </template>
-
-<style scoped>
-.page__name {
-  font-size: 1rem;
-  color: var(--primary-color50);
-  font-weight: 600;
-}
-
-.page__block-row {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.page__block-col {
-  display: flex;
-  flex-direction: row;
-  gap: 16px;
-}
-</style>

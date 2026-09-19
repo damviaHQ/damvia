@@ -10,9 +10,12 @@ import {
   DialogOverlay,
   DialogPortal,
   useForwardPropsEmits,
-} from 'radix-vue'
+} from 'reka-ui'
 import { X } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
+import { dialogSurfaceClasses, clientDialogClasses } from '@/components/ui/dialog/styles'
+
+defineOptions({ inheritAttrs: false })
 
 const props = defineProps<DialogContentProps & { class?: HTMLAttributes['class'] }>()
 const emits = defineEmits<DialogContentEmits>()
@@ -29,23 +32,23 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 <template>
   <DialogPortal>
     <DialogOverlay
-      :data-admin-overlay="adminTheme || undefined"      class="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      :data-admin-overlay="adminTheme || undefined" :data-client-overlay="!adminTheme || undefined"      class="fixed inset-0 z-50 bg-black/45     "
     />
     <DialogContent
-      v-bind="forwarded"
+      v-bind="{ ...forwarded, ...$attrs }"
       :class="
         cn(
-          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg',
-          adminTheme && 'dv-theme dv-admin admin-dialog', props.class
+          dialogSurfaceClasses,
+          adminTheme ? 'dv-theme dv-admin admin-dialog' : clientDialogClasses, props.class
         )
       "
     >
       <slot />
 
       <DialogClose data-dialog-close
-        class="absolute right-4 top-4 right-5 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+        class="absolute right-5 top-5 grid size-8 place-items-center rounded-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       >
-        <X class="w-5 h-5" stroke-width="3" />
+        <X class="size-6" stroke-width="1.7" />
         <span class="sr-only">Close</span>
       </DialogClose>
     </DialogContent>

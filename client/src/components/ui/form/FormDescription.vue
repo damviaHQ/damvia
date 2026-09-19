@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { helpClasses } from '@/components/ui/field/styles'
 import type { HTMLAttributes } from 'vue'
 import { useFormField } from './useFormField'
 import { cn } from '@/lib/utils'
@@ -13,7 +14,7 @@ const { formDescriptionId } = useFormField()
 <template>
   <p
     :id="formDescriptionId"
-    :class="cn('text-sm text-muted-foreground', props.class)"
+    :class="cn(helpClasses, props.class)"
   >
     <slot />
   </p>

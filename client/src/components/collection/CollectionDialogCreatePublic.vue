@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -100,7 +101,7 @@ const collectionOptions = computed(() => {
           children: c.children ? formatCollectionArray(c.children) : undefined,
         }))
   }
-  return formatCollectionArray(collections.value)
+  return formatCollectionArray(collections.value) ?? []
 })
 
 async function onSubmit() {
@@ -122,8 +123,8 @@ function handleKeyDown(event: KeyboardEvent) {
 
 <template>
   <Dialog :open="modelValue" @update:open="emit('update:modelValue', $event)">
-    <DialogContent class="sm:max-w-[425px]">
-      <form @submit.prevent="onSubmit" @keydown="handleKeyDown">
+    <DialogContent class="sm:max-w-[480px]">
+      <form @submit.prevent="onSubmit" @keydown="handleKeyDown" class="grid gap-6">
         <DialogHeader>
           <DialogTitle>Create a public collection</DialogTitle>
           <DialogDescription>
@@ -134,24 +135,24 @@ function handleKeyDown(event: KeyboardEvent) {
           </DialogDescription>
         </DialogHeader>
 
-        <div class="grid gap-4 py-4">
-          <div>
-            <Label>Collection Name</Label>
-            <Input v-model="form.name" type="text" placeholder="Name" class="form-input mb-075" required />
-          </div>
-          <div v-if="collectionOptions.length > 0">
-            <Label>Parent collection</Label>
-            <Treeselect v-model="form.collectionId" class="mb-075" placeholder="Parent collection"
+        <div class="grid gap-4">
+          <FieldGroup>
+            <Label for="create-collection-name">Collection name</Label>
+            <Input id="create-collection-name" v-model="form.name" type="text" placeholder="Name"  required />
+          </FieldGroup>
+          <FieldGroup v-if="collectionOptions.length > 0" class="grid gap-2">
+            <Label for="parent-collection">Parent collection</Label>
+            <Treeselect v-model="form.collectionId" input-id="parent-collection" placeholder="Parent collection"
               :options="collectionOptions" :clearable="true" :flat="true" />
-          </div>
+          </FieldGroup>
           <div class="flex items-center gap-2">
-            <Checkbox v-model:checked="form.draft" id="draft" />
+            <Checkbox v-model="form.draft" id="draft" />
             <Label for="draft">Draft</Label>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="link" @click="emit('update:modelValue', false)" :disabled="isPending">
+          <Button type="button" variant="outline" @click="emit('update:modelValue', false)" :disabled="isPending">
             Cancel
           </Button>
           <Button type="submit" :disabled="isPending">

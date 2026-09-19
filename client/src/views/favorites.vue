@@ -15,7 +15,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
 import Loader from "@/components/Loader.vue"
-import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 
@@ -23,26 +22,18 @@ const { status, data: favorites, error } = useQuery({
   queryKey: ["favorites"],
   queryFn: () => trpc.favorite.list.query(),
 })
-const breadcrumbItems: PathBreadcrumbItem[] = [{ id: 'favorites', label: 'My Favorites' }]
 </script>
 
 <template>
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="favorites__container p-4">
-    <PathBreadcrumb :items="breadcrumbItems" />
-    <collection-grid-files :files="favorites" />
+  <div v-else-if="status === 'success'" class="favorites__container">
+    <h1 class="mb-7! text-[26px]! font-semibold! tracking-tight">Favorites</h1>
+    <div v-if="!favorites?.length" class="grid justify-items-center gap-3 py-20 text-center [&_p]:max-w-sm [&_p]:text-sm [&_p]:text-neutral-500"><h2>No favorites yet</h2><p>Save assets with the star icon to find them here.</p><router-link :to="{ name: 'search' }" class="dv-button">Browse assets</router-link></div>
+    <collection-grid-files v-else :files="favorites" />
   </div>
 </template>
-
-<style scoped>
-.heading-1 {
-  color: var(--primary-color50);
-  font-size: 1rem;
-  margin-bottom: 1em;
-}
-</style>

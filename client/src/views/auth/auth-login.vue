@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import AuthResendEmail from "@/components/AuthResendEmail.vue"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -112,45 +113,41 @@ const resendLoginEmail = async () => {
     <div v-if="authParams.collectionName" class="font-semibold mb-4">
       Access to {{ authParams.collectionName }} collection
     </div>
-    <div class="space-y-2">
+    <FieldGroup>
       <Label for="email">Your email</Label>
-      <Input id="email" type="email" v-model="form.email" placeholder="name@domain.com" />
-    </div>
-    <div v-if="
+      <Input id="email" type="email" v-model="form.email" placeholder="name@domain.com" autocomplete="email" :aria-invalid="formRootError ? true : undefined" :aria-describedby="formRootError ? 'login-error' : undefined" />
+    </FieldGroup>
+    <FieldGroup v-if="
       globalStore.env &&
       !globalStore.env.passwordLessAuthentication &&
-      !authParams.magicLink" class="space-y-2">
+      !authParams.magicLink" >
       <Label for="password">Password</Label>
-      <Input id="password" type="password" v-model="form.password" placeholder="My password" />
-    </div>
-    <div v-if="formRootError" class="text-sm font-medium text-destructive">
+      <Input id="password" type="password" v-model="form.password" placeholder="My password" autocomplete="current-password" :aria-invalid="formRootError ? true : undefined" :aria-describedby="formRootError ? 'login-error' : undefined" />
+    </FieldGroup>
+    <div v-if="formRootError" id="login-error" role="alert" class="text-sm font-medium text-destructive">
       {{ formRootError }}
     </div>
     <div class="flex flex-col pt-5">
       <div class="flex items-center space-x-2 mb-3">
-        <Checkbox id="acceptPolicies" v-model:checked="acceptedPolicies" />
+        <Checkbox id="acceptPolicies" v-model="acceptedPolicies" />
         <Label for="acceptPolicies">
           I accept the
           <router-link to="/privacy-policy" class="underline">Privacy and Cookie
             Policy</router-link>.
         </Label>
       </div>
-      <Button type="submit" class="w-full" :disabled="!isFormValid"> Log in </Button>
-      <div class="flex items-center" v-if="!authParams.magicLink">
-        <Button variant="link" class="px-0">
+      <p v-if="!isFormValid" id="login-requirements" class="mb-2 text-xs text-neutral-500">
+        {{ emailRegex.test(form.email) ? "Accept the Privacy and Cookie Policy to log in." : "Enter a valid email and accept the Privacy and Cookie Policy to log in." }}
+      </p>
+      <Button type="submit" class="w-full" :disabled="!isFormValid" :aria-describedby="isFormValid ? undefined : 'login-requirements'"> Log in </Button>
+      <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mt-2" v-if="!authParams.magicLink">
+        <Button as-child variant="link" class="px-0 text-xs">
           <router-link :to="{ name: 'sign-up' }">No account? Register now</router-link>
         </Button>
-        <Button variant="link" class="px-0" v-if="globalStore.env && !globalStore.env.passwordLessAuthentication">
+        <Button as-child variant="link" class="px-0 text-xs" v-if="globalStore.env && !globalStore.env.passwordLessAuthentication">
           <router-link :to="{ name: 'password-reset' }"> Reset password </router-link>
         </Button>
       </div>
     </div>
   </form>
 </template>
-
-<style scoped lang="scss">
-.coming-soon {
-  color: var(--primary-color);
-  margin-left: 2rem;
-}
-</style>

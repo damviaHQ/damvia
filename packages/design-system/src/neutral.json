@@ -1,0 +1,153 @@
+{
+  "color.blue": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.14901960784313725,
+        0.14901960784313725,
+        0.14901960784313725
+      ],
+      "alpha": 1,
+      "hex": "#262626"
+    }
+  },
+  "color.blue-hover": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.09019607843137255,
+        0.09019607843137255,
+        0.09019607843137255
+      ],
+      "alpha": 1,
+      "hex": "#171717"
+    }
+  },
+  "color.midnight": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.09019607843137255,
+        0.09019607843137255,
+        0.09019607843137255
+      ],
+      "alpha": 1,
+      "hex": "#171717"
+    }
+  },
+  "color.sky": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.9333333333333333,
+        0.9333333333333333,
+        0.9333333333333333
+      ],
+      "alpha": 1,
+      "hex": "#eeeeee"
+    }
+  },
+  "color.canvas": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.9803921568627451,
+        0.9803921568627451,
+        0.9803921568627451
+      ],
+      "alpha": 1,
+      "hex": "#fafafa"
+    }
+  },
+  "color.ink": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.14901960784313725,
+        0.14901960784313725,
+        0.14901960784313725
+      ],
+      "alpha": 1,
+      "hex": "#262626"
+    }
+  },
+  "color.muted": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.3843137254901961,
+        0.3843137254901961,
+        0.3843137254901961
+      ],
+      "alpha": 1,
+      "hex": "#626262"
+    }
+  },
+  "color.line": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.8980392156862745,
+        0.8980392156862745,
+        0.8980392156862745
+      ],
+      "alpha": 1,
+      "hex": "#e5e5e5"
+    }
+  },
+  "text.on-dark-secondary": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.8313725490196079,
+        0.8313725490196079,
+        0.8313725490196079
+      ],
+      "alpha": 1,
+      "hex": "#d4d4d4"
+    }
+  },
+  "text.on-dark-muted": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.6392156862745098,
+        0.6392156862745098,
+        0.6392156862745098
+      ],
+      "alpha": 1,
+      "hex": "#a3a3a3"
+    }
+  },
+  "font.body": {
+    "$type": "fontFamily",
+    "$value": [
+      "Inter",
+      "system-ui",
+      "sans-serif"
+    ]
+  },
+  "selection.color": {
+    "$type": "color",
+    "$value": {
+      "colorSpace": "srgb",
+      "components": [
+        0.3215686274509804,
+        0.3215686274509804,
+        0.3215686274509804
+      ],
+      "alpha": 1,
+      "hex": "#525252"
+    }
+  }
+}

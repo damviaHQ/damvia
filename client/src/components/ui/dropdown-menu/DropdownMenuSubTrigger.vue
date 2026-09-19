@@ -4,7 +4,7 @@ import {
   DropdownMenuSubTrigger,
   type DropdownMenuSubTriggerProps,
   useForwardProps,
-} from 'radix-vue'
+} from 'reka-ui'
 import { ChevronRight } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 
@@ -23,7 +23,7 @@ const forwardedProps = useForwardProps(delegatedProps)
   <DropdownMenuSubTrigger
     v-bind="forwardedProps"
     :class="cn(
-      'flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent',
+      'flex cursor-default select-none items-center rounded-xs px-2 py-1.5 text-sm outline-hidden focus:bg-accent data-[state=open]:bg-accent',
       props.class,
     )"
   >

@@ -61,7 +61,8 @@ export const useGlobalStore = defineStore('global', () => {
 	function fetchEnv() {
 		return trpc.env.query().then((data) => {
 			env.value = data
-			document.title = data.appName
+			const title = router.currentRoute.value.meta.title
+			document.title = title ? `${title} · ${data.appName}` : data.appName
 		})
 	}
 

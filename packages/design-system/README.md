@@ -1,11 +1,12 @@
 # @damvia/design-system
 
-Shared Damvia foundations, proposal `0.1.0`. This package is private and has not been published to npm. Its JSON tokens, CSS and font can be consumed by both the Vue admin and the Astro website.
+Shared Damvia foundations, proposal `0.1.0`, with Damvia and neutral client themes. This package is private and has not been published to npm. Its JSON tokens, CSS and font can be consumed by both the Vue admin and the Astro website.
 
 ## Contents
 
 - `src/tokens.json`: source design tokens, using DTCG types, groups and aliases.
 - `src/tokens.css`: generated variables, scoped to `.dv-theme`.
+- `src/neutral.json`: neutral palette overrides; the compiler generates `.dv-theme.dv-neutral` from the same semantic roles.
 - `src/components.css`: framework-independent button, input, badge, panel and table styles.
 - `src/fonts.css`: optional self-hosted Mona Sans. Load once per application.
 - `src/fonts/OFL.txt`: upstream font license.
@@ -22,7 +23,7 @@ npm run check --prefix packages/design-system
 npm run design:dev --prefix client
 ```
 
-Open `http://127.0.0.1:5174/design-system.html`. No server, authentication or database is needed. This single reference page documents foundations, component contracts, toast styling and usage guidance. Product layouts live only in the real admin and are not duplicated here.
+Open `http://127.0.0.1:5174/design-system.html`. No server, authentication or database is needed. This single reference page has a theme switch and real production controls as well as foundations, component contracts, toast styling and usage guidance. Product layouts live only in the real admin and are not duplicated here.
 
 ```sh
 npm run design:check --prefix client
@@ -73,7 +74,7 @@ Text uses semantic roles instead of local grey shades. Light surfaces use `text.
 
 ## Theming boundary
 
-The `dv-` prefix avoids collisions with the current Tailwind/shadcn theme. Variables exist only under `.dv-theme`; there are no `:root` tokens. Future tenant themes can override semantic variables locally, but this proposal deliberately leaves the customer portal untouched.
+The `dv-` prefix avoids collisions with the current Tailwind/shadcn theme. Variables exist only under `.dv-theme`; there are no `:root` tokens. The client uses `.dv-theme.dv-neutral.dv-client`; the admin uses `.dv-theme.dv-admin`. These are two themes of one system, not separate component libraries. Shared production controls live in `client/src/styles/controls.css`; client layout styling lives in `client/src/styles/client.css`. Set tenant font and brand override variables on `:root` so body-teleported overlays can inherit them.
 
 ## Distribution
 

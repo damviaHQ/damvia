@@ -1,0 +1,47 @@
+/* Shared surface for shadcn checkboxes and the tree-select adapter. */
+@utility checkbox-surface {
+  @apply size-4 shrink-0 border border-input bg-background;
+  border-radius:var(--dv-radius-control);
+}
+
+/* Tree-select renders internal DOM without a class API. Keep its adapter here. */
+:is(.dv-admin, .dv-client) .vue-treeselect .vue-treeselect-helper-hide { display:none; }
+:is(.dv-admin, .dv-client) .vue-treeselect__control { @apply border pl-1 rounded-none; border-color:hsl(var(--border)); min-height:var(--dv-control-height); }
+:is(.dv-admin, .dv-client) .vue-treeselect:not(.vue-treeselect--disabled) .vue-treeselect__control:hover { border-color:var(--dv-text-secondary); }
+:is(.dv-admin, .dv-client) .vue-treeselect:focus-within .vue-treeselect__control { outline:2px solid hsl(var(--ring)); outline-offset:2px; }
+:is(.dv-admin, .dv-client) .vue-treeselect__menu { @apply border rounded-none shadow-md mt-1; background:var(--dv-surface-panel); color:var(--dv-text-primary); border-color:var(--dv-color-line); }
+:is(.dv-admin, .dv-client) .vue-treeselect__option { @apply p-1; }
+:is(.dv-admin, .dv-client) .vue-treeselect__option--highlight { background:var(--dv-surface-canvas); }
+:is(.dv-admin, .dv-client) .vue-treeselect__option--selected { @apply bg-neutral-50; }
+:is(.dv-admin, .dv-client) :is(.vue-treeselect__placeholder, .vue-treeselect__single-value) { @apply flex items-center text-[length:var(--dv-field-label-size)] leading-[var(--dv-field-line-height)]; color:var(--dv-text-secondary); }
+:is(.dv-admin, .dv-client) .vue-treeselect__single-value { @apply px-1.5 py-2.5; color:var(--dv-text-primary); }
+:is(.dv-admin, .dv-client) input.vue-treeselect__input { @apply text-[length:var(--dv-field-label-size)] leading-[var(--dv-field-line-height)]; border:0; min-height:0; padding:0; background:transparent; color:var(--dv-text-primary); }
+:is(.dv-admin, .dv-client) input.vue-treeselect__input:focus-visible { outline:none; }
+:is(.dv-admin, .dv-client) .vue-treeselect__multi-value { @apply flex w-full flex-wrap items-center gap-1 px-1.5 py-1.5 mb-0; }
+:is(.dv-admin, .dv-client) .vue-treeselect__multi-value-item { @apply inline-flex max-w-full items-center gap-1 border-0 py-0 pl-1.5 pr-0 text-[length:var(--dv-field-label-size)] leading-6 rounded-none; background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
+:is(.dv-admin, .dv-client) .vue-treeselect__value-remove { @apply grid size-6 shrink-0 place-items-center p-0; color:var(--dv-text-secondary); }
+:is(.dv-admin, .dv-client) :is(.vue-treeselect__control-arrow, .vue-treeselect__x) { color:var(--dv-text-secondary); }
+@media (prefers-reduced-motion: reduce) {
+  .dv-theme *, .dv-theme *::before, .dv-theme *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+}
+
+/* Tree-select owns its checkbox DOM; match the shared Checkbox surface and states. */
+:is(.dv-admin, .dv-client) .vue-treeselect__checkbox {
+  @apply checkbox-surface transition-none;
+}
+:is(.dv-admin, .dv-client) .vue-treeselect__label-container:hover .vue-treeselect__checkbox--unchecked { border-color:var(--dv-text-secondary); background:hsl(var(--background)); }
+:is(.dv-admin, .dv-client) .vue-treeselect__label-container :is(.vue-treeselect__checkbox--checked, .vue-treeselect__checkbox--indeterminate) { border-color:var(--dv-selection-color); background:var(--dv-selection-color); color:hsl(var(--primary-foreground)); }
+:is(.dv-admin, .dv-client) .vue-treeselect__label-container .vue-treeselect__checkbox--disabled { opacity:.5; cursor:not-allowed; }
+:is(.dv-admin, .dv-client) :is(.vue-treeselect__check-mark, .vue-treeselect__minus-mark) {
+  @apply inset-0 size-3.5 transition-none;
+  background-image:none; background-color:currentColor; transform:none;
+  mask:center / 14px 14px no-repeat var(--checkbox-mark);
+}
+:is(.dv-admin, .dv-client) .vue-treeselect__check-mark { --checkbox-mark:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m20 6-11 11-5-5' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+:is(.dv-admin, .dv-client) .vue-treeselect__minus-mark { --checkbox-mark:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12h14' fill='none' stroke='black' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"); }
+
+/* Selected tags wrap as one row flow; the search input stays inside that flow. */
+:is(.dv-admin, .dv-client) .vue-treeselect__multi-value-item-container { @apply max-w-full p-0; }
+:is(.dv-admin, .dv-client) .vue-treeselect__multi-value-label { @apply min-w-0 truncate p-0; }
+:is(.dv-admin, .dv-client) .vue-treeselect--multi .vue-treeselect__input-container { @apply min-w-5 flex-1 p-0; }
+:is(.dv-admin, .dv-client) .vue-treeselect__multi-value-item-container { transition:none; transform:none; }

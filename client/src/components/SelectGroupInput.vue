@@ -1,6 +1,6 @@
 <template>
   <Treeselect
-    :options="groupOptions"
+    :options="groupOptions" :input-id="id"
     :multiple="true"
     placeholder="Select groups..."
   />
@@ -11,6 +11,8 @@ import Treeselect from "vue3-treeselect-ts";
 import {useQuery} from "@tanstack/vue-query";
 import {trpc} from "@/services/server.ts";
 import {computed} from "vue";
+
+defineProps<{ id?: string }>()
 
 const groupsQuery = useQuery({
   queryKey: ["groups"],

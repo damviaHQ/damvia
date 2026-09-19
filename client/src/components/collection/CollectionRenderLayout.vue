@@ -68,43 +68,22 @@ function getBlockStyle(blocks: BlockType[], block: BlockType) {
 </script>
 
 <template>
-  <div v-if="collection.page" class="collection-layout-renderer__block-row">
-    <div v-for="row in rows" :key="row.value" class="collection-layout-renderer__block-col">
+  <div v-if="collection.page" class="collection-layout-renderer__block-row flex flex-col gap-4">
+    <div v-for="row in rows" :key="row.value" class="collection-layout-renderer__block-col flex flex-row gap-4">
       <block v-for="block in row.columns" :key="block.id" :block="block" :collection="collection"
         :page="collection.page" :style="getBlockStyle(row.columns, block)" :generate-route="generateRoute" />
     </div>
   </div>
-  <div v-else class="collection-layout-renderer__container">
+  <div v-else class="collection-layout-renderer__container flex flex-col gap-8 mb-6">
     <div v-if="childrenCollections?.length">
-      <div class="text-neutral-400 font-medium text-sm mb-2">Collections</div>
+      <div class="mb-4 text-[12px] font-semibold text-neutral-500">Collections</div>
       <CollectionRender :collections="childrenCollections" :generate-route="generateRoute" />
     </div>
     <div v-if="collection?.files">
-      <div class="text-neutral-400 font-medium text-sm mb-2">
+      <div class="mb-4 text-[12px] font-semibold text-neutral-500">
         {{ getGlobalAssetType?.name ?? "Files" }}
       </div>
       <CollectionRenderFiles :collection="collection" />
     </div>
   </div>
 </template>
-
-<style scoped>
-.collection-layout-renderer__block-row {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.collection-layout-renderer__block-col {
-  display: flex;
-  flex-direction: row;
-  gap: 16px;
-}
-
-.collection-layout-renderer__container {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin-bottom: 24px;
-}
-</style>

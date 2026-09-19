@@ -19,7 +19,7 @@ import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
 import { cloneDeep, filter, groupBy, map, maxBy, minBy, sortBy, sumBy } from "lodash"
 import { Plus } from "lucide-vue-next"
-import { computed, ref } from "vue"
+import { computed, nextTick, ref } from "vue"
 
 export type Page = RouterOutput["collection"]["findById"]["page"]
 export type Collection = RouterOutput["collection"]["findById"]
@@ -106,6 +106,7 @@ const maxRowValue = computed(
 )
 const draggingBlockId = ref<string | undefined>(undefined)
 const hoveredDropzone = ref<string | null>(null)
+const moveAnnouncement = ref("")
 
 function getBlockStyle(blocks: Block[], block: Block) {
   return {
@@ -159,6 +160,10 @@ function handleRowDrop(event: DragEvent, row: number, column: number) {
     return
   }
 
+  moveToRow(block, row, column)
+}
+
+function moveToRow(block: Block, row: number, column: number) {
   const pageBlocks = filter(
     cloneDeep(props.page.blocks ?? []),
     (current) => current.id !== block.id
@@ -172,16 +177,7 @@ function handleRowDrop(event: DragEvent, row: number, column: number) {
       row: current.row >= row ? current.row + 1 : current.row,
     })),
   ]
-  trpc.page.updateLayout
-    .mutate({ pageId: props.page.id, blocks: blocksPayload })
-    .then(async () => {
-      if (props.collection) {
-        await queryClient.invalidateQueries({
-          queryKey: ["collection", props.collection.id],
-        })
-      }
-      await queryClient.invalidateQueries({ queryKey: ["pages", props.page.id] })
-    })
+  return updateLayout(blocksPayload)
 }
 
 function handleColDrop(event: DragEvent, row: number, column: number) {
@@ -197,6 +193,10 @@ function handleColDrop(event: DragEvent, row: number, column: number) {
     return
   }
 
+  moveToColumn(block, row, column)
+}
+
+function moveToColumn(block: Block, row: number, column: number) {
   const pageBlocks = filter(
     cloneDeep(props.page.blocks ?? []),
     (current) => current.id !== block.id
@@ -210,8 +210,12 @@ function handleColDrop(event: DragEvent, row: number, column: number) {
       row: current.row,
     })),
   ]
-  trpc.page.updateLayout
-    .mutate({ pageId: props.page.id, blocks: blocksPayload })
+  return updateLayout(blocksPayload)
+}
+
+function updateLayout(blocks: { id: string; width: number; row: number; column: number }[]) {
+  return trpc.page.updateLayout
+    .mutate({ pageId: props.page.id, blocks })
     .then(async () => {
       if (props.collection) {
         await queryClient.invalidateQueries({
@@ -221,48 +225,85 @@ function handleColDrop(event: DragEvent, row: number, column: number) {
       await queryClient.invalidateQueries({ queryKey: ["pages", props.page.id] })
     })
 }
+
+function getMoveState(rowIndex: number, columnIndex: number) {
+  const columns = rows.value[rowIndex].columns
+  const isAlone = columns.length === 1
+  return {
+    up: !isAlone || rowIndex > 0,
+    down: !isAlone || rowIndex < rows.value.length - 1,
+    left: columnIndex > 0,
+    right: columnIndex < columns.length - 1,
+  }
+}
+
+async function handleMove(block: Block, rowIndex: number, columnIndex: number, direction: "up" | "down" | "left" | "right") {
+  const row = rows.value[rowIndex]
+  const isAlone = row.columns.length === 1
+  if (direction === "up") {
+    await moveToRow(block, isAlone ? rows.value[rowIndex - 1].value : row.value, 1)
+  } else if (direction === "down") {
+    await moveToRow(block, isAlone ? rows.value[rowIndex + 1].value + 1 : row.value + 1, 1)
+  } else if (direction === "left") {
+    await moveToColumn(block, row.value, row.columns[columnIndex - 1].column)
+  } else {
+    await moveToColumn(block, row.value, row.columns[columnIndex + 1].column + 1)
+  }
+
+  await nextTick()
+  const position = rows.value.flatMap((current) => current.columns).findIndex((current: Block) => current.id === block.id) + 1
+  moveAnnouncement.value = `Block moved to position ${position}`
+  const blockElement = document.querySelector(`[data-block-id="${block.id}"]`)
+  const button =
+    blockElement?.querySelector<HTMLButtonElement>(`[data-block-action="${direction}"]:not(:disabled)`) ??
+    blockElement?.querySelector<HTMLButtonElement>(".block__action:not(:disabled)")
+  button?.focus()
+}
 </script>
 
 <template>
-  <div class="page-editor__root">
+  <div class="page-editor__root flex flex-col">
+    <div class="sr-only" role="status">{{ moveAnnouncement }}</div>
     <div :class="[
-      'page-editor__row-dropzone',
-      draggingBlockId && 'page-editor__row-dropzone--active',
-      hoveredDropzone === `row-${minRowValue}` && 'page-editor__dropzone--hovered',
+      'page-editor__row-dropzone h-8 [margin:8px_0] w-full [content:var(--dv-empty-content)]',
+      draggingBlockId && 'page-editor__row-dropzone--active border border-dashed border-neutral-400',
+      hoveredDropzone === `row-${minRowValue}` && 'page-editor__dropzone--hovered bg-neutral-200',
     ]" @drop="handleRowDrop($event, minRowValue, 1)" @dragover.prevent="hoveredDropzone = `row-${minRowValue}`"
       @dragleave="hoveredDropzone = null" />
-    <template v-for="row in rows" :key="row.value">
-      <div class="page-editor__row">
+    <template v-for="(row, rowIndex) in rows" :key="row.value">
+      <div class="page-editor__row flex">
         <div :class="[
-          'page-editor__col-dropzone',
-          draggingBlockId && 'page-editor__col-dropzone--active',
+          'page-editor__col-dropzone [margin:0_8px] w-8 [content:var(--dv-empty-content)]',
+          draggingBlockId && 'page-editor__col-dropzone--active border border-dashed border-neutral-400',
           hoveredDropzone ===
           `col-${row.value}-${computeColumnMinValue(row.columns)}` &&
-          'page-editor__dropzone--hovered',
+          'page-editor__dropzone--hovered bg-neutral-200',
         ]" @drop="handleColDrop($event, row.value, computeColumnMinValue(row.columns))" @dragover.prevent="
           hoveredDropzone = `col-${row.value}-${computeColumnMinValue(row.columns)}`
           " @dragleave="hoveredDropzone = null" />
-        <template v-for="block in row.columns" :key="block.id">
+        <template v-for="(block, columnIndex) in row.columns" :key="block.id">
           <PageEditorBlock :class="[
             'cursor-grab border border-transparent border-spacing-1 p-[0.5rem]',
             { 'opacity-50': draggingBlockId === block.id },
           ]" :page="page" :block="block" :dragging-block-id="draggingBlockId" :collection="$props.collection"
             :style="getBlockStyle(row.columns, block)" :generate-route="() => ({})" draggable="true" @dragover.prevent
-            @dragstart="handleDragStart($event, block)" @dragend="draggingBlockId = undefined" edit-mode />
+            @dragstart="handleDragStart($event, block)" @dragend="draggingBlockId = undefined" edit-mode
+            :can-move="getMoveState(rowIndex, columnIndex)"
+            @move="handleMove(block, rowIndex, columnIndex, $event)" />
           <div :class="[
-            'page-editor__col-dropzone',
-            draggingBlockId && 'page-editor__col-dropzone--active',
+            'page-editor__col-dropzone [margin:0_8px] w-8 [content:var(--dv-empty-content)]',
+            draggingBlockId && 'page-editor__col-dropzone--active border border-dashed border-neutral-400',
             hoveredDropzone === `col-${row.value}-${block.column + 1}` &&
-            'page-editor__dropzone--hovered',
+            'page-editor__dropzone--hovered bg-neutral-200',
           ]" @drop="handleColDrop($event, row.value, block.column + 1)"
             @dragover.prevent="hoveredDropzone = `col-${row.value}-${block.column + 1}`"
             @dragleave="hoveredDropzone = null" />
         </template>
       </div>
       <div :class="[
-        'page-editor__row-dropzone',
-        draggingBlockId && 'page-editor__row-dropzone--active',
-        hoveredDropzone === `row-${row.value + 1}` && 'page-editor__dropzone--hovered',
+        'page-editor__row-dropzone h-8 [margin:8px_0] w-full [content:var(--dv-empty-content)]',
+        draggingBlockId && 'page-editor__row-dropzone--active border border-dashed border-neutral-400',
+        hoveredDropzone === `row-${row.value + 1}` && 'page-editor__dropzone--hovered bg-neutral-200',
       ]" @drop="handleRowDrop($event, row.value + 1, 1)" @dragover.prevent="hoveredDropzone = `row-${row.value + 1}`"
         @dragleave="hoveredDropzone = null" />
     </template>
@@ -271,7 +312,7 @@ function handleColDrop(event: DragEvent, row: number, column: number) {
         aria-label="Add content block"
         class="editor__plus-button flex items-center justify-center w-full border border-dashed border-neutral-400 rounded-md cursor-pointer p-1"
         @click="isBlockSelectorOpen = true">
-        <Plus class="w-6 h-6 text-neutral-400" />
+        <Plus class="w-6 h-6 text-neutral-500" />
       </button>
     </div>
   </div>
@@ -279,47 +320,3 @@ function handleColDrop(event: DragEvent, row: number, column: number) {
   <PageEditorDialog v-model="isBlockSelectorOpen" :page="page" :collection="$props.collection"
     :max-row-value="maxRowValue" />
 </template>
-
-<style scoped>
-.page-editor__root {
-  display: flex;
-  flex-direction: column;
-}
-
-.page-editor__row {
-  display: flex;
-}
-
-.page-editor__col-dropzone {
-  margin: 0 8px;
-  width: 32px;
-  content: " ";
-}
-
-.page-editor__col-dropzone--active {
-  @apply border border-dashed border-neutral-400;
-}
-
-.page-editor__col-dropzone--hovered {
-  @apply bg-neutral-100;
-}
-
-.page-editor__row-dropzone {
-  height: 32px;
-  margin: 8px 0;
-  width: 100%;
-  content: " ";
-}
-
-.page-editor__row-dropzone--active {
-  @apply border border-dashed border-neutral-400;
-}
-
-.page-editor__row-dropzone--hovered {
-  @apply bg-neutral-100;
-}
-
-.page-editor__dropzone--hovered {
-  @apply bg-neutral-200;
-}
-</style>

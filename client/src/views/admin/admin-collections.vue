@@ -24,7 +24,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { ChevronDown, ChevronRight, CirclePlus, EyeOff, FilePenLine, Folder, Image, PencilLine, Trash2 } from "lucide-vue-next"
-import { TreeItem, TreeRoot } from 'radix-vue'
+import { TreeItem, TreeRoot } from 'reka-ui'
 import { computed, ref, watch } from "vue"
 
 const { status, data: collections, error } = useQuery({

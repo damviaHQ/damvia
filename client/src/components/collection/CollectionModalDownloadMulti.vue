@@ -28,7 +28,7 @@ import { formatFileSize } from "@/utils/fileSize"
 import { useQueryClient } from "@tanstack/vue-query"
 import {CircleHelpIcon, Copyright, FileStack, X} from "lucide-vue-next"
 import { computed, ref, watch, watchEffect } from "vue"
-import {Dialog, DialogContent, DialogTrigger} from "@/components/ui/dialog";
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger} from "@/components/ui/dialog";
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: "update:modelValue", isOpen: boolean): void }>()
@@ -180,35 +180,35 @@ function removeFromSelection(file: { id: string }) {
 </script>
 
 <template>
-  <div v-if="modelValue" class="bg-neutral-800 fixed top-0 left-0 w-full h-full z-20 py-5 px-8 text-neutral-200">
+  <div v-if="modelValue" class="bg-white fixed top-0 left-0 w-full h-full z-30 py-5 px-7 text-neutral-800">
     <div class="modal__header flex justify-between items-center mb-4">
       <div class="flex items-center gap-2">
         <FileStack />
-        <div class="text-xl font-medium">Selected files</div>
+        <div class="text-[17px] font-semibold">Selected files</div>
       </div>
-      <Button variant="ghost" size="icon" type="button"
-        class="text-neutral-200 hover:text-neutral-300 bg-transparent hover:bg-neutral-700"
+      <Button aria-label="Close selected files" variant="ghost" size="icon" type="button"
+        class="text-neutral-800 hover:text-neutral-600 bg-transparent hover:bg-neutral-100"
         @click="$emit('update:modelValue', false)">
         <X strokeWidth="3" />
       </Button>
     </div>
     <div v-if="res" class="modal__content flex flex-wrap overflow-x-hidden">
       <div class="modal__content-left flex-1 pr-4 items-start overflow-y-auto h-[calc(100vh-90px)]">
-        <div class="file-grid">
-          <div v-for="file in res.files" :key="file.id" class="file-item">
-            <div class="relative flex flex-col items-center max-w-[20%] min-w-[190px] p-1 bg-neutral-700">
-              <div @click="removeFromSelection(file)" class="download-assets-modal__unselect-item">
+        <div class="file-grid grid [grid-template-columns:repeat(auto-fill,_minmax(190px,_1fr))] gap-2">
+          <div v-for="file in res.files" :key="file.id" class="file-item w-full min-w-0">
+            <div class="relative flex flex-col items-center max-w-[20%] min-w-[190px] p-1 border border-neutral-200 bg-neutral-50">
+              <div @click="removeFromSelection(file)" class="download-assets-modal__unselect-item cursor-pointer flex absolute top-2 left-2 p-0">
                 <X class="w-4 h-4" />
               </div>
               <img v-if="file.thumbnailURL" v-lazy="file.thumbnailURL" :alt="file.name"
                 class="w-full h-[150px] object-contain justify-self-start items-start p-2" @load="onImageLoad" />
-              <thumbnailPlaceholder v-else :alt="file.name" @load="onImageLoad" class="fill-neutral-200 h-[150px]" />
+              <thumbnailPlaceholder v-else :alt="file.name" @load="onImageLoad" class="fill-neutral-600 h-[150px]" />
             </div>
             <div class="w-full flex flex-col gap-1 max-w-full p-1 overflow-hidden text-ellipsis whitespace-nowrap">
-              <div class="w-full text-sm text-neutral-200 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+              <div class="w-full text-sm text-neutral-800 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                 {{ file.name }}
               </div>
-              <div class="text-xs text-neutral-400">
+              <div class="text-xs text-neutral-500">
                 {{ getFileExtension(file.name) }} - {{ formatFileSize(file.size) }}
               </div>
             </div>
@@ -216,9 +216,9 @@ function removeFromSelection(file: { id: string }) {
         </div>
       </div>
       <div
-        class="modal__content-right flex flex-col gap-5 px-4 pl-6 flex-[0_0_320px] h-[calc(100vh-90px)] w-full border-l border-neutral-700 overflow-y-auto">
+        class="modal__content-right flex flex-col gap-5 px-4 pl-6 flex-[0_0_340px] h-[calc(100vh-90px)] w-full border-l border-neutral-200 overflow-y-auto">
         <div v-if="imageCount && allowImageCompression">
-          <div class="font-medium mb-4 text-lg">Choose an Image format</div>
+          <div class="mb-3 text-[13px] font-semibold">Choose an Image format</div>
           <RadioGroup v-model="form.imageFormat">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
@@ -228,14 +228,14 @@ function removeFromSelection(file: { id: string }) {
                 { name: 'WEBP', value: 'webp' },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`"
-                  class="border border-brand text-brand min-w-max" />
+                  class="border border-primary text-primary shrink-0" />
                 <Label :for="`image-format-${option.value}`">{{ option.name }}</Label>
               </div>
             </div>
           </RadioGroup>
         </div>
         <div v-else-if="imageCount">
-          <div class="font-medium mb-4 text-lg">Choose Image format</div>
+          <div class="mb-3 text-[13px] font-semibold">Choose Image format</div>
           <RadioGroup v-model="form.imageFormat">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
@@ -243,19 +243,19 @@ function removeFromSelection(file: { id: string }) {
                 { name: 'PNG', value: 'png', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
                 { name: 'JPG', value: 'jpg', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
                 { name: 'WEBP', value: 'webp', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
-              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option': option.disabled }">
+              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible': option.disabled }">
                 <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`" :disabled="option.disabled"
-                  class="border border-brand text-brand min-w-max" />
+                  class="border border-primary text-primary shrink-0" />
                 <Label :for="`image-format-${option.value}`" :class="{ 'text-neutral-500': option.disabled }">
                   {{ option.name }}
                 </Label>
-                <div v-if="option.disabled && option.tooltip" class="tooltip">{{ option.tooltip }}</div>
+                <div v-if="option.disabled && option.tooltip" class="tooltip absolute [background-color:#4b5563] [color:#e5e7eb] p-2 rounded-none [font-size:0.75rem] [max-width:250px] [z-index:50] [margin-top:-2.5rem] ml-6 [box-shadow:0_4px_6px_-1px_rgba(0,_0,_0,_0.1),_0_2px_4px_-1px_rgba(0,_0,_0,_0.06)]">{{ option.tooltip }}</div>
               </div>
             </div>
           </RadioGroup>
         </div>
         <div v-if="imageCount && form.imageFormat !== 'original'">
-          <div class="font-medium mb-4 text-lg">Image quality</div>
+          <div class="mb-3 text-[13px] font-semibold">Image quality</div>
           <RadioGroup v-model="form.imageResolution">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
@@ -276,17 +276,17 @@ function removeFromSelection(file: { id: string }) {
                 },
               ]" :key="option.value" class="flex items-center space-x-2">
                 <RadioGroupItem :value="option.value" :id="`image-quality-${option.value}`"
-                  class="border border-brand text-brand min-w-max" />
+                  class="border border-primary text-primary shrink-0" />
                 <div>
                   <Label :for="`image-quality-${option.value}`">{{ option.name }}</Label>
-                  <p class="text-sm text-neutral-400">{{ option.description }}</p>
+                  <p class="text-sm text-neutral-500">{{ option.description }}</p>
                 </div>
               </div>
             </div>
           </RadioGroup>
         </div>
         <div>
-          <div class="font-medium mb-4 text-lg">Download type</div>
+          <div class="mb-3 text-[13px] font-semibold">Download type</div>
           <RadioGroup v-model="form.downloadType">
             <div class="flex flex-col space-y-2">
               <div v-for="option in [
@@ -303,54 +303,55 @@ function removeFromSelection(file: { id: string }) {
                   description:
                     'A zip is saved for 7 days in My Downloads. You will receive an email with the link when ready.',
                 },
-              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option': option.disabled }">
+              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible': option.disabled }">
                 <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"
-                  class="border border-brand text-brand min-w-max" />
+                  class="border border-primary text-primary shrink-0" />
                 <div>
                   <Label :for="`download-type-${option.value}`" :class="{ 'text-neutral-500': option.disabled }">
                     {{ option.name }}
                   </Label>
-                  <p class="text-sm" :class="option.disabled ? 'text-neutral-500' : 'text-neutral-400'">
+                  <p class="text-sm" :class="option.disabled ? 'text-neutral-500' : 'text-neutral-500'">
                     {{ option.description }}
                   </p>
                 </div>
-                <div v-if="option.disabled && option.tooltip" class="tooltip">{{ option.tooltip }}</div>
+                <div v-if="option.disabled && option.tooltip" class="tooltip absolute [background-color:#4b5563] [color:#e5e7eb] p-2 rounded-none [font-size:0.75rem] [max-width:250px] [z-index:50] [margin-top:-2.5rem] ml-6 [box-shadow:0_4px_6px_-1px_rgba(0,_0,_0,_0.1),_0_2px_4px_-1px_rgba(0,_0,_0,_0.06)]">{{ option.tooltip }}</div>
               </div>
             </div>
           </RadioGroup>
         </div>
         <div v-if="hasLicenses">
           <div>
-            <div class="font-medium mb-4 text-lg">Usage Licensing Agreement</div>
+            <div class="mb-3 text-[13px] font-semibold">Usage Licensing Agreement</div>
             <div class="flex-col gap-1">
               <div v-if="res.licenses.length > 0" class="flex-col gap-1"></div>
-              <div v-for="license in res.licenses" :key="license.id" class="flex items-center text-neutral-300">
-                <Copyright class="w-4 h-4 mr-4 text-neutral-50" />
+              <div v-for="license in res.licenses" :key="license.id" class="flex items-center text-neutral-600">
+                <Copyright class="w-4 h-4 mr-4 text-neutral-600" />
                 <div class="flex flex-col">
                   <Dialog v-if="license.details">
                     <DialogTrigger as-child>
-                      <button class="flex items-center text-sm mb-1 text-neutral-200">
+                      <button class="flex items-center text-sm mb-1 text-neutral-800">
                         {{ license.name }}
                         <CircleHelpIcon class="ml-2 h-4 w-4" />
                       </button>
                     </DialogTrigger>
-                    <DialogContent>
-                      <div class="max-h-[80vh] overflow-auto" v-html="license.details" />
+                    <DialogContent class="sm:max-w-[640px] gap-5">
+                      <DialogHeader><DialogTitle>{{ license.name }}</DialogTitle><DialogDescription>Usage terms</DialogDescription></DialogHeader>
+                      <div class="text-sm leading-relaxed [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5" v-html="license.details" />
                     </DialogContent>
                   </Dialog>
-                  <div v-else class="text-sm mb-1 text-neutral-200">
+                  <div v-else class="text-sm mb-1 text-neutral-800">
                     {{ license.name }}
                   </div>
-                  <div class="text-neutral-300 text-xs">
+                  <div class="text-neutral-600 text-xs">
                     {{ license.scopes.map((scope) => scope.toUpperCase()).join(", ") }}
                   </div>
                 </div>
               </div>
               <div class="flex items-center py-6 gap-4">
-                <Checkbox id="terms" v-model:checked="form.isAcceptingTerms"
+                <Checkbox id="terms" v-model="form.isAcceptingTerms"
                   class="border-brand [&>*]:bg-brand [&>*]:text-neutral-800"
                   :class="{ 'border-red-500': hasTermsError }" />
-                <Label for="terms" class="text-sm leading-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                <Label for="terms" class="leading-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   :class="{
                     'text-red-500': hasTermsError,
                     'text-brand': !hasTermsError && form.isAcceptingTerms,
@@ -364,13 +365,13 @@ function removeFromSelection(file: { id: string }) {
         </div>
         <div>
           <Button @click="download" :disabled="isLoading"
-            class="w-full bg-brand text-neutral-800 ring-1 ring-inset ring-brand hover:bg-brand-hover hover:text-neutral-900 hover:ring-brand-hover"
+            class="w-full bg-primary text-primary-foreground hover:bg-[var(--dv-action-hover)]"
             :class="{
-              'ring ring-neutral-200 bg-neutral-800 text-neutral-200 hover:ring-brand hover:text-brand hover:bg-neutral-800': hasLicenses && !form.isAcceptingTerms,
+              'ring ring-neutral-200 bg-white text-neutral-800 hover:ring-brand hover:text-brand hover:bg-white': hasLicenses && !form.isAcceptingTerms,
             }">
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>
-          <div class="mt-2 text-sm text-neutral-300">
+          <div class="mt-2 text-sm text-neutral-600">
             Total Size: {{ totalSize }}
           </div>
         </div>
@@ -381,115 +382,3 @@ function removeFromSelection(file: { id: string }) {
     </div>
   </div>
 </template>
-
-<style scoped>
-.download-assets-modal__header-icon {
-  width: 2rem;
-  height: 2rem;
-  stroke-width: 2px;
-  margin-right: 0.5rem;
-}
-
-.download-assets-modal__header-close {
-  background: transparent;
-  cursor: pointer;
-  border: none;
-}
-
-.download-assets-modal__header-close svg {
-  width: 2rem;
-  height: 2rem;
-  stroke-width: 2px;
-  color: #fff;
-}
-
-.download-assets-modal__download-button {
-  padding: 0.75rem 2rem;
-  width: 100%;
-  display: block;
-  border: none;
-  color: var(--primary-color15);
-  font-weight: 600;
-  font-size: 16px;
-  background: var(--accent-color);
-  cursor: pointer;
-}
-
-.download-assets-modal__download-button:hover {
-  background: var(--accent-color);
-}
-
-.download-assets-modal__download-button[disabled] {
-  pointer-events: none;
-  opacity: 50%;
-}
-
-.warning {
-  color: #ff5e5e;
-  font-size: 14px;
-  margin-top: 0.5rem;
-}
-
-.info-message {
-  color: #9ca3af;
-  font-size: 14px;
-  margin-top: 0.5rem;
-  font-style: italic;
-}
-
-.tooltip {
-  position: absolute;
-  background-color: #4b5563;
-  color: #e5e7eb;
-  padding: 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  max-width: 250px;
-  z-index: 50;
-  margin-top: -2.5rem;
-  margin-left: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-.disabled-option {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.disabled-option > * {
-  cursor: not-allowed;
-}
-
-.disabled-option .tooltip {
-  display: block;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s, visibility 0.3s;
-  transition-delay: 0.5s;
-}
-
-.disabled-option:hover .tooltip {
-  opacity: 1;
-  visibility: visible;
-}
-
-.download-assets-modal__unselect-item {
-  cursor: pointer;
-  display: flex;
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  padding: 0;
-}
-
-.file-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 0.5rem;
-}
-
-.file-item {
-  width: 100%;
-  min-width: 0;
-}
-</style>

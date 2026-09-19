@@ -12,10 +12,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. */
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import tailwind from '@tailwindcss/vite'
 import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [tailwind(), vue()],
+  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) }, dedupe: ['vue', '@internationalized/date'] },
   base: './',
   server: {
     fs: {

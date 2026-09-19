@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -170,7 +171,7 @@ async function handleSubmit() {
           <div v-if="error" role="alert" class="admin-form-error">
             {{ error }}
           </div>
-          <div class="form-field">
+          <FieldGroup class="form-field">
             <Label class="form" for="type">Type</Label>
             <Select v-model="form.type" :disabled="!!item">
               <SelectTrigger id="type" class="w-full">
@@ -183,7 +184,7 @@ async function handleSubmit() {
                 <SelectItem value="page">Page</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </FieldGroup>
           <template v-if="form.type === 'collection'">
             <div class="form-field">
               <label class="form">Collection</label>
@@ -191,7 +192,7 @@ async function handleSubmit() {
                 :options="subCollections" :disabled="!!item" />
             </div>
             <div class="form-field flex items-center space-x-2">
-              <Checkbox v-model:checked="form.data.sync" :disabled="!!item" id="sync" />
+              <Checkbox v-model="form.data.sync" :disabled="!!item" id="sync" />
               <Label for="sync"
                 class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Display and synchronize all sub-collections in the menu
@@ -199,15 +200,15 @@ async function handleSubmit() {
             </div>
           </template>
           <template v-if="form.type === 'page'">
-            <div class="form-field">
+            <FieldGroup class="form-field">
               <Label class="form">Page</Label>
               <treeselect v-model="form.pageId" class="mb-075" placeholder="Page" :options="pageOptions"
                 :disabled="!!item" />
-            </div>
+            </FieldGroup>
           </template>
           <div v-else-if="form.type === 'divider'" class="flex flex-col gap-6">
             <div class="form-field">
-              <Checkbox v-model:checked="form.data.border" id="border" />
+              <Checkbox v-model="form.data.border" id="border" />
               <Label for="border"
                 class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Show a divider line
@@ -234,16 +235,16 @@ async function handleSubmit() {
             </div>
           </div>
           <template v-if="form.type === 'text'">
-            <div class="flex flex-col gap-2">
+            <FieldGroup >
               <Label class="form" for="text">Text</Label>
               <Input id="text" v-model="form.data.text" type="text" />
-            </div>
-            <div class="form-field">
+            </FieldGroup>
+            <FieldGroup class="form-field">
               <Label class="form" for="url">URL (optional)</Label>
               <Input id="url" v-model="form.data.url" type="url" />
-            </div>
+            </FieldGroup>
             <div v-if="form.data.url" class="form-field flex items-center space-x-2">
-              <Checkbox v-model:checked="form.data.external" id="external" />
+              <Checkbox v-model="form.data.external" id="external" />
               <Label for="external"
                 class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                 Open in new tab

@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button"
 import { trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
-import { X } from "lucide-vue-next"
 import { computed, defineAsyncComponent, ref } from "vue"
 
 const globalStore = useGlobalStore()
@@ -42,7 +41,7 @@ const items = computed(() => {
       description: assetType.description ?? undefined
     }
   })
-  result.asset_file = { name: "Other Files without a type", description: undefined }
+  result.asset_file = { name: "Other files", description: "Files without an asset type." }
   return result
 })
 
@@ -72,59 +71,23 @@ function resetDisplayPreferences() {
 </script>
 
 <template>
-  <div v-if="status === 'pending'">
-    <Loader :text="true" />
-  </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
-    {{ error?.message }}
-  </div>
-  <div v-else-if="status === 'success'" class="download__container flex flex-col gap-4">
-    <p class="text-sm text-neutral-500 mb-8 max-w-[80%]">
-      When browsing collections, assets are organized by "Types," which define their specific usage (e.g., product vs.
-      marketing pictures). You
-      can choose how to display these types. Note that these settings are stored in your browser and will need to be
-      reconfigured if you switch
-      browsers.
-    </p>
-    <div class="flex gap-[10%]">
-      <div class="">
-        <div class="flex flex-col gap-8 max-w-[80%]">
-          <div v-for="(item, id) in items" :key="id" class="space-y-2">
-            <div class="flex flex-col gap-1">
-              <span class="font-medium text-sm">{{ item.name }}</span>
-              <div class="flex flex-col gap-4">
-                <span v-if="!item.description && item.name === 'Other Files without a type'"
-                  class="text-sm text-neutral-500">Some files don't fall
-                  into
-                  any type.</span>
-                <span v-else-if="!item.description && item.name === 'Collections'" class="text-sm text-neutral-500">How
-                  do you want to display your
-                  collections.</span>
-                <span v-else-if="item.description" class="text-sm text-neutral-500">{{ item.description }}</span>
-                <DisplaySelector :model-value="getDisplayPreference(id)"
-                  @update:model-value="(value) => setDisplayPreference(id, value)" />
-              </div>
-            </div>
-          </div>
-          <Button @click="resetDisplayPreferences" variant="link" class="self-start p-0 mt-8">
-            <X class="w-4 h-4 mr-1" /> Reset all to default
-          </Button>
-        </div>
+  <Loader v-if="status === 'pending'" :text="true" />
+  <p v-else-if="status === 'error'" role="alert" class="text-sm text-destructive">{{ error?.message }}</p>
+  <div v-else class="grid gap-5">
+    <div>
+      <div class="grid grid-cols-[minmax(0,1fr)_auto_120px] items-center gap-5 pb-3 text-xs text-neutral-500">
+        <span>Content</span><span class="w-[154px]">Display</span><span>Preview</span>
       </div>
-      <div>
-        <h3 class="text-lg font-semibold mb-4">Preview</h3>
-        <div class="space-y-8">
-          <div v-for="(item, id) in items" :key="id" class="space-y-2">
-            <div class="text-xs text-neutral-500">{{ item.name }}</div>
-            <div v-if="getDisplayPreference(id) === 'grid'">
-              <component :is="skeletonGrid" />
-            </div>
-            <div v-else>
-              <component :is="skeletonList" />
-            </div>
-          </div>
+      <div v-for="(item, id) in items" :key="id" data-display-row
+        class="grid grid-cols-[minmax(0,1fr)_auto_120px] items-center gap-5 py-4">
+        <div class="min-w-0">
+          <p :id="`display-label-${id}`" class="text-[13px] font-medium leading-5 break-words">{{ item.name }}</p>
+          <p v-if="item.description" class="mt-1 text-xs leading-5 text-neutral-500">{{ item.description }}</p>
         </div>
+        <DisplaySelector :aria-labelledby="`display-label-${id}`" :model-value="getDisplayPreference(id)" @update:model-value="value => setDisplayPreference(id, value)" />
+        <component :is="getDisplayPreference(id) === 'grid' ? skeletonGrid : skeletonList" class="h-auto w-[120px]" aria-hidden="true" />
       </div>
     </div>
+    <div class="flex justify-start"><Button type="button" variant="outline" @click="resetDisplayPreferences">Reset to defaults</Button></div>
   </div>
 </template>

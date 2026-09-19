@@ -15,7 +15,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { QuillEditor } from "@vueup/vue-quill"
 import "@vueup/vue-quill/dist/vue-quill.snow.css"
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, useId, watch } from 'vue'
 
 const props = defineProps<{
   data: any
@@ -26,6 +26,13 @@ const emit = defineEmits<{
 }>()
 
 const content = ref('')
+const labelId = useId()
+
+function labelEditor(quill: { root: HTMLElement }) {
+  quill.root.setAttribute('aria-labelledby', labelId)
+  quill.root.setAttribute('role', 'textbox')
+  quill.root.setAttribute('aria-multiline', 'true')
+}
 
 onMounted(() => {
   if (typeof props.data === 'string') {
@@ -52,29 +59,10 @@ function updateContent(newContent: string) {
 
 <template>
   <div class="flex flex-col h-full">
-    <h1 class="text-lg font-medium mb-4">Add text content</h1>
-    <div class="flex-grow overflow-hidden flex flex-col">
+    <h3 :id="labelId" class="text-sm font-semibold mb-4">Add text content</h3>
+    <div class="flex-grow flex flex-col overflow-hidden [&_.ql-container]:flex-1 [&_.ql-container]:overflow-auto [&_.ql-container]:flex [&_.ql-container]:flex-col [&_.ql-editor]:flex-1 [&_.ql-editor]:overflow-auto">
       <QuillEditor v-model:content="content" theme="snow" toolbar="essential" placeholder="..." content-type="html"
-        @update:content="updateContent" class="flex-grow flex flex-col" />
+        @update:content="updateContent" @ready="labelEditor" class="flex-grow flex flex-col" />
     </div>
   </div>
 </template>
-
-<style scoped>
-.flex-grow {
-  display: flex;
-  flex-direction: column;
-}
-
-.flex-grow :deep(.ql-container) {
-  flex: 1;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.flex-grow :deep(.ql-editor) {
-  flex: 1;
-  overflow: auto;
-}
-</style>

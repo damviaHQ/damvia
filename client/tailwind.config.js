@@ -1,5 +1,4 @@
 const path = require("node:path")
-const animate = require("tailwindcss-animate")
 const twColors = require("tailwindcss/colors")
 require("dotenv").config({ path: path.join(__dirname, ".env"), quiet: true })
 
@@ -14,7 +13,6 @@ function resolveColor(value, fallback) {
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
-  safelist: ["dark"],
   prefix: "",
   content: [
     './pages/**/*.{ts,tsx,vue}',
@@ -37,9 +35,9 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: resolveColor(process.env.VITE_BRAND_COLOR, "#DFE9FF"),
-          hover: resolveColor(process.env.VITE_BRAND_COLOR_HOVER, "#F6F8FC"),
-          strong: resolveColor(process.env.VITE_BRAND_COLOR_STRONG, "#0044F4"),
+          DEFAULT: "var(--tenant-brand-color, " + resolveColor(process.env.VITE_BRAND_COLOR, "#e5e5e5") + ")",
+          hover: "var(--tenant-brand-hover, " + resolveColor(process.env.VITE_BRAND_COLOR_HOVER, "#f5f5f5") + ")",
+          strong: "var(--tenant-brand-strong, " + resolveColor(process.env.VITE_BRAND_COLOR_STRONG, "#262626") + ")",
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -78,24 +76,24 @@ module.exports = {
       borderRadius: {
       	xl: "calc(var(--radius) + 4px)",
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "max(0px, calc(var(--radius) - 2px))",
+        sm: "max(0px, calc(var(--radius) - 4px))",
       },
       keyframes: {
         "accordion-down": {
           from: { height: 0 },
-          to: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "var(--reka-accordion-content-height)" },
         },
         "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
+          from: { height: "var(--reka-accordion-content-height)" },
           to: { height: 0 },
         },
         "collapsible-down": {
           from: { height: 0 },
-          to: { height: 'var(--radix-collapsible-content-height)' },
+          to: { height: 'var(--reka-collapsible-content-height)' },
         },
         "collapsible-up": {
-          from: { height: 'var(--radix-collapsible-content-height)' },
+          from: { height: 'var(--reka-collapsible-content-height)' },
           to: { height: 0 },
         },
       },
@@ -107,5 +105,5 @@ module.exports = {
       },
     },
   },
-  plugins: [animate],
+  plugins: [],
 }

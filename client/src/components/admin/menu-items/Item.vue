@@ -180,6 +180,8 @@ function openDialog(type: "add" | "edit") {
 </template>
 
 <style scoped>
+@reference "../../../style.css";
+
 .items-tree__grab {
   @apply mr-2 cursor-grab;
 }

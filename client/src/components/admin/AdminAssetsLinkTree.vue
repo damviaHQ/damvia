@@ -82,6 +82,8 @@ function handleLinkClick(event: MouseEvent) {
 </template>
 
 <style scoped>
+@reference "../../style.css";
+
 .layout-link-tree__wrapper {
   display: flex;
   flex-direction: column;

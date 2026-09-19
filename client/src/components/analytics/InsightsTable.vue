@@ -44,6 +44,7 @@ const display = (value: unknown) =>
     </header>
     <div v-if="rows.length" class="report-table-scroll">
       <table>
+        <caption class="sr-only">{{ title }}</caption>
         <thead>
           <tr>
             <th v-for="column in columns" :key="column.key" :class="{ numeric: column.numeric }" scope="col">

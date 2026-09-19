@@ -30,55 +30,18 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="auth-layout__root">
-    <div class="auth-layout__container">
-      <div class="flex flex-1 flex-col justify-center p-8 ml-[5%]">
-        <div class="auth-layout__form flex flex-col gap-[4rem] max-w-[350px]">
-          <Logo class="auth-layout__logo" />
+  <div class="auth-layout__root min-h-screen flex flex-col items-center m-0 justify-between bg-white">
+    <div class="auth-layout__container min-h-screen flex w-full overflow-hidden">
+      <main id="main-content" tabindex="-1" class="flex flex-1 flex-col items-center justify-center px-6 py-12 focus:outline-none">
+        <div class="auth-layout__form flex flex-col gap-9 w-full max-w-[360px]">
+          <Logo class="auth-layout__logo block [width:132px] h-auto" />
           <slot></slot>
           <footer class="text-sm text-neutral-500">
             <router-link to="/legal-information" target="_blank">Legal Mention</router-link>
           </footer>
         </div>
-      </div>
-      <div class="auth-layout__image" :style="{ backgroundImage: `url(${backgroundImageUrl})` }"></div>
+      </main>
+      <div v-if="backgroundImageUrl" class="auth-layout__image hidden md:block !bg-neutral-100 [width:60%] [background:no-repeat_center_center] [background-size:cover] [flex-shrink:0]" :style="{ backgroundImage: `url(${backgroundImageUrl})` }"></div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.auth-layout__root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0;
-  justify-content: space-between;
-}
-
-.auth-layout__container {
-  min-height: 100vh;
-  display: flex;
-  width: 100%;
-  overflow: hidden;
-}
-
-.auth-layout__image {
-  @apply !bg-neutral-100;
-  width: 60%;
-  background: no-repeat center center;
-  background-size: cover;
-  flex-shrink: 0;
-}
-
-.auth-layout__logo {
-  display: block;
-  width: 132px;
-  height: auto;
-}
-
-footer a,
-a:visited {
-  color: var(--primary-color80);
-}
-</style>

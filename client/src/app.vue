@@ -52,11 +52,12 @@ const resendVerificationEmail = async () => {
 </script>
 
 <template>
-  <div v-if="globalStore.isAuthenticated && !globalStore.user">
+  <div class="dv-theme" :class="route.meta.layout === 'admin' ? '' : 'dv-neutral dv-client'">
+  <main v-if="globalStore.isAuthenticated && !globalStore.user">
     <Loader :text="true" />
-  </div>
+  </main>
   <LayoutAuth v-else-if="globalStore.user && !(globalStore.user.approved && globalStore.user.emailVerified)">
-    <div v-if="!globalStore.user.emailVerified" class="flex flex-col">
+    <div v-if="!globalStore.user.emailVerified" role="status" class="flex flex-col">
       <p>An email has been sent with a link to confirm your account to: <span class="font-bold">{{
         globalStore.user.email }}</span> </p>
       <div class="text-sm flex flex-col gap-1 mt-8">
@@ -66,7 +67,7 @@ const resendVerificationEmail = async () => {
         </div>
       </div>
     </div>
-    <div v-else>
+    <div v-else role="status">
       <div>Please wait until your account is approved.</div>
       <div>
         Your subscription is under review. You will be reached by email when an admin has
@@ -75,5 +76,6 @@ const resendVerificationEmail = async () => {
     </div>
   </LayoutAuth>
   <LayoutRouter v-else></LayoutRouter>
-  <Toaster />
+  <Toaster :neutral="route.meta.layout !== 'admin'" />
+  </div>
 </template>

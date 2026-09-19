@@ -39,9 +39,6 @@ import { computed, ref, watch, provide } from "vue"
 import { useRoute } from "vue-router"
 import ClientLogo from '@/components/ClientLogo.vue'
 import PathBreadcrumb, { type PathBreadcrumbItem } from '@/components/navigation/PathBreadcrumb.vue'
-import '../../../packages/design-system/src/tokens.css'
-import '../../../packages/design-system/src/fonts.css'
-import '../../../packages/design-system/src/components.css'
 import '@/styles/admin.css'
 provide('damvia-admin-theme', true)
 const route = useRoute()
@@ -75,6 +72,7 @@ const storageLevel = computed(() => {
 
 <template>
   <div class="dv-theme dv-admin admin-shell">
+    <a href="#admin-content" class="skip-link">Skip to content</a>
     <button class="mobile-nav-toggle" :aria-expanded="mobileOpen" aria-controls="admin-navigation" @click="mobileOpen = !mobileOpen"><Menu />{{ mobileOpen ? 'Close navigation' : 'Open navigation' }}</button>
     <aside id="admin-navigation" class="admin-sidebar" :class="{ 'is-open': mobileOpen }">
       <router-link :to="{ name: 'home' }" class="admin-brand" aria-label="Back to the DAM" title="Back to the DAM" @click="mobileOpen = false"><ClientLogo admin /><span>ADMIN</span></router-link>
@@ -190,7 +188,7 @@ const storageLevel = computed(() => {
           <template v-if="storage.serverContactEmails.length"> Contact <a :href="`mailto:${storage.serverContactEmails.join(',')}`" class="underline">{{ storage.serverContactEmails.join(', ') }}</a>.</template>
         </span>
       </div>
-      <main id="admin-content"><slot></slot></main>
+      <main id="admin-content" tabindex="-1"><slot></slot></main>
     </div>
   </div>
 </template>
@@ -201,9 +199,10 @@ const storageLevel = computed(() => {
 .admin-brand { display:flex; align-items:center; gap:16px; padding:0 10px 18px; }
 .admin-brand :deep(.client-logo--default) { width:108px; filter:brightness(0) invert(1); }
 .admin-brand :deep(.client-logo--uploaded) { filter:none; background:white; padding:8px; border-radius:var(--dv-radius-graphic); width:128px; height:56px; object-fit:contain; }
-.admin-brand span { font-size:9px; letter-spacing:.1em; border:1px solid #46527c; padding:3px 5px; border-radius:var(--dv-radius-data); }
+.admin-brand span { font-size:11px; letter-spacing:.1em; border:1px solid #46527c; padding:3px 5px; border-radius:var(--dv-radius-data); }
 .admin-nav { flex:1; min-height:0; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#39436b transparent; }
 .admin-nav::-webkit-scrollbar { width:5px; }
+.admin-nav :focus-visible, .admin-brand:focus-visible, .sidebar-credit a:focus-visible, .mobile-nav-toggle:focus-visible { outline:2px solid #85aaff; outline-offset:-2px; }
 .admin-nav::-webkit-scrollbar-thumb { background:#39436b; }
 .menu-section { margin-bottom:8px; }
 .menu-section-title { color:var(--dv-text-on-dark-muted); font-size:10px; padding:8px 12px 4px; }
@@ -227,6 +226,9 @@ const storageLevel = computed(() => {
 .sidebar-credit a:hover { color:var(--dv-text-on-dark); }
 .admin-workspace { display:flex; flex:1; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
 .admin-workspace > #admin-content { flex:1; min-height:0; overflow-y:auto; }
+#admin-content:focus { outline:none; }
+.skip-link { position:absolute; top:8px; left:8px; z-index:100; padding:8px 12px; background:white; color:var(--dv-text-primary); font-size:13px; transform:translateY(-200%); }
+.skip-link:focus { transform:none; }
 .admin-topbar { min-height:65px; padding:12px 36px; display:flex; align-items:center; justify-content:space-between; gap:16px; background:white; border-bottom:1px solid var(--dv-color-line); font-size:11px; color:var(--dv-text-secondary); }
 .admin-topbar > :deep(.dv-breadcrumb) { flex:1; min-width:0; }
 .admin-topbar :deep(.dv-breadcrumb__current) { text-transform:capitalize; }

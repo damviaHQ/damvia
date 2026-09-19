@@ -45,7 +45,7 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { trpc } from "@/services/server.ts"
 import { useMutation } from "@tanstack/vue-query"
-import { Upload } from "lucide-vue-next"
+import { Pencil, Upload } from "lucide-vue-next"
 import { parse } from "papaparse"
 import { computed, ref, watchEffect } from "vue"
 import { useRouter } from "vue-router"
@@ -69,6 +69,8 @@ const overrideAll = ref(false)
 const selectedOverrides = ref<{ [key: string]: boolean }>({})
 const isComparing = ref(false)
 const isImporting = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+const primaryKeyError = ref("")
 
 const router = useRouter()
 
@@ -80,6 +82,7 @@ const handleFileUpload = async (e: Event) => {
     comparisonResults.value = []
     selectedOverrides.value = {}
     primaryKeyName.value = "_placeholder"
+    primaryKeyError.value = ""
 
     const parseConfig = {
       header: true,
@@ -137,9 +140,11 @@ const showComparisonDialog = ref(false)
 
 const handleCsvCompare = async () => {
   if (!primaryKeyName.value || primaryKeyName.value === "_placeholder") {
-    toast.error("Please select a valid primary key column.")
+    primaryKeyError.value = "Please select a valid primary key column."
+    toast.error(primaryKeyError.value)
     return
   }
+  primaryKeyError.value = ""
 
   const filteredData = parsedData.value.map((row) => {
     const filteredRow: Record<string, string> = {}
@@ -183,7 +188,8 @@ const importCsvMutation = useMutation({
 
 const handleCsvImport = () => {
   if (!primaryKeyName.value) {
-    toast.error("Please select a primary key column.")
+    primaryKeyError.value = "Please select a primary key column."
+    toast.error(primaryKeyError.value)
     return
   }
 
@@ -252,13 +258,14 @@ function handleOverrideAll(value: boolean) {
 
       <div class="mb-8">
         <div class="flex items-center gap-4">
-          <Button as="label" for="file-upload" variant="outline" class="flex items-center gap-2 cursor-pointer">
+          <input ref="fileInput" type="file" @change="handleFileUpload" class="hidden" accept=".csv"
+            aria-label="Choose CSV file" />
+          <Button type="button" variant="outline" class="flex items-center gap-2" @click="fileInput?.click()">
             <Upload />
             Choose CSV file
-            <input id="file-upload" type="file" @change="handleFileUpload" class="hidden" accept=".csv" />
           </Button>
-          <span v-if="parsedData.length > 0" class="text-sm text-green-600">
-            CSV ready for review
+          <span role="status" class="text-sm text-[var(--dv-color-success)]">
+            {{ parsedData.length > 0 ? "CSV ready for review" : "" }}
           </span>
         </div>
         <Alert v-if="parsedData.length === 0" variant="default" class="mt-2">
@@ -295,14 +302,15 @@ function handleOverrideAll(value: boolean) {
 
       <div v-if="columns.length > 0" class="flex flex-col gap-8">
         <div class="flex flex-col space-y-2">
-          <h3 class="text-lg font-semibold mb-2">1. Select Primary Key Column</h3>
+          <h3 id="primary-key-heading" class="text-lg font-semibold mb-2">1. Select Primary Key Column</h3>
           <p class="text-sm admin-text-secondary">
             This column will be used to identify your record reference.
           </p>
 
           <div class="w-full max-w-xs">
-            <Select v-model="primaryKeyName">
-              <SelectTrigger>
+            <Select v-model="primaryKeyName" @update:model-value="primaryKeyError = ''">
+              <SelectTrigger aria-labelledby="primary-key-heading" :aria-invalid="!!primaryKeyError || undefined"
+                :aria-describedby="primaryKeyError ? 'primary-key-error' : undefined">
                 <SelectValue placeholder="Select the Primary Key column" />
               </SelectTrigger>
               <SelectContent class="max-h-[300px] overflow-y-auto">
@@ -313,6 +321,9 @@ function handleOverrideAll(value: boolean) {
               </SelectContent>
             </Select>
           </div>
+          <p v-if="primaryKeyError" id="primary-key-error" class="text-sm text-[var(--dv-color-danger)]" role="alert">
+            {{ primaryKeyError }}
+          </p>
           <p class="text-sm admin-text-secondary">
             The primary key is a unique identifier for each row in your data.
           </p>
@@ -322,7 +333,7 @@ function handleOverrideAll(value: boolean) {
           <h3 class="text-lg font-semibold mb-2">2. Select Columns to Import:</h3>
           <div class="grid grid-cols-3 gap-4">
             <div v-for="column in columns" :key="column" class="flex items-center space-x-2">
-              <Checkbox :id="column" v-model:checked="selectedColumns[column]" />
+              <Checkbox :id="column" v-model="selectedColumns[column]" />
               <Label :for="column">{{ column }}</Label>
             </div>
           </div>
@@ -358,13 +369,13 @@ function handleOverrideAll(value: boolean) {
                   <br />
                   Red are duplicated Primary Keys and will be ignored.
                   <br />
-                  Yellow values have differences. Check the override box to update the
+                  Yellow values marked with a pencil icon have differences. Check the override box to update the
                   database with the new values.
                 </AlertDescription>
               </Alert>
               <div v-if="comparisonResults.some((result) => result.status === 'changed')"
                 class="ml-4 mb-2 flex items-center">
-                <Checkbox id="override-all" v-model:checked="overrideAll" />
+                <Checkbox id="override-all" v-model="overrideAll" />
                 <Label for="override-all" class="ml-2"> Override all changes </Label>
               </div>
               <Table class="bg-white" :class="{ 'opacity-50': isImporting }">
@@ -373,6 +384,7 @@ function handleOverrideAll(value: boolean) {
                     <TableHead v-if="
                       comparisonResults.some((result) => result.status === 'changed')
                     ">
+                      <span class="sr-only">Override</span>
                     </TableHead>
                     <TableHead v-for="column in filteredColumnsForPrimaryKey" :key="column"
                       :class="{ 'new-column': isNewColumn(column) }">
@@ -389,7 +401,8 @@ function handleOverrideAll(value: boolean) {
                       comparisonResults.some((result) => result.status === 'changed')
                     ">
                       <Checkbox v-if="result.status === 'changed'"
-                        v-model:checked="selectedOverrides[result.new[primaryKeyName]]" :disabled="overrideAll" />
+                        v-model="selectedOverrides[result.new[primaryKeyName]]" :disabled="overrideAll"
+                        :aria-label="`Override ${result.new[primaryKeyName]}`" />
                     </TableCell>
                     <TableCell v-for="column in filteredColumnsForPrimaryKey" :key="column">
                       <div v-if="result.status !== 'new' && column !== primaryKeyName" class="existing-value">
@@ -399,7 +412,9 @@ function handleOverrideAll(value: boolean) {
                         highlight: result.differences[column],
                         'new-entry': result.status === 'new',
                       }">
+                        <Pencil v-if="result.differences[column]" class="inline size-3 mr-1" aria-hidden="true" />
                         {{ result.new[column] }}
+                        <span v-if="result.differences[column]" class="sr-only">(changed)</span>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -421,6 +436,8 @@ function handleOverrideAll(value: boolean) {
 </template>
 
 <style scoped>
+@reference "../../../style.css";
+
 .new-column {
   @apply bg-green-100;
 }

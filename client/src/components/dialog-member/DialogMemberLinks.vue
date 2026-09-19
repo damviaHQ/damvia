@@ -17,10 +17,8 @@ import Loader from "@/components/Loader.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { trpc } from "@/services/server"
-import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import dayjs from "dayjs"
 import { Copy, X } from "lucide-vue-next"
@@ -30,7 +28,6 @@ import { useRouter } from "vue-router"
 const router = useRouter()
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
-const globalStore = useGlobalStore()
 const emit = defineEmits(['close'])
 
 const { data, status, error } = useQuery({
@@ -92,86 +89,34 @@ function goToCollection(collectionId: string) {
   <div v-if="status === 'pending'">
     <Loader :text="true" />
   </div>
-  <div v-else-if="status === 'error'" class="alert alert-danger">
+  <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="links__container flex flex-col gap-4">
-    <p class="text-sm text-neutral-500">
-      This is the list of all invitations you have created. If a guest cannot access a collection, check if the link has
-      expired. You can navigate to
-      the collection and create a new invitation.
-    </p>
-    <Table v-if="data && data.length > 0">
-      <TableHeader>
-        <TableRow>
-          <TableHead>Creation</TableHead>
-          <TableHead>Expiration</TableHead>
-          <TableHead>Guest Email</TableHead>
-          <TableHead>Collection</TableHead>
-          <TableHead v-if="globalStore.user?.role === 'admin'"></TableHead>
-          <TableHead></TableHead>
-        </TableRow>
-      </TableHeader>
+    <Table v-if="data && data.length > 0" class="table-fixed text-[13px] [&_td]:px-3 [&_td]:py-3 [&_th]:px-3">
+      <TableHeader><TableRow>
+        <TableHead class="w-[35%]">Guest / collection</TableHead>
+        <TableHead class="w-[24%]">Dates</TableHead>
+        <TableHead class="w-[14%]">Status</TableHead>
+        <TableHead class="w-[27%]"><span class="sr-only">Actions</span></TableHead>
+      </TableRow></TableHeader>
       <TableBody>
         <TableRow v-for="link in sortedData" :key="link.id">
-          <TableCell :class="{ 'opacity-50': isExpired(link) }">
-            <div class="min-w-max">
-              {{ dayjs(link.createdAt).format('YYYY-MM-DD') }}
-            </div>
-          </TableCell>
-          <TableCell :class="{ 'opacity-50': isExpired(link) }">
-            <div class="min-w-max">
-              {{ dayjs(link.expiresAt).format('YYYY-MM-DD') }}
-            </div>
-          </TableCell>
-          <TableCell :class="{ 'opacity-50': isExpired(link) }">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger class="cursor-default">
-                  <div class="max-w-[15rem] truncate">
-                    {{ link.email }}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ link.email }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </TableCell>
-          <TableCell :class="{ 'opacity-50': isExpired(link) }">
-            <Button @click="goToCollection(link.collection.id)" variant="link" class="px-0 text-primary text-left">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <div class="max-w-[15rem] truncate">
-                      {{ link.collection.name }}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p> {{ link.collection.name }}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+          <TableCell :class="{ 'text-neutral-500': isExpired(link) }">
+            <p class="truncate" :title="link.email">{{ link.email }}</p>
+            <Button @click="goToCollection(link.collection.id)" variant="link" class="mt-1 h-auto max-w-full justify-start p-0 text-neutral-500" :title="link.collection.name">
+              <span class="truncate">{{ link.collection.name }}</span>
             </Button>
           </TableCell>
-          <TableCell :class="{ 'opacity-50': isExpired(link) }">
-            <Badge v-if="!isExpired(link) && globalStore.user?.role === 'admin'"
-              :class="link.collection.public ? 'bg-brand text-neutral-800 hover:bg-brand-hover' : 'bg-green-500 hover:bg-green-600'">
-              {{ link.collection.public ? 'Public' : 'Private' }}
-            </Badge>
-            <Badge v-else-if="isExpired(link)" class="bg-neutral-500 hover:bg-neutral-600">Expired</Badge>
+          <TableCell class="text-xs leading-5 text-neutral-500">
+            <p>Created {{ dayjs(link.createdAt).format('D MMM YYYY') }}</p>
+            <p>Expires {{ dayjs(link.expiresAt).format('D MMM YYYY') }}</p>
           </TableCell>
+          <TableCell><Badge variant="secondary">{{ isExpired(link) ? 'Expired' : 'Active' }}</Badge></TableCell>
           <TableCell>
-            <div class="flex gap-5 items-center min-w-max">
-              <Button variant="outline" @click="copyInvitationLink(link)" :disabled="isExpired(link)">
-                <Copy class="w-4 h-4 mr-1" />
-                Copy link
-              </Button>
-              <Button variant="link" @click="removeInvitation(link.id)"
-                class="flex justify-start px-0 text-destructive">
-                <X class="w-4 h-4 mr-1" />
-                Remove access
-              </Button>
+            <div class="flex flex-col items-start gap-1">
+              <Button variant="ghost" size="sm" class="gap-2 px-2" @click="copyInvitationLink(link)" :disabled="isExpired(link)"><Copy class="size-4" />Copy link</Button>
+              <Button variant="ghost" size="sm" class="gap-2 px-2 text-destructive" @click="removeInvitation(link.id)"><X class="size-4" />Remove access</Button>
             </div>
           </TableCell>
         </TableRow>

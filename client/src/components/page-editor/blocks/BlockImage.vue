@@ -13,11 +13,12 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ref, watch } from 'vue'
+import { ref, useId, watch } from 'vue'
 
 const props = defineProps<{
   data: {
@@ -30,6 +31,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: "update", value: { data: any, file: File | null }): void
 }>()
+
+const fieldId = useId()
 
 const form = ref({
   url: props.data.url || '',
@@ -79,39 +82,27 @@ function updateExternal(checked: boolean) {
 
 <template>
   <div class="flex flex-col gap-4">
-    <h1 class="text-lg font-medium">Add an image</h1>
+    <h3 class="text-sm font-semibold">Add an image</h3>
     <div class="flex flex-col gap-2">
-      <Label>Image</Label>
-      <input ref="fileInputRef" type="file" accept="image/*" style="display: none" @change="handleFileUploaded" />
+      <Label :for="`${fieldId}-file`">Image</Label>
+      <input :id="`${fieldId}-file`" ref="fileInputRef" type="file" accept="image/*" style="display: none" @change="handleFileUploaded" />
       <div v-if="previewURL" class="flex flex-col items-center gap-2">
-        <img :src="previewURL" height="64px" width="auto" />
+        <img :src="previewURL" alt="Selected image preview" class="h-16 w-auto" />
         <Button variant="outline" size="sm" @click="triggerFileUpload">
           Change image
         </Button>
       </div>
-      <button v-else variant="outline" class="block-editor-modal__dropzone" @click="triggerFileUpload" type="button">
+      <button v-else variant="outline" class="block-editor-modal__dropzone flex items-center justify-center [border:1px_dashed_var(--dv-color-line,_#929292)] [color:var(--dv-text-secondary,_#929292)] [height:60px] w-full" @click="triggerFileUpload" type="button">
         Click here to select a file
       </button>
     </div>
-    <div class="flex flex-col gap-2">
-      <Label>URL (optional)</Label>
-      <Input v-model="form.url" type="url" @input="updateForm" />
-    </div>
+    <FieldGroup>
+      <Label :for="`${fieldId}-url`">URL (optional)</Label>
+      <Input :id="`${fieldId}-url`" v-model="form.url" type="url" @input="updateForm" />
+    </FieldGroup>
     <div v-if="form.url" class="flex items-center space-x-2">
-      <Checkbox id="external" :checked="form.external" @update:checked="updateExternal" />
-      <Label for="external">Open in new tab</Label>
+      <Checkbox :id="`${fieldId}-external`" :model-value="form.external" @update:model-value="updateExternal($event === true)" />
+      <Label :for="`${fieldId}-external`">Open in new tab</Label>
     </div>
   </div>
 </template>
-
-<style scoped>
-.block-editor-modal__dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--dv-color-line, #929292);
-  color: var(--dv-text-secondary, #929292);
-  height: 60px;
-  width: 100%;
-}
-</style>

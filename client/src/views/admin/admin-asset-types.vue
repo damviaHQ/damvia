@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { DialogClose } from "@/components/ui/dialog"
 import AdminList from "@/components/admin/AdminList.vue"
 import DisplaySelector from "@/components/DisplaySelector.vue"
@@ -268,20 +269,20 @@ async function onModalSubmit(event: Event) {
         </DialogHeader>
         <div class="modal-editor-grid">
           <div class="flex flex-col gap-5 min-w-0">
-            <div class="flex flex-col gap-2">
+            <FieldGroup >
               <Label for="name">Name *</Label>
               <Input id="name" v-model="form.name" placeholder="Name" />
-            </div>
-            <div class="flex flex-col gap-2">
+            </FieldGroup>
+            <FieldGroup >
               <Label for="description">Description</Label>
               <Input id="description" v-model="form.description" placeholder="Description" />
-            </div>
+            </FieldGroup>
             <div class="flex items-center space-x-2">
-              <Checkbox id="isRelatedToProducts" v-model:checked="form.isRelatedToProducts" />
+              <Checkbox id="isRelatedToProducts" v-model="form.isRelatedToProducts" />
               <Label for="isRelatedToProducts">Related to products</Label>
             </div>
             <div class="flex items-center space-x-2">
-              <Checkbox id="includeInSearchByDefault" v-model:checked="form.includeInSearchByDefault" />
+              <Checkbox id="includeInSearchByDefault" v-model="form.includeInSearchByDefault" />
               <Label for="includeInSearchByDefault">Search by default</Label>
             </div>
             <div class="flex flex-col gap-2">

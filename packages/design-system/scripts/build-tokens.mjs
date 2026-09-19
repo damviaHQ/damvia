@@ -60,7 +60,14 @@ function hslChannels(name) {
 }
 const license = readFileSync(new URL(import.meta.url), 'utf8').split('*/')[0] + '*/\n'
 const tokenOutput = `${license}/* Generated from tokens.json. Run npm run build in packages/design-system. */\n.dv-theme {\n${[...tokens].map(([name, token]) => `  --dv-${name.replaceAll('.', '-')}: ${cssValue(token)};`).join('\n')}\n}\n`
-const output = tokenOutput + `\n/* Admin-only bridge for shared shadcn controls and teleported overlays. */\n.dv-admin {\n${Object.entries(adminRoles).map(([role, token]) => `  --${role}: ${hslChannels(token)};`).join('\n')}\n}\n`
+let output = tokenOutput + `\n/* Admin-only bridge for shared shadcn controls and teleported overlays. */\n.dv-admin {\n${Object.entries(adminRoles).map(([role, token]) => `  --${role}: ${hslChannels(token)};`).join('\n')}\n}\n`
+// Resolve the same semantic roles after applying the neutral palette.
+const neutral = JSON.parse(readFileSync(new URL('../src/neutral.json', import.meta.url)))
+for (const [name, token] of Object.entries(neutral)) {
+  if (!tokens.has(name)) throw new Error(`Unknown neutral token: ${name}`)
+  tokens.set(name, token)
+}
+output += `\n/* White-label theme: shared geometry and semantics, achromatic brand roles. */\n.dv-theme.dv-neutral {\n${Object.entries(neutral).map(([name, token]) => `  --dv-${name.replaceAll('.', '-')}: ${cssValue(token)};`).join('\n')}\n  --dv-font-body: var(--tenant-font-family, Inter, system-ui, sans-serif);\n${Object.entries(adminRoles).map(([role, token]) => `  --${role}: ${hslChannels(token)};`).join('\n')}\n  --radius: 0px;\n}\n`
 const destination = new URL('../src/tokens.css', import.meta.url)
 if (process.argv.includes('--check')) {
   if (readFileSync(destination, 'utf8') !== output) throw new Error('tokens.css is out of date')

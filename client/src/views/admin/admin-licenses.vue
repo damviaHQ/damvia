@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { DialogClose } from "@/components/ui/dialog"
 import AdminList from "@/components/admin/AdminList.vue"
 import Loader from "@/components/Loader.vue"
@@ -43,8 +44,8 @@ import {RouterOutput, trpc} from "@/services/server.ts"
 import {CalendarDate, parseDate} from '@internationalized/date'
 import {useQuery, useQueryClient} from "@tanstack/vue-query"
 import {CirclePlus, PencilLine, Trash2, XIcon} from "lucide-vue-next"
-import {useDateFormatter} from 'radix-vue'
-import {toDate} from 'radix-vue/date'
+import {useDateFormatter} from 'reka-ui'
+import {toDate} from 'reka-ui/date'
 import {computed, ref} from 'vue'
 import Treeselect from "vue3-treeselect-ts"
 import {QuillEditor} from "@vueup/vue-quill";
@@ -256,10 +257,10 @@ async function onModalSubmit(event: Event) {
       <form :aria-busy="saving" @submit.prevent="onModalSubmit" class="admin-form">
         <div class="grid grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] gap-6">
           <div class="flex flex-col gap-4">
-            <div class="flex flex-col gap-2">
+            <FieldGroup >
               <Label for="name">Name *</Label>
               <Input id="name" v-model="form.name" placeholder="License name" />
-            </div>
+            </FieldGroup>
             <div class="flex flex-col gap-2">
               <Label for="usageFrom">Usage From</Label>
               <div class="flex gap-2">
@@ -294,16 +295,16 @@ async function onModalSubmit(event: Event) {
                 </Button>
               </div>
             </div>
-            <div class="flex flex-col gap-2">
+            <FieldGroup >
               <Label for="scopes">Usage Scopes *</Label>
               <Treeselect v-model="form.scopes" :options="licenseScopeOptions" :multiple="true"
                 placeholder="Select scopes" />
-            </div>
-            <div class="flex flex-col gap-2">
+            </FieldGroup>
+            <FieldGroup >
               <Label for="allowedRegions">Allowed Regions *</Label>
               <Treeselect v-model="form.allowedRegionIds" :options="regionOptions" :multiple="true"
                 placeholder="Select allowed regions" />
-            </div>
+            </FieldGroup>
           </div>
           <div class="flex flex-col gap-2 h-full">
             <Label for="details">Details</Label>
