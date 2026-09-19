@@ -3,14 +3,14 @@ title: Contributing
 description: Set up a development environment, know the scripts and checks that exist, and submit a change with its license header and its documentation.
 sidebar:
   order: 1
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 This page is the entry point for developers who want to change or extend Damvia. It covers the application packages, their scripts and checks, and what a pull request must contain. The other pages of this group describe the code itself: [Architecture](./architecture.md), [Data model](./data-model.md), [tRPC API](./api.md), [Writing a background job](./background-jobs.md) [Storage drivers](./storage-drivers.md) and the proposed [Design system](./design-system.md).
 
 ## The development environment is the local setup
 
-Follow [Local setup](../getting-started/local-setup.md): `docker-compose up -d` in `server/` for Postgres, MailHog and MinIO, then `npm run dev` in `server/` and in `client/`. Security regression tests use their own disposable PostgreSQL database; keep it separate from development data.
+Follow [Local setup](../getting-started/local-setup.md): `docker-compose up -d` in `server/` for Postgres, MailHog and MinIO, then `npm run dev` in `server/` and in `client/`. The server test suites use their own disposable PostgreSQL database; keep it separate from development data.
 
 ## Application packages and shared foundations
 
@@ -20,46 +20,66 @@ The two application packages have their own `package.json` and `node_modules`. A
 |---|---|
 | `server/` | Node, Fastify 5, tRPC 11, TypeORM 0.3, pg-boss 10, MinIO client, winston, zod |
 | `packages/design-system/` | Framework-independent design tokens, CSS and self-hosted font; proposal only |
-| `client/` | Vue 3, Vite 5, TypeScript, Tailwind 3, shadcn-vue (`components/ui/`), Pinia, TanStack Vue Query, tRPC 10 client |
+| `client/` | Vue 3, Vite 8, TypeScript, Tailwind 4, shadcn-vue (`components/ui/`), Pinia, TanStack Vue Query, tRPC 11 client, Vitest |
 
-`client/package.json` declares `"server": "file:../server"`, which makes `client/node_modules/server` a symlink to `../../server`. The client uses it for router types and also some runtime enums: `client/src/services/server.ts` imports `type { AppRouter } from "server/src/trpc"`, and `client/src/stores/downloadStore.ts` imports the `DownloadStatus` and `DownloadType` enums from `server/src/entity/download`. Install both packages before running either type check, or the client's imports do not resolve.
+`client/package.json` declares `"server": "file:../server"`, which makes `client/node_modules/server` a symlink to `../../server`. The client only imports types from it: `client/src/services/server.ts` imports `type { AppRouter } from "server/src/trpc"`, and `client/src/stores/downloadStore.ts` imports the `DownloadStatus` and `DownloadType` types from `server/src/entity/download`. The client type check reads those types from the declaration files that `npm run build` in `server/` writes to `server/dist/` (`client/tsconfig.json` maps `server/src/*` to `../server/dist/*`), so build the server before running `vue-tsc`.
 
 ## Scripts
 
 | Package | Script | What it runs |
 |---|---|---|
 | `server/` | `npm run dev` | `ENABLE_WORKER=true nodemon --exec ts-node src/index.ts`: API, worker and cloud sync in one process, restarted on save |
-| `server/` | `npm run build` | `NODE_ENV=production tsc` into `server/dist/` |
-| `server/` | `npm run test:security` | Builds the server and runs the database-backed security suite; requires `SECURITY_TEST_DATABASE_URL` pointing to a disposable database ending in `_test` |
+| `server/` | `npm run build` | `NODE_ENV=production tsc` into `server/dist/`, then the type declarations the client reads |
+| `server/` | `npm test` | Builds the server and runs every suite in `server/test/*.cjs` one file at a time against `SECURITY_TEST_DATABASE_URL`, a disposable database whose name ends in `_test` |
+| `server/` | `npm run test:security` | Same build, security suite only |
 | `server/` | `npm start` | `NODE_ENV=production node dist/index.js` |
 | `server/` | `npm run cli -- <command>` | `ts-node src/cli.ts`; the only command is `check-integrity`, see [CLI](../reference/cli.md) |
 | `server/` | `npm run typeorm` | `typeorm-ts-node-commonjs`, the TypeORM CLI running on the TypeScript sources |
 | `client/` | `npm run dev` | `vite`, on port 5173 |
 | `client/` | `npm run build` | `vite build` into `client/dist/` |
+| `client/` | `npm run typecheck` | `vue-tsc --noEmit` over `src/` and `test/unit/`; needs `npm run build` in `server/` first |
+| `client/` | `npm test` | Vitest over `client/test/unit/**/*.test.ts`; `npm run test:watch` keeps it running |
 | `client/` | `npm run preview` | `vite preview` of the built bundle |
 | `client/` | `npm run design:dev` | Isolated design proposal on port 5174 at `/design-system.html` |
 | `client/` | `npm run design:check` | Strict type check of the isolated design proposal |
 | `client/` | `npm run design:build` | Token freshness check and standalone static preview build |
 
-## Automated checks and current failures
+## Automated checks
 
-Application checks and documentation checks are separate. Documentation has source validation, regression tests and a pull-request workflow. The server has a security regression suite and its own CI workflow; there is no ESLint/Prettier configuration. Application commands:
+One GitHub Actions workflow, `.github/workflows/ci.yml`, runs on every pull request and on pushes to `main`. Its three jobs are meant to be required status checks on `main`; enable that in the repository settings under branch protection.
 
-- `cd client && npx vue-tsc --noEmit` type-checks the client, including the `.vue` files and the tRPC procedure types pulled from the server.
-- `cd server && npm run build` type-checks and compiles the server.
-- `cd server && npm run test:security` runs API, credential, access and migration tests against `SECURITY_TEST_DATABASE_URL`. The suite clears fixture tables and never loads the application’s `.env`. Use a disposable PostgreSQL 15 database. CI provides one automatically.
+| Job | What it runs |
+|---|---|
+| `server` | `npm ci` and `npm test` in `server/` against a `postgres:15` service |
+| `client` | `npm ci` and `npm run build` in `server/`, then `npm ci`, `npm run typecheck`, `npm test` and `npm run build` in `client/` |
+| `docs` | `node --test scripts/docs.test.mjs` and `scripts/check-docs.sh` |
 
-Run both before opening a pull request and report failures. The client check currently fails; do not describe a Vite build as a passing type check. `server/tsconfig.json` does not enable `strict`; `client/tsconfig.json` does, with `noUnusedLocals` and `noUnusedParameters`.
+Run the same commands before opening a pull request. There is no ESLint or Prettier configuration. `server/tsconfig.json` enables `strictNullChecks` but not the rest of `strict`; nullable entity columns therefore declare an explicit column `type`, because TypeORM cannot infer one from a `string | null` property. `client/tsconfig.json` is fully `strict`, with `noUnusedLocals` and `noUnusedParameters`. Both type checks must pass with zero errors.
 
-:::note
-The client depends on `@trpc/client` 10 and `@trpc/server` 10, while the server depends on `@trpc/server` 11 (installed: 10.45.0 and 11.1.0). The client only imports the `AppRouter` *type* from the server, and `inferRouterInputs` / `inferRouterOutputs` from its own tRPC 10, so the browser does not import the server router as executable code. The two versions must still agree on request and response formats, and the client must be able to read the server's types. The complete type check has not validated this version gap: it currently fails in `search.vue`. Vite build success is not a type or protocol compatibility check. When testing an upgrade, `RouterInput` and `RouterOutput` in `client/src/services/server.ts` are the first symbols that will fail.
-:::
+### Server suites
+
+`server/test/*.cjs` are `node:test` files that require the compiled `dist/` output, so every run starts with a build. `server/test/lib/helpers.cjs` holds the shared setup: it refuses any `SECURITY_TEST_DATABASE_URL` whose database name does not end in `_test`, never loads `server/.env`, replaces the S3 clients, the cloud driver, the mail transport and the pg-boss queues with in-memory stubs, and exposes `setup()` and `teardown()` for each suite's `before` and `after` hooks. `setup()` asserts the newest migration name, undoes the last upgrade migrations, seeds legacy rows, re-runs the migrations and creates the fixture users; when you add a migration, update `LATEST_MIGRATION` and `UPGRADE_MIGRATIONS` in the helper. All suites share one database, which is why `npm test` passes `--test-concurrency=1`.
+
+| File | Covers |
+|---|---|
+| `pure.cjs` | Password hashing, reset-token hashing, `APP_SECRET` validation, `STORAGE_QUOTA` parsing, byte formatting, download file names; needs no database |
+| `auth-invariants.cjs` | Walks every tRPC procedure: everything outside a short public allowlist must reject an anonymous caller, and an unverified account may reach only the account-management procedures |
+| `access.cjs` | The visibility matrix of `userCollectionsQuery` and `userCollectionFilesQuery` for every role and collection state, and that both builders agree |
+| `sync.cjs` | Folder and file upserts, inheritance of licence and asset type, queued synchronisations, folder deletion, `synchronizeCollection` |
+| `search.cjs` | Token and exact search, attribute, scope, file type and asset type filters, pagination, search activity events, `searchNotFound` |
+| `download.cjs` | Single-file and archive downloads, entry names, access refusals |
+| `users.cjs` | Sign-up approval and default groups, password-less mode, session tokens |
+| `security.cjs` | The original regression suite: upgrades, credentials, roles, invitations, licences, exports, storage quota, alerts, branding, insights |
+
+### Client suites
+
+`client/test/unit/**/*.test.ts` run with Vitest in a Node environment; files under `client/test/unit/dom/` run in happy-dom for the Pinia store and the composables. They cover the pure helpers in `client/src/utils/` and `client/src/lib/`, `extractErrors`, the navigation guard in `client/src/router/guard.ts`, the global store and the toast composable. Playwright specs in `client/test/ui/` (`npm run test:ui`) exercise the isolated design preview and are not part of CI.
 
 ## Submitting a change
 
 1. Branch from `main`.
 2. Make the change, keeping the license header and the documentation rule below.
-3. Run the two type checks and `scripts/check-docs.sh` (install checker dependencies with `npm ci --prefix scripts`). Run `node --test scripts/docs.test.mjs` for documentation tooling changes.
+3. Run `npm test` in `server/`, then `npm run typecheck`, `npm test` and `npm run build` in `client/`, and `scripts/check-docs.sh` (install checker dependencies with `npm ci --prefix scripts`). Run `node --test scripts/docs.test.mjs` for documentation tooling changes.
 4. Open a pull request against `main` on [github.com/damviaHQ/damvia](https://github.com/damviaHQ/damvia).
 
 ## Every source file starts with the AGPL header
@@ -88,5 +108,3 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 ## Documentation changes ship in the same pull request
 
 `docs/` is the source of the public documentation site. When a change alters behaviour that a page describes, update that page in the same pull request and set its `lastUpdated` to the day you checked it. The contract for the pages (frontmatter, style, folder layout) and the list of triggers that always require a doc edit are in the `docs/README.md` file in the repository; `docs/_internal/page-map.md` maps code areas to pages. Adding an environment variable means touching the code, `server/.env.template` or `client/.env.template`, and [Environment variables](../reference/environment-variables.md); adding a queue means updating [Background jobs](../reference/background-jobs.md). `scripts/check-docs.sh` catches the forgotten ones.
-
-The focused Users UI logic checks run with `node --test client/test/admin-users.test.cjs` from the repository root. They cover combined filtering, role/region action permissions, status classification and CSV formula escaping.

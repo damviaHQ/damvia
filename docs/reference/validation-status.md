@@ -31,9 +31,9 @@ scripts/check-docs.sh
 node --test scripts/docs.test.mjs
 ```
 
-From `server/`, run `npm run build`. From `client/`, run `npm run build` and separately `npx vue-tsc --noEmit`; retain and report that check's current failure rather than treating the Vite build as a replacement. For isolated component validation run `npm run ui:check` and `npm run test:ui`.
+From `server/`, run `SECURITY_TEST_DATABASE_URL=postgresql://.../damvia_security_test npm test` against a disposable PostgreSQL 15 database. The suites clear fixture tables, run migrations and test access, credentials, synchronisation, search, downloads, sign-up and concurrent requests. They never load `server/.env` or send email. The database name must end in `_test`.
 
-Run `SECURITY_TEST_DATABASE_URL=postgresql://.../damvia_security_test npm run test:security` from `server/` against a disposable PostgreSQL 15 database. The suite clears fixture tables, runs migrations and tests access, credentials and concurrent requests. It never loads `server/.env` or sends email. The database name must end in `_test`.
+From `client/`, run `npm run typecheck`, `npm test` and `npm run build` after building the server once. The type check must report zero errors; a Vite build alone is not a type check. For isolated component validation run `npm run ui:check` and `npm run test:ui`.
 
 The website build must use the corrected renderer and schema, with the documentation submodule advanced to the intended code version. It then runs the generated-HTML checker. See the repository's `docs/README.md` for publication wiring. Local edits to the adjacent application checkout do not update the website's pinned submodule by themselves.
 

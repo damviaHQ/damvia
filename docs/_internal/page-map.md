@@ -4,6 +4,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 
 | Code | Page(s) |
 |---|---|
+| `server/test/`, `client/test/unit/`, `client/vitest.config.ts`, `.github/workflows/ci.yml` | `contributing/index.md`, `reference/validation-status.md`, `getting-started/local-setup.md` |
 | `server/src/env.ts` | `reference/environment-variables.md`, `configuration/server-env.md` |
 | `server/.env.template`, `client/.env.template` | `reference/environment-variables.md`, `configuration/client-env.md` |
 | `server/src/worker.ts` | `reference/background-jobs.md`, `deployment/worker-and-scaling.md` |

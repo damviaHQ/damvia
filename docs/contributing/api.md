@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-19
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -104,7 +104,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 |---|---|---|---|
 | `tree` | query | `userApproved` | Collections visible to the user, as a tree |
 | `treeAdmin` | query | `userAdmin` | Public collection tree for the admin screen |
-| `search` | query | `userApproved` | Files matching text, asset types, product facets and scope |
+| `search` | query | `userApproved` | Files matching text, asset types, product facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored |
 | `searchNotFound` | query | `userApproved` | Returns the search terms that matched no file name in the same scope |
 | `findById` | query | `userApproved` | One collection with files, children, invitations |
 | `lastAddedFiles` | query | `userApproved` | 10 most recent collection files, optionally under one collection |

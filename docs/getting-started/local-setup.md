@@ -3,7 +3,7 @@ title: Local setup
 description: Run the full stack on one machine with docker-compose for the services and npm for the server and client.
 sidebar:
   order: 2
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-19
 ---
 
 This procedure targets a local development instance. Compilation and documentation checks have been run on macOS; a complete cloud-connected installation has not been exercised. Use the [acceptance checklist](../deployment/acceptance-checklist.md) to validate your instance.
@@ -84,7 +84,9 @@ Sign up at `http://localhost:5173/sign-up`. The region dropdown offers `Global`,
 | Wipe everything and start over | `docker-compose down -v` in `server/` (deletes the `postgres` and `minio` volumes) |
 | Force a full consistency pass between database and MinIO | `npm run cli -- check-integrity` in `server/` |
 | See queued and failed jobs | `psql postgresql://dam:dam@localhost/dam -c "select name, state, count(*) from pgboss.job group by 1,2"` |
-| Type-check the client | `npx vue-tsc --noEmit` in `client/` |
+| Type-check the client | `npm run build` in `server/`, then `npm run typecheck` in `client/` |
+| Run the server suites | `SECURITY_TEST_DATABASE_URL=postgresql://dam:dam@localhost/dam_test npm test` in `server/`, after creating the `dam_test` database once |
+| Run the client suites | `npm test` in `client/` |
 
 :::note
 The cloud sync marks anything absent from the listing as `pending_deletion` and the deletion job checks it every minute. Pointing a development instance at a production Dropbox is safe for Dropbox (Damvia never writes to it), but the local MinIO copy will be rebuilt from scratch.
