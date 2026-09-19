@@ -201,7 +201,7 @@ const handleCsvImport = () => {
         result.status === "new" ||
         (result.status === "changed" &&
           result.status !== "duplicate" &&
-          (overrideAll.value || selectedOverrides.value[result.new[primaryKeyName]]))
+          (overrideAll.value || selectedOverrides.value[result.new[primaryKeyName.value]]))
     )
     .map((result) => {
       const filteredRow: Record<string, string> = {}
@@ -211,7 +211,7 @@ const handleCsvImport = () => {
           overrideAll.value ||
           (result.status === "changed" &&
             (result.differences[key] ||
-              selectedOverrides.value[result.new[primaryKeyName]]))
+              selectedOverrides.value[result.new[primaryKeyName.value]]))
         ) {
           filteredRow[key] = result.new[key]
         } else {
