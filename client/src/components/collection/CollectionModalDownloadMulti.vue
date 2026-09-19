@@ -26,7 +26,7 @@ import { useGlobalStore } from "@/stores/globalStore"
 import { getFileExtension } from "@/utils/fileExtention"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQueryClient } from "@tanstack/vue-query"
-import {CircleHelpIcon, Copyright, FileStack, X} from "lucide-vue-next"
+import {CircleHelpIcon, Copyright, FileStack, X} from "@lucide/vue"
 import { computed, ref, watch, watchEffect } from "vue"
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger} from "@/components/ui/dialog";
 import { FocusScope } from "reka-ui"

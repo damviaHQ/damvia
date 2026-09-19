@@ -23,7 +23,7 @@ import {cn} from '@/lib/utils.ts'
 import {Button} from '@/components/ui/button'
 import {Calendar} from '@/components/ui/calendar'
 import {Popover, PopoverContent, PopoverTrigger} from '@/components/ui/popover'
-import {CalendarIcon} from 'lucide-vue-next'
+import {CalendarIcon} from '@lucide/vue'
 import {DateValue, toDate} from 'reka-ui/date'
 import {CalendarRootEmits, CalendarRootProps, useForwardPropsEmits} from "reka-ui";
 import {HTMLAttributes, computed, useId} from "vue";

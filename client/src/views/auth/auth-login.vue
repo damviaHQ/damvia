@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
-import { Mail } from "lucide-vue-next"
+import { Mail } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 

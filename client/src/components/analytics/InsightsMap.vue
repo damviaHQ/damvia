@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ArrowLeft, ArrowUpRight, Download, Globe2, MapPin, Minus, Plus, RotateCcw, X } from 'lucide-vue-next'
+import { ArrowLeft, ArrowUpRight, Download, Globe2, MapPin, Minus, Plus, RotateCcw, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import geography from '@/assets/maps/world.json'
 import { clusterLocations, locateRegions } from '@/utils/activityMap'

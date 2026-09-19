@@ -15,7 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { menuIconClasses, sidebarSectionTitleClasses } from "@/components/layout-main/navigationStyles"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronDown, ChevronRight } from "lucide-vue-next"
+import { ChevronDown, ChevronRight } from "@lucide/vue"
 import { computed, ref } from "vue"
 
 export type FacetOption = { id: string, label: string, count?: number }

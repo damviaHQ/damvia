@@ -20,7 +20,7 @@ import CollectionFavoriteButton from "@/components/collection/CollectionFavorite
 import CollectionThumbnail from "@/components/collection/CollectionThumbnail.vue"
 import { RouterOutput } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
-import { Folder } from "lucide-vue-next"
+import { Folder } from "@lucide/vue"
 import { ref } from "vue"
 import { RouteLocationRaw } from "vue-router"
 

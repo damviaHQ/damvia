@@ -20,7 +20,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { Asset } from "@/layouts/LayoutAdmin.vue"
-import { ChevronDown, ChevronRight, Folder, FolderOpen } from "lucide-vue-next"
+import { ChevronDown, ChevronRight, Folder, FolderOpen } from "@lucide/vue"
 import { ref, watch } from "vue"
 import { useRouter } from "vue-router"
 

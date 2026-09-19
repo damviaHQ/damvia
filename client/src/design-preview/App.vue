@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { CheckCircle2, X } from 'lucide-vue-next'
+import { CheckCircle2, X } from '@lucide/vue'
 import { onUnmounted, ref } from 'vue'
 import logo from '../assets/logo.svg?url'
 import Foundations from './Foundations.vue'

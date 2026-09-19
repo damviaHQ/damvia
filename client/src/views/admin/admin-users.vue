@@ -23,7 +23,7 @@ import { extractErrors, trpc } from '@/services/server'
 import { useGlobalStore } from '@/stores/globalStore'
 import { canApproveUser, canDeleteUser, canEditUser, filterUsers, usersCsv, userState, userStateLabels, type AdminUser, type UserFilters, type UserSort, type UserView } from '@/utils/adminUsers'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowDownToLine, ArrowUpDown, Check, ChevronLeft, ChevronRight, ClipboardList, Search, SlidersHorizontal, Trash2, Users, X } from 'lucide-vue-next'
+import { ArrowDownToLine, ArrowUpDown, Check, ChevronLeft, ChevronRight, ClipboardList, Search, SlidersHorizontal, Trash2, Users, X } from '@lucide/vue'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 

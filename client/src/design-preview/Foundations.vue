@@ -12,7 +12,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ArrowRight, ChevronRight, Copy, Download, LoaderCircle, CircleAlert, CheckCircle2, Info, MoreHorizontal, X } from 'lucide-vue-next'
+import { ArrowRight, ChevronRight, Copy, Download, LoaderCircle, CircleAlert, CheckCircle2, Info, MoreHorizontal, X } from '@lucide/vue'
 import DvButton from './components/DvButton.vue'
 import DvBadge from './components/DvBadge.vue'
 import tokens from '../../../packages/design-system/src/tokens.json'

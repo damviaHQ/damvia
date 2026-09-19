@@ -11,7 +11,7 @@ import {
   DialogPortal,
   useForwardPropsEmits,
 } from 'reka-ui'
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 import { dialogSurfaceClasses, clientDialogClasses } from '@/components/ui/dialog/styles'
 

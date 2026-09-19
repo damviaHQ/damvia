@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useIsTruncated } from "@/composables/useIsTruncated"
 import { RouterOutput } from "@/services/server.ts"
 import sortBy from "lodash/sortBy"
-import { ChevronDown, ChevronRight } from "lucide-vue-next"
+import { ChevronDown, ChevronRight } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 
 type MenuItem = RouterOutput["menuItem"]["list"][number]

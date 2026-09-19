@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FILE_TYPE_OPTIONS, type SearchSort } from "@/utils/searchQuery"
-import { LayoutDashboard, X } from "lucide-vue-next"
+import { LayoutDashboard, X } from "@lucide/vue"
 import { computed } from "vue"
 
 export type FilterChip = { key: string, value: string, label: string }

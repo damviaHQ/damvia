@@ -44,7 +44,7 @@ import {
   GripVertical,
   HardDrive,
   Server,
-} from "lucide-vue-next"
+} from "@lucide/vue"
 import type { AcceptableValue } from "reka-ui"
 import { computed, ref, watch } from "vue"
 import { useRoute } from "vue-router"

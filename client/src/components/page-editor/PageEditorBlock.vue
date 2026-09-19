@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button"
 import type { Block, Collection, Page } from "@/layouts/LayoutPageEditor.vue"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Settings, Trash2 } from "lucide-vue-next"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Settings, Trash2 } from "@lucide/vue"
 import { ref } from "vue"
 import { RouteLocationRaw } from "vue-router"
 

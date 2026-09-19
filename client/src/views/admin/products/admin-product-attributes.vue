@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/table"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { CirclePlus, FileUp, PencilLine, Trash2 } from "lucide-vue-next"
+import { CirclePlus, FileUp, PencilLine, Trash2 } from "@lucide/vue"
 import { ref, watchEffect } from "vue"
 import { RouterOutput, trpc } from "../../../services/server.ts"
 

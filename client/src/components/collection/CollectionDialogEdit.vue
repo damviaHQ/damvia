@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
-import { ImageMinus, ImageUp, Trash } from "lucide-vue-next"
+import { ImageMinus, ImageUp, Trash } from "@lucide/vue"
 import { ref, toRefs, watch } from "vue"
 import { useRouter } from "vue-router"
 import SelectGroupInput from "@/components/SelectGroupInput.vue";

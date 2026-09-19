@@ -42,7 +42,7 @@ import {
   Trash2,
   X,
   CircleHelpIcon,
-} from "lucide-vue-next"
+} from "@lucide/vue"
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from "vue"
 import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger} from "@/components/ui/dialog";
 import { FocusScope } from "reka-ui"

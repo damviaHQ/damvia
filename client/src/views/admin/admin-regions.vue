@@ -57,7 +57,7 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { CirclePlus, PencilLine, Trash2 } from "lucide-vue-next"
+import { CirclePlus, PencilLine, Trash2 } from "@lucide/vue"
 import { ref } from "vue"
 
 const toast = useGlobalToast()

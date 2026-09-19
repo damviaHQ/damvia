@@ -39,7 +39,7 @@ import {
   Plus,
   Settings,
   Trash,
-} from "lucide-vue-next"
+} from "@lucide/vue"
 import { computed, nextTick, ref } from "vue"
 
 type MenuItem = RouterOutput["menuItem"]["list"]

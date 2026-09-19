@@ -49,7 +49,7 @@ import {
 } from "@/components/ui/table"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { CirclePlus, Trash2 } from "lucide-vue-next"
+import { CirclePlus, Trash2 } from "@lucide/vue"
 import { ref } from "vue"
 import { trpc } from "../../services/server.ts"
 

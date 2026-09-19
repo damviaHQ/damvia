@@ -21,10 +21,11 @@ import { useGlobalStore } from "@/stores/globalStore"
 import {
   createColumnHelper,
   FlexRender,
-  getCoreRowModel,
-  useVueTable,
+  columnVisibilityFeature,
+  tableFeatures,
+  useTable,
 } from "@tanstack/vue-table"
-import { EyeOff, Folder } from "lucide-vue-next"
+import { EyeOff, Folder } from "@lucide/vue"
 import { computed, ref } from "vue"
 import { RouteLocationRaw } from "vue-router"
 
@@ -36,7 +37,8 @@ const props = defineProps<{
   placeholder?: string | null
 }>()
 const globalStore = useGlobalStore()
-const columnHelper = createColumnHelper<Collection>()
+const features = tableFeatures({ columnVisibilityFeature })
+const columnHelper = createColumnHelper<typeof features, Collection>()
 const hoveredRowId = ref<string | null>(null)
 const openDropdownId = ref<string | null>(null)
 
@@ -116,14 +118,14 @@ function handleSelection(collection: Collection) {
   globalStore.addToSelection({ id: collection.id, type: "collection" })
 }
 
-const table = useVueTable({
+const table = useTable({
+  features,
   get data() {
     return collections.value
   },
   get columns() {
     return visibleColumns.value
   },
-  getCoreRowModel: getCoreRowModel(),
 })
 
 </script>

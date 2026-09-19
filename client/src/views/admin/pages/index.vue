@@ -50,7 +50,7 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { CirclePlus, FilePenLine, PencilLine, Trash2 } from "lucide-vue-next"
+import { CirclePlus, FilePenLine, PencilLine, Trash2 } from "@lucide/vue"
 import { ref } from "vue"
 
 export type Page = RouterOutput["page"]["list"][number]

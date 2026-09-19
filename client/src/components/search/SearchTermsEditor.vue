@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { parseQueryParts } from "@/utils/searchQuery"
-import { TriangleAlert, X } from "lucide-vue-next"
+import { TriangleAlert, X } from "@lucide/vue"
 import { nextTick, ref, watch } from "vue"
 
 const props = withDefaults(defineProps<{

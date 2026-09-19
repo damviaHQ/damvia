@@ -20,7 +20,7 @@ import Loader from "@/components/Loader.vue"
 import { Button } from "@/components/ui/button"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
-import { CirclePlus } from "lucide-vue-next"
+import { CirclePlus } from "@lucide/vue"
 import { ref } from "vue"
 
 const isAdminDialogCreateCollectionOpen = ref(false)

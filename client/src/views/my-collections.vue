@@ -18,7 +18,7 @@ import CollectionDialogCreate from "@/components/collection/CollectionDialogCrea
 import Loader from "@/components/Loader.vue"
 import { Button } from "@/components/ui/button"
 import { useMyCollections } from "@/composables/useMyCollections"
-import { Plus } from "lucide-vue-next"
+import { Plus } from "@lucide/vue"
 import { ref } from "vue"
 import { useRouter } from "vue-router"
 

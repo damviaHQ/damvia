@@ -22,7 +22,7 @@ import { useCollectionFavorites } from "@/composables/useCollectionFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Ellipsis, FolderOpen, Link, Settings, Star } from "lucide-vue-next"
+import { Ellipsis, FolderOpen, Link, Settings, Star } from "@lucide/vue"
 import { computed, ref } from "vue"
 import { useRouter } from "vue-router"
 

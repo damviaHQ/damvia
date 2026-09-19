@@ -30,7 +30,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { extractErrors, RouterOutput, trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
 import dayjs from "dayjs"
-import { Copy, Link, Send, XCircle } from "lucide-vue-next"
+import { Copy, Link, Send, XCircle } from "@lucide/vue"
 import { computed, onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
 

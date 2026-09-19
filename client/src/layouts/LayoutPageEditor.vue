@@ -25,7 +25,7 @@ import maxBy from "lodash/maxBy"
 import minBy from "lodash/minBy"
 import sortBy from "lodash/sortBy"
 import sumBy from "lodash/sumBy"
-import { Plus } from "lucide-vue-next"
+import { Plus } from "@lucide/vue"
 import { computed, nextTick, ref } from "vue"
 
 export type Page = RouterOutput["collection"]["findById"]["page"]

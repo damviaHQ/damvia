@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { ArrowLeft } from "lucide-vue-next"
+import { ArrowLeft } from "@lucide/vue"
 </script>
 
 <template>

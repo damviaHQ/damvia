@@ -44,7 +44,7 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { trpc } from "@/services/server.ts"
 import { useMutation } from "@tanstack/vue-query"
-import { Pencil, Upload } from "lucide-vue-next"
+import { Pencil, Upload } from "@lucide/vue"
 import { parse } from "papaparse"
 import { computed, ref, watchEffect } from "vue"
 import { useRouter } from "vue-router"

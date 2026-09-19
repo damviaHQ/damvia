@@ -26,7 +26,7 @@ import type { Block, BlockType, Collection, Page } from "@/layouts/LayoutPageEdi
 import { trpc } from "@/services/server.ts"
 import { useQueryClient } from "@tanstack/vue-query"
 import "@vueup/vue-quill/dist/vue-quill.snow.css"
-import { Clock, Files, FileText, Image, LayoutGrid, Video } from 'lucide-vue-next'
+import { Clock, Files, FileText, Image, LayoutGrid, Video } from '@lucide/vue'
 import { ref, watch } from 'vue'
 
 type BlockListType =

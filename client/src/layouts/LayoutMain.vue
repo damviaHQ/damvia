@@ -25,7 +25,7 @@ import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
 import sortBy from "lodash/sortBy"
-import { ChevronDown, ChevronRight, Plus, Menu, X, Star } from "lucide-vue-next"
+import { ChevronDown, ChevronRight, Plus, Menu, X, Star } from "@lucide/vue"
 import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 

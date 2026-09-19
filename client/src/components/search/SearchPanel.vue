@@ -23,7 +23,7 @@ import { useSearchState } from "@/composables/useSearchState"
 import { type SearchScope } from "@/utils/searchQuery"
 import { trpc } from "@/services/server"
 import { useQuery } from "@tanstack/vue-query"
-import { ArrowLeft, Copy, Trash2 } from "lucide-vue-next"
+import { ArrowLeft, Copy, Trash2 } from "@lucide/vue"
 import { computed } from "vue"
 
 const { form, terms, hasQuery, filters, setTerms, setExactMatch, setScope, toggleValue, clearFilters } = useSearchState()

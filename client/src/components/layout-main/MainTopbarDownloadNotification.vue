@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import { Button } from "@/components/ui/button"
 import LayoutDialogMember from "@/layouts/LayoutDialogMember.vue"
 import { useDownloadStore } from "@/stores/downloadStore"
-import { FolderDown } from "lucide-vue-next"
+import { FolderDown } from "@lucide/vue"
 import { storeToRefs } from "pinia"
 import { onMounted, ref } from "vue"
 

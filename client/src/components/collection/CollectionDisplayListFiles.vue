@@ -32,11 +32,13 @@ import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   createColumnHelper,
   FlexRender,
-  getCoreRowModel,
-  useVueTable,
+  columnOrderingFeature,
+  columnVisibilityFeature,
+  tableFeatures,
+  useTable,
 } from "@tanstack/vue-table"
 import dayjs from "dayjs"
-import { Star, StarOff, Trash2 } from "lucide-vue-next"
+import { Star, StarOff, Trash2 } from "@lucide/vue"
 import { computed, ref } from "vue"
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
@@ -159,7 +161,8 @@ const globalAssetType = files.value.every(
   ? files.value[0]?.assetType
   : null
 const listDisplayItems = globalAssetType?.listDisplayItems ?? []
-const columnHelper = createColumnHelper<File>()
+const features = tableFeatures({ columnOrderingFeature, columnVisibilityFeature })
+const columnHelper = createColumnHelper<typeof features, File>()
 const columns = [
   columnHelper.display({
     id: "name",
@@ -223,12 +226,12 @@ const getVisibleColumns = computed(() => {
   })
 })
 
-const table = useVueTable<File>({
+const table = useTable<typeof features, File>({
+  features,
   get data() {
     return files.value
   },
   columns: getVisibleColumns.value,
-  getCoreRowModel: getCoreRowModel(),
   initialState: {
     columnOrder: ["name", ...listDisplayItems, "actions"],
     columnVisibility: Object.fromEntries(

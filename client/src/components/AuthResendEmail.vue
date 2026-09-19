@@ -15,7 +15,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
 import { useGlobalToast } from '@/composables/useGlobalToast'
-import { RotateCcw } from "lucide-vue-next"
+import { RotateCcw } from "@lucide/vue"
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps<{

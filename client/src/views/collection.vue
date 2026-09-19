@@ -34,7 +34,7 @@ import {
   Link,
   Settings,
   Trash2,
-} from "lucide-vue-next"
+} from "@lucide/vue"
 import { storeToRefs } from "pinia"
 import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"

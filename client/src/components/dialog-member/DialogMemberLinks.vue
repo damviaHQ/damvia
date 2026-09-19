@@ -21,7 +21,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { trpc } from "@/services/server"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import dayjs from "dayjs"
-import { Copy, X } from "lucide-vue-next"
+import { Copy, X } from "@lucide/vue"
 import { computed } from "vue"
 import { useRouter } from "vue-router"
 

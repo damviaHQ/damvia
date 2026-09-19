@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { Download } from 'lucide-vue-next'
+import { Download } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 defineProps<{ title: string; description: string; empty?: boolean }>()
 defineEmits<{ export: [] }>()

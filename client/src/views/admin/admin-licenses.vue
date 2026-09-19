@@ -43,7 +43,7 @@ import {useGlobalToast} from "@/composables/useGlobalToast"
 import {RouterOutput, trpc} from "@/services/server.ts"
 import {CalendarDate, parseDate} from '@internationalized/date'
 import {useQuery, useQueryClient} from "@tanstack/vue-query"
-import {CirclePlus, PencilLine, Trash2, XIcon} from "lucide-vue-next"
+import {CirclePlus, PencilLine, Trash2, XIcon} from "@lucide/vue"
 import {useDateFormatter} from 'reka-ui'
 import {toDate} from 'reka-ui/date'
 import {computed, ref, type Raw} from 'vue'

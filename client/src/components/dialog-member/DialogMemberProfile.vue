@@ -23,8 +23,8 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
-import { toTypedSchema } from "@vee-validate/zod"
-import { AlertTriangle } from "lucide-vue-next"
+import { zodTypedSchema } from "@/lib/zodTypedSchema"
+import { AlertTriangle } from "@lucide/vue"
 import { useForm } from "vee-validate"
 import { watchEffect } from "vue"
 import * as z from "zod"
@@ -35,10 +35,10 @@ const { data, status, error } = useQuery({
   queryKey: ['user'],
   queryFn: () => trpc.user.me.query(),
 })
-const formSchema = toTypedSchema(z.object({
+const formSchema = zodTypedSchema(z.object({
   name: z.string().min(1).max(80),
   company: z.string().min(1).max(80),
-  email: z.string().email(),
+  email: z.email(),
 }))
 const { handleSubmit, setFieldValue } = useForm({
   validationSchema: formSchema,

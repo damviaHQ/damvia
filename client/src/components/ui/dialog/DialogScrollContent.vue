@@ -9,7 +9,7 @@ import {
   DialogPortal,
   useForwardPropsEmits,
 } from 'reka-ui'
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 import { inject } from 'vue'
 const adminTheme = inject('damvia-admin-theme', false)
 import { cn } from '@/lib/utils'

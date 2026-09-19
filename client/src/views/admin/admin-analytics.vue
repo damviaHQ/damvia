@@ -50,7 +50,7 @@ import {
   Search,
   TrendingUp,
   Users,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import Papa from 'papaparse'
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

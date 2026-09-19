@@ -17,7 +17,7 @@ import { menuIconClasses, menuIconSlotClasses, treeRowClasses, treeActiveRowClas
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsTruncated } from "@/composables/useIsTruncated"
-import { ChevronDown, ChevronRight } from "lucide-vue-next"
+import { ChevronDown, ChevronRight } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 
 type Item = { id: string; name: string; children: Item[] }

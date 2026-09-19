@@ -35,7 +35,7 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { trpc } from "@/services/server.ts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
-import { createColumnHelper, getCoreRowModel, useVueTable } from "@tanstack/vue-table"
+import { columnVisibilityFeature, createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table"
 import { onKeyStroke } from "@vueuse/core"
 import {
   Blocks,
@@ -44,7 +44,7 @@ import {
   Filter,
   FilterX,
   PackageX,
-} from "lucide-vue-next"
+} from "@lucide/vue"
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 
 const toast = useGlobalToast()
@@ -104,7 +104,8 @@ function isEditableCell(columnId: string) {
 }
 
 // Create column helper for TanStack Table
-const columnHelper = createColumnHelper<any>()
+const features = tableFeatures({ columnVisibilityFeature })
+const columnHelper = createColumnHelper<typeof features, any>()
 
 // Define columns for the table
 const columns = computed(() => {
@@ -146,14 +147,14 @@ const columns = computed(() => {
 })
 
 // Setup tanstack table
-const table = useVueTable({
+const table = useTable({
+  features,
   get data() {
     return data.value?.products || []
   },
   get columns() {
     return columns.value
   },
-  getCoreRowModel: getCoreRowModel(),
 })
 
 const rovingCell = computed(() => {

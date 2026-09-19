@@ -30,7 +30,7 @@ import { RouterOutput, trpc } from "@/services/server.ts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
-import {Loader2Icon} from "lucide-vue-next";
+import {Loader2Icon} from "@lucide/vue";
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{

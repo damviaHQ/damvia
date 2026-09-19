@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useMediaQuery } from "@vueuse/core"
-import { FileDown, LayoutDashboard, Link, User } from "lucide-vue-next"
+import { FileDown, LayoutDashboard, Link, User } from "@lucide/vue"
 import { TabsTrigger as TabsTriggerPrimitive } from "reka-ui"
 import { computed, ref, watch } from "vue"
 

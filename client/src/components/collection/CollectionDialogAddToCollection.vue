@@ -28,7 +28,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ChevronDown, ChevronRight, CirclePlus, Folder, Loader2Icon } from "lucide-vue-next"
+import { ChevronDown, ChevronRight, CirclePlus, Folder, Loader2Icon } from "@lucide/vue"
 import { TreeItem, TreeRoot } from 'reka-ui'
 import {computed, ref} from "vue"
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";

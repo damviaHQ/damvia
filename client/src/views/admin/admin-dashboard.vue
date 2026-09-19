@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, ArrowUpRight, Users, FolderOpen, Cloud, CloudOff, HardDrive, RefreshCw, Bell, AlertCircle, Check, FileArchive, UserCheck, UserPlus, MailPlus } from "lucide-vue-next"
+import { ArrowRight, ArrowUpRight, Users, FolderOpen, Cloud, CloudOff, HardDrive, RefreshCw, Bell, AlertCircle, Check, FileArchive, UserCheck, UserPlus, MailPlus } from "@lucide/vue"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"

@@ -52,7 +52,7 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ArrowDown, ArrowUp, CirclePlus, GripVertical, PencilLine, Trash2 } from "lucide-vue-next"
+import { ArrowDown, ArrowUp, CirclePlus, GripVertical, PencilLine, Trash2 } from "@lucide/vue"
 import { computed, nextTick, ref } from "vue"
 import Draggable from "vuedraggable"
 

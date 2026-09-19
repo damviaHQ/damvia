@@ -30,7 +30,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Check, FolderPen, FolderSync } from "lucide-vue-next"
+import { Check, FolderPen, FolderSync } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
 

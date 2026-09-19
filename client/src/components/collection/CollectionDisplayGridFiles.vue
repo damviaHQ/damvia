@@ -23,7 +23,7 @@ import { useGlobalStore } from "@/stores/globalStore"
 import { getFileExtension } from "@/utils/fileExtention"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Star, Trash2 } from "lucide-vue-next"
+import { Star, Trash2 } from "@lucide/vue"
 import { computed, ref } from "vue"
 
 type File = RouterOutput["collection"]["findById"]["files"][number]

@@ -34,7 +34,7 @@ import {
   Settings,
   SquareChevronLeft,
   Users,
-} from "lucide-vue-next"
+} from "@lucide/vue"
 import { computed, ref, watch, provide } from "vue"
 import { useRoute } from "vue-router"
 import ClientLogo from '@/components/ClientLogo.vue'

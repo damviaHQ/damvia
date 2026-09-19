@@ -36,7 +36,7 @@ import {
   SquareX,
   User,
   Users
-} from "lucide-vue-next"
+} from "@lucide/vue"
 import { defineAsyncComponent, ref } from "vue"
 
 const globalStore = useGlobalStore()

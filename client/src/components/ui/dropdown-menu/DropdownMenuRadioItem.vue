@@ -7,7 +7,7 @@ import {
   type DropdownMenuRadioItemProps,
   useForwardPropsEmits,
 } from 'reka-ui'
-import { Circle } from 'lucide-vue-next'
+import { Circle } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<DropdownMenuRadioItemProps & { class?: HTMLAttributes['class'] }>()

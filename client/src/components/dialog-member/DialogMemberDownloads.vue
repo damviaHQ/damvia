@@ -29,7 +29,7 @@ import { trpc } from "@/services/server.ts"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { useQuery } from "@tanstack/vue-query"
 import dayjs from "dayjs"
-import { Download, Link } from "lucide-vue-next"
+import { Download, Link } from "@lucide/vue"
 
 const toast = useGlobalToast()
 const downloadStore = useDownloadStore()
