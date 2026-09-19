@@ -25,6 +25,7 @@ import { createLogger, format, transports } from "winston"
 import AssetUpdater from "./asset-updater/base"
 import DropboxAssetUpdater from "./asset-updater/dropbox"
 import OneDriveAssetUpdater from "./asset-updater/one-drive"
+import GoogleDriveAssetUpdater, { parseServiceAccount } from "./asset-updater/google-drive"
 
 import { validateAppSecret } from './services/credentials'
 
@@ -188,6 +189,7 @@ export function assetUpdater(): AssetUpdater {
         requireEnv('DROPBOX_APP_SECRET'),
         requireEnv('DROPBOX_REFRESH_TOKEN'),
         process.env.DROPBOX_USE_TEAM_ROOT === 'true',
+        process.env.DROPBOX_ROOT_PATH ?? '',
       )
     } else if (process.env.ASSET_UPDATER === 'onedrive') {
       _assetUpdater = new OneDriveAssetUpdater(
@@ -196,6 +198,12 @@ export function assetUpdater(): AssetUpdater {
         requireEnv('ONEDRIVE_CLIENT_SECRET'),
         requireEnv('ONEDRIVE_USER'),
         requireEnv('ONEDRIVE_DRIVE'),
+      )
+    } else if (process.env.ASSET_UPDATER === 'googledrive') {
+      _assetUpdater = new GoogleDriveAssetUpdater(
+        parseServiceAccount(requireEnv('GOOGLE_DRIVE_SERVICE_ACCOUNT')),
+        requireEnv('GOOGLE_DRIVE_FOLDER_ID'),
+        process.env.GOOGLE_DRIVE_IMPERSONATE,
       )
     } else {
       throw new Error('Provide a valid asset updater')

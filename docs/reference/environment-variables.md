@@ -59,16 +59,20 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ASSET_UPDATER` | none, required | `dropbox` or `onedrive`. Any other value stops the server at startup with `Provide a valid asset updater`. |
+| `ASSET_UPDATER` | none, required | `dropbox`, `onedrive` or `googledrive`. Any other value stops the server at startup with `Provide a valid asset updater`. |
 | `DROPBOX_APP_KEY` | unset | Dropbox app key (Dropbox only). |
 | `DROPBOX_APP_SECRET` | unset | Dropbox app secret. |
 | `DROPBOX_REFRESH_TOKEN` | unset | Long-lived refresh token obtained once through the OAuth flow. See [Dropbox](../integrations/dropbox.md). |
 | `DROPBOX_USE_TEAM_ROOT` | `false` | `true` lists the Dropbox Business team space instead of the member's home folder. |
+| `DROPBOX_ROOT_PATH` | empty | Folder to sync, such as `/Marketing/Assets`; it becomes the single top-level asset folder. Empty syncs the whole Dropbox under a folder named `Dropbox`. See [Dropbox](../integrations/dropbox.md). |
 | `ONEDRIVE_TENANT_ID` | unset | Azure AD tenant (OneDrive only). |
 | `ONEDRIVE_CLIENT_ID` | unset | Azure app registration client id. |
 | `ONEDRIVE_CLIENT_SECRET` | unset | Azure app client secret. |
 | `ONEDRIVE_USER` | unset | User principal name whose drive is synced, for example `assets@company.com`. |
-| `ONEDRIVE_DRIVE` | unset | Use `root` for the whole drive. Subfolder delta support is not validated; do not use the incomplete `root:/DAM` example. See [OneDrive](../integrations/onedrive.md). |
+| `ONEDRIVE_DRIVE` | unset | `root` for the whole drive, or a closed path such as `root:/Marketing/Assets:` to sync one subtree (the form production runs). See [OneDrive](../integrations/onedrive.md). |
+| `GOOGLE_DRIVE_SERVICE_ACCOUNT` | unset | The JSON key of the service account, base64-encoded or raw (Google Drive only). See [Google Drive](../integrations/google-drive.md). |
+| `GOOGLE_DRIVE_FOLDER_ID` | unset | Id of the folder to sync; it becomes the single top-level asset folder. |
+| `GOOGLE_DRIVE_IMPERSONATE` | unset | Optional Workspace user the service account acts as, with domain-wide delegation. |
 
 ### PIM linking
 

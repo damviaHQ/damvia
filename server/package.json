@@ -12,6 +12,7 @@
   "dependencies": {
     "@azure/identity": "^4.9.0",
     "@fastify/cors": "^11.0.1",
+    "@googleapis/drive": "^26.0.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@microsoft/microsoft-graph-types": "^2.40.0",
     "@trpc/server": "^11.19.0",
