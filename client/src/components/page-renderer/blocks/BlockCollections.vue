@@ -15,38 +15,27 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRender from "@/components/collection/CollectionRender.vue"
 import { LayoutGrid } from "@lucide/vue"
-import BlockPlaceholder from "./BlockPlaceholder.vue"
-import { RouterOutput, trpc } from "@/services/server.ts"
-import { useQuery } from "@tanstack/vue-query"
 import { computed } from "vue"
 import { RouteLocationRaw } from "vue-router"
-import type { Collection } from "../types"
+import type { Collection, PageAssets } from "../types"
+import BlockPlaceholder from "./BlockPlaceholder.vue"
 
 const props = defineProps<{
   data: any
+  assets?: PageAssets
   collection?: Collection
   generateRoute: (collection: Collection) => RouteLocationRaw
   editing?: boolean
 }>()
 
-const { data: collectionTree } = useQuery({
-  queryKey: ["collection", "tree"],
-  queryFn: () => trpc.collection.tree.query(),
-})
-
-const flatCollections = computed(() => {
-  function flatten(collections: RouterOutput["collection"]["tree"]): Collection[] {
-    return collections.flatMap((collection: Collection) => [collection, ...flatten(collection.children ?? [])])
-  }
-  return collectionTree.value ? flatten(collectionTree.value) : []
-})
-
-// With no explicit choice the block lists whatever sits under this collection.
+// Chosen collections are resolved by the server alongside the page, with the
+// thumbnails their cards preview. Reading them from the collection tree gave
+// no previews, because that tree is built without sample files.
 const collections = computed(() => {
   if (props.data?.collectionsId?.length) {
     return props.data.collectionsId
-      .map((id: string) => flatCollections.value.find((collection) => collection.id === id))
-      .filter((collection: Collection | undefined) => !!collection)
+      .map((id: string) => props.assets?.collections?.[id])
+      .filter((collection: unknown) => !!collection)
   }
   return props.collection?.children ?? []
 })

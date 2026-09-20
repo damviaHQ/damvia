@@ -225,10 +225,21 @@ async function readObject(key: string, limit: number) {
 	return Buffer.concat(chunks)
 }
 
+export type PageAssetFile = { name: string, mimeType: string, thumbnailURL: string | null, fileURL: string }
+export type PageAssetCollection = {
+	id: string
+	name: string
+	numberOfFiles: number
+	draft: boolean
+	canEdit: boolean
+	thumbnailURL: string | null
+	sampleFiles: { id: string, name: string, thumbnailURL: string | null }[]
+}
+
 export type PageAssets = {
 	uploads: Record<string, string>
-	files: Record<string, { name: string, mimeType: string, thumbnailURL: string | null, fileURL: string }>
-	collections: Record<string, { name: string, thumbnailURL: string | null }>
+	files: Record<string, PageAssetFile>
+	collections: Record<string, PageAssetCollection>
 	pages: Record<string, { name: string | null }>
 }
 
@@ -271,12 +282,32 @@ export async function resolvePageAssets(user: User, blocks: PageBlock[]): Promis
 		const collections = await userCollectionsQuery(user)
 			.andWhere('collection.id IN (:...ids)', { ids: [...collectionIds] })
 			.getMany()
+		// A collection card previews its content, so the sample files a card
+		// falls back on when it has no thumbnail of its own are resolved too.
+		const sampleIds = collections.flatMap((collection: Collection) => collection.sampleFileIds ?? [])
+		const samples = sampleIds.length
+			? await userCollectionFilesQuery(user).andWhere('collection_file.id IN (:...ids)', { ids: sampleIds }).getMany()
+			: []
 		await Promise.all(collections.map(async (collection: Collection) => {
 			assets.collections[collection.id] = {
+				id: collection.id,
 				name: collection.name,
+				numberOfFiles: collection.numberOfFiles,
+				draft: collection.draft,
+				canEdit: collection.canEdit(user),
 				thumbnailURL: collection.hasThumbnail
 					? await mainS3().presignedGetObject(mainS3Bucket(), collection.thumbnailStorageKey)
 					: null,
+				sampleFiles: await Promise.all((collection.sampleFileIds ?? [])
+					.map((fileId) => samples.find((sample: CollectionFile) => sample.id === fileId))
+					.filter((file): file is CollectionFile => !!file)
+					.map(async (file: CollectionFile) => ({
+						id: file.id,
+						name: file.assetFile.name,
+						thumbnailURL: file.assetFile.hasThumbnail
+							? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey)
+							: null,
+					}))),
 			}
 		}))
 	}

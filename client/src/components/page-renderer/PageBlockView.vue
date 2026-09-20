@@ -37,8 +37,8 @@ defineProps<{
   <BlockText v-else-if="block.type === 'text'" :data="block.data" :editing="editing" />
   <BlockImage v-else-if="block.type === 'image'" :data="block.data" :assets="assets" :editing="editing" />
   <BlockVideo v-else-if="block.type === 'video'" :data="block.data" :assets="assets" :editing="editing" />
-  <BlockCollections v-else-if="block.type === 'collections'" :data="block.data" :collection="collection"
-    :generate-route="generateRoute" :editing="editing" />
+  <BlockCollections v-else-if="block.type === 'collections'" :data="block.data" :assets="assets"
+    :collection="collection" :generate-route="generateRoute" :editing="editing" />
   <BlockFiles v-else-if="block.type === 'files'" :data="block.data" :collection="collection" :editing="editing" />
   <BlockLastFiles v-else-if="block.type === 'last_files'" :data="block.data" :collection="collection"
     :editing="editing" />

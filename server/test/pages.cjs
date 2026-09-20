@@ -54,18 +54,29 @@ function withStorage(run) {
 
 const blocksOf = pageId => db.getRepository(PageBlock).find({ where: { pageId }, order: { position: 'ASC' } })
 
-async function makePage(owner) {
+async function makePage(owner, { blocks } = {}) {
     const collection = await makeCollection({ owner, public: false })
-    const page = await caller(owner).page.createForCollection({ collectionId: collection.id })
+    const created = await caller(owner).page.createForCollection({ collectionId: collection.id })
+    if (blocks === null) {
+        return { collection, page: created }
+    }
+    // What the editor writes on its first save: the default arrangement.
+    const page = await caller(owner).page.save({
+        pageId: created.id,
+        blocks: blocks ?? [
+            { type: 'collections', size: 'full', data: {} },
+            { type: 'files', size: 'full', data: {} },
+        ],
+    })
     return { collection, page }
 }
 
-test('a new collection page starts with the collections and files blocks in order', async () => {
-    const { page } = await makePage(member)
-    assert.deepEqual(page.blocks.map(block => [block.type, block.position, block.size]), [
-        ['collections', 0, 'full'],
-        ['files', 1, 'full'],
-    ])
+test('a collection page is created empty, and asking twice returns the same one', async () => {
+    const { collection, page } = await makePage(member, { blocks: null })
+    assert.deepEqual(page.blocks, [])
+
+    const again = await caller(member).page.createForCollection({ collectionId: collection.id })
+    assert.equal(again.id, page.id)
 })
 
 test('only an admin or the collection owner can read and change a page', async () => {
@@ -220,4 +231,31 @@ test('deleting a collection takes its page objects with it', async () => {
         await caller(member).collection.remove(collection.id)
         assert.equal(objects.size, 0)
     })
+})
+
+// A collections block can point anywhere in the library. Its cards preview
+// their content, so the page has to resolve that content for the reader.
+test('collections chosen in a block arrive with the previews their cards need', async () => {
+    const folder = await makeFolder()
+    const file = await makeFile(folder, { hasThumbnail: true })
+    const chosen = await makeCollection({ name: 'Chosen' })
+    const sample = await save(CollectionFile, { collectionId: chosen.id, assetFileId: file.id })
+    await db.query('UPDATE collections SET sample_file_ids = $1 WHERE id = $2', [[sample.id], chosen.id])
+
+    const hidden = await makeCollection({ name: 'Hidden', public: false, owner: admin })
+    const { collection, page } = await makePage(member)
+    await caller(member).page.save({
+        pageId: page.id,
+        blocks: [{ type: 'collections', size: 'full', data: { collectionsId: [chosen.id, hidden.id] } }],
+    })
+
+    const read = await caller(member).collection.findById(collection.id)
+    const card = read.page.assets.collections[chosen.id]
+    assert.equal(card.name, 'Chosen')
+    assert.equal(card.numberOfFiles, 1)
+    assert.equal(card.sampleFiles.length, 1, 'the card has nothing to preview')
+    assert.ok(card.sampleFiles[0].thumbnailURL, 'the preview has no address')
+
+    // A collection the reader cannot open is simply not part of the page.
+    assert.equal(read.page.assets.collections[hidden.id], undefined)
 })

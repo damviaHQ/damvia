@@ -65,9 +65,9 @@ Each block type has its own payload, defined once in `server/src/page-blocks/sch
 Editing a page is its own screen, at `/collections/:id/edit` for a collection page and `/admin/pages/:id` for a standalone one. The navigation tree and the top bar are replaced, so nothing competes with the page being edited:
 
 - The **left sidebar is the block library**. Drag a block onto the page to insert it where you drop it, or click it to add it at the end.
-- The **top bar** names the page, says whether there are unsaved changes, and holds `Discard`, `Save` and `Exit`.
+- The **top bar** names the page, says whether there are unsaved changes, and holds `Discard`, `Save` and `Exit`, plus `Reset to default layout` on a collection page that has one.
 - **Each block carries a toolbar** on hover or keyboard focus: a drag handle, the three width buttons, `Move block up` and `Move block down`, a settings popover for the types that have options, `Duplicate block` and `Delete block`. A keyboard move announces the block's new position to screen readers.
-- **Text is written on the page itself.** Selecting text raises a small toolbar with bold, italic, two heading levels, lists, quote and link.
+- **Text is written on the page itself.** Selecting text raises a small toolbar with bold, italic, three heading levels (title, heading, subheading), lists, quote and link.
 - **Pictures and videos open a chooser** with two tabs: upload a file, or pick one from the library, where each picture is shown in its own proportions. The library tab searches the same index as the rest of the application, without recording the search as library activity. Video has a third tab for a YouTube or Vimeo address. A chosen picture appears in the block straight away, before the page is saved.
 - **A picture keeps its proportions** and is held to Small, Medium, Large or Full size, chosen in the block settings, so a large original does not take over the page. A banner picture fills its frame instead, and two compact controls on the picture itself let the author change it or drag, or arrow-key, the part that stays in view.
 - **Nothing inside a block responds to a reader's gestures while editing.** Collections and files are shown as they will appear, but they cannot be opened, selected or followed, so a click always acts on the block.
@@ -82,13 +82,17 @@ Nothing is written until `Save`, which sends the whole page in one call. `Discar
 
 ### Collection pages
 
-`page.createForCollection` is available to whoever can edit the collection. It creates the page with a `collections` block and a `files` block, both full width. The page is returned inside the collection payload, so the collection view renders it in place of the default listing.
+`Edit page` sits in the header of every collection the user can edit, whether or not that collection has a layout of its own yet. A collection without one opens the editor on a draft of the default arrangement — a full-width `collections` block above a full-width `files` block — so the author starts from what readers already see and changes it from there.
+
+The page row is only written when there is something to put in it. `page.createForCollection`, available to whoever can edit the collection, creates it empty and returns the existing one when there already is one, and the editor calls it on the first `Save` — or earlier, if a picture is uploaded and needs somewhere to live. An author who leaves without saving leaves the collection on its default layout: a page created for an upload is deleted again on the way out, with its objects. `Reset to default layout` deletes the page for good and returns the collection to the default listing.
+
+The page is returned inside the collection payload, so the collection view renders it in place of the default listing.
 
 ### Permissions and stored files
 
 `page.save` and the upload procedures resolve the page through `findPage` in `server/src/services/page.ts` and then check `Page.canEdit`: an admin can edit any page; another user can edit only a collection page whose collection they can see and own. A page someone cannot reach is reported as missing rather than forbidden, so the editor never confirms that a page exists to someone who cannot see it.
 
-What a block points at is resolved for whoever is reading it. A page is returned with an `assets` map holding the addresses of its pictures, files, collections and pages, built for that reader: a file they are not allowed to open simply does not appear, and the block renders nothing rather than a broken or leaked link.
+What a block points at is resolved for whoever is reading it. A page is returned with an `assets` map holding the addresses of its pictures, files, collections and pages, built for that reader: a file they are not allowed to open simply does not appear, and the block renders nothing rather than a broken or leaked link. A collection named by a block arrives with what its card needs to preview its content, its own thumbnail or the sample files it falls back on, so a collection chosen from elsewhere in the library looks the same as a sub-collection.
 
 Pictures and videos live in the **main** bucket under `blocks/{pageId}/`:
 
