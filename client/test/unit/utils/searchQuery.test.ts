@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { activeFilters, clearFilterQuery, parseQueryParts, parseSearchQuery, patchSearchQuery, queryValueToArray, toggleQueryValue } from '@/utils/searchQuery.ts'
+import { activeFilters, clearFilterQuery, formatSizeRange, parseQueryParts, parseSearchQuery, patchSearchQuery, queryValueToArray, toggleQueryValue } from '@/utils/searchQuery.ts'
 
 describe('search query parsing', () => {
   test('query values become string arrays', () => {
@@ -25,14 +25,16 @@ describe('search query parsing', () => {
 
   test('route query maps onto the search input with defaults', () => {
     expect(parseSearchQuery({}, 'all')).toEqual({
-      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], productViews: [], fileTypes: [], searchScope: 'all', exactMatch: false, attributes: {}, sort: undefined,
+      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], productViews: [], fileTypes: [], extensions: [], minSize: undefined, maxSize: undefined, searchScope: 'all', exactMatch: false, attributes: {}, sort: undefined,
     })
     expect(parseSearchQuery({
-      q: 'red hat', page: '2', from_collection: 'c1', asset_types: 't1', product_views: ['front', 'back'], file_types: 'image', search_scope: 'current', exact_match: 'true', sort: 'newest',
+      q: 'red hat', page: '2', from_collection: 'c1', asset_types: 't1', product_views: ['front', 'back'], file_types: 'image', search_scope: 'current', exact_match: 'true', sort: 'newest', extensions: 'jpg', size_min: '2', size_max: '50',
     }, 'all')).toEqual({
-      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], productViews: ['front', 'back'], fileTypes: ['image'], searchScope: 'current', exactMatch: true, attributes: {}, sort: 'newest',
+      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], productViews: ['front', 'back'], fileTypes: ['image'], extensions: ['jpg'], minSize: 2097152, maxSize: 52428800, searchScope: 'current', exactMatch: true, attributes: {}, sort: 'newest',
     })
     expect(parseSearchQuery({ sort: 'random' }, 'all').sort).toBeUndefined()
+    expect(parseSearchQuery({ size_min: 'abc', size_max: '-3' }, 'all')).toMatchObject({ minSize: undefined, maxSize: undefined })
+    expect(parseSearchQuery({ size_max: '0.5' }, 'all').maxSize).toBe(524288)
     expect(parseSearchQuery({ exact_match: 'yes', page: 'x' }, 'all')).toMatchObject({ exactMatch: false, page: undefined })
   })
 
@@ -64,16 +66,25 @@ describe('search query parsing', () => {
   })
 
   test('clearing filters keeps the terms, scope and mode', () => {
-    expect(clearFilterQuery({ q: 'a', exact_match: 'true', search_scope: 'current', from_collection: 'c', asset_types: 't', product_views: 'v', file_types: 'image', 'attributes[color]': 'red', sort: 'name' }))
+    expect(clearFilterQuery({ q: 'a', exact_match: 'true', search_scope: 'current', from_collection: 'c', asset_types: 't', product_views: 'v', file_types: 'image', extensions: 'jpg', size_min: '2', size_max: '50', 'attributes[color]': 'red', sort: 'name' }))
       .toEqual({ q: 'a', exact_match: 'true', search_scope: 'current', from_collection: 'c', sort: 'name' })
   })
 
+  test('a size range reads as plain words', () => {
+    expect(formatSizeRange(undefined, undefined)).toBe('Any size')
+    expect(formatSizeRange(2097152, undefined)).toBe('Over 2 MB')
+    expect(formatSizeRange(undefined, 52428800)).toBe('Under 50 MB')
+    expect(formatSizeRange(2097152, 52428800)).toBe('2 to 50 MB')
+  })
+
   test('active filters list every selected value with its group', () => {
-    const form = parseSearchQuery({ asset_types: 't1', file_types: ['image', 'video'], 'attributes[color]': 'red' }, 'all')
+    const form = parseSearchQuery({ asset_types: 't1', file_types: ['image', 'video'], extensions: 'jpg', size_min: '2', size_max: '50', 'attributes[color]': 'red' }, 'all')
     expect(activeFilters(form)).toEqual([
       { key: 'asset_types', value: 't1', group: 'asset_types' },
       { key: 'file_types', value: 'image', group: 'file_types' },
       { key: 'file_types', value: 'video', group: 'file_types' },
+      { key: 'extensions', value: 'jpg', group: 'extensions' },
+      { key: 'size', value: '2 to 50 MB', group: 'size' },
       { key: 'attributes[color]', value: 'red', group: 'attribute', attributeId: 'color' },
     ])
   })

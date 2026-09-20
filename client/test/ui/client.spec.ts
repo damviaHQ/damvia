@@ -6,7 +6,10 @@ test('desktop collection preserves selection, previews, search and account contr
   page.on('pageerror', error => errors.push(error.message))
   await page.route('**/trpc/**', async route => {
     const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    await route.fulfill({ json: { result: { data: responses[name] ?? [] } } })
+    const data = name === 'assetType.list'
+      ? [(responses[name] as any[])[0], { ...(responses[name] as any[])[0], id: 'video', name: 'Motion' }]
+      : responses[name] ?? []
+    await route.fulfill({ json: { result: { data } } })
   })
   await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
   await page.goto('/collections/campaign')
@@ -82,6 +85,7 @@ test('desktop collection preserves selection, previews, search and account contr
   await expect(photography).toBeHidden()
   await page.keyboard.press('Escape')
   await expect(options).toBeHidden()
+  await expect(options.getByRole('button', { name: 'Search scope', exact: true })).toBeVisible()
   await page.getByRole('searchbox', { name: 'Search assets', exact: true }).fill('sand')
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/search\?.*q=sand/)
@@ -201,7 +205,7 @@ test('search page shows the panel with counts, the toolbar and the not-found ter
   const files = (responses['collection.findById'] as any).files.map((file: any) => ({ ...file, assetTypeId: 'type-0' }))
   const search = {
     total: 8, page: 1, totalPages: 1, previousPage: null, nextPage: null, results: files,
-    facets: { assetTypes: { 'type-0': 5, 'type-1': 3 }, fileTypes: { image: 8 }, productViews: {}, attributes: { colour: { Red: 5, Blue: 3 } } },
+    facets: { assetTypes: { 'type-0': 5, 'type-1': 3 }, fileTypes: { image: 8 }, extensions: { jpg: 6, png: 2 }, productViews: {}, attributes: { colour: { Red: 5, Blue: 3 } } },
   }
   await page.route('**/trpc/**', async route => {
     const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
@@ -220,20 +224,67 @@ test('search page shows the panel with counts, the toolbar and the not-found ter
   await expect(panel.getByRole('button', { name: /^zzz/ })).toBeVisible()
   await expect(panel.getByRole('status')).toContainText('1 of 2 not found: zzz')
   await expect(page.getByText('8 results', { exact: true })).toBeVisible()
-  await expect(page.getByRole('radio', { name: 'All 8', exact: true })).toHaveAttribute('aria-checked', 'true')
-  await expect(page.getByRole('radio', { name: 'Videos 0', exact: true })).toBeDisabled()
+  const fileType = page.getByRole('combobox', { name: 'File type', exact: true })
+  await expect(fileType).toContainText('All files')
+  await fileType.click()
+  await expect(page.getByRole('option', { name: 'Images 8', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'Videos 0', exact: true })).toBeDisabled()
+  await page.getByRole('option', { name: 'Images 8', exact: true }).click()
+  await expect(page).toHaveURL(/file_types=image/)
+  await expect(fileType).toContainText('Images')
+  // the dropdown states the file type, so it gets no chip and is cleared from the dropdown itself
+  await expect(page.getByRole('button', { name: /Remove filter File type/ })).toHaveCount(0)
+  await fileType.click()
+  await page.getByRole('option', { name: 'All files 8', exact: true }).click()
+  await expect(page).not.toHaveURL(/file_types/)
   await expect(page.getByRole('heading', { name: 'Events (8)', exact: true })).toBeVisible()
   const events = panel.getByRole('checkbox', { name: 'Events', exact: true })
   await expect(events).toHaveAccessibleDescription('5 files')
   await expect(events).toHaveCSS('width', '16px')
   await expect(events).toHaveCSS('border-radius', '0px')
-  await expect(panel.getByRole('checkbox', { name: /^Photography with a very long/ })).toBeDisabled()
+  await expect(panel.getByRole('checkbox', { name: /^Photography with a very long/ })).toHaveCount(0)
   await events.click()
   await expect(page).toHaveURL(/asset_types=type-0/)
   await expect(page.getByRole('button', { name: 'Remove filter Asset type: Events', exact: true })).toBeVisible()
+  // file format and size live in the toolbar, the panel keeps asset types and attributes
+  await expect(panel.getByRole('checkbox', { name: 'JPG', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'File format, Any', exact: true }).click()
+  const jpg = page.getByRole('checkbox', { name: 'JPG', exact: true })
+  await expect(jpg).toHaveAccessibleDescription('6 files')
+  await jpg.click()
+  await expect(page).toHaveURL(/extensions=jpg/)
+  // the dropdown states its own choice, so no chip is added for it
+  await expect(page.getByRole('button', { name: /Remove filter Format/ })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Clear formats', exact: true }).click()
+  await expect(page).not.toHaveURL(/extensions/)
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: 'File size, Any size', exact: true }).click()
+  await page.getByLabel('From', { exact: true }).fill('50')
+  await page.getByLabel('To', { exact: true }).fill('2')
+  await page.getByRole('button', { name: 'Apply', exact: true }).click()
+  await expect(page).toHaveURL(/size_min=2&size_max=50|size_max=50&size_min=2/)
+  await expect(page.getByRole('button', { name: 'File size, 2 to 50 MB', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Remove filter Size/ })).toHaveCount(0)
+  await page.getByRole('button', { name: 'File size, 2 to 50 MB', exact: true }).click()
+  await page.getByRole('button', { name: 'Clear size', exact: true }).click()
+  await expect(page).not.toHaveURL(/size_min/)
+
+  const exact = panel.getByRole('switch', { name: 'Exact phrase', exact: true })
+  await expect(exact).not.toBeChecked()
+  await exact.click()
+  await expect(page).toHaveURL(/exact_match=true/)
+  await exact.click()
+  await expect(page).not.toHaveURL(/exact_match/)
   await panel.getByRole('checkbox', { name: 'Red', exact: true }).click()
   await expect(page).toHaveURL(/attributes(\[|%5B)colour(\]|%5D)=Red/)
-  await expect(panel.getByRole('checkbox', { name: 'Green', exact: true })).toBeDisabled()
+  await expect(panel.getByRole('checkbox', { name: 'Green', exact: true })).toHaveCount(0)
+  await expect(panel.getByRole('checkbox', { name: 'Red', exact: true })).toBeVisible()
+  // the panel owns its scrolling, so the footer sits below the values instead of over them
+  expect(await page.locator('aside#client-navigation').evaluate(element => element.scrollHeight > element.clientHeight + 1)).toBe(false)
+  const footerBox = (await panel.getByRole('button', { name: /Clear all filters/ }).boundingBox())!
+  const lastRowBox = (await panel.getByRole('checkbox').last().boundingBox())!
+  expect(lastRowBox.y + lastRowBox.height).toBeLessThanOrEqual(footerBox.y)
   await panel.getByRole('button', { name: 'Clear all filters (2)', exact: true }).click()
   await expect(page).not.toHaveURL(/asset_types/)
   await expect(page).toHaveURL(/q=sand\+zzz/)
@@ -243,7 +294,8 @@ test('search page shows the panel with counts, the toolbar and the not-found ter
   await panel.getByRole('button', { name: 'Remove them', exact: true }).click()
   await expect(page).toHaveURL(/q=sand(&|$)/)
   await page.screenshot({ path: '/private/tmp/claude-501/-Users-arnaud-Documents-Github-damvia/769748be-582c-42d5-a4c4-22d86d85089a/scratchpad/search-page.png' })
-  await panel.getByRole('radio', { name: 'Everywhere', exact: true }).click()
+  await expect(panel.getByRole('radio', { name: 'This collection only', exact: true })).toBeChecked()
+  await panel.getByRole('radio', { name: 'All collections', exact: true }).click()
   await expect(page).toHaveURL(/search_scope=all/)
   expect(errors).toEqual([])
 })

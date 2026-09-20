@@ -18,11 +18,12 @@ import SearchFacetGroup, { type FacetOption } from "@/components/search/SearchFa
 import SearchTermsEditor from "@/components/search/SearchTermsEditor.vue"
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Switch } from "@/components/ui/switch"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useSearchState } from "@/composables/useSearchState"
 import { type SearchScope } from "@/utils/searchQuery"
 import { RouterOutput, trpc } from "@/services/server"
-import { useQuery } from "@tanstack/vue-query"
+import { keepPreviousData, useQuery } from "@tanstack/vue-query"
 import { ArrowLeft, Copy, Trash2 } from "@lucide/vue"
 import { computed } from "vue"
 
@@ -41,6 +42,8 @@ const { data: collection } = useQuery({
 const { data: search } = useQuery({
   queryKey: computed(() => ["search", form.value]),
   queryFn: () => trpc.collection.search.query(form.value),
+  // Keep the previous counts while the next results load, so the rows do not disappear.
+  placeholderData: keepPreviousData,
 })
 const notFoundInput = computed(() => ({
   query: terms.value,
@@ -54,11 +57,13 @@ const { data: notFound } = useQuery({
   enabled: computed(() => !form.value.exactMatch && terms.value.length > 0),
   queryKey: computed(() => ["search-not-found", notFoundInput.value]),
   queryFn: () => trpc.collection.searchNotFound.query(notFoundInput.value),
+  placeholderData: keepPreviousData,
 })
 const missing = computed(() => (form.value.exactMatch ? [] : notFound.value ?? []))
 
-const emptyFacets: RouterOutput["collection"]["search"]["facets"] = { assetTypes: {}, fileTypes: {}, extensions: {}, productViews: {}, attributes: {} }
-const facets = computed(() => search.value?.facets ?? emptyFacets)
+type SearchFacets = RouterOutput["collection"]["search"]["facets"]
+const emptyFacets: SearchFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, productViews: {}, attributes: {} }
+const facets = computed<SearchFacets>(() => search.value?.facets ?? emptyFacets)
 const collectionName = computed(() => collection.value?.name ?? "this collection")
 
 const assetTypeOptions = computed<FacetOption[]>(() =>
@@ -137,7 +142,9 @@ function removeMissing() {
 </script>
 
 <template>
-  <div class="flex min-h-full min-w-0 flex-col gap-2" data-search-panel>
+  <div class="flex h-full min-w-0 flex-col" data-search-panel>
+    <!-- The filters scroll on their own so the footer never covers a value. -->
+    <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto" data-search-panel-scroll>
     <router-link :to="backTarget" :class="sidebarRowClasses" class="-mx-0">
       <span :class="menuIconSlotClasses"><ArrowLeft :class="menuIconClasses" aria-hidden="true" /></span>
       <span>{{ form.collectionId ? `Back to ${collectionName}` : "Back to Library" }}</span>
@@ -149,10 +156,11 @@ function removeMissing() {
         <Button v-if="hasQuery" type="button" variant="ghost" class="h-7 px-2 text-caption text-neutral-600 hover:text-red-600" @click="setTerms([])">Clear</Button>
       </div>
       <SearchTermsEditor class="mx-3" :model-value="terms" :exact-match="form.exactMatch" :not-found="missing" @update:model-value="setTerms" />
-      <RadioGroup :model-value="form.exactMatch ? 'exact' : 'any'" aria-label="How the words are matched" class="flex flex-wrap gap-x-4 gap-y-0.5 px-3 pb-1" @update:model-value="setExactMatch($event === 'exact')">
-        <label class="flex cursor-pointer items-center gap-2 text-body text-neutral-700"><RadioGroupItem id="search-mode-any" value="any" /> Any of the words</label>
-        <label class="flex cursor-pointer items-center gap-2 text-body text-neutral-700"><RadioGroupItem id="search-mode-exact" value="exact" /> Exact phrase</label>
-      </RadioGroup>
+      <label class="flex cursor-pointer items-center gap-2 px-3 pb-1 text-body text-neutral-700">
+        <Switch id="search-mode-exact" aria-label="Exact phrase" :model-value="form.exactMatch" @update:model-value="setExactMatch($event as boolean)" />
+        <span>Exact phrase</span>
+        <span class="text-caption text-[color:var(--dv-text-secondary)]">{{ form.exactMatch ? "the words in this order" : "off, any of the words" }}</span>
+      </label>
       <div v-if="missing.length" role="status" class="mx-3 grid gap-1 border border-[var(--dv-color-warning)]/30 bg-[var(--dv-color-warning-soft)] px-3 py-1.5 text-body text-[var(--dv-color-warning)]">
         <p><strong class="font-semibold">{{ missing.length }} of {{ terms.length }}</strong> not found: <span class="break-words">{{ missing.join(", ") }}</span></p>
         <div class="flex flex-wrap gap-3">
@@ -163,19 +171,21 @@ function removeMissing() {
     </section>
 
     <section v-if="form.collectionId" aria-labelledby="search-where-title" class="flex min-w-0 flex-col gap-1 border-t border-neutral-200 pt-1 pb-1">
-      <h2 id="search-where-title" :class="sidebarSectionTitleClasses" class="flex h-8 items-center">Where</h2>
+      <h2 id="search-where-title" :class="sidebarSectionTitleClasses" class="flex h-8 items-center">Where to search</h2>
+      <p class="truncate px-3 pb-0.5 text-caption text-[color:var(--dv-text-secondary)]" :title="collectionName">{{ collectionName }}</p>
       <RadioGroup :model-value="form.searchScope" class="flex min-w-0 flex-col" @update:model-value="setScope($event as SearchScope)">
-        <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-all" value="all" /> Everywhere</label>
-        <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-sub" value="current_with_sub" /> <span class="min-w-0 flex-1 truncate">{{ collectionName }} and its sub-collections</span></label>
-        <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-current" value="current" /> <span class="min-w-0 flex-1 truncate">{{ collectionName }} only</span></label>
+        <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-all" value="all" /> All collections</label>
+        <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-sub" value="current_with_sub" /> <span class="min-w-0 flex-1 truncate">This collection and its sub-collections</span></label>
+        <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem class="shrink-0" id="search-scope-current" value="current" /> <span class="min-w-0 flex-1 truncate">This collection only</span></label>
       </RadioGroup>
     </section>
 
-    <SearchFacetGroup id="search-asset-types" title="Asset type" :options="assetTypeOptions" :selected="form.assetTypes" empty-text="No asset type configured" @toggle="toggleValue('asset_types', $event)" />
+    <SearchFacetGroup id="search-asset-types" title="Asset type" :options="assetTypeOptions" :selected="form.assetTypes" @toggle="toggleValue('asset_types', $event)" />
     <SearchFacetGroup v-if="productViewOptions.length" id="search-product-views" title="Product view" :options="productViewOptions" :selected="form.productViews" :open="form.productViews.length > 0" @toggle="toggleValue('product_views', $event)" />
     <SearchFacetGroup v-for="group in attributeGroups" :id="`search-facet-${group.id}`" :key="group.id" :title="group.title" :options="group.options" :selected="form.attributes[group.id] ?? []" :open="(form.attributes[group.id]?.length ?? 0) > 0 || attributeGroups.length <= 3" @toggle="toggleValue(`attributes[${group.id}]`, $event)" />
 
-    <div v-if="filters.length" class="sticky bottom-0 -mx-3 -mb-5 mt-auto border-t border-neutral-200 bg-neutral-50 p-2">
+    </div>
+    <div v-if="filters.length" class="-mx-3 shrink-0 border-t border-neutral-200 bg-neutral-50 px-3 pt-2">
       <Button type="button" variant="outline" class="w-full" @click="clearFilters">Clear all filters ({{ filters.length }})</Button>
     </div>
   </div>

@@ -44,10 +44,10 @@ const currentCollectionId = computed(() => {
   return null
 })
 const searchScopeOptions = computed(() => {
-  const globalOptions = { all: "all files and collections" }
+  const globalOptions = { all: "all collections" }
   const collectionOptions = {
-    current_with_sub: "current and sub collections",
-    current: "current collection",
+    current_with_sub: "this collection and its sub-collections",
+    current: "this collection only",
   }
   return currentCollectionId.value ? { ...collectionOptions, ...globalOptions } : globalOptions
 })
@@ -115,6 +115,14 @@ const selectedAssetTypes = computed(() =>
     .map((id) => assetTypes.value?.find((assetType) => assetType.id === id))
     .filter((assetType) => assetType)
 )
+// A choice with a single possible value is shown as plain words, not as a control.
+const canChooseAssetType = computed(() => (assetTypes.value?.length ?? 0) > 1)
+const canChooseScope = computed(() => Object.keys(searchScopeOptions.value).length > 1)
+const assetTypeLabel = computed(() => selectedAssetTypes.value.length
+  ? selectedAssetTypes.value.map((assetType) => assetType!.name).join(", ")
+  : "any asset type")
+const scopeLabel = computed(() => (searchScopeOptions.value as Record<string, string>)[options.value.searchScope] ?? "all collections")
+
 const isAssetTypeSelectOpen = ref(false)
 const isSearchScopeSelectOpen = ref(false)
 const assetTypeSelect = ref<HTMLElement | null>(null)
@@ -247,10 +255,11 @@ function clearText() {
               <span class="min-w-0 truncate">{{ options.exactMatch ? "search an exact term in" : "search multiple references of" }}</span>
             </button>
           </div>
-          <div ref="assetTypeSelect" class="relative min-w-0 shrink" @keydown.esc="closeAssetTypeSelect">
+          <span v-if="!canChooseAssetType" class="min-w-0 shrink truncate">{{ assetTypeLabel }}</span>
+          <div v-else ref="assetTypeSelect" class="relative min-w-0 shrink" @keydown.esc="closeAssetTypeSelect">
             <Label for="search-asset-types" class="sr-only">Asset types</Label>
             <button id="search-asset-types" ref="assetTypeToggle" type="button" aria-label="Asset types" :aria-expanded="isAssetTypeSelectOpen" aria-controls="search-asset-types-options" :class="sentenceChoiceClasses" @click="isAssetTypeSelectOpen = !isAssetTypeSelectOpen">
-              <span class="min-w-0 truncate">{{ selectedAssetTypes.length ? selectedAssetTypes.map((assetType) => assetType!.name).join(', ') : 'any asset type' }}</span>
+              <span class="min-w-0 truncate">{{ assetTypeLabel }}</span>
               <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
             </button>
             <div v-if="isAssetTypeSelectOpen" id="search-asset-types-options" class="absolute z-20 mt-1 flex min-w-full flex-col gap-1 border border-input bg-white p-1 shadow-md">
@@ -261,10 +270,11 @@ function clearText() {
             </div>
           </div>
           <span class="shrink-0">in</span>
-          <div ref="searchScopeSelect" class="relative min-w-0 shrink" @keydown.esc="closeSearchScopeSelect">
+          <span v-if="!canChooseScope" class="min-w-0 shrink truncate">{{ scopeLabel }}</span>
+          <div v-else ref="searchScopeSelect" class="relative min-w-0 shrink" @keydown.esc="closeSearchScopeSelect">
             <Label for="search-scope" class="sr-only">Search scope</Label>
             <button id="search-scope" ref="searchScopeToggle" type="button" aria-label="Search scope" :aria-expanded="isSearchScopeSelectOpen" aria-controls="search-scope-options" :class="sentenceChoiceClasses" @click="isSearchScopeSelectOpen = !isSearchScopeSelectOpen">
-              <span class="min-w-0 truncate">{{ (searchScopeOptions as any)[options.searchScope] ?? 'all files and collections' }}</span>
+              <span class="min-w-0 truncate">{{ scopeLabel }}</span>
               <ChevronDown class="size-4 shrink-0" aria-hidden="true" />
             </button>
             <div v-if="isSearchScopeSelectOpen" id="search-scope-options" class="absolute z-20 mt-1 flex min-w-full flex-col gap-1 border border-input bg-white p-1 shadow-md">

@@ -33,7 +33,28 @@ export const FILE_TYPE_OPTIONS = [
 ] as const
 
 // Filter keys that "Clear all filters" resets; the terms, scope and mode stay.
-export const FILTER_KEYS = ['asset_types', 'product_views', 'file_types'] as const
+export const FILTER_KEYS = ['asset_types', 'product_views', 'file_types', 'extensions', 'size_min', 'size_max'] as const
+
+export const BYTES_PER_MB = 1024 * 1024
+
+// Sizes travel through the URL in megabytes, because that is what the user typed.
+export function megabytesToBytes(value: string | number | null | undefined): number | undefined {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number.parseFloat(value) : NaN
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * BYTES_PER_MB) : undefined
+}
+
+export function bytesToMegabytes(value: number | undefined): string {
+  return value === undefined ? '' : String(Number((value / BYTES_PER_MB).toFixed(2)))
+}
+
+export function formatSizeRange(minSize: number | undefined, maxSize: number | undefined): string {
+  const from = bytesToMegabytes(minSize)
+  const to = bytesToMegabytes(maxSize)
+  if (from && to) return `${from} to ${to} MB`
+  if (from) return `Over ${from} MB`
+  if (to) return `Under ${to} MB`
+  return 'Any size'
+}
 
 export function queryValueToArray(query: LocationQueryValue | LocationQueryValue[] | undefined): string[] {
   if (!query) {
@@ -81,6 +102,9 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: Searc
     assetTypes: queryValueToArray(query.asset_types),
     productViews: queryValueToArray(query.product_views),
     fileTypes: queryValueToArray(query.file_types),
+    extensions: queryValueToArray(query.extensions),
+    minSize: megabytesToBytes(query.size_min as string | undefined),
+    maxSize: megabytesToBytes(query.size_max as string | undefined),
     searchScope: toSearchScope(queryValueToString(query.search_scope)) ?? defaultSearchScope,
     exactMatch: query.exact_match === "true",
     attributes,
@@ -122,13 +146,17 @@ export function clearFilterQuery(query: LocationQuery): LocationQuery {
   return patchSearchQuery(query, patch)
 }
 
-export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'product_views' | 'file_types' | 'attribute', attributeId?: string }
+export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'product_views' | 'file_types' | 'extensions' | 'size' | 'attribute', attributeId?: string }
 
 export function activeFilters(form: SearchForm): ActiveFilter[] {
   return [
     ...form.assetTypes.map((value) => ({ key: 'asset_types', value, group: 'asset_types' as const })),
     ...form.productViews.map((value) => ({ key: 'product_views', value, group: 'product_views' as const })),
     ...form.fileTypes.map((value) => ({ key: 'file_types', value, group: 'file_types' as const })),
+    ...form.extensions.map((value) => ({ key: 'extensions', value, group: 'extensions' as const })),
+    ...(form.minSize !== undefined || form.maxSize !== undefined
+      ? [{ key: 'size', value: formatSizeRange(form.minSize, form.maxSize), group: 'size' as const }]
+      : []),
     ...Object.entries(form.attributes).flatMap(([attributeId, values]) =>
       values.map((value) => ({ key: `attributes[${attributeId}]`, value, group: 'attribute' as const, attributeId }))
     ),

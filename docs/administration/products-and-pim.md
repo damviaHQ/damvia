@@ -3,7 +3,7 @@ title: Products and PIM
 description: Import a product catalogue from CSV, link files to products by file name, and turn product columns into search facets.
 sidebar:
   order: 10
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 The PIM section stores a flat product catalogue and links asset files to it by parsing file names. Once linked, product columns can be searched, offered as filters and displayed next to files.
@@ -70,7 +70,7 @@ A matching file whose key has no product row gets `product_id` set to null, whic
 How each flag is used by `collection.search` (`server/src/trpc/router/collection.ts`, predicates in `server/src/services/search.ts`):
 
 - **searchable**: every word of the query is matched with `ILIKE` against `asset_file.name` and against `product.meta_data['<name>']` for each searchable attribute; with `exactMatch` the whole query is matched once. `collection.searchNotFound` uses the same columns to tell the user which typed references matched nothing; the search panel marks those terms and offers to copy or remove them.
-- **facetable**: `productAttribute.listFacets` returns each facetable attribute with the distinct values found in products. The search panel shows one collapsible checkbox group per facetable attribute, each value with the number of files it would leave in the current results (values with no file are greyed out). The client sends the chosen values as `attributes`, and the server adds one `product.meta_data[<name>] IN (...)` condition per attribute: values of the same attribute are alternatives, and choosing values in two attributes narrows the results to files matching both. The counts come from `collection.search`'s `facets`, described in [API](../contributing/api.md).
+- **facetable**: `productAttribute.listFacets` returns each facetable attribute with the distinct values found in products. The search panel shows one collapsible checkbox group per facetable attribute, each value with the number of files it would leave in the current results. A value that would return nothing is hidden, so a long catalogue does not produce long dead lists; a group whose values all return nothing disappears, and a value stays listed while it is selected so it can be cleared. Groups of more than eight values gain a type-to-filter box and a `Show n more` row. The client sends the chosen values as `attributes`, and the server adds one `product.meta_data[<name>] IN (...)` condition per attribute: values of the same attribute are alternatives, and choosing values in two attributes narrows the results to files matching both. The counts come from `collection.search`'s `facets`, described in [API](../contributing/api.md).
 - **viewable**: `formatCollectionFile` returns the product's viewable attributes with each file, so they can be shown in details and as list columns configured on the [asset type](./asset-types.md).
 
 A product view filter only matches files whose asset type has `is_related_to_products` set, so tag your packshot folders with such a type. Results are paginated 300 per page and sorted by relevance when there is a query (`sort` accepts `name` and `newest` too).

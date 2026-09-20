@@ -58,6 +58,7 @@ export function useSearchState() {
     setScope: (searchScope: SearchScope) => push({ search_scope: searchScope }),
     setSort: (sort: SearchSort | undefined) => push({ sort }),
     setValues: (key: string, values: string[]) => push({ [key]: values }),
+    setSizeRange: (range: { min: string, max: string }) => push({ size_min: range.min || undefined, size_max: range.max || undefined }),
     toggleValue: (key: string, value: string) =>
       router.push({ name: "search", query: toggleQueryValue(route.query, key, value) }),
     clearFilters: () => router.push({ name: "search", query: clearFilterQuery(route.query) }),

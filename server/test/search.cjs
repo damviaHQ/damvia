@@ -35,9 +35,9 @@ before(async () => {
     const product = await save(Product, { productKey: 'SKU-1', primaryKeyName: 'SKU', metaData: { color: 'red', size: 'M' } })
     const blue = await save(Product, { productKey: 'SKU-2', primaryKeyName: 'SKU', metaData: { color: 'navy', size: 'M' } })
     const files = [
-        [rootFolder, root, { name: 'shirt-red.png', mimeType: 'image/png' }],
-        [rootFolder, root, { name: 'hat.mp4', mimeType: 'video/mp4', assetTypeId: related.id, productView: 'front' }],
-        [rootFolder, root, { name: 'spec.pdf', mimeType: 'application/pdf', assetTypeId: unrelated.id, productView: 'front' }],
+        [rootFolder, root, { name: 'shirt-red.png', mimeType: 'image/png', size: String(5 * 1024 * 1024) }],
+        [rootFolder, root, { name: 'hat.mp4', mimeType: 'video/mp4', assetTypeId: related.id, productView: 'front', size: String(250 * 1024 * 1024) }],
+        [rootFolder, root, { name: 'spec.pdf', mimeType: 'application/pdf', assetTypeId: unrelated.id, productView: 'front', size: String(40 * 1024 * 1024) }],
         [childFolder, child, { name: 'notes.txt', mimeType: 'text/plain', productId: product.id }],
         [childFolder, child, { name: 'blue-cap.png', mimeType: 'image/png', productId: blue.id, assetTypeId: related.id }],
     ]
@@ -78,6 +78,29 @@ test('values of one attribute are alternatives while different attributes narrow
     assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['red', 'navy'] } })), ['blue-cap.png', 'notes.txt'])
     assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['red'], [sizeAttr.id]: ['M'] } })), ['notes.txt'])
     assert.deepEqual(names(await searchAs({ attributes: { [colorAttr.id]: ['red'], [sizeAttr.id]: ['L'] } })), [])
+})
+
+test('files can be narrowed to one extension and extensions are counted', async () => {
+    assert.deepEqual(names(await searchAs({ extensions: ['png'] })), ['blue-cap.png', 'shirt-red.png'])
+    assert.deepEqual(names(await searchAs({ extensions: ['.PNG', 'mp4'] })), ['blue-cap.png', 'hat.mp4', 'shirt-red.png'])
+    assert.deepEqual(names(await searchAs({ extensions: ['pdf'], fileTypes: ['image'] })), [])
+    assert.equal((await searchAs({ extensions: [] })).total, 5)
+    assert.deepEqual((await searchAs({})).facets.extensions, { png: 2, mp4: 1, pdf: 1, txt: 1 })
+    assert.deepEqual((await searchAs({ extensions: ['png'] })).facets.extensions, { png: 2, mp4: 1, pdf: 1, txt: 1 })
+    assert.deepEqual((await searchAs({ extensions: ['png'] })).facets.fileTypes, { image: 2 })
+    assert.deepEqual(await caller(fixtures.member).collection.searchNotFound({ query: ['hat'], extensions: ['png'] }), ['hat'])
+})
+
+test('files can be narrowed to a size range in bytes', async () => {
+    const MB = 1024 * 1024
+    assert.deepEqual(names(await searchAs({ maxSize: MB })), ['blue-cap.png', 'notes.txt'])
+    assert.deepEqual(names(await searchAs({ minSize: 100 * MB })), ['hat.mp4'])
+    assert.deepEqual(names(await searchAs({ minSize: 4 * MB, maxSize: 50 * MB })), ['shirt-red.png', 'spec.pdf'])
+    assert.deepEqual(names(await searchAs({ minSize: 5 * MB, maxSize: 5 * MB })), ['shirt-red.png'])
+    assert.deepEqual(names(await searchAs({ minSize: 500 * MB })), [])
+    assert.equal((await searchAs({ minSize: 0 })).total, 5)
+    assert.deepEqual((await searchAs({ minSize: 100 * MB })).facets.fileTypes, { video: 1 })
+    assert.deepEqual(await caller(fixtures.member).collection.searchNotFound({ query: ['hat'], maxSize: MB }), ['hat'])
 })
 
 test('facet counts cover the whole result set and leave out their own filter', async () => {

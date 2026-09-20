@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -104,8 +104,8 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 |---|---|---|---|
 | `tree` | query | `userApproved` | Collections visible to the user, as a tree |
 | `treeAdmin` | query | `userAdmin` | Public collection tree for the admin screen |
-| `search` | query | `userApproved` | Files matching text, asset types, product facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored. Values of one attribute are alternatives, different attributes narrow each other. `sort` is `relevance` (default with a query: files matching more words first, then names starting with a word), `name` or `newest`; the order is stable across pages. The response carries `facets`: counts per asset type, file type (`image`, `video`, `document`, `other`), product view and facetable attribute value, computed over the whole result set with the dimension's own filter left out |
-| `searchNotFound` | query | `userApproved` | Returns the search terms found neither in a visible file name nor in a searchable attribute, within the same scope, asset type, product view and file type filters |
+| `search` | query | `userApproved` | Files matching text, asset types, file formats, product facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored. Values of one attribute are alternatives, different attributes narrow each other. `sort` is `relevance` (default with a query: files matching more words first, then names starting with a word), `name` or `newest`; the order is stable across pages. `extensions` keeps only files whose name ends in one of the given extensions, compared in lower case and with a leading dot ignored. `minSize` and `maxSize` bound the file size in bytes and either may be omitted. The response carries `facets`: counts per asset type, file type (`image`, `video`, `document`, `other`), file extension, product view and facetable attribute value, computed over the whole result set with the dimension's own filter left out |
+| `searchNotFound` | query | `userApproved` | Returns the search terms found neither in a visible file name nor in a searchable attribute, within the same scope, asset type, product view, file type and extension filters |
 | `findById` | query | `userApproved` | One collection with files, children, invitations |
 | `lastAddedFiles` | query | `userApproved` | 10 most recent collection files, optionally under one collection |
 | `create` | mutation | `userApproved` | New collection; `public` is forced to `false` for non-admins, so only admins create public ones |

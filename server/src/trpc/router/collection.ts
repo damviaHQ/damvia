@@ -207,6 +207,8 @@ export default router({
 			productViews: z.string().array().optional().nullable(),
 			fileTypes: z.string().array().optional().nullable(),
 			extensions: z.string().max(20).array().max(50).optional().nullable(),
+			minSize: z.number().int().min(0).max(1e15).optional().nullable(),
+			maxSize: z.number().int().min(0).max(1e15).optional().nullable(),
 			searchScope: searchScope,
 			exactMatch: z.boolean().optional().nullable(),
 			attributes: z.record(z.string(), z.string().array().nullable()).nullable().optional(),
@@ -254,6 +256,8 @@ export default router({
 			productViews: z.string().array().optional().nullable(),
 			fileTypes: z.string().array().optional().nullable(),
 			extensions: z.string().max(20).array().max(50).optional().nullable(),
+			minSize: z.number().int().min(0).max(1e15).optional().nullable(),
+			maxSize: z.number().int().min(0).max(1e15).optional().nullable(),
 			searchScope: searchScope,
 		}))
 		.query(async ({ input, ctx }) => {

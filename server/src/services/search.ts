@@ -27,6 +27,8 @@ export type SearchSort = 'relevance' | 'name' | 'newest'
 export type SearchInput = {
 	query?: string | null
 	extensions?: string[] | null
+	minSize?: number | null
+	maxSize?: number | null
 	collectionId?: string | null
 	assetTypes?: string[] | null
 	productViews?: string[] | null
@@ -152,6 +154,14 @@ export function buildSearchQuery(
 		query.andWhere(`${fileExtensionExpression} IN (:...extensions)`, {
 			extensions: input.extensions.map(normalizeExtension).filter((value) => value),
 		})
+	}
+
+	// A size range the user typed, in bytes; either end may be left open.
+	if (typeof input.minSize === 'number') {
+		query.andWhere('asset_file.size >= :minSize', { minSize: input.minSize })
+	}
+	if (typeof input.maxSize === 'number') {
+		query.andWhere('asset_file.size <= :maxSize', { maxSize: input.maxSize })
 	}
 
 	if (exclude !== 'fileTypes' && input.fileTypes?.length) {

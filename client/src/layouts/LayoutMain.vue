@@ -15,7 +15,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import MainLinkTree from "@/components/layout-main/MainLinkTree.vue"
 import MainMenuTree from "@/components/layout-main/MainMenuTree.vue"
-import { menuIconClasses, menuIconSlotClasses, sidebarRowClasses, sidebarSectionTitleClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "@/components/layout-main/navigationStyles"
+import { menuIconClasses, menuIconSlotClasses, sidebarSectionTitleClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "@/components/layout-main/navigationStyles"
 import SearchPanel from "@/components/search/SearchPanel.vue"
 import { useMyCollections } from "@/composables/useMyCollections"
 import MainTopbar from "@/components/layout-main/MainTopbar.vue"
@@ -231,10 +231,10 @@ const activeMyCollectionIndex = computed(() =>
   myCollections.value.findIndex((collection: Collection) => openCollections.value.includes(collection.id))
 )
 const myCollectionsActive = computed(() => activeMyCollectionIndex.value >= 0)
-const isMyCollectionsTabOpen = ref(false)
+const isMyCollectionsTabOpen = ref(route.name === "my-collections")
 
 watch([myCollectionsActive, () => route.fullPath], () => {
-  if (myCollectionsActive.value || route.name === "my-collections") {
+  if (myCollectionsActive.value) {
     isMyCollectionsTabOpen.value = true
   }
 }, { immediate: true })
@@ -251,8 +251,8 @@ const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/c
         <SearchPanel v-if="isSearchRoute" />
         <nav v-else aria-label="Collections">
           <div v-if="globalStore.user?.role !== 'guest'" class="mb-4 grid gap-1">
-            <router-link :to="{ name: 'favorites' }" :class="sidebarRowClasses" active-class="bg-neutral-200/70 text-neutral-950">
-              <span :class="menuIconSlotClasses"><Star :class="menuIconClasses" /></span><span>Favorites</span>
+            <router-link :to="{ name: 'favorites' }" :class="treeRowClasses" :active-class="treeActiveRowClasses">
+              <span :class="menuIconSlotClasses"><Star :class="menuIconClasses" aria-hidden="true" /></span><span class="min-w-0 truncate">Favorites</span>
             </router-link>
             <div>
               <div class="relative flex items-center gap-1">
@@ -264,7 +264,9 @@ const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/c
                   <ChevronDown v-if="isMyCollectionsTabOpen" :class="menuIconClasses" />
                   <ChevronRight v-else :class="menuIconClasses" />
                 </Button>
-                <router-link :to="{ name: 'my-collections' }" :class="[treeRowClasses, 'flex-1 peer-hover:bg-neutral-200 peer-hover:text-neutral-900']" :active-class="treeActiveRowClasses">
+                <router-link :to="{ name: 'my-collections' }" :class="[treeRowClasses, 'flex-1 peer-hover:bg-neutral-200 peer-hover:text-neutral-900']" :active-class="treeActiveRowClasses"
+                  :aria-expanded="myCollections.length ? isMyCollectionsTabOpen : undefined" :aria-controls="myCollections.length ? 'my-collections-tree' : undefined"
+                  @click.exact="isMyCollectionsTabOpen = !isMyCollectionsTabOpen">
                   <span :class="menuIconSlotClasses" aria-hidden="true" /><span class="min-w-0 truncate">My collections</span>
                 </router-link>
                 <Button variant="ghost" size="icon" aria-label="Create collection" class="size-7 p-1.5 [&_svg]:size-4" @click="isDialogCreateCollectionOpen = true"><Plus :class="menuIconClasses" /></Button>
@@ -289,7 +291,8 @@ const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/c
       </aside>
     </TooltipProvider>
     <MainTopbar />
-    <main id="main-content" tabindex="-1" class="client-workspace min-w-0 flex-1 overflow-auto p-5 focus:outline-none"><slot /></main>
+    <!-- Search keeps its top inset inside the opaque sticky toolbar. -->
+    <main id="main-content" tabindex="-1" class="client-workspace isolate min-w-0 flex-1 overflow-auto px-5 pb-5 focus:outline-none" :class="isSearchRoute ? 'pt-0' : 'pt-5'"><slot /></main>
     <CollectionDialogCreate v-model="isDialogCreateCollectionOpen" @created="router.push({ name: 'collection', params: { id: $event.id } })" />
   </div>
 </template>

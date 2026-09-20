@@ -13,7 +13,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionDisplayGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
 import CollectionDisplayListFiles from "@/components/collection/CollectionDisplayListFiles.vue"
 import Loader from "@/components/Loader.vue"
@@ -29,18 +28,17 @@ import {
 } from "@/components/ui/pagination"
 import { Button } from "@/components/ui/button"
 import { useSearchState } from "@/composables/useSearchState"
-import LayoutDialogMember from "@/layouts/LayoutDialogMember.vue"
 import { trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
+import type { DisplayView } from "@/utils/displayPreferences"
 import { FILE_TYPE_OPTIONS } from "@/utils/searchQuery"
-import { useQuery } from "@tanstack/vue-query"
+import { keepPreviousData, useQuery } from "@tanstack/vue-query"
 import groupBy from "lodash/groupBy"
 import { storeToRefs } from "pinia"
-import { computed, ref } from "vue"
+import { computed } from "vue"
 
 const PER_PAGE = 300
-const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage } = useSearchState()
-const isMemberDialogOpen = ref(false)
+const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange } = useSearchState()
 
 const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
 const { data: productFacets } = useQuery({ queryKey: ["products", "attributes", "facets"], queryFn: () => trpc.productAttribute.listFacets.query() })
@@ -49,9 +47,11 @@ const { data: collection } = useQuery({
   queryKey: computed(() => ["collection", form.value.collectionId]),
   queryFn: () => trpc.collection.findById.query(form.value.collectionId!),
 })
-const { status, data: search, error } = useQuery({
+const { status, data: search, error, isPlaceholderData } = useQuery({
   queryKey: computed(() => ["search", form.value]),
   queryFn: () => trpc.collection.search.query(form.value),
+  // Changing a filter refines the current results instead of blanking the page.
+  placeholderData: keepPreviousData,
 })
 const notFoundInput = computed(() => ({
   query: terms.value,
@@ -65,9 +65,10 @@ const { data: notFound } = useQuery({
   enabled: computed(() => !form.value.exactMatch && terms.value.length > 0),
   queryKey: computed(() => ["search-not-found", notFoundInput.value]),
   queryFn: () => trpc.collection.searchNotFound.query(notFoundInput.value),
+  placeholderData: keepPreviousData,
 })
 
-const emptyFacets = { assetTypes: {}, fileTypes: {}, productViews: {}, attributes: {} }
+const emptyFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, productViews: {}, attributes: {} }
 const facets = computed(() => search.value?.facets ?? emptyFacets)
 const results = computed<any[]>(() => search.value?.results ?? [])
 const total = computed(() => search.value?.total ?? results.value.length)
@@ -88,19 +89,33 @@ const searchResults = computed(() =>
     .sort((a, b) => (a.assetType?.name ?? "￿").localeCompare(b.assetType?.name ?? "￿"))
 )
 
+// The toolbar dropdowns already name their own choice, so they get no chips.
+// Formats come from the files themselves, so the list only offers what exists.
+const formatOptions = computed(() => {
+  const counts: Record<string, number> = facets.value.extensions ?? {}
+  const values = new Set<string>([...Object.keys(counts), ...form.value.extensions])
+  return Array.from(values)
+    .map((value) => ({ id: value, label: value.toUpperCase(), count: counts[value] ?? 0 }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+})
+
 const chips = computed<FilterChip[]>(() =>
-  filters.value.map((filter) => {
+  filters.value.filter((filter) => !["file_types", "extensions", "size"].includes(filter.group)).map((filter) => {
     if (filter.group === "asset_types") {
       const name = assetTypes.value?.find((assetType: any) => assetType.id === filter.value)?.name ?? filter.value
-      return { key: filter.key, value: filter.value, label: `Asset type: ${name}` }
+      return { key: filter.key, value: filter.value, label: `Asset type: ${name}`, category: "Asset type", displayValue: name }
     } else if (filter.group === "file_types") {
       const name = FILE_TYPE_OPTIONS.find((option) => option.id === filter.value)?.label ?? filter.value
-      return { key: filter.key, value: filter.value, label: `File type: ${name}` }
+      return { key: filter.key, value: filter.value, label: `File type: ${name}`, category: "File type", displayValue: name }
+    } else if (filter.group === "size") {
+      return { key: filter.key, value: filter.value, label: `Size: ${filter.value}`, category: "Size", displayValue: filter.value }
+    } else if (filter.group === "extensions") {
+      return { key: filter.key, value: filter.value, label: `Format: ${filter.value.toUpperCase()}`, category: "Format", displayValue: filter.value.toUpperCase() }
     } else if (filter.group === "product_views") {
-      return { key: filter.key, value: filter.value, label: `View: ${filter.value}` }
+      return { key: filter.key, value: filter.value, label: `View: ${filter.value}`, category: "View", displayValue: filter.value }
     }
     const facet = productFacets.value?.find((entry: any) => entry.id === filter.attributeId)
-    return { key: filter.key, value: filter.value, label: `${facet?.displayName || facet?.name || "Attribute"}: ${filter.value}` }
+    return { key: filter.key, value: filter.value, label: `${facet?.displayName || facet?.name || "Attribute"}: ${filter.value}`, category: facet?.displayName || facet?.name || "Attribute", displayValue: filter.value }
   })
 )
 
@@ -122,13 +137,21 @@ function toggleSelection() {
     .forEach((file: any) => globalStore.addToSelection({ type: "file", id: file.id }))
 }
 
-function displayFor(assetType: any): "grid" | "list" {
+function displayFor(assetType: any): DisplayView {
   return (
     globalStore.displayPreferences[assetType?.id as never] ??
     assetType?.defaultDisplay ??
     globalStore.displayPreferences["asset_file"] ??
     "grid"
   )
+}
+
+function removeChip(chip: FilterChip) {
+  if (chip.key === "size") {
+    setSizeRange({ min: "", max: "" })
+    return
+  }
+  toggleValue(chip.key, chip.value)
 }
 
 function focusTerms() {
@@ -145,11 +168,12 @@ function focusTerms() {
     <div v-if="status === 'pending'">
       <Loader :text="true" />
     </div>
-    <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
+    <div v-else-if="status === 'error'" role="alert" class="mt-5 alert alert-danger">
       {{ error?.message }}
     </div>
     <template v-else-if="status === 'success' && search">
       <SearchToolbar
+        :files="results"
         :total="total"
         :terms="terms"
         :scope-label="scopeLabel"
@@ -158,13 +182,23 @@ function focusTerms() {
         :sort="form.sort"
         :has-query="hasQuery"
         :chips="chips"
+        :formats="formatOptions"
+        :selected-formats="form.extensions"
+        :min-size="form.minSize"
+        :max-size="form.maxSize"
+        :selected-count="selection.length"
+        :all-selected="allSelected"
         @update:file-types="setValues('file_types', $event)"
         @update:sort="setSort($event)"
-        @remove-chip="toggleValue($event.key, $event.value)"
+        @remove-chip="removeChip($event)"
+        @toggle-selection="toggleSelection"
+        @toggle-format="toggleValue('extensions', $event)"
+        @clear-formats="setValues('extensions', [])"
+        @apply-size="setSizeRange($event)"
         @clear-filters="clearFilters"
-        @open-display-preferences="isMemberDialogOpen = true"
       />
 
+      <div class="flex min-h-0 flex-1 flex-col transition-opacity" :class="isPlaceholderData && 'pointer-events-none opacity-60'" :aria-busy="isPlaceholderData || undefined">
       <SearchEmptyState
         v-if="!results.length"
         :terms="terms"
@@ -180,15 +214,6 @@ function focusTerms() {
       />
 
       <template v-else>
-        <div class="mb-4 flex items-center gap-1.5">
-          <CollectionCheckbox label="Select all results" :state="allSelected ? 'check' : selection.length > 0 ? 'undetermined' : false" @click="toggleSelection" />
-          <button type="button" class="cursor-pointer bg-transparent p-0 text-body text-neutral-500 hover:text-neutral-900" @click="toggleSelection">
-            <template v-if="allSelected">Unselect all</template>
-            <template v-else-if="selection.length">{{ selection.length }} selected, select all</template>
-            <template v-else>Select all</template>
-          </button>
-        </div>
-
         <div v-for="result in searchResults" :key="result.assetType?.id ?? 'other'" class="search__result-group mb-6">
           <h2 class="search__asset-type-name mb-2 text-body text-neutral-500">
             {{ result.assetType?.name ?? "Other files" }}
@@ -213,7 +238,7 @@ function focusTerms() {
           </nav>
         </Pagination>
       </template>
+      </div>
     </template>
-    <LayoutDialogMember v-model:open="isMemberDialogOpen" :initial-tab="'display-preferences'" />
   </div>
 </template>
