@@ -19,7 +19,7 @@ import { Page } from "../../entity/page"
 import { PageBlock, PageBlockType } from "../../entity/page-block"
 import { User } from "../../entity/user"
 import { dataSource } from "../../env"
-import { blockInputSchema, BlockType, emptyBlockData, uploadKeysOf } from "../../page-blocks/schema"
+import { blockInputSchema, BlockType, uploadKeysOf } from "../../page-blocks/schema"
 import { sanitizeBlockHtml } from "../../page-blocks/sanitize"
 import { userCollectionsQuery } from "../../services/collection"
 import {
@@ -29,6 +29,7 @@ import {
 	findPage,
 	loadEditablePage,
 	removePageObjects,
+	resolveCollectionAssets,
 	resolvePageAssets,
 	savePage,
 } from "../../services/page"
@@ -111,16 +112,23 @@ export default router({
 				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
 			}
 
+			// The editor asks for this row the first time it has something to
+			// write, so a second ask must hand back the same page rather than
+			// break on the one-page-per-collection index.
+			const existing = await dataSource.getRepository(Page).findOne({
+				where: { collectionId: collection.id },
+				relations: { blocks: true },
+			})
+			if (existing) {
+				return formatPage(existing, ctx.user)
+			}
+
+			// The page is born empty: the editor sends the blocks it is showing
+			// with the save that follows.
 			const page = new Page()
 			page.collectionId = collection.id
-			await dataSource.transaction(async (em) => {
-				await em.save(page)
-				// Kept on the entity so the caller gets the blocks it just created.
-				page.blocks = await em.save([
-					new PageBlock({ pageId: page.id, type: PageBlockType.COLLECTIONS, position: 0, size: 'full', data: emptyBlockData('collections') }),
-					new PageBlock({ pageId: page.id, type: PageBlockType.FILES, position: 1, size: 'full', data: emptyBlockData('files') }),
-				])
-			})
+			page.blocks = []
+			await dataSource.getRepository(Page).save(page)
 			return formatPage(page, ctx.user)
 		}),
 	update: publicProcedure
@@ -173,6 +181,15 @@ export default router({
 			await collectPageGarbage(page.id, blocks.flatMap((block) => uploadKeysOf(block.data)))
 			return formatPage(page, ctx.user)
 		}),
+	// The editor asks for these while an author is choosing, so a collection
+	// previews straight away instead of only once the page has been saved.
+	// It returns nothing the caller could not already reach on their own.
+	collectionPreviews: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({
+			collectionIds: z.uuid().array().max(200),
+		}))
+		.query(({ input, ctx }) => resolveCollectionAssets(ctx.user, input.collectionIds)),
 	createUpload: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.object({

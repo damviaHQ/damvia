@@ -279,37 +279,7 @@ export async function resolvePageAssets(user: User, blocks: PageBlock[]): Promis
 	}
 
 	if (collectionIds.size) {
-		const collections = await userCollectionsQuery(user)
-			.andWhere('collection.id IN (:...ids)', { ids: [...collectionIds] })
-			.getMany()
-		// A collection card previews its content, so the sample files a card
-		// falls back on when it has no thumbnail of its own are resolved too.
-		const sampleIds = collections.flatMap((collection: Collection) => collection.sampleFileIds ?? [])
-		const samples = sampleIds.length
-			? await userCollectionFilesQuery(user).andWhere('collection_file.id IN (:...ids)', { ids: sampleIds }).getMany()
-			: []
-		await Promise.all(collections.map(async (collection: Collection) => {
-			assets.collections[collection.id] = {
-				id: collection.id,
-				name: collection.name,
-				numberOfFiles: collection.numberOfFiles,
-				draft: collection.draft,
-				canEdit: collection.canEdit(user),
-				thumbnailURL: collection.hasThumbnail
-					? await mainS3().presignedGetObject(mainS3Bucket(), collection.thumbnailStorageKey)
-					: null,
-				sampleFiles: await Promise.all((collection.sampleFileIds ?? [])
-					.map((fileId) => samples.find((sample: CollectionFile) => sample.id === fileId))
-					.filter((file): file is CollectionFile => !!file)
-					.map(async (file: CollectionFile) => ({
-						id: file.id,
-						name: file.assetFile.name,
-						thumbnailURL: file.assetFile.hasThumbnail
-							? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey)
-							: null,
-					}))),
-			}
-		}))
+		Object.assign(assets.collections, await resolveCollectionAssets(user, [...collectionIds]))
 	}
 
 	if (pageIds.size) {
@@ -323,3 +293,46 @@ export async function resolvePageAssets(user: User, blocks: PageBlock[]): Promis
 }
 
 export { blockPrefix, collectPageGarbage, listPageObjects, removePageObjects }
+
+// Cards for named collections, resolved for the reader. The editor asks for
+// these directly while an author is still choosing, so a collection previews
+// as soon as it is picked rather than only once the page has been saved.
+export async function resolveCollectionAssets(user: User, ids: string[]): Promise<Record<string, PageAssetCollection>> {
+	const cards: Record<string, PageAssetCollection> = {}
+	if (!ids.length) {
+		return cards
+	}
+
+	const collections = await userCollectionsQuery(user)
+		.andWhere('collection.id IN (:...ids)', { ids })
+		.getMany()
+	// A collection card previews its content, so the sample files a card falls
+	// back on when it has no thumbnail of its own are resolved too.
+	const sampleIds = collections.flatMap((collection: Collection) => collection.sampleFileIds ?? [])
+	const samples = sampleIds.length
+		? await userCollectionFilesQuery(user).andWhere('collection_file.id IN (:...ids)', { ids: sampleIds }).getMany()
+		: []
+	await Promise.all(collections.map(async (collection: Collection) => {
+		cards[collection.id] = {
+			id: collection.id,
+			name: collection.name,
+			numberOfFiles: collection.numberOfFiles,
+			draft: collection.draft,
+			canEdit: collection.canEdit(user),
+			thumbnailURL: collection.hasThumbnail
+				? await mainS3().presignedGetObject(mainS3Bucket(), collection.thumbnailStorageKey)
+				: null,
+			sampleFiles: await Promise.all((collection.sampleFileIds ?? [])
+				.map((fileId) => samples.find((sample: CollectionFile) => sample.id === fileId))
+				.filter((file): file is CollectionFile => !!file)
+				.map(async (file: CollectionFile) => ({
+					id: file.id,
+					name: file.assetFile.name,
+					thumbnailURL: file.assetFile.hasThumbnail
+						? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey)
+						: null,
+				}))),
+		}
+	}))
+	return cards
+}

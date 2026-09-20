@@ -259,3 +259,20 @@ test('collections chosen in a block arrive with the previews their cards need', 
     // A collection the reader cannot open is simply not part of the page.
     assert.equal(read.page.assets.collections[hidden.id], undefined)
 })
+
+// The editor resolves cards while an author is choosing, before the page has
+// been saved, so the procedure must stand on its own access rules.
+test('collection previews are available before a save, and only for what the caller can see', async () => {
+    const visible = await makeCollection({ name: 'Visible' })
+    const hidden = await makeCollection({ name: 'Hidden', public: false, owner: admin })
+
+    const cards = await caller(member).page.collectionPreviews({ collectionIds: [visible.id, hidden.id] })
+    assert.equal(cards[visible.id].name, 'Visible')
+    assert.deepEqual(cards[visible.id].sampleFiles, [])
+    assert.equal(cards[hidden.id], undefined, 'a collection the caller cannot see was returned')
+
+    assert.deepEqual(await caller(member).page.collectionPreviews({ collectionIds: [] }), {})
+    for (const user of [null, { ...member, approved: false }]) {
+        await forbidden(caller(user).page.collectionPreviews({ collectionIds: [visible.id] }))
+    }
+})

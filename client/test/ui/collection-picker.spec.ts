@@ -83,3 +83,41 @@ test('a collection chosen from elsewhere shows its preview', async ({ page }) =>
   await expect(page.locator(`img[src="${preview}"]`)).toBeVisible()
   expect(errors).toEqual([])
 })
+
+// Choosing a collection used to leave the block empty until the page was
+// saved, because its card was only resolved when the page was read back.
+test('a collection appears in the block as soon as it is chosen', async ({ page }) => {
+  const preview = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Crect width=%2240%22 height=%2240%22 fill=%22%2339c%22/%3E%3C/svg%3E'
+  const card = {
+    id: 'child', name: 'Child collection', numberOfFiles: 2, draft: false, canEdit: false,
+    thumbnailURL: null, sampleFiles: [{ id: 'sample-1', name: 'One.jpg', thumbnailURL: preview }],
+  }
+  const saves: any[] = []
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+  await page.route('**/trpc/**', async route => {
+    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
+    let data: unknown = responses[name] ?? []
+    if (name === 'collection.findById') data = subject
+    if (name === 'collection.tree') data = [parent]
+    if (name === 'page.collectionPreviews') data = { child: card }
+    if (name === 'page.save') saves.push(route.request().postDataJSON())
+    await route.fulfill({ json: { result: { data } } })
+  })
+
+  await page.goto('/collections/campaign/edit')
+  const block = page.locator('[data-block-index="0"]')
+  await block.hover()
+  await block.getByRole('button', { name: 'Block settings' }).click()
+  await page.getByRole('dialog').locator('.vue-treeselect__control').click()
+
+  const parentOption = page.locator('.vue-treeselect__option', { hasText: 'Parent collection' }).first()
+  await parentOption.locator('.vue-treeselect__option-arrow-container').click()
+  await page.locator('.vue-treeselect__option', { hasText: 'Child collection' }).first().click()
+
+  await expect(block.getByText('Child collection')).toBeVisible()
+  await expect(block.locator(`img[src="${preview}"]`)).toBeVisible()
+  expect(saves).toEqual([])
+  expect(errors).toEqual([])
+})

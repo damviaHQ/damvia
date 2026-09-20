@@ -14,6 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRender from "@/components/collection/CollectionRender.vue"
+import { trpc } from "@/services/server.ts"
+import { useQuery } from "@tanstack/vue-query"
 import { LayoutGrid } from "@lucide/vue"
 import { computed } from "vue"
 import { RouteLocationRaw } from "vue-router"
@@ -31,10 +33,22 @@ const props = defineProps<{
 // Chosen collections are resolved by the server alongside the page, with the
 // thumbnails their cards preview. Reading them from the collection tree gave
 // no previews, because that tree is built without sample files.
+const chosen = computed<string[]>(() => props.data?.collectionsId ?? [])
+
+// A collection picked a moment ago is not in the page's assets yet, since
+// those are resolved when the page is read. Asking for the missing ones keeps
+// the editor honest without waiting for a save.
+const missing = computed(() => chosen.value.filter((id) => !props.assets?.collections?.[id]))
+const { data: resolved } = useQuery({
+  queryKey: computed(() => ["page", "collection-previews", missing.value.join(",")]),
+  queryFn: () => trpc.page.collectionPreviews.query({ collectionIds: missing.value }),
+  enabled: computed(() => missing.value.length > 0),
+})
+
 const collections = computed(() => {
-  if (props.data?.collectionsId?.length) {
-    return props.data.collectionsId
-      .map((id: string) => props.assets?.collections?.[id])
+  if (chosen.value.length) {
+    return chosen.value
+      .map((id: string) => props.assets?.collections?.[id] ?? (resolved.value as any)?.[id])
       .filter((collection: unknown) => !!collection)
   }
   return props.collection?.children ?? []
