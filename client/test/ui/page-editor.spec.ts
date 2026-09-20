@@ -166,6 +166,25 @@ test('leaving with unsaved changes asks before losing them', async ({ page }) =>
   expect(errors).toEqual([])
 })
 
+test('the banner picture controls stay out of the way of the block toolbar', async ({ page }) => {
+  const { errors } = await fixture(page)
+  await page.goto('/collections/campaign/edit')
+
+  const banner = page.locator('[data-block-index="3"]')
+  const move = banner.getByRole('button', { name: 'Move the picture' })
+  const change = banner.getByRole('button', { name: 'Change the picture' })
+  await banner.hover()
+  await expect(move).toBeVisible()
+  await expect(change).toBeVisible()
+
+  // They are compact and sit on the left, clear of the toolbar on the right.
+  const bannerBox = await banner.boundingBox()
+  const moveBox = await move.boundingBox()
+  expect(moveBox!.width).toBeLessThan(40)
+  expect(moveBox!.x).toBeLessThan(bannerBox!.x + bannerBox!.width / 2)
+  expect(errors).toEqual([])
+})
+
 test('the part of a banner picture that stays in frame can be moved', async ({ page }) => {
   const { saves, errors } = await fixture(page)
   await page.goto('/collections/campaign/edit')
@@ -173,7 +192,7 @@ test('the part of a banner picture that stays in frame can be moved', async ({ p
   const banner = page.locator('[data-block-index="3"]')
   await expect(banner.locator('img')).toHaveAttribute('style', /object-position:\s*50% 50%/)
 
-  await banner.getByRole('button', { name: 'Move picture' }).click()
+  await banner.getByRole('button', { name: 'Move the picture' }).click()
   await expect(banner).toContainText('Drag the picture to choose what stays in frame')
 
   const frame = await banner.locator('img').boundingBox()

@@ -19,7 +19,8 @@ import { resolveMedia } from "@/components/page-renderer/media"
 import type { Collection, EditorBlock, PageAssets } from "@/components/page-renderer/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ImageUp, Move } from "@lucide/vue"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Check, ImageUp, Move } from "@lucide/vue"
 import { computed, ref } from "vue"
 import { RouteLocationRaw } from "vue-router"
 import MediaPickerDialog from "./MediaPickerDialog.vue"
@@ -100,10 +101,10 @@ function nudge(event: KeyboardEvent) {
     <RichTextEditor v-if="block.type === 'text'" :model-value="block.data.html ?? ''"
       placeholder="Write a title or a paragraph…" @update:model-value="patch({ html: $event })" />
 
-    <div v-else-if="block.type === 'hero'" class="relative">
+    <div v-else-if="block.type === 'hero'" class="group/hero relative">
       <div ref="heroImage" :class="isRepositioning && hasMedia && 'cursor-move ring-2 ring-neutral-900'"
         @pointerdown="startReposition" @pointermove="event => event.buttons === 1 && reposition(event)">
-        <BlockHero :data="block.data" :assets="assets" editing />
+        <BlockHero :data="block.data" :assets="assets" editing :text-hidden="!isRepositioning" />
       </div>
       <div class="pointer-events-none absolute inset-0 flex flex-col justify-end gap-2 p-6 md:p-10">
         <Input v-if="!isRepositioning" :model-value="block.data.title ?? ''" placeholder="Banner title"
@@ -113,15 +114,41 @@ function nudge(event: KeyboardEvent) {
           class="pointer-events-auto border-transparent bg-white/85" aria-label="Banner subtitle"
           @update:model-value="patch({ subtitle: $event })" />
       </div>
-      <div class="absolute right-3 top-3 flex gap-2">
-        <Button v-if="hasMedia" type="button" size="sm" :variant="isRepositioning ? 'default' : 'outline'"
-          :aria-pressed="isRepositioning" @click="isRepositioning = !isRepositioning" @keydown="nudge">
-          <Move class="size-4" />{{ isRepositioning ? "Done" : "Move picture" }}
-        </Button>
-        <Button v-if="!isRepositioning" type="button" variant="outline" size="sm" @click="isPickerOpen = true">
-          <ImageUp class="size-4" />{{ hasMedia ? "Change picture" : "Add a picture" }}
-        </Button>
+
+      <!-- Picture controls sit on the picture, away from the block toolbar,
+           and stay quiet until the block is hovered or holds keyboard focus. -->
+      <div v-if="hasMedia"
+        class="absolute left-3 top-3 flex items-center gap-0.5 rounded-md bg-neutral-900/70 p-0.5 opacity-0 backdrop-blur-sm transition-opacity group-hover/hero:opacity-100 group-focus-within/hero:opacity-100"
+        :class="isRepositioning && 'opacity-100'">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button type="button" variant="ghost" size="icon"
+              class="size-7 text-white hover:bg-white/20 hover:text-white"
+              :class="isRepositioning && 'bg-white/25'" :aria-pressed="isRepositioning"
+              :aria-label="isRepositioning ? 'Finish moving the picture' : 'Move the picture'"
+              @click="isRepositioning = !isRepositioning" @keydown="nudge">
+              <Check v-if="isRepositioning" class="size-4" />
+              <Move v-else class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ isRepositioning ? "Finish moving" : "Move the picture" }}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button type="button" variant="ghost" size="icon"
+              class="size-7 text-white hover:bg-white/20 hover:text-white" aria-label="Change the picture"
+              @click="isPickerOpen = true">
+              <ImageUp class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Change the picture</TooltipContent>
+        </Tooltip>
       </div>
+      <Button v-else type="button" variant="outline" size="sm" class="absolute left-3 top-3"
+        @click="isPickerOpen = true">
+        <ImageUp class="size-4" />Add a picture
+      </Button>
+
       <p v-if="isRepositioning" class="mt-1 text-xs text-neutral-500">
         Drag the picture to choose what stays in frame, or use the arrow keys.
       </p>

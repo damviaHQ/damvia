@@ -19,7 +19,9 @@ import { resolveMedia } from "../media"
 import type { PageAssets } from "../types"
 import BlockLink from "./BlockLink.vue"
 
-const props = defineProps<{ data: any; assets?: PageAssets; editing?: boolean }>()
+// While editing, the title and subtitle are typed into fields laid over the
+// banner, so the rendered copies would double up behind them.
+const props = defineProps<{ data: any; assets?: PageAssets; editing?: boolean; textHidden?: boolean }>()
 const media = computed(() => resolveMedia(props.data?.media, props.assets))
 const isEmpty = computed(() => !media.value && !props.data?.title && !props.data?.subtitle)
 const focus = computed(() => {
@@ -34,11 +36,13 @@ const focus = computed(() => {
     <img v-if="media" :src="media.url" alt="" class="absolute inset-0 h-full w-full object-cover" :style="focus" />
     <div v-if="media" aria-hidden="true" class="absolute inset-0 bg-linear-to-t from-black/70 to-black/10" />
     <div class="relative" :class="media ? 'text-white' : 'text-neutral-900'">
-      <h2 v-if="data.title" class="text-3xl font-semibold text-balance md:text-4xl">{{ data.title }}</h2>
-      <p v-if="data.subtitle" class="mt-2 max-w-2xl text-base md:text-lg">{{ data.subtitle }}</p>
-      <p v-if="editing && !data.title && !data.subtitle" class="text-sm italic opacity-80">
-        Add a picture and a title to this banner.
-      </p>
+      <template v-if="!textHidden">
+        <h2 v-if="data.title" class="text-3xl font-semibold text-balance md:text-4xl">{{ data.title }}</h2>
+        <p v-if="data.subtitle" class="mt-2 max-w-2xl text-base md:text-lg">{{ data.subtitle }}</p>
+        <p v-if="editing && !data.title && !data.subtitle" class="text-sm italic opacity-80">
+          Add a picture and a title to this banner.
+        </p>
+      </template>
       <BlockLink v-if="data.button?.label" :link="data.button.link" :assets="assets" :disabled="editing"
         class="mt-4 inline-block w-max">
         <Button type="button" tabindex="-1">{{ data.button.label }}</Button>
