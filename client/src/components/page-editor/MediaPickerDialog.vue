@@ -24,7 +24,9 @@ import { useQuery } from "@tanstack/vue-query"
 import { parseEmbedUrl } from "server/src/page-blocks/schema"
 import { computed, ref, useId, watch } from "vue"
 
-const props = defineProps<{ modelValue: boolean; pageId: string; kind: "image" | "video" }>()
+// The page may not exist yet, so its id is asked for at the moment the
+// upload needs somewhere to go.
+const props = defineProps<{ modelValue: boolean; resolvePageId: () => Promise<string>; kind: "image" | "video" }>()
 const emit = defineEmits<{
   (e: "update:modelValue", open: boolean): void
   (e: "select", payload: { media: any; previewUrl?: string; name?: string }): void
@@ -32,6 +34,10 @@ const emit = defineEmits<{
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"]
+// The library calls anything "image/…" a picture, which includes formats no
+// browser draws — a PSD or a TIFF would be picked and then show as a broken
+// image on the page. A page may only offer what it can actually display.
+const DISPLAYABLE = { image: [...IMAGE_TYPES, "image/svg+xml"], video: VIDEO_TYPES }
 const MAX_BYTES = { image: 20 * 1024 * 1024, video: 500 * 1024 * 1024 }
 
 const toast = useGlobalToast()
@@ -63,6 +69,9 @@ const { data: results, isFetching } = useQuery({
   enabled: computed(() => props.modelValue),
 })
 
+const files = computed(() => (results.value?.results ?? []).filter((file: any) => DISPLAYABLE[props.kind].includes(file.mimeType)))
+const hiddenCount = computed(() => (results.value?.results?.length ?? 0) - files.value.length)
+
 async function upload(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -78,7 +87,8 @@ async function upload(event: Event) {
         ? "Choose a JPEG, PNG, WebP, GIF or AVIF picture of up to 20 MB."
         : "Choose an MP4, WebM or MOV video of up to 500 MB.")
     }
-    const created = await trpc.page.createUpload.mutate({ pageId: props.pageId, kind: props.kind, contentType: file.type })
+    const pageId = await props.resolvePageId()
+    const created = await trpc.page.createUpload.mutate({ pageId, kind: props.kind, contentType: file.type })
     const form = new FormData()
     for (const [key, value] of Object.entries(created.fields)) form.append(key, value)
     form.append("file", file)
@@ -86,7 +96,7 @@ async function upload(event: Event) {
     if (!response.ok) {
       throw new Error("The upload failed. Please try again.")
     }
-    const finalized = await trpc.page.finalizeUpload.mutate({ pageId: props.pageId, uploadId: created.uploadId, kind: props.kind })
+    const finalized = await trpc.page.finalizeUpload.mutate({ pageId, uploadId: created.uploadId, kind: props.kind })
     emit("select", { media: { source: "upload", s3key: finalized.s3key }, previewUrl: finalized.url })
     emit("update:modelValue", false)
   } catch (error) {
@@ -134,9 +144,11 @@ function useEmbed() {
           <Input v-model="search" type="search" :placeholder="`Search ${kind === 'image' ? 'pictures' : 'videos'}`"
             aria-label="Search the library" />
           <p v-if="isFetching" class="mt-4 text-sm text-neutral-500">Searching…</p>
-          <p v-else-if="!results?.results?.length" class="mt-4 text-sm text-neutral-500">Nothing found here.</p>
+          <p v-else-if="!files.length" class="mt-4 text-sm text-neutral-500">
+            {{ hiddenCount ? `Nothing here a page can show. ${kind === "image" ? "Formats such as PSD or TIFF cannot be displayed on a page." : "This video format cannot be played on a page."}` : "Nothing found here." }}
+          </p>
           <div v-else class="mt-4 grid max-h-[50vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-4">
-            <button v-for="file in results.results" :key="file.id" type="button"
+            <button v-for="file in files" :key="file.id" type="button"
               class="group overflow-hidden rounded-md border border-neutral-200 text-left hover:border-neutral-500"
               @click="chooseFile(file)">
               <span class="flex h-28 items-center justify-center bg-neutral-100 p-1">
@@ -147,6 +159,9 @@ function useEmbed() {
               <span class="block truncate px-2 py-1 text-xs text-neutral-700">{{ file.name }}</span>
             </button>
           </div>
+          <p v-if="files.length && hiddenCount" class="mt-3 text-xs text-neutral-500">
+            {{ hiddenCount }} {{ hiddenCount > 1 ? "files are" : "file is" }} hidden because a page cannot display {{ hiddenCount > 1 ? "them" : "it" }}.
+          </p>
         </TabsContent>
         <TabsContent value="upload" class="mt-4">
           <input :id="`${fieldId}-file`" ref="fileInput" type="file" :accept="accept" class="hidden" @change="upload" />

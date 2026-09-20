@@ -19,7 +19,7 @@ import Placeholder from "@tiptap/extension-placeholder"
 import StarterKit from "@tiptap/starter-kit"
 import { Editor, EditorContent } from "@tiptap/vue-3"
 import { BubbleMenu } from "@tiptap/vue-3/menus"
-import { Bold, Heading2, Heading3, Italic, Link2, List, ListOrdered, Quote } from "@lucide/vue"
+import { Bold, Heading1, Heading2, Heading3, Italic, Link2, List, ListOrdered, Quote } from "@lucide/vue"
 import { onBeforeUnmount, shallowRef, watch } from "vue"
 
 const props = defineProps<{ modelValue: string; placeholder?: string }>()
@@ -32,7 +32,7 @@ const editor = shallowRef(
     content: props.modelValue || "",
     extensions: [
       StarterKit.configure({
-        heading: { levels: [2, 3, 4] },
+        heading: { levels: [1, 2, 3, 4] },
         code: false,
         codeBlock: false,
         link: false,
@@ -76,6 +76,9 @@ function toggleLink() {
       <Button type="button" variant="ghost" size="icon" class="size-8" aria-label="Italic"
         :aria-pressed="editor.isActive('italic')" :class="editor.isActive('italic') && 'bg-muted'"
         @click="editor.chain().focus().toggleItalic().run()"><Italic class="size-4" /></Button>
+      <Button type="button" variant="ghost" size="icon" class="size-8" aria-label="Title"
+        :aria-pressed="editor.isActive('heading', { level: 1 })" :class="editor.isActive('heading', { level: 1 }) && 'bg-muted'"
+        @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"><Heading1 class="size-4" /></Button>
       <Button type="button" variant="ghost" size="icon" class="size-8" aria-label="Heading"
         :aria-pressed="editor.isActive('heading', { level: 2 })" :class="editor.isActive('heading', { level: 2 }) && 'bg-muted'"
         @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"><Heading2 class="size-4" /></Button>
@@ -104,6 +107,7 @@ function toggleLink() {
 .rich-text :deep(.tiptap p.is-editor-empty:first-child::before) {
   content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--dv-text-secondary, #929292);
 }
+.page-text :deep(h1) { font-size: 2rem; font-weight: 600; padding-bottom: .5rem; }
 .page-text :deep(h2) { font-size: 1.5rem; font-weight: 600; padding-bottom: .5rem; }
 .page-text :deep(h3) { font-size: 1.25rem; font-weight: 600; padding-bottom: .5rem; }
 .page-text :deep(h4) { font-size: 1.125rem; font-weight: 600; padding-bottom: .5rem; }
@@ -111,5 +115,6 @@ function toggleLink() {
 .page-text :deep(ul) { list-style: disc; padding-left: 1.5rem; padding-bottom: .5rem; }
 .page-text :deep(ol) { list-style: decimal; padding-left: 1.5rem; padding-bottom: .5rem; }
 .page-text :deep(blockquote) { border-left: 4px solid var(--dv-color-line, #e2e8f0); padding: .25rem 0 .25rem 1rem; }
-.page-text :deep(a) { color: #2563eb; text-decoration: underline; }
+.page-text :deep(a) { color: inherit; font-weight: 500; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-decoration-thickness: 1px; text-underline-offset: .2em; transition: text-decoration-color .15s; }
+.page-text :deep(a:hover) { text-decoration-color: currentColor; }
 </style>

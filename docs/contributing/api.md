@@ -165,13 +165,15 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `menuItem.setHome` | mutation | `userAdmin` | Flags the home item |
 | `menuItem.updatePositions` | mutation | `userAdmin` | Reorders and reparents |
 | `page.list` | query | `userAdmin` | Pages |
-| `page.findById` | query | `userApproved` | One page with blocks |
+| `page.findById` | query | `userApproved` | One standalone page with its blocks and the `assets` its blocks refer to, resolved for the caller |
 | `page.create` | mutation | `userAdmin` | Standalone page |
-| `page.createForCollection` | mutation | `userApproved` | Page bound to a collection the caller can edit |
+| `page.createForCollection` | mutation | `userApproved` | Empty page bound to a collection the caller can edit, or the one it already has |
 | `page.update` | mutation | `userAdmin` | Renames a page |
 | `page.remove` | mutation | `userApproved` | Deletes a page the caller can edit |
-| `page.addBlock`, `removeBlock`, `updateLayout`, `updateBlockData` | mutation | `userApproved` | Block editing, checked with `page.canEdit(user)` |
-| `page.presignedUploadUrl` | query | `userApproved` | Presigned PUT (24 h) for a block's `data.s3key` in the main bucket |
+| `page.save` | mutation | `userApproved` | Writes the whole block list in one transaction, checked with `page.canEdit(user)`: blocks are created, updated, reordered and deleted together, `data` is validated against the schema for its type, text is sanitised, and objects no longer referenced are removed afterwards |
+| `page.collectionPreviews` | query | `userApproved` | Cards for the named collections, resolved for the caller, so the editor can preview a collection the moment it is chosen rather than after a save |
+| `page.createUpload` | mutation | `userApproved` | Ten-minute presigned POST to `blocks/{pageId}/tmp/{uploadId}`, with a MIME allowlist and a size limit (20 MB images, 500 MB videos) |
+| `page.finalizeUpload` | mutation | `userApproved` | Validates the staged upload, re-encodes images to WebP, and moves it to `blocks/{pageId}/{uuid}` |
 | `settings.getAdminBranding` | query | `userManagerOrAdmin` | Read-only host policy `{ useClientLogo }` |
 | `settings.getClientLogo` | query | public | Presigned URL of processed client logo, or `{ exists: false, imageUrl: null }` |
 | `settings.getClientLogoUpload` | mutation | `userAdmin` | Ten-minute presigned POST with scoped key, SVG/PNG/WebP MIME type and 5 MB limit |

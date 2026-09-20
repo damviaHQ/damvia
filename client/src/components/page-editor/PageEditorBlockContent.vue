@@ -30,7 +30,7 @@ import RichTextEditor from "./RichTextEditor.vue"
 // reader sees; only the controls around it differ.
 const props = defineProps<{
   block: EditorBlock
-  pageId: string
+  resolvePageId: () => Promise<string>
   assets?: PageAssets
   collection?: Collection
   generateRoute: (collection: Collection) => RouteLocationRaw
@@ -178,7 +178,7 @@ function nudge(event: KeyboardEvent) {
       <PageBlockView :block="block" :assets="assets" :collection="collection" :generate-route="generateRoute" editing />
     </div>
 
-    <MediaPickerDialog v-if="['image', 'video', 'hero'].includes(block.type)" v-model="isPickerOpen" :page-id="pageId"
+    <MediaPickerDialog v-if="['image', 'video', 'hero'].includes(block.type)" v-model="isPickerOpen" :resolve-page-id="resolvePageId"
       :kind="mediaKind" @select="onSelect" />
   </div>
 </template>

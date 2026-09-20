@@ -66,7 +66,7 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 				productAttributes: opts.productAttributes,
 			})))
 			: undefined,
-		page: collection.page ? await formatPage(collection.page) : null,
+		page: collection.page ? await formatPage(collection.page, opts.user) : null,
 		parentId: collection.parentId,
 		parent: collection.parent && shouldDisplayParent
 			? await formatCollection({ collection: collection.parent, ...opts })
@@ -213,6 +213,8 @@ export default router({
 			exactMatch: z.boolean().optional().nullable(),
 			attributes: z.record(z.string(), z.string().array().nullable()).nullable().optional(),
 			sort: z.enum(['relevance', 'name', 'newest']).optional().nullable(),
+			// Picking an image inside the page editor is not a library search.
+			silent: z.boolean().optional(),
 		}))
 		.query(async ({ input, ctx }) => {
 			const context = await loadSearchContext(input)
@@ -225,7 +227,7 @@ export default router({
 			])
 			const totalPages = Math.ceil(total / perPage)
 			const searchTerm = input.query?.trim().toLowerCase()
-			if (searchTerm && input.page === 1) {
+			if (searchTerm && input.page === 1 && !input.silent) {
 				await dataSource.query(`
 					INSERT INTO activity_events (user_id, type, collection_id, metadata)
 					SELECT $1, 'search', $2, $3::jsonb

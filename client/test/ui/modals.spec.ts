@@ -109,10 +109,11 @@ test('client dialogs and nested content have readable headings and contained lay
   await page.keyboard.press('Escape')
   editor = true
   await page.reload()
-  await page.getByRole('button', { name: 'Edit page', exact: true }).click()
-  await page.getByRole('button', { name: 'Add content block', exact: true }).click()
+  // The editor is reached from the collection itself, and its library is the
+  // screen's left sidebar rather than a dialog.
+  await page.getByRole('link', { name: 'Edit page', exact: true }).click()
   await capture('editor')
-  for (const block of ['Collections', 'Files', 'Last Files', 'Text', 'Image', 'Video']) {
+  for (const block of ['Collections', 'Files', 'Latest files', 'Text', 'Picture', 'Video']) {
     await page.getByRole('button', { name: new RegExp(`^${block} `) }).click()
     await capture(`editor-${block.toLowerCase().replace(' ', '-')}`)
   }

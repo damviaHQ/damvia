@@ -12,8 +12,9 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import type { EditorBlock } from "@/components/page-renderer/types"
 import { Clock, Files, FileText, Image, LayoutGrid, LayoutPanelTop, Video } from "@lucide/vue"
-import type { BlockType } from "server/src/page-blocks/schema"
+import { emptyBlockData, type BlockType } from "server/src/page-blocks/schema"
 
 export type LibraryItem = {
   type: BlockType
@@ -35,4 +36,13 @@ export const BLOCK_LIBRARY: LibraryItem[] = [
 
 export function libraryItem(type: BlockType) {
   return BLOCK_LIBRARY.find((item) => item.type === type)
+}
+
+// What a collection looks like before anyone arranges it: the editor opens on
+// these, so the author starts from the layout readers already see.
+export function defaultCollectionBlocks(): EditorBlock[] {
+  return [
+    { type: "collections", size: "full", data: emptyBlockData("collections") },
+    { type: "files", size: "full", data: emptyBlockData("files") },
+  ]
 }

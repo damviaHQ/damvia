@@ -33,7 +33,9 @@ const { status, data, error } = useQuery({
     : trpc.page.findById.query(id.value),
 })
 
-const page = computed(() => (isCollectionPage.value ? (data.value as any)?.page : data.value))
+// A collection whose layout has never been arranged has no page yet; the
+// editor opens on a draft of the default one and creates it when saved.
+const page = computed(() => (isCollectionPage.value ? (data.value as any)?.page : data.value) ?? undefined)
 const collection = computed(() => (isCollectionPage.value ? (data.value as any) : undefined))
 const title = computed(() => (isCollectionPage.value ? `${collection.value?.name} collection` : `"${page.value?.name}"`))
 const exitTo = computed(() => isCollectionPage.value
@@ -44,8 +46,5 @@ const exitTo = computed(() => isCollectionPage.value
 <template>
   <div v-if="status === 'pending'" class="p-8"><Loader :text="true" /></div>
   <div v-else-if="status === 'error'" class="p-8" role="alert">{{ error?.message }}</div>
-  <div v-else-if="!page" class="p-8">
-    <p class="text-sm text-neutral-600">This collection has no page to edit yet.</p>
-  </div>
   <PageEditor v-else :page="page" :collection="collection" :title="title" :exit-to="exitTo" />
 </template>

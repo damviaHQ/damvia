@@ -24,6 +24,7 @@ defineProps<{ data: { html?: string }; editing?: boolean }>()
 </template>
 
 <style scoped>
+.page-text :deep(h1) { font-size: 2rem; font-weight: 600; padding-bottom: .5rem; }
 .page-text :deep(h2) { font-size: 1.5rem; font-weight: 600; padding-bottom: .5rem; }
 .page-text :deep(h3) { font-size: 1.25rem; font-weight: 600; padding-bottom: .5rem; }
 .page-text :deep(h4) { font-size: 1.125rem; font-weight: 600; padding-bottom: .5rem; }
@@ -31,6 +32,7 @@ defineProps<{ data: { html?: string }; editing?: boolean }>()
 .page-text :deep(ul) { list-style: disc; padding-left: 1.5rem; padding-bottom: .5rem; }
 .page-text :deep(ol) { list-style: decimal; padding-left: 1.5rem; padding-bottom: .5rem; }
 .page-text :deep(blockquote) { border-left: 4px solid var(--dv-color-line, #e2e8f0); padding: .25rem 0 .25rem 1rem; }
-.page-text :deep(a) { color: #2563eb; text-decoration: underline; }
+.page-text :deep(a) { color: inherit; font-weight: 500; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-decoration-thickness: 1px; text-underline-offset: .2em; transition: text-decoration-color .15s; }
+.page-text :deep(a:hover) { text-decoration-color: currentColor; }
 .page-text :deep(hr) { border: 0; border-top: 1px solid var(--dv-color-line, #e2e8f0); margin: 1rem 0; }
 </style>

@@ -30,12 +30,15 @@ import isEqual from "lodash/isEqual"
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { onBeforeRouteLeave, useRouter } from "vue-router"
 import draggable from "vuedraggable"
+import { defaultCollectionBlocks } from "./blockLibrary"
 import PageEditorBlockContent from "./PageEditorBlockContent.vue"
 import PageEditorBlockFrame from "./PageEditorBlockFrame.vue"
 import PageEditorLibrary from "./PageEditorLibrary.vue"
 
 const props = defineProps<{
-  page: PageData
+  // A collection with no custom layout yet has no page: the editor opens on a
+  // draft of the default arrangement and the row is created on the first save.
+  page?: PageData
   collection?: Collection
   title: string
   exitTo: { name: string; params?: Record<string, string> }
@@ -46,15 +49,29 @@ const toast = useGlobalToast()
 const queryClient = useQueryClient()
 
 // The editor owns the page while it is open; nothing is written until Save.
-const blocks = ref<EditorBlock[]>(toEditorBlocks(props.page))
-const assets = ref<PageAssets>(cloneDeep(props.page.assets) as PageAssets)
+const blocks = ref<EditorBlock[]>(initialBlocks())
+const assets = ref<PageAssets>(cloneDeep(props.page?.assets) as PageAssets)
 const saved = ref<EditorBlock[]>(cloneDeep(blocks.value))
+const pageId = ref<string | null>(props.page?.id ?? null)
 const isSaving = ref(false)
 const isLeaveDialogOpen = ref(false)
+const isResetDialogOpen = ref(false)
 const announcement = ref("")
 let confirmedLeave = false
+// A page this editor brought into being, and which no save has kept, is undone
+// when the author leaves.
+let createdHere = false
+const persisted = ref(!!props.page)
 
 const isDirty = computed(() => !isEqual(blocks.value, saved.value))
+const canReset = computed(() => !!props.collection && persisted.value)
+
+function initialBlocks(): EditorBlock[] {
+  if (props.page) {
+    return toEditorBlocks(props.page)
+  }
+  return props.collection ? defaultCollectionBlocks() : []
+}
 
 function toEditorBlocks(page: PageData): EditorBlock[] {
   return (page.blocks ?? []).map((block) => ({
@@ -65,10 +82,18 @@ function toEditorBlocks(page: PageData): EditorBlock[] {
   }))
 }
 
-watch(() => props.page.id, () => {
-  blocks.value = toEditorBlocks(props.page)
-  assets.value = cloneDeep(props.page.assets) as PageAssets
+watch(() => props.page?.id, (id) => {
+  // The page the editor just created comes back through the refetched
+  // collection; reloading from it would undo what the author is editing.
+  if (id === pageId.value) {
+    return
+  }
+  blocks.value = initialBlocks()
+  assets.value = cloneDeep(props.page?.assets) as PageAssets
   saved.value = cloneDeep(blocks.value)
+  pageId.value = props.page?.id ?? null
+  persisted.value = !!props.page
+  createdHere = false
 })
 
 function guardUnload(event: BeforeUnloadEvent) {
@@ -165,23 +190,40 @@ function onDrop(event: any) {
   }
 }
 
+// The page row is only brought into being when there is something to write to
+// it: a save, or a picture that needs somewhere to live.
+async function ensurePageId(): Promise<string> {
+  if (pageId.value) {
+    return pageId.value
+  }
+  if (!props.collection) {
+    throw new Error("This page cannot be created.")
+  }
+  const page = await trpc.page.createForCollection.mutate({ collectionId: props.collection.id })
+  pageId.value = page.id
+  createdHere = true
+  return page.id
+}
+
 async function save() {
   if (isSaving.value) {
     return
   }
   isSaving.value = true
   try {
+    const id = await ensurePageId()
     const result = await trpc.page.save.mutate({
-      pageId: props.page.id,
+      pageId: id,
       blocks: blocks.value.map((block) => ({ id: block.id ?? null, type: block.type, size: block.size, data: block.data })),
     })
     blocks.value = toEditorBlocks(result as PageData)
     assets.value = mergeAssets(result.assets as PageAssets, assets.value)
     saved.value = cloneDeep(blocks.value)
+    persisted.value = true
     if (props.collection) {
       await queryClient.invalidateQueries({ queryKey: ["collection", props.collection.id] })
     }
-    await queryClient.invalidateQueries({ queryKey: ["pages", props.page.id] })
+    await queryClient.invalidateQueries({ queryKey: ["pages", id] })
     toast.success("Page saved")
   } catch (error) {
     toast.error(extractErrors(error as Error).message)
@@ -194,14 +236,60 @@ function discard() {
   blocks.value = cloneDeep(saved.value)
 }
 
-function exit() {
+// Nothing kept means nothing left behind: the page created for an upload goes
+// away again, and its objects with it.
+async function dropUnsavedPage() {
+  if (!createdHere || persisted.value || !pageId.value) {
+    return
+  }
+  try {
+    await trpc.page.remove.mutate({ pageId: pageId.value })
+    pageId.value = null
+    createdHere = false
+    if (props.collection) {
+      await queryClient.invalidateQueries({ queryKey: ["collection", props.collection.id] })
+    }
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
+  }
+}
+
+async function exit() {
+  // With unsaved changes the route guard asks first; the page is only dropped
+  // once the author confirms they are leaving them behind.
+  if (!isDirty.value) {
+    await dropUnsavedPage()
+  }
   router.push(props.exitTo)
 }
 
-function leaveWithoutSaving() {
+async function leaveWithoutSaving() {
   confirmedLeave = true
   isLeaveDialogOpen.value = false
+  await dropUnsavedPage()
   router.push(props.exitTo)
+}
+
+async function resetToDefaultLayout() {
+  isResetDialogOpen.value = false
+  if (!pageId.value) {
+    return
+  }
+  try {
+    await trpc.page.remove.mutate({ pageId: pageId.value })
+    persisted.value = false
+    createdHere = false
+    pageId.value = null
+    saved.value = cloneDeep(blocks.value)
+    confirmedLeave = true
+    if (props.collection) {
+      await queryClient.invalidateQueries({ queryKey: ["collection", props.collection.id] })
+    }
+    toast.success("Collection is back to its default layout")
+    router.push(props.exitTo)
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
+  }
 }
 </script>
 
@@ -216,6 +304,7 @@ function leaveWithoutSaving() {
       </span>
       <span v-else class="flex items-center gap-1 text-xs text-neutral-500"><Check class="size-3.5" />Saved</span>
       <div class="ml-auto flex items-center gap-2">
+        <Button v-if="canReset" type="button" variant="ghost" @click="isResetDialogOpen = true">Reset to default layout</Button>
         <Button type="button" variant="outline" :disabled="!isDirty || isSaving" @click="discard">Discard</Button>
         <Button type="button" :disabled="!isDirty || isSaving" @click="save">{{ isSaving ? "Saving…" : "Save" }}</Button>
         <Button type="button" variant="ghost" @click="exit"><ChevronLeft class="size-4" />Exit</Button>
@@ -235,7 +324,7 @@ function leaveWithoutSaving() {
                 <PageEditorBlockFrame :block="element" :index="index" :count="blocks.length"
                   @update="updateData(index, $event)" @resize="resize(index, $event)" @move="move(index, $event)"
                   @duplicate="duplicate(index)" @remove="remove(index)">
-                  <PageEditorBlockContent :block="element" :page-id="page.id" :assets="assets" :collection="collection"
+                  <PageEditorBlockContent :block="element" :resolve-page-id="ensurePageId" :assets="assets" :collection="collection"
                     :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })"
                     @update="updateData(index, $event)" @preview="rememberPreview" />
                 </PageEditorBlockFrame>
@@ -258,6 +347,21 @@ function leaveWithoutSaving() {
         <AlertDialogFooter>
           <AlertDialogCancel>Keep editing</AlertDialogCancel>
           <AlertDialogAction @click="leaveWithoutSaving">Leave without saving</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog v-model:open="isResetDialogOpen">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Reset to the default layout?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This page and the pictures uploaded to it are deleted, and the collection lists its sub-collections and files again.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep this layout</AlertDialogCancel>
+          <AlertDialogAction @click="resetToDefaultLayout">Reset to default layout</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

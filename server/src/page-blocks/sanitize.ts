@@ -16,7 +16,7 @@ import sanitizeHtml from "sanitize-html"
 
 // The editor produces exactly these nodes. Styles and classes are dropped on
 // purpose: page authors choose content, the theme chooses how it looks.
-export const ALLOWED_TAGS = ['p', 'br', 'h2', 'h3', 'h4', 'strong', 'em', 'u', 's', 'a', 'ul', 'ol', 'li', 'blockquote', 'hr']
+export const ALLOWED_TAGS = ['p', 'br', 'h1', 'h2', 'h3', 'h4', 'strong', 'em', 'u', 's', 'a', 'ul', 'ol', 'li', 'blockquote', 'hr']
 
 export function sanitizeBlockHtml(html: string): string {
 	return sanitizeHtml(html ?? '', {

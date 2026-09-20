@@ -137,28 +137,6 @@ async function onSubmit() {
   }
 }
 
-async function setupCustomLayout() {
-  if (!props.collection.page) {
-    await trpc.page.createForCollection.mutate({
-      collectionId: props.collection.id,
-    })
-    queryClient.invalidateQueries({ queryKey: ["collection"] })
-
-    emit("updated", { ...props.collection, page: { id: "temp" } } as any)
-    toast.success("Page created, you can now edit your collection layout")
-  }
-}
-
-async function clearCustomLayout() {
-  if (props.collection.page) {
-    await trpc.page.remove.mutate({
-      pageId: props.collection.page.id,
-    })
-    queryClient.invalidateQueries({ queryKey: ["collection"] })
-    emit("updated", { ...props.collection, page: null } as any)
-    toast.success("Page removed, collection is back to default layout")
-  }
-}
 </script>
 
 <template>
@@ -212,12 +190,6 @@ async function clearCustomLayout() {
               <Button v-if="form.thumbnailURL" type="button" variant="ghost" size="sm" @click="form.thumbnailURL = null"><ImageMinus class="size-5" />Remove image</Button>
             </div>
           </div>
-        </FieldGroup>
-        <FieldGroup class="justify-items-start">
-          <Label>Layout</Label>
-          <FieldDescription>Use a custom layout to arrange images and text.</FieldDescription>
-          <Button v-if="collection.page" type="button" variant="outline" size="sm" @click="clearCustomLayout">Use default layout</Button>
-          <Button v-else type="button" variant="outline" size="sm" @click="setupCustomLayout">Use custom layout</Button>
         </FieldGroup>
       </section>
 

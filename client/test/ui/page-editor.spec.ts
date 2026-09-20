@@ -16,16 +16,28 @@ const collection = {
   page: { id: 'page-1', name: null, blocks: [textBlock, imageBlock, listBlock, heroBlock], assets: emptyAssets },
 }
 
-async function fixture(page: Page) {
+// A collection whose layout has never been arranged has no page of its own.
+async function fixture(page: Page, { withPage = true } = {}) {
   const saves: any[] = []
+  const creates: any[] = []
+  const removes: any[] = []
   const errors: string[] = []
+  const subject = withPage ? collection : { ...collection, page: null }
   page.on('pageerror', error => errors.push(error.message))
   await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
   await page.route('**/trpc/**', async route => {
     const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
     let data: unknown = responses[name] ?? []
-    if (name === 'collection.findById') data = collection
-    if (name === 'collection.tree') data = [collection]
+    if (name === 'collection.findById') data = subject
+    if (name === 'collection.tree') data = [subject]
+    if (name === 'page.createForCollection') {
+      creates.push(route.request().postDataJSON())
+      data = { id: 'page-1', name: null, blocks: [], assets: emptyAssets }
+    }
+    if (name === 'page.remove') {
+      removes.push(route.request().postDataJSON())
+      data = { id: 'page-1', name: null, blocks: [], assets: emptyAssets }
+    }
     if (name === 'collection.search') data = { total: 1, page: 1, totalPages: 1, previousPage: null, nextPage: null, facets: {}, results: [libraryFile] }
     if (name === 'page.save') {
       const body = route.request().postDataJSON()
@@ -37,7 +49,7 @@ async function fixture(page: Page) {
     }
     await route.fulfill({ json: { result: { data } } })
   })
-  return { saves, errors }
+  return { saves, creates, removes, errors }
 }
 
 test('the page editor is a screen of its own, with the block library in place of the menu', async ({ page }) => {
@@ -78,6 +90,50 @@ test('a block is added, resized and saved, and only then does the page stop bein
   expect(saves[0].blocks.map((block: any) => [block.type, block.size])).toEqual([
     ['text', 'full'], ['image', 'half'], ['collections', 'full'], ['hero', 'full'], ['hero', 'half'],
   ])
+  expect(errors).toEqual([])
+})
+
+test('a collection with no layout of its own opens on the default one, and is only created when saved', async ({ page }) => {
+  const { saves, creates, errors } = await fixture(page, { withPage: false })
+  await page.goto('/collections/campaign/edit')
+
+  // What readers already get: the sub-collections, then the files.
+  await expect(page.locator('[data-block-index="0"]')).toContainText('Collections')
+  await expect(page.locator('[data-block-index="1"]')).toContainText('Files')
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+  expect(creates).toEqual([])
+
+  await page.getByRole('button', { name: 'Text Titles and paragraphs' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+  await expect(page.getByText('Unsaved changes')).toHaveCount(0)
+  expect(creates).toHaveLength(1)
+  expect(saves[0].blocks.map((block: any) => block.type)).toEqual(['collections', 'files', 'text'])
+  expect(errors).toEqual([])
+})
+
+test('leaving a collection that never had a layout writes nothing', async ({ page }) => {
+  const { saves, creates, errors } = await fixture(page, { withPage: false })
+  await page.goto('/collections/campaign/edit')
+
+  await page.getByRole('button', { name: 'Exit' }).click()
+  await expect(page).toHaveURL(/\/collections\/campaign$/)
+  expect(creates).toEqual([])
+  expect(saves).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('a page can be reset to the default layout from the editor', async ({ page }) => {
+  const { removes, errors } = await fixture(page)
+  await page.goto('/collections/campaign/edit')
+
+  await page.locator('header').getByRole('button', { name: 'Reset to default layout' }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toContainText('Reset to the default layout?')
+  await dialog.getByRole('button', { name: 'Reset to default layout' }).click()
+
+  await expect(page).toHaveURL(/\/collections\/campaign$/)
+  expect(removes).toEqual([{ pageId: 'page-1' }])
   expect(errors).toEqual([])
 })
 
