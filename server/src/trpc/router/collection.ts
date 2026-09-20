@@ -438,11 +438,29 @@ export default router({
 				await duplicateFiles({ em, files: filesToDuplicate, destination: collection })
 			})
 		}),
+	rename: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({ id: z.uuid(), name: z.string().trim().min(1).max(80) }))
+		.mutation(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			}
+			if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			}
+			if (collection.synchronized) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Rename synchronized collections in your cloud storage.' })
+			}
+			await dataSource.getRepository(Collection).update(collection.id, { name: input.name })
+			collection.name = input.name
+			return formatCollection({ collection, user: ctx.user })
+		}),
 	update: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(
 			z.object({
-				id: z.string().uuid(),
+				id: z.uuid(),
 				name: z.string().min(1).max(80),
 				description: z.string().max(255).optional().nullable(),
 				public: z.boolean().optional(),

@@ -13,25 +13,28 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import CollectionDialogDelete from "@/components/collection/CollectionDialogDelete.vue"
 import CollectionDialogEdit from "@/components/collection/CollectionDialogEdit.vue"
+import CollectionDialogRename from "@/components/collection/CollectionDialogRename.vue"
 import CollectionDialogShare from "@/components/collection/CollectionDialogShare.vue"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useCollectionFavorites } from "@/composables/useCollectionFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Ellipsis, FolderOpen, Link, Settings, Star } from "@lucide/vue"
+import { Ellipsis, Link, Settings, Pencil, Trash } from "@lucide/vue"
 import { computed, ref } from "vue"
-import { useRouter } from "vue-router"
 
-defineEmits<{ "update:open": [boolean] }>()
+const emit = defineEmits<{ "update:open": [boolean] }>()
 const props = defineProps<{ collection: RouterOutput["collection"]["findById"] }>()
-const router = useRouter()
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
-const { canFavorite, isFavorite, toggle, isSaving, isSuccess } = useCollectionFavorites()
+const canRename = computed(() => props.collection.canEdit && !props.collection.synchronized)
+const menuOpen = ref(false)
+const dismissedByOutsidePointer = ref(false)
+const deleteModalOpen = ref(false)
+const renameModalOpen = ref(false)
 const editModalOpen = ref(false)
 const shareModalOpen = ref(false)
 const isLoadingAction = ref(false)
@@ -39,8 +42,25 @@ const queryKey = computed(() => ["collection", props.collection.id])
 const { data: details } = useQuery({
   queryKey,
   queryFn: () => trpc.collection.findById.query(props.collection.id),
-  enabled: computed(() => editModalOpen.value || shareModalOpen.value),
+  enabled: computed(() => editModalOpen.value || shareModalOpen.value || (menuOpen.value && !!props.collection.parentId && !props.collection.parent)),
 })
+
+const canDelete = computed(() => {
+  const collection = details.value ?? props.collection
+  return collection.canEdit && (!collection.parentId || (!!collection.parent && !collection.parent.synchronized))
+})
+
+function updateMenuOpen(open: boolean) {
+  if (open) dismissedByOutsidePointer.value = false
+  menuOpen.value = open
+  emit('update:open', open)
+}
+
+function handleCloseAutoFocus(event: Event) {
+  // An outside click should not refocus the card and keep its hover actions visible.
+  // Leave the default focus return in place for keyboard dismissal.
+  if (dismissedByOutsidePointer.value) event.preventDefault()
+}
 
 async function openDialog(action: 'edit' | 'share') {
   isLoadingAction.value = true
@@ -57,17 +77,14 @@ async function openDialog(action: 'edit' | 'share') {
 </script>
 
 <template>
-  <DropdownMenu @update:open="$emit('update:open', $event)">
+  <DropdownMenu v-if="collection.canEdit" @update:open="updateMenuOpen">
     <DropdownMenuTrigger :disabled="isLoadingAction" class="flex size-6 shrink-0 items-center justify-center text-neutral-600 cursor-pointer bg-transparent border-none hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-600" :aria-label="`Actions for ${collection.name}`">
       <Ellipsis aria-hidden="true" class="size-6" />
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" side="bottom" :side-offset="4" :collision-padding="12" class="min-w-52">
-      <DropdownMenuItem class="gap-2" @select="router.push({ name: 'collection', params: { id: collection.id } })">
-        <FolderOpen aria-hidden="true" class="size-4 shrink-0" /> Open collection
-      </DropdownMenuItem>
-      <DropdownMenuItem v-if="canFavorite" class="gap-2" :disabled="isSaving || !isSuccess" @select="toggle(collection.id)">
-        <Star aria-hidden="true" class="size-4 shrink-0" :class="isFavorite(collection.id) && 'fill-current'" />
-        {{ isFavorite(collection.id) ? 'Remove from favorites' : 'Add to favorites' }}
+    <DropdownMenuContent align="end" side="bottom" :side-offset="4" :collision-padding="12" class="min-w-52"
+      @pointer-down-outside="dismissedByOutsidePointer = true" @close-auto-focus="handleCloseAutoFocus">
+      <DropdownMenuItem v-if="canRename" class="gap-2" @select="renameModalOpen = true">
+        <Pencil aria-hidden="true" class="size-4 shrink-0" /> Rename collection
       </DropdownMenuItem>
       <DropdownMenuItem v-if="collection.canEdit" class="gap-2" @select="openDialog('share')">
         <Link aria-hidden="true" class="size-4 shrink-0" /> Share collection
@@ -75,8 +92,14 @@ async function openDialog(action: 'edit' | 'share') {
       <DropdownMenuItem v-if="collection.canEdit" class="gap-2" @select="openDialog('edit')">
         <Settings aria-hidden="true" class="size-4 shrink-0" /> Edit collection
       </DropdownMenuItem>
+      <DropdownMenuSeparator v-if="canDelete" />
+      <DropdownMenuItem v-if="canDelete" class="gap-2 text-destructive data-[highlighted]:text-destructive" @select="deleteModalOpen = true">
+        <Trash aria-hidden="true" class="size-4 shrink-0" /> Delete collection
+      </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
+  <CollectionDialogDelete v-if="canDelete && deleteModalOpen" v-model="deleteModalOpen" :collection="details ?? collection" />
+  <CollectionDialogRename v-if="canRename && renameModalOpen" v-model="renameModalOpen" :collection="collection" />
   <CollectionDialogEdit v-if="details && collection.canEdit && editModalOpen" v-model="editModalOpen" :collection="details" />
   <CollectionDialogShare v-if="details && collection.canEdit && shareModalOpen" v-model="shareModalOpen" :collection="details" />
 </template>
