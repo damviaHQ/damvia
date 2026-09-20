@@ -35,9 +35,9 @@ describe('PageRenderer', () => {
 
     const blocks = wrapper.findAll('.block')
     expect(blocks.map((block) => block.text())).toEqual(['hero', 'image', 'text', 'files'])
-    expect(wrapper.html()).toContain('md:col-span-6')
-    expect(wrapper.html()).toContain('md:col-span-3')
-    expect(wrapper.html()).toContain('md:col-span-2')
+    expect(wrapper.html()).toContain('col-span-6')
+    expect(wrapper.html()).toContain('col-span-3')
+    expect(wrapper.html()).toContain('col-span-2')
   })
 
   // A block that shows nothing used to vanish from the grid, so everything
@@ -56,7 +56,7 @@ describe('PageRenderer', () => {
 
     const cells = Array.from(wrapper.find('.page-renderer').element.children)
     expect(cells).toHaveLength(3)
-    expect(cells.map((cell) => cell.className)).toEqual(['md:col-span-3', 'md:col-span-3', 'md:col-span-6'])
+    expect(cells.map((cell) => cell.className)).toEqual(['col-span-3', 'col-span-3', 'col-span-6'])
     expect(cells[1].textContent).toBe('')
     expect(cells[2].textContent).toContain('Below')
   })

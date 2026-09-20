@@ -15,13 +15,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { RouteLocationRaw } from "vue-router"
 import PageBlockView from "./PageBlockView.vue"
-import { PAGE_WIDTH, spanClass } from "./layout"
+import { spanClass } from "./layout"
 import type { Collection, EditorBlock, PageAssets } from "./types"
 
 // The one grid on the page: viewers and the editor render blocks identically,
 // so what an author arranges is exactly what a reader gets. Every block keeps
 // its own cell, including one with nothing to show, or the blocks after it
 // would move up and the reader would see a different layout from the author.
+// The page takes whatever width it is given: a library needs the room.
 defineProps<{
   blocks: EditorBlock[]
   assets?: PageAssets
@@ -31,7 +32,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="page-renderer grid grid-cols-1 gap-4 md:grid-cols-6 md:items-start" :class="PAGE_WIDTH">
+  <div class="page-renderer grid grid-cols-6 items-start gap-4">
     <div v-for="(block, index) in blocks" :key="block.id ?? index" :class="spanClass(block.size)">
       <PageBlockView :block="block" :assets="assets" :collection="collection" :generate-route="generateRoute" />
     </div>

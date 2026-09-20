@@ -16,12 +16,14 @@ import { describe, expect, test } from 'vitest'
 import { columnsLeftBefore, fitToLine, insertAt, moveItem, spanClass } from '@/components/page-renderer/layout'
 
 describe('page layout', () => {
-  test('a block spans the grid according to its size', () => {
-    expect(spanClass('full')).toBe('md:col-span-6')
-    expect(spanClass('half')).toBe('md:col-span-3')
-    expect(spanClass('third')).toBe('md:col-span-2')
+  // No breakpoint: blocks an author put side by side stay side by side, and
+  // the content inside each block wraps to the block instead.
+  test('a block spans the grid according to its size, at every width', () => {
+    expect(spanClass('full')).toBe('col-span-6')
+    expect(spanClass('half')).toBe('col-span-3')
+    expect(spanClass('third')).toBe('col-span-2')
     // A row of six columns is what makes halves and thirds share a line.
-    expect(spanClass('nonsense' as any)).toBe('md:col-span-6')
+    expect(spanClass('nonsense' as any)).toBe('col-span-6')
   })
 
   test('moving a block keeps every other block in order', () => {

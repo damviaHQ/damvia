@@ -16,10 +16,13 @@ import type { BlockSize } from "server/src/page-blocks/schema"
 
 // Blocks are an ordered list, not a grid: each one takes the full width, a half
 // or a third of a six column grid, and the browser packs them into lines.
+// The proportions hold at every width. Blocks an author put side by side stay
+// side by side, and it is the content inside each block that reflows, wrapping
+// to the width of the block rather than to the width of the window.
 const SPANS: Record<BlockSize, string> = {
-  full: "md:col-span-6",
-  half: "md:col-span-3",
-  third: "md:col-span-2",
+  full: "col-span-6",
+  half: "col-span-3",
+  third: "col-span-2",
 }
 
 export const SIZE_LABELS: Record<BlockSize, string> = {
@@ -31,11 +34,6 @@ export const SIZE_LABELS: Record<BlockSize, string> = {
 export function spanClass(size: BlockSize): string {
   return SPANS[size] ?? SPANS.full
 }
-
-// A page is the same width wherever it is shown. Without this the editor and
-// the reader wrapped at different points, so what an author arranged was not
-// what a reader saw. It also keeps lines readable on a very wide screen.
-export const PAGE_WIDTH = "mx-auto w-full max-w-5xl"
 
 export const COLUMNS = 6
 const SPAN_UNITS: Record<BlockSize, number> = { full: 6, half: 3, third: 2 }

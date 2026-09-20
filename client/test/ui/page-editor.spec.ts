@@ -236,29 +236,53 @@ test('the live page keeps the layout the author arranged, empty blocks included'
   await page.goto('/collections/campaign')
   const live = page.locator('.page-renderer > div')
   await expect(live).toHaveCount(arranged)
-  await expect(live.nth(0)).toHaveClass(/md:col-span-6/)
-  await expect(live.nth(1)).toHaveClass(/md:col-span-3/)
+  await expect(live.nth(0)).toHaveClass(/col-span-6/)
+  await expect(live.nth(1)).toHaveClass(/col-span-3/)
   expect(errors).toEqual([])
 })
 
-// The editor used to clamp the page while the live view filled the whole
-// window, so blocks wrapped at different points and the arrangement an author
-// made was not the one a reader got.
-test('a page is the same width whether it is being edited or read', async ({ page }) => {
+// A library needs its width, so the page takes whatever room it is given.
+// What must not change is the arrangement: blocks placed side by side stay
+// side by side however narrow the window gets, and their content reflows.
+test('blocks placed side by side stay side by side at any width', async ({ page }) => {
   const { errors } = await fixture(page)
-
-  await page.goto('/collections/campaign/edit')
-  await expect(page.getByRole('heading', { name: /Editing/ })).toBeVisible()
-  const edited = await page.locator('[data-block-index="0"]').evaluate(
-    (element) => (element.parentElement!.parentElement as HTMLElement).getBoundingClientRect().width
-  )
-
+  const sideBySide = [
+    heroBlock,
+    { ...imageBlock, position: 1, size: 'half' },
+    { ...listBlock, id: 'block-list-2', position: 2, size: 'half' },
+  ]
+  await page.route('**/trpc/collection.findById*', async route => {
+    await route.fulfill({ json: { result: { data: { ...collection, page: { ...collection.page, blocks: sideBySide } } } } })
+  })
   await page.goto('/collections/campaign')
+
+  const cells = page.locator('.page-renderer > div')
+  await expect(cells).toHaveCount(3)
+  for (const width of [1400, 1000, 700]) {
+    await page.setViewportSize({ width, height: 900 })
+    const boxes = await cells.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const box = (node as HTMLElement).getBoundingClientRect()
+        return { top: Math.round(box.top), width: Math.round(box.width) }
+      })
+    )
+    // The picture and the collections block are both half width: same line,
+    // and each one is about half of the full-width banner above them.
+    expect(boxes[1].top).toBe(boxes[2].top)
+    expect(boxes[1].width).toBeCloseTo(boxes[2].width, -1)
+    expect(boxes[1].width).toBeLessThan(boxes[0].width * 0.55)
+  }
+  expect(errors).toEqual([])
+})
+
+test('a page uses the room it is given rather than a fixed width', async ({ page }) => {
+  const { errors } = await fixture(page)
+  await page.setViewportSize({ width: 1800, height: 900 })
+  await page.goto('/collections/campaign')
+
   const read = await page.locator('.page-renderer').evaluate(
     (element) => (element as HTMLElement).getBoundingClientRect().width
   )
-
-  expect(edited).toBe(read)
-  expect(read).toBeLessThanOrEqual(1024)
+  expect(read).toBeGreaterThan(1200)
   expect(errors).toEqual([])
 })

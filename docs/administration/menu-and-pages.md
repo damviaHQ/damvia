@@ -44,7 +44,9 @@ A row of `pages` has a `name` and an optional `collection_id`. A unique partial 
 
 Blocks are an ordered list, not a grid. Each one is `full`, `half` or `third` of the page width, and the browser packs consecutive narrow blocks onto the same line: two `half` blocks sit side by side, three `third` blocks make a row of three, and a `full` block always starts a new line. Authors choose nothing else about layout; there is no padding, margin, colour or font setting anywhere in the editor.
 
-A page is the same width wherever it is shown, in the editor and on the live page alike, and is centred once the window is wider than that. Blocks therefore wrap at the same point for the author and for the reader. Every block keeps its own cell even when it has nothing to show, so a picture that has not been chosen yet, or a listing that is still empty, does not pull the blocks after it out of place. An empty text block keeps the room it took in the editor, which is what makes it usable as deliberate space between two sections.
+A page takes all the width it is given, in the editor and on the live page alike, because a library needs the room to show its pictures. The proportions hold at every width: blocks an author placed side by side stay side by side, and never drop onto a line of their own on a narrower window. What reflows is the content inside each block, since a collection or file listing wraps to the width of its block rather than to the width of the window.
+
+Every block keeps its own cell even when it has nothing to show, so a picture that has not been chosen yet, or a listing that is still empty, does not pull the blocks after it out of place. An empty text block keeps the room it took in the editor, which is what makes it usable as deliberate space between two sections.
 
 | Block type | Editor name | What it shows |
 | --- | --- | --- |
