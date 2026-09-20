@@ -3,7 +3,7 @@ title: Assets tree
 description: Browse the folder tree synced from cloud storage, tag folders with types and licenses, and understand file statuses and thumbnails.
 sidebar:
   order: 7
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 The assets tree is the mirror of the cloud folder Damvia synchronizes from Dropbox or OneDrive. Administrators do not upload files here; they browse what the sync brought in and decide, per folder, which asset type and license apply. Everything else on this page happens in background jobs.
@@ -63,7 +63,7 @@ Storage settings are covered in [Object storage](../integrations/object-storage.
 
 | Family | Extensions | Tool |
 | --- | --- | --- |
-| Images | `jpg`, `jpeg`, `png`, `gif`, `bmp`, `webp`, `tiff`, `tif`, `svg`, `psd` | `sharp`, with ImageMagick `convert` for the cases sharp cannot read |
+| Images | `jpg`, `jpeg`, `png`, `gif`, `bmp`, `webp`, `tiff`, `tif`, `svg`, `psd`, `heic`, `heif` | `sharp`, with ImageMagick `convert` for the cases sharp cannot read. HEIC and HEIF always go through ImageMagick, because the `sharp` build ships libheif without an HEVC decoder and can open the container but not the pixels |
 | Vector and PDF | `pdf`, `eps`, `ai` | Ghostscript renders the first page to PNG |
 | Office and text | `doc`, `docx`, `xls`, `xlsx`, `ppt`, `pptx`, `odt`, `ods`, `odp`, `rtf`, `pps`, `ppsx`, `potx`, `pot`, `html`, `htm`, `xml`, `json`, `md`, `yaml`, `yml`, `txt`, `css`, `js`, `ts`, `csv` | `soffice --headless --convert-to pdf`, then Ghostscript |
 | Video | `mp4`, `mov`, `avi`, `mkv`, `wmv`, `flv`, `webm`, `m4v` | ffmpeg extracts a frame |

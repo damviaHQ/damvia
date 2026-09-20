@@ -33,7 +33,7 @@ import * as libre from 'libreoffice-convert'
 export const LIBREOFFICE_EXTENSIONS = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'pps', 'ppsx', 'potx', 'pot', 'html', 'htm', 'xml', 'json', 'md', 'yaml', 'yml', 'txt', 'css', 'js', 'ts', 'csv'];
 export const GHOSTSCRIPT_EXTENSIONS = ['pdf', 'eps', 'ai'];
 export const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv', 'wmv', 'flv', 'webm', 'm4v'];
-export const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif', 'svg', 'psd'];
+export const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'tiff', 'tif', 'svg', 'psd', 'heic', 'heif'];
 export const FONT_EXTENSIONS = ['ttf', 'otf'];
 
 export const LIBREOFFICE_MIMETYPES = [
@@ -88,7 +88,11 @@ export const IMAGE_MIMETYPES = [
     'image/vnd.adobe.photoshop',
     'application/photoshop',
     'application/psd',
-    'image/psd'
+    'image/psd',
+    'image/heic',
+    'image/heif',
+    'image/heic-sequence',
+    'image/heif-sequence'
 ];
 
 export const FONT_MIMETYPES = [
@@ -360,10 +364,34 @@ export async function processImageThumbnail(
         const thumbnailPath = await tmpFile();
         const fileSize = parseInt(file.size, 10);
         const extension = file.name.split('.').pop()?.toLowerCase();
-        const isPsd = extension === 'psd' || file.mimeType === 'image/vnd.adobe.photoshop' || 
-                     file.mimeType === 'application/photoshop' || file.mimeType === 'application/psd' || 
+        const isPsd = extension === 'psd' || file.mimeType === 'image/vnd.adobe.photoshop' ||
+                     file.mimeType === 'application/photoshop' || file.mimeType === 'application/psd' ||
                      file.mimeType === 'image/psd';
-        
+        const isHeic = extension === 'heic' || extension === 'heif' ||
+                      file.mimeType === 'image/heic' || file.mimeType === 'image/heif' ||
+                      file.mimeType === 'image/heic-sequence' || file.mimeType === 'image/heif-sequence';
+
+        // sharp ships libheif without an HEVC decoder, so it can read the container
+        // but not the pixels; ImageMagick handles these.
+        if (isHeic) {
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    const cmd = `convert "${contentPath}[0]" -auto-orient -resize 1920x1280 -quality 85 "${thumbnailPath}.webp"`;
+                    exec(cmd, (error) => {
+                        if (error) {
+                            reject(error);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+
+                return `${thumbnailPath}.webp`;
+            } catch (heicError) {
+                return null;
+            }
+        }
+
         if (isPsd) {
             try {
                 await new Promise<void>((resolve, reject) => {
