@@ -32,6 +32,10 @@ test('a collection row opens its page editor, and the collection itself in a new
   await expect(open).toHaveAttribute('href', '/collections/campaign')
   await expect(open).toHaveAttribute('target', '_blank')
 
+  // The collection's own settings are named for what they are, so neither
+  // button reads as "edit" while the other one edits the page.
+  await expect(row.getByRole('button', { name: 'Settings of Autumn essentials' })).toBeVisible()
+
   await row.getByRole('link', { name: 'Edit the page of Autumn essentials' }).click()
   await expect(page).toHaveURL(/\/collections\/campaign\/edit$/)
   await expect(page.getByRole('heading', { name: /Editing/ })).toBeVisible()

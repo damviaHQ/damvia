@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ChevronDown, ChevronRight, CirclePlus, ExternalLink, EyeOff, FilePenLine, Folder, Image, PencilLine, Trash2 } from "@lucide/vue"
+import { ChevronDown, ChevronRight, CirclePlus, ExternalLink, EyeOff, FilePenLine, Folder, Image, Settings, Trash2 } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 
 const { status, data: collections, error } = useQuery({
@@ -180,9 +180,11 @@ async function confirmDeleteCollection() {
               <FilePenLine class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Page
             </router-link>
           </Button>
-          <Button variant="link" @click="handleEditCollection(item)" :aria-label="`Edit ${item.name}`"
+          <!-- Name, thumbnail, groups: the collection's own settings, which
+               "Edit" made sound like editing the page next to it. -->
+          <Button variant="link" @click="handleEditCollection(item)" :aria-label="`Settings of ${item.name}`"
             class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
-            <PencilLine class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Edit
+            <Settings class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Settings
           </Button>
           <AlertDialog>
             <AlertDialogTrigger as-child>
