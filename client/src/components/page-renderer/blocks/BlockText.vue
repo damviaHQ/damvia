@@ -18,7 +18,9 @@ defineProps<{ data: { html?: string }; editing?: boolean }>()
 
 <template>
   <div v-if="data.html" class="page-text" v-html="data.html" />
-  <p v-else-if="editing" class="text-sm text-neutral-500 italic">Empty text block. Click to write something.</p>
+  <!-- Authors use an empty text block as deliberate space, so it keeps the
+       room it took in the editor rather than collapsing on the live page. -->
+  <div v-else class="min-h-8" aria-hidden="true" />
 </template>
 
 <style scoped>

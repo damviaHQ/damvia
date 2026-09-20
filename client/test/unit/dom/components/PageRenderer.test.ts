@@ -40,6 +40,27 @@ describe('PageRenderer', () => {
     expect(wrapper.html()).toContain('md:col-span-2')
   })
 
+  // A block that shows nothing used to vanish from the grid, so everything
+  // after it moved up and the live page did not match the editor.
+  test('a block with nothing to show still holds its place in the layout', () => {
+    const wrapper = mount(PageRenderer, {
+      props: {
+        blocks: [
+          { id: '1', type: 'text', size: 'half', data: { html: '<p>Left</p>' } },
+          { id: '2', type: 'text', size: 'half', data: { html: '' } },
+          { id: '3', type: 'text', size: 'full', data: { html: '<p>Below</p>' } },
+        ],
+        generateRoute: () => ({}),
+      },
+    })
+
+    const cells = Array.from(wrapper.find('.page-renderer').element.children)
+    expect(cells).toHaveLength(3)
+    expect(cells.map((cell) => cell.className)).toEqual(['md:col-span-3', 'md:col-span-3', 'md:col-span-6'])
+    expect(cells[1].textContent).toBe('')
+    expect(cells[2].textContent).toContain('Below')
+  })
+
   test('an empty page renders an empty grid rather than failing', () => {
     const wrapper = mount(PageRenderer, { props: { blocks: [], generateRoute: () => ({}) }, global: { stubs } })
     expect(wrapper.findAll('.block')).toHaveLength(0)

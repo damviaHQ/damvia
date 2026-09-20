@@ -32,6 +32,11 @@ export function spanClass(size: BlockSize): string {
   return SPANS[size] ?? SPANS.full
 }
 
+// A page is the same width wherever it is shown. Without this the editor and
+// the reader wrapped at different points, so what an author arranged was not
+// what a reader saw. It also keeps lines readable on a very wide screen.
+export const PAGE_WIDTH = "mx-auto w-full max-w-5xl"
+
 export const COLUMNS = 6
 const SPAN_UNITS: Record<BlockSize, number> = { full: 6, half: 3, third: 2 }
 

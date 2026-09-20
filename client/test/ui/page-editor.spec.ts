@@ -222,3 +222,43 @@ test('a picture is held to a chosen height instead of filling the page', async (
   await expect(picture).toHaveClass(/object-contain/)
   expect(errors).toEqual([])
 })
+
+test('the live page keeps the layout the author arranged, empty blocks included', async ({ page }) => {
+  const { errors } = await fixture(page)
+
+  await page.goto('/collections/campaign/edit')
+  await expect(page.getByRole('heading', { name: /Editing/ })).toBeVisible()
+  const arranged = await page.locator('[data-block-index]').count()
+  expect(arranged).toBe(4)
+
+  // The reader sees a cell for every block, in the same widths, even though
+  // the picture and the collections list have nothing to show yet.
+  await page.goto('/collections/campaign')
+  const live = page.locator('.page-renderer > div')
+  await expect(live).toHaveCount(arranged)
+  await expect(live.nth(0)).toHaveClass(/md:col-span-6/)
+  await expect(live.nth(1)).toHaveClass(/md:col-span-3/)
+  expect(errors).toEqual([])
+})
+
+// The editor used to clamp the page while the live view filled the whole
+// window, so blocks wrapped at different points and the arrangement an author
+// made was not the one a reader got.
+test('a page is the same width whether it is being edited or read', async ({ page }) => {
+  const { errors } = await fixture(page)
+
+  await page.goto('/collections/campaign/edit')
+  await expect(page.getByRole('heading', { name: /Editing/ })).toBeVisible()
+  const edited = await page.locator('[data-block-index="0"]').evaluate(
+    (element) => (element.parentElement!.parentElement as HTMLElement).getBoundingClientRect().width
+  )
+
+  await page.goto('/collections/campaign')
+  const read = await page.locator('.page-renderer').evaluate(
+    (element) => (element as HTMLElement).getBoundingClientRect().width
+  )
+
+  expect(edited).toBe(read)
+  expect(read).toBeLessThanOrEqual(1024)
+  expect(errors).toEqual([])
+})

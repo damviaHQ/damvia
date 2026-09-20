@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { fitToLine, moveItem, spanClass } from "@/components/page-renderer/layout"
+import { PAGE_WIDTH, fitToLine, moveItem, spanClass } from "@/components/page-renderer/layout"
 import type { Collection, EditorBlock, PageAssets, PageData } from "@/components/page-renderer/types"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -227,9 +227,9 @@ function leaveWithoutSaving() {
         <PageEditorLibrary @add="addBlock" />
       </aside>
       <main class="min-w-0 flex-1 overflow-y-auto p-4 md:p-8">
-        <div class="mx-auto max-w-5xl rounded-md bg-white p-4 md:p-6">
+        <div class="mx-auto w-full max-w-[calc(64rem+3rem)] rounded-md bg-white p-4 md:p-6">
           <draggable v-model="blocks" group="page-blocks" handle=".block-handle" item-key="id" :animation="150"
-            class="grid grid-cols-1 gap-4 md:grid-cols-6 md:items-start" @change="onDrop">
+            class="grid grid-cols-1 gap-4 md:grid-cols-6 md:items-start" :class="PAGE_WIDTH" @change="onDrop">
             <template #item="{ element, index }">
               <div :class="spanClass(element.size)">
                 <PageEditorBlockFrame :block="element" :index="index" :count="blocks.length"
