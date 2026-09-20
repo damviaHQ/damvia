@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
+import { DEFAULT_MASONRY_SIZE, MASONRY_SIZES } from "@/utils/displayPreferences"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 import { RotateCcw } from "@lucide/vue"
@@ -52,6 +54,9 @@ const collectionOptions = computed(() => {
   return collections.value ? format(collections.value) : []
 })
 
+const masonrySize = computed(() => props.data?.masonrySize ?? DEFAULT_MASONRY_SIZE)
+const masonrySizeLabel = computed(() => MASONRY_SIZES.find((size) => size.id === masonrySize.value)?.label ?? "")
+
 function patch(values: Record<string, unknown>) {
   emit("update", { ...props.data, ...values })
 }
@@ -73,8 +78,22 @@ function patch(values: Record<string, unknown>) {
           <SelectItem value="user_preferences">As the reader prefers</SelectItem>
           <SelectItem value="grid">Grid</SelectItem>
           <SelectItem value="list">List</SelectItem>
+          <!-- Collection cards are all the same shape, so only files tile. -->
+          <SelectItem v-if="type !== 'collections'" value="masonry">Masonry</SelectItem>
         </SelectContent>
       </Select>
+    </FieldGroup>
+    <FieldGroup v-if="data.layout === 'masonry'">
+      <div class="flex items-center justify-between gap-3">
+        <Label :id="`${fieldId}-masonry-size`">Picture size</Label>
+        <span class="text-xs text-neutral-500">{{ masonrySizeLabel }}</span>
+      </div>
+      <Slider :model-value="[masonrySize]" :min="1" :max="4" :step="1"
+        :thumb-labelledby="`${fieldId}-masonry-size`"
+        @update:model-value="patch({ masonrySize: $event?.[0] ?? DEFAULT_MASONRY_SIZE })" />
+      <p class="text-xs text-neutral-500">
+        Pictures keep their own proportions and fill the width. A layout chosen here is the one every reader sees.
+      </p>
     </FieldGroup>
     <FieldGroup v-if="type === 'collections'">
       <Label :id="`${fieldId}-selection`">Collections to show (optional)</Label>

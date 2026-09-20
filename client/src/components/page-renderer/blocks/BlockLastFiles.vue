@@ -27,7 +27,7 @@ const { data: lastFiles } = useQuery({
   queryKey: computed(() => ["collection", props.collection?.id, "last-files"]),
   queryFn: () => trpc.collection.lastAddedFiles.query({ collectionId: props.collection?.id ?? null }),
 })
-const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) ? props.data.layout : null))
+const forceView = computed(() => (["list", "grid", "masonry"].includes(props.data?.layout) ? props.data.layout : null))
 </script>
 
 <template>
@@ -36,6 +36,7 @@ const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) 
     <BlockPlaceholder v-if="editing && !lastFiles.length" :icon="Clock" title="Latest files"
       explanation="The most recently added files appear here, and the list keeps itself up to date."
       reason="Nothing has been added recently, so this block is empty for now." />
-    <CollectionRenderFiles v-else :files="lastFiles" :force-view="forceView" />
+    <CollectionRenderFiles v-else :files="lastFiles" :force-view="forceView"
+      :force-masonry-size="data.masonrySize ?? null" />
   </div>
 </template>

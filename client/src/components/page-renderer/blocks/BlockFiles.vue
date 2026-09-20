@@ -29,7 +29,7 @@ const { data: collection } = useQuery({
   queryFn: () => trpc.collection.findById.query(collectionId.value as string),
   enabled: computed(() => !!collectionId.value),
 })
-const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) ? props.data.layout : null))
+const forceView = computed(() => (["list", "grid", "masonry"].includes(props.data?.layout) ? props.data.layout : null))
 </script>
 
 <template>
@@ -40,6 +40,7 @@ const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) 
       :reason="data.collectionId
         ? 'The collection you chose holds no file yet.'
         : 'This block shows the files of this collection, and there are none yet. They appear as soon as files are added.'" />
-    <CollectionRenderFiles v-else :collection="collection" :force-view="forceView" />
+    <CollectionRenderFiles v-else :collection="collection" :force-view="forceView"
+      :force-masonry-size="data.masonrySize ?? null" />
   </div>
 </template>

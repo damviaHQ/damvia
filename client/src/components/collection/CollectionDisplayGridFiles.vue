@@ -39,6 +39,9 @@ const props = defineProps<{
   getPath?: (file: File) => string | undefined
   // A page block that fixes the grid layout overrules the reader's masonry.
   uniform?: boolean
+  // A page block can ask for masonry instead, at a size its author chose.
+  masonry?: boolean
+  masonrySize?: number | null
 }>()
 const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
@@ -57,11 +60,12 @@ const removable = computed(
 const files = computed(() => props.files ?? props.collection?.files)
 
 const displayGroupId = computed(() => fileDisplayGroup(files.value ?? []).id)
-const isMasonry = computed(() => !props.uniform && globalStore.displayPreferences[displayGroupId.value] === 'masonry')
-const masonrySize = computed(() =>
-  MASONRY_SIZES.find(size => size.id === globalStore.displayDetails[displayGroupId.value]?.masonrySize)
-  ?? MASONRY_SIZES.find(size => size.id === DEFAULT_MASONRY_SIZE)!
-)
+const isMasonry = computed(() => props.masonry || (!props.uniform && globalStore.displayPreferences[displayGroupId.value] === 'masonry'))
+const masonrySize = computed(() => {
+  // A page block's own size wins over the reader's, since it also fixed the layout.
+  const chosen = props.masonry ? props.masonrySize : globalStore.displayDetails[displayGroupId.value]?.masonrySize
+  return MASONRY_SIZES.find(size => size.id === chosen) ?? MASONRY_SIZES.find(size => size.id === DEFAULT_MASONRY_SIZE)!
+})
 
 // Columns share the full width, so a tile's height only becomes knowable once
 // the container has been measured.

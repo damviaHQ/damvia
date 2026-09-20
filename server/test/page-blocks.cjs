@@ -56,6 +56,16 @@ test('a picture height is a number of pixels, and the old words still read', () 
     }
 })
 
+test('files can be tiled as masonry at a chosen size, collections cannot', () => {
+    for (const type of ['files', 'last_files']) {
+        assert.doesNotThrow(() => schema.parseBlockData(type, { layout: 'masonry', masonrySize: 2 }))
+        assert.throws(() => schema.parseBlockData(type, { masonrySize: 0 }))
+        assert.throws(() => schema.parseBlockData(type, { masonrySize: 5 }))
+    }
+    // A collection card is always the same shape, so it has nothing to tile.
+    assert.throws(() => schema.parseBlockData('collections', { layout: 'masonry' }))
+})
+
 test('a block cannot be saved with another block type payload', () => {
     assert.throws(() => schema.parseBlockData('collections', { collectionsId: ['not-a-uuid'] }))
     assert.throws(() => schema.parseBlockData('video', { media: { source: 'embed', provider: 'dailymotion', videoId: 'abcdef' } }))

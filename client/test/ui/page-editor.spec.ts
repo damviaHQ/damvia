@@ -8,6 +8,7 @@ const textBlock = { id: 'block-text', type: 'text', pageId: 'page-1', position: 
 const imageBlock = { id: 'block-image', type: 'image', pageId: 'page-1', position: 1, size: 'half', data: { media: null, height: 'medium', alt: '', caption: '', link: null } }
 const heroBlock = { id: 'block-hero', type: 'hero', pageId: 'page-1', position: 3, size: 'full', data: { media: { source: 'upload', s3key: bannerKey }, focus: { x: 50, y: 50 }, title: 'Autumn', subtitle: '', button: null } }
 const listBlock = { id: 'block-list', type: 'collections', pageId: 'page-1', position: 2, size: 'full', data: { title: null, layout: null, collectionsId: null } }
+const filesBlock = { id: 'block-files', type: 'files', pageId: 'page-1', position: 0, size: 'full', data: { title: null, layout: null, masonrySize: null, collectionId: null } }
 const libraryFile = { id: 'file-1', name: 'Campaign.jpg', mimeType: 'image/jpeg', thumbnailURL: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22100%22%3E%3Crect width=%22400%22 height=%22100%22 fill=%22%23888%22/%3E%3C/svg%3E', fileURL: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22100%22%3E%3Crect width=%22400%22 height=%22100%22 fill=%22%23444%22/%3E%3C/svg%3E', assetTypeId: 'photo', attributes: [], licenses: [], size: '1000', collectionId: 'campaign', createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-01T10:00:00Z', dimensions: { width: 400, height: 100 } }
 const collection = {
   id: 'campaign', name: 'Autumn essentials', public: true, ownerId: 'preview-user', canEdit: true,
@@ -17,12 +18,13 @@ const collection = {
 }
 
 // A collection whose layout has never been arranged has no page of its own.
-async function fixture(page: Page, { withPage = true } = {}) {
+async function fixture(page: Page, { withPage = true, blocks }: { withPage?: boolean; blocks?: any[] } = {}) {
   const saves: any[] = []
   const creates: any[] = []
   const removes: any[] = []
   const errors: string[] = []
-  const subject = withPage ? collection : { ...collection, page: null }
+  const page1 = blocks ? { ...collection.page, blocks } : collection.page
+  const subject = withPage ? { ...collection, page: page1 } : { ...collection, page: null }
   page.on('pageerror', error => errors.push(error.message))
   await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
   await page.route('**/trpc/**', async route => {
@@ -156,6 +158,34 @@ test('an empty listing explains what will fill it rather than saying nothing was
   await expect(block).toContainText('appears as a card')
   await expect(block).toContainText('sub-collections of this collection')
   await expect(block).not.toContainText('No collections found')
+  expect(errors).toEqual([])
+})
+
+test('a files block can be tiled as masonry, at a size its author sets', async ({ page }) => {
+  const { saves, errors } = await fixture(page, { blocks: [filesBlock] })
+  await page.goto('/collections/campaign/edit')
+
+  const block = page.locator('[data-block-index="0"]')
+  await block.hover()
+  await block.getByRole('button', { name: 'Block settings' }).click()
+  const panel = page.getByRole('dialog')
+
+  // The size only matters once the tiling is chosen, so it appears with it.
+  await expect(panel.getByRole('slider')).toHaveCount(0)
+  await panel.getByLabel('Display').click()
+  await page.getByRole('option', { name: 'Masonry' }).click()
+  const slider = panel.getByRole('slider')
+  await expect(slider).toBeVisible()
+  await expect(panel).toContainText('Large')
+
+  await slider.focus()
+  await page.keyboard.press('ArrowLeft')
+  await expect(panel).toContainText('Medium')
+
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect.poll(() => saves.length).toBe(1)
+  expect(saves[0].blocks[0].data).toMatchObject({ layout: 'masonry', masonrySize: 2 })
   expect(errors).toEqual([])
 })
 

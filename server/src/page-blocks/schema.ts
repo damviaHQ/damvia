@@ -62,6 +62,12 @@ export type BlockLink = z.infer<typeof linkSchema>
 const layout = z.enum(['grid', 'list']).nullish()
 const title = z.string().max(120).nullish()
 
+// Files can also be tiled, keeping each picture's own proportions; collections,
+// whose cards are all the same, cannot. The size is one of the four the reader's
+// own masonry slider offers, and stands as the default for everyone.
+const fileLayout = z.enum(['grid', 'list', 'masonry']).nullish()
+const masonrySize = z.number().int().min(1).max(4).nullish()
+
 // How tall a picture is allowed to be, in pixels: the author drags the picture
 // itself rather than choosing among fixed words.
 export const MIN_IMAGE_HEIGHT = 80
@@ -102,8 +108,8 @@ export const blockDataSchemas = {
 	}),
 	video: z.object({ media: videoRefSchema.nullish().default(null) }),
 	collections: z.object({ title, layout, collectionsId: z.uuid().array().max(200).nullish() }),
-	files: z.object({ title, layout, collectionId: z.uuid().nullish() }),
-	last_files: z.object({ title, layout }),
+	files: z.object({ title, layout: fileLayout, masonrySize, collectionId: z.uuid().nullish() }),
+	last_files: z.object({ title, layout: fileLayout, masonrySize }),
 } satisfies Record<BlockType, z.ZodType>
 
 export type BlockDataMap = { [T in BlockType]: z.infer<typeof blockDataSchemas[T]> }

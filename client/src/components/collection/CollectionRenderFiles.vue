@@ -28,7 +28,9 @@ const props = defineProps<{
   collection?: Collection
   files?: CollectionFile[]
   placeholder?: string | null
-  forceView?: "list" | "grid" | null
+  forceView?: "list" | "grid" | "masonry" | null
+  // A page block that asks for masonry also sets the size everyone sees.
+  forceMasonrySize?: number | null
   // The path tooltip only exists in the grid; the list has its own columns.
   getPath?: (file: File) => string | undefined
 }>()
@@ -52,5 +54,6 @@ const fileDisplayPreference = computed<DisplayView>(() => {
   <CollectionDisplayListFiles v-if="fileDisplayPreference === 'list'" :collection="collection" :files="files"
     :placeholder="placeholder" />
   <CollectionDisplayGridFiles v-else :collection="collection" :files="files" :placeholder="placeholder"
-    :get-path="getPath" :uniform="forceView === 'grid'" />
+    :get-path="getPath" :uniform="forceView === 'grid'" :masonry="forceView === 'masonry'"
+    :masonry-size="forceMasonrySize ?? null" />
 </template>
