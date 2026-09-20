@@ -17,15 +17,16 @@ import { trpc, type RouterOutput } from '@/services/server'
 import { useGlobalStore } from '@/stores/globalStore'
 import { computed } from 'vue'
 
-type Collection = RouterOutput['favorite']['listCollections'][number]
+type File = RouterOutput['favorite']['list'][number]
 
-export function useCollectionFavorites() {
+export function useFileFavorites() {
   const store = useGlobalStore()
-  return useFavoriteList<Collection>({
-    queryKey: computed(() => ['collection-favorites', store.user?.id]),
+  const favorites = useFavoriteList<File>({
+    queryKey: computed(() => ['favorites', store.user?.id]),
     enabled: computed(() => ['admin', 'manager', 'member'].includes(store.user?.role ?? '')),
-    list: () => trpc.favorite.listCollections.query(),
-    add: id => trpc.favorite.addCollection.mutate({ collectionId: id }),
-    remove: id => trpc.favorite.removeCollection.mutate({ collectionId: id }),
+    list: () => trpc.favorite.list.query(),
+    add: id => trpc.favorite.add.mutate({ collectionFileId: id }),
+    remove: id => trpc.favorite.remove.mutate({ collectionFileId: id }),
   })
+  return { ...favorites, isFavorite: (file: File) => favorites.isFavorite(file.id) }
 }

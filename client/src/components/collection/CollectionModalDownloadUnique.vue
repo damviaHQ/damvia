@@ -26,9 +26,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useFileFavorites } from "@/composables/useFileFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
-import { useGlobalStore } from "@/stores/globalStore"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
@@ -62,11 +62,9 @@ const emit = defineEmits<{
 const toast = useGlobalToast()
 const props = defineProps<Props>()
 const viewedAt = new Map<string, number>()
-const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
 const hasTermsError = ref(false)
 const isLoading = ref(false)
-const haveAccessToFavorites = globalStore.user?.role !== "guest"
 const form = ref<{
   imageFormat: "png" | "jpg" | "webp" | "original"
   imageResolution: "high" | "medium" | "low"
@@ -82,14 +80,21 @@ const form = ref<{
   downloadType: "direct",
   isAcceptingTerms: false,
 })
-const { data: favorites } = useQuery({
-  queryKey: ["favorites"],
-  queryFn: () => trpc.favorite.list.query(),
-})
+const {
+  canFavorite: haveAccessToFavorites,
+  isFavorite,
+  toggle: toggleFavorite,
+  isSaving: isSavingFavorite,
+  isSuccess: favoritesReady,
+} = useFileFavorites()
 
 const removable = computed(() => props.collection?.canEdit && !props.collection.synchronized)
 const files = computed(() => props.files ?? props.collection?.files)
 const currentFile = computed<File>(() => files.value?.find((file: File) => file.id === props.modelValue))
+const hasCustomDownloadSettings = computed(() =>
+  (currentFile.value?.mimeType.startsWith("image/") && form.value.imageFormat !== "original") ||
+  (currentFile.value?.mimeType.startsWith("video/") && form.value.videoFormat !== "original")
+)
 const allowDirectDownload = computed(() => { return !currentFile.value || parseInt(currentFile.value.size, 10) <= 5_000_000_000 })
 
 const { data: fileCollection } = useQuery({
@@ -157,28 +162,6 @@ watchEffect(() => {
     hasTermsError.value = false;
   }
 })
-
-function isFavorite(file: File) {
-  return favorites.value?.some((favorite) => favorite.id === file.id)
-}
-
-async function addToFavorite(file: File) {
-  try {
-    await trpc.favorite.add.mutate({ collectionFileId: file.id })
-    await queryClient.invalidateQueries({ queryKey: ["favorites"] })
-  } catch (error) {
-    toast.error((error as Error).message)
-  }
-}
-
-async function removeFromFavorite(file: File) {
-  try {
-    await trpc.favorite.remove.mutate({ collectionFileId: file.id })
-    await queryClient.invalidateQueries({ queryKey: ["favorites"] })
-  } catch (error) {
-    toast.error((error as Error).message)
-  }
-}
 
 async function remove(file: File) {
   if (!removable) {
@@ -308,15 +291,27 @@ watch(() => props.modelValue, (newValue) => {
 </script>
 
 <template>
+  <Teleport to="body">
   <FocusScope v-if="currentFile" as="div" trapped loop tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="gallery-modal-title"
-    class="gallery-modal bg-white fixed top-0 left-0 w-full h-full z-30 py-5 px-7 text-neutral-800 outline-hidden" @mount-auto-focus="focusModal">
+    class="gallery-modal bg-white fixed top-0 left-0 w-full h-full z-40 py-5 px-7 text-neutral-800 outline-hidden" @mount-auto-focus="focusModal">
     <div class="gallery-modal__header max-md:flex-col max-md:items-start max-md:[&>div:last-child]:w-full flex items-center justify-between mb-4 flex-wrap gap-3">
-      <div class="flex items-center">
-        <h2 id="gallery-modal-title">
+      <div class="flex items-center gap-3">
+        <template v-if="haveAccessToFavorites">
+          <button v-if="isFavorite(currentFile)" @click="toggleFavorite(currentFile)" :disabled="isSavingFavorite(currentFile.id) || !favoritesReady" type="button"
+            aria-label="Remove from favorites" aria-pressed="true" class="group/favorite relative flex items-center shrink-0">
+            <Star aria-hidden="true" class="w-5 h-5 text-neutral-800 fill-neutral-600 group-hover/favorite:opacity-0 group-focus-visible/favorite:opacity-0" />
+            <StarOff aria-hidden="true"
+              class="w-5 h-5 text-neutral-800 absolute inset-0 opacity-0 group-hover/favorite:opacity-100 group-focus-visible/favorite:opacity-100 transition-opacity fill-white" />
+          </button>
+          <button v-else @click="toggleFavorite(currentFile)" :disabled="isSavingFavorite(currentFile.id) || !favoritesReady" type="button" aria-label="Add to favorites" aria-pressed="false" class="flex items-center shrink-0">
+            <Star aria-hidden="true" class="w-5 h-5 text-neutral-800 hover:fill-neutral-600" />
+          </button>
+        </template>
+        <h2 id="gallery-modal-title" class="flex items-center">
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger>
-                <span class="block text-[17px] font-semibold truncate max-w-[300px] md:max-w-[400px]">
+              <TooltipTrigger class="flex items-center">
+                <span class="block text-[17px] font-semibold leading-none truncate max-w-[300px] md:max-w-[400px]">
                   {{ truncateFileName(currentFile.name) }}
                 </span>
               </TooltipTrigger>
@@ -326,23 +321,9 @@ watch(() => props.modelValue, (newValue) => {
             </Tooltip>
           </TooltipProvider>
         </h2>
-
-        <div class="flex items-center gap-6 ml-4">
-          <template v-if="haveAccessToFavorites">
-            <button v-if="isFavorite(currentFile)" @click="removeFromFavorite(currentFile)" type="button"
-              aria-label="Remove from favorites" class="relative">
-              <Star class="w-5 h-5 text-neutral-800 fill-neutral-600" />
-              <StarOff
-                class="w-5 h-5 text-neutral-800 absolute inset-0 opacity-0 hover:opacity-100 transition-opacity fill-white bg-white" />
-            </button>
-            <button v-else @click="addToFavorite(currentFile)" type="button" aria-label="Add to favorites" class="block">
-              <Star class="w-5 h-5 text-neutral-800 hover:fill-neutral-600" />
-            </button>
-          </template>
-          <button v-if="removable" @click="remove(currentFile)" type="button" aria-label="Remove from collection">
-            <Trash2 class="w-5 h-5 text-neutral-800 hover:text-neutral-500" />
-          </button>
-        </div>
+        <button v-if="removable" @click="remove(currentFile)" type="button" aria-label="Remove from collection" class="flex items-center ml-3">
+          <Trash2 class="w-5 h-5 text-neutral-800 hover:text-neutral-500" />
+        </button>
       </div>
 
       <div class="flex items-center gap-2">
@@ -599,10 +580,14 @@ watch(() => props.modelValue, (newValue) => {
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>
           <div class="mt-2 text-sm text-neutral-600">
-            Total Size: {{ formatFileSize(currentFile.size) }}
+            Original files: {{ formatFileSize(currentFile.size) }}
           </div>
+          <p v-if="hasCustomDownloadSettings" class="mt-1 text-xs text-neutral-500">
+            Final size may vary.
+          </p>
         </div>
       </div>
     </div>
   </FocusScope>
+  </Teleport>
 </template>
