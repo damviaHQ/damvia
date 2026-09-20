@@ -137,14 +137,15 @@ function exportCsv() {
   <Loader v-if="status === 'pending'" :text="true" />
   <div v-else-if="status === 'error'" class="admin-error" role="alert"><p>{{ error?.message }}</p><Button variant="outline" class="dv-button" @click="refetch()">Try again</Button></div>
   <section v-else class="dv-panel users-panel" aria-label="User directory">
-   <div class="users-tabs" role="group" aria-label="User status">
-    <button v-for="tab in tabs" :key="tab.key" :aria-pressed="filters.view === tab.key" :class="{ active: filters.view === tab.key }" @click="filters.view = tab.key">{{ tab.label }}<span>{{ count(tab.key) }}</span></button>
-   </div>
    <div class="users-toolbar">
-    <label class="users-search"><Search /><span class="dv-sr-only">Search users</span><input ref="searchInput" v-model="filters.search" type="search" placeholder="Search name, email or company" /></label>
-    <Button variant="outline" class="dv-button" :aria-expanded="showFilters" aria-controls="user-filters" @click="showFilters = !showFilters"><SlidersHorizontal />Filters<span v-if="activeFilterCount" class="filter-count">{{ activeFilterCount }}</span></Button>
-    <button v-if="hasFilters" class="users-text-action" @click="resetFilters"><X />Clear filters</button>
-    <span class="users-result-count" aria-live="polite">{{ filtered.length }} {{ filtered.length === 1 ? 'user' : 'users' }}</span>
+    <div class="users-tabs" role="group" aria-label="User status">
+     <button v-for="tab in tabs" :key="tab.key" :aria-pressed="filters.view === tab.key" :class="{ active: filters.view === tab.key }" @click="filters.view = tab.key">{{ tab.label }}<span>{{ count(tab.key) }}</span></button>
+    </div>
+    <div class="users-search-controls">
+     <label class="users-search"><Search /><span class="dv-sr-only">Search users</span><input ref="searchInput" v-model="filters.search" type="search" placeholder="Search name, email or company" /></label>
+     <Button variant="outline" class="dv-button" :aria-expanded="showFilters" aria-controls="user-filters" aria-label="Filters" @click="showFilters = !showFilters"><SlidersHorizontal /><span class="users-filter-label">Filters</span><span v-if="activeFilterCount" class="filter-count">{{ activeFilterCount }}</span></Button>
+     <Button v-if="hasFilters" variant="ghost" class="dv-button users-clear-filters" aria-label="Clear filters" title="Clear filters" @click="resetFilters"><X /></Button>
+    </div>
    </div>
    <div v-if="showFilters" id="user-filters" class="users-filters">
     <div><label for="users-filter-role">Role</label><select id="users-filter-role" v-model="filters.role" class="dv-select"><option value="all">All roles</option><option value="no-guests">Exclude guests</option><option v-for="(label, value) in roleLabels" :key="value" :value="value">{{ label }}</option></select></div>
@@ -175,7 +176,7 @@ function exportCsv() {
      </tr></tbody>
     </table>
    </div>
-   <footer class="users-pagination"><span>{{ filtered.length ? (page - 1) * perPage + 1 : 0 }}–{{ Math.min(page * perPage, filtered.length) }} of {{ filtered.length }}</span><div><label>Rows<select v-model.number="perPage" class="dv-select"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option></select></label><Button variant="outline" class="dv-button" :disabled="page === 1" aria-label="Previous page" @click="page--"><ChevronLeft /></Button><span>{{ page }} / {{ pageCount }}</span><Button variant="outline" class="dv-button" :disabled="page === pageCount" aria-label="Next page" @click="page++"><ChevronRight /></Button></div></footer>
+   <footer class="users-pagination"><span aria-live="polite" aria-atomic="true">{{ filtered.length ? (page - 1) * perPage + 1 : 0 }}–{{ Math.min(page * perPage, filtered.length) }} of {{ filtered.length }} {{ filtered.length === 1 ? 'user' : 'users' }}</span><div><label>Rows<select v-model.number="perPage" class="dv-select"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option></select></label><Button variant="outline" class="dv-button" :disabled="page === 1" aria-label="Previous page" @click="page--"><ChevronLeft /></Button><span>{{ page }} / {{ pageCount }}</span><Button variant="outline" class="dv-button" :disabled="page === pageCount" aria-label="Next page" @click="page++"><ChevronRight /></Button></div></footer>
   </section>
   <Dialog :open="detailsOpen" @update:open="value => { if (!savingDetails) detailsOpen = value }">
    <DialogContent class="dv-theme dv-admin admin-dialog user-details-dialog" @close-auto-focus="restoreFocus" @escape-key-down="event => { if (savingDetails) event.preventDefault() }" @interact-outside="event => { if (savingDetails) event.preventDefault() }">
@@ -198,28 +199,30 @@ function exportCsv() {
 </template>
 
 <style scoped>
-.users-panel { overflow:hidden; width:100%; min-width:0; }
-.users-tabs { display:flex; gap:26px; padding:0 24px; border-bottom:1px solid var(--dv-color-line); overflow-x:auto; }
-.users-tabs button { display:flex; align-items:center; gap:8px; padding:19px 0 16px; white-space:nowrap; border-bottom:2px solid transparent; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
+.users-panel { overflow:hidden; width:100%; min-width:0; container-type:inline-size; }
+.users-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:12px 24px; padding:12px 24px; border-bottom:1px solid var(--dv-color-line); }
+.users-tabs { display:flex; align-items:center; gap:16px; max-width:100%; min-width:0; overflow-x:auto; }
+.users-tabs button { display:flex; align-items:center; gap:8px; min-height:var(--dv-control-height); padding:8px 0; white-space:nowrap; border-bottom:2px solid transparent; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
 .users-tabs button.active { border-color:var(--dv-action-primary); color:var(--dv-text-primary); font-weight:550; }
 .users-tabs button span { padding:2px 6px; border-radius:var(--dv-radius-data); background:var(--dv-surface-canvas); font-size:var(--dv-size-caption); }
 .users-tabs button.active span { background:var(--dv-action-primary); color:white; }
-.users-toolbar { display:flex; align-items:center; gap:12px; padding:20px 24px; flex-wrap:wrap; }
-.users-search { display:flex; align-items:center; gap:10px; padding:0 12px; border:1px solid var(--dv-color-line); min-height:40px; width:320px; max-width:100%; }
-.users-search svg { width:var(--dv-icon-compact); color:var(--dv-text-secondary); }
-.users-search input { background:transparent; min-width:0; width:100%; border:0; outline:none; font-size:var(--dv-size-caption); padding:10px 0; }
+.users-search-controls { display:flex; align-items:center; gap:8px; flex:1 1 360px; min-width:0; }
+.users-search-controls > button { flex-shrink:0; min-height:var(--dv-control-height); }
+.users-search-controls .users-clear-filters { width:var(--dv-control-height); padding:8px; }
+.users-search { display:flex; align-items:center; gap:8px; flex:1; min-width:0; padding:0 var(--dv-control-padding-x); border:1px solid var(--dv-color-line-strong); min-height:var(--dv-control-height); }
+.users-search svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); flex-shrink:0; color:var(--dv-text-secondary); }
+.users-search input { background:transparent; min-width:0; width:100%; border:0; outline:none; font-size:var(--dv-size-caption); line-height:var(--dv-field-line-height); padding:var(--dv-control-padding-y) 0; }
 .users-search:focus-within { outline:2px solid var(--dv-action-primary); outline-offset:2px; }
 .users-text-action { display:inline-flex; align-items:center; gap:5px; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); white-space:nowrap; }
 .users-text-action svg { width:var(--dv-icon-compact); }
-.users-result-count { margin-left:auto; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
-.users-filters { display:flex; gap:16px; flex-wrap:wrap; padding:0 24px 20px; }
-.users-filters > div { display:grid; gap:7px; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); flex:1; min-width:150px; max-width:250px; }
-.users-filters select { width:100%; font-size:var(--dv-size-caption); }
-.filter-count { background:var(--dv-surface-canvas); padding:1px 5px; }
+.users-filters { display:flex; gap:12px 16px; flex-wrap:wrap; padding:12px 24px; border-bottom:1px solid var(--dv-color-line); }
+.users-filters > div { display:flex; align-items:center; gap:8px; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); flex:1 1 200px; min-width:0; }
+.users-filters select { flex:1; min-width:0; font-size:var(--dv-size-caption); }
+.filter-count { background:var(--dv-surface-canvas); padding:0 4px; line-height:var(--dv-field-line-height); }
 .users-selection { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 24px; border-top:1px solid var(--dv-color-line); background:var(--dv-surface-canvas); font-size:var(--dv-size-caption); }
 .users-selection > span { color:var(--dv-text-secondary); }
 .users-selection button { margin-left:auto; }
-.users-table-scroll { overflow-x:auto; width:100%; min-width:0; }
+.users-table-scroll { position:relative; overflow-x:auto; width:100%; min-width:0; }
 .users-table { min-width:850px; }
 .users-table th { padding:12px 18px; }
 .users-table td { padding:18px; font-size:var(--dv-size-caption); }
@@ -249,5 +252,13 @@ function exportCsv() {
 .read-only-details p { color:var(--dv-text-secondary); }
 .read-only-details dl { display:grid; grid-template-columns:100px 1fr; gap:16px; margin-top:20px; }
 .read-only-details dt { color:var(--dv-text-secondary); }
-@media(max-width:760px) { .users-tabs { gap:20px; padding:0 18px; } .users-toolbar { padding:18px; } .users-search { width:100%; } .users-filters { padding:0 18px 18px; } .users-pagination { padding:16px 18px; } .users-selection > span { display:none; } }
+@container (max-width:600px) {
+ .users-toolbar { padding:12px 16px; gap:8px; }
+ .users-tabs, .users-search-controls { flex-basis:100%; }
+ .users-filters { padding:12px 16px; }
+ .users-pagination { padding:12px 16px; gap:12px; }
+ .users-selection { padding:12px 16px; }
+ .users-selection > span { display:none; }
+}
+@container (max-width:360px) { .users-filter-label { display:none; } }
 </style>

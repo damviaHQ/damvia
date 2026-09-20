@@ -43,7 +43,7 @@ watch(() => props.user.id, () => {
   Object.assign(draft, { name: props.user.name, email: props.user.email, company: props.user.company, regionId: props.user.regionId, role: props.user.role, groupIds: props.user.groups.map(group => group.id), maintenanceContact: props.user.maintenanceContact ?? false })
   errors.value = {}; rootError.value = ''
 }, { immediate: true })
-const schema = z.object({ name: z.string().min(1, 'Enter a name.').max(80), email: z.string().email('Enter a valid email address.'), company: z.string().min(1, 'Enter a company name.').max(80), regionId: z.string().uuid('Choose a region.'), role: z.enum(['admin', 'manager', 'member', 'guest']), groupIds: z.string().uuid().array(), maintenanceContact: z.boolean() })
+const schema = z.object({ name: z.string().min(1, 'Enter a name.').max(80), email: z.email('Enter a valid email address.'), company: z.string().min(1, 'Enter a company name.').max(80), regionId: z.uuid('Choose a region.'), role: z.enum(['admin', 'manager', 'member', 'guest']), groupIds: z.uuid().array(), maintenanceContact: z.boolean() })
 async function save() {
   if (saving.value || !canEditUser(store.user, props.user)) return
   rootError.value = ''; errors.value = {}
