@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ChevronDown, ChevronRight, CirclePlus, EyeOff, FilePenLine, Folder, Image, PencilLine, Trash2 } from "@lucide/vue"
+import { ChevronDown, ChevronRight, CirclePlus, ExternalLink, EyeOff, FilePenLine, Folder, Image, PencilLine, Trash2 } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 
 const { status, data: collections, error } = useQuery({
@@ -166,6 +166,20 @@ async function confirmDeleteCollection() {
         </div>
 
         <div class="flex items-center gap-2 ml-5" @click="stopPropagation">
+          <Button variant="link" as-child :aria-label="`Open ${item.name}`"
+            class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
+            <!-- The reader's own view of the collection, left in its own tab so
+                 the tree here keeps its place. -->
+            <router-link :to="{ name: 'collection', params: { id: item.id } }" target="_blank" rel="noopener">
+              <ExternalLink class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Open
+            </router-link>
+          </Button>
+          <Button variant="link" as-child :aria-label="`Edit the page of ${item.name}`"
+            class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
+            <router-link :to="{ name: 'collection-edit', params: { id: item.id } }">
+              <FilePenLine class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Page
+            </router-link>
+          </Button>
           <Button variant="link" @click="handleEditCollection(item)" :aria-label="`Edit ${item.name}`"
             class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
             <PencilLine class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Edit
