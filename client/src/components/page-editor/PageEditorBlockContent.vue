@@ -15,13 +15,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import PageBlockView from "@/components/page-renderer/PageBlockView.vue"
 import BlockHero from "@/components/page-renderer/blocks/BlockHero.vue"
-import { resolveMedia } from "@/components/page-renderer/media"
+import { imageHeightOf, resolveMedia } from "@/components/page-renderer/media"
 import type { Collection, EditorBlock, PageAssets } from "@/components/page-renderer/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Check, ImageUp, Move } from "@lucide/vue"
-import { computed, ref } from "vue"
+import { MAX_IMAGE_HEIGHT, MIN_IMAGE_HEIGHT } from "server/src/page-blocks/schema"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
 import { RouteLocationRaw } from "vue-router"
 import MediaPickerDialog from "./MediaPickerDialog.vue"
 import RichTextEditor from "./RichTextEditor.vue"
@@ -75,6 +76,73 @@ function startReposition(event: PointerEvent) {
   }
   ;(event.target as HTMLElement).setPointerCapture?.(event.pointerId)
   reposition(event)
+}
+
+// The height of a picture is dragged on the picture itself. The handle follows
+// the bottom edge, which moves as the picture is resized or the window changes.
+const imageFrame = ref<HTMLElement | null>(null)
+const isResizing = ref(false)
+const imageBottom = ref(0)
+const imageHeight = computed(() => imageHeightOf(props.block.data?.height))
+
+function imageElement(): HTMLImageElement | null {
+  return imageFrame.value?.querySelector("img") ?? null
+}
+
+function trackImageBottom() {
+  const frame = imageFrame.value?.getBoundingClientRect()
+  const image = imageElement()?.getBoundingClientRect()
+  imageBottom.value = frame && image ? image.bottom - frame.top : 0
+}
+
+const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(trackImageBottom)
+watch([imageFrame, () => props.block.data?.media], () => {
+  observer?.disconnect()
+  const image = imageElement()
+  if (image) {
+    observer?.observe(image)
+    image.complete ? trackImageBottom() : image.addEventListener("load", trackImageBottom, { once: true })
+  }
+}, { flush: "post" })
+onBeforeUnmount(() => observer?.disconnect())
+
+// Dragging below the picture's full height would do nothing visible, so the
+// handle stops where the picture stops growing.
+function tallestUseful(): number {
+  const image = imageElement()
+  if (!image?.naturalWidth || !image.naturalHeight) {
+    return MAX_IMAGE_HEIGHT
+  }
+  return Math.round((image.clientWidth * image.naturalHeight) / image.naturalWidth)
+}
+
+function resizeTo(pixels: number) {
+  const ceiling = Math.max(MIN_IMAGE_HEIGHT, Math.min(MAX_IMAGE_HEIGHT, tallestUseful()))
+  patch({ height: Math.round(Math.min(ceiling, Math.max(MIN_IMAGE_HEIGHT, pixels))) })
+}
+
+function startResize(event: PointerEvent) {
+  isResizing.value = true
+  ;(event.target as HTMLElement).setPointerCapture?.(event.pointerId)
+}
+
+function onResize(event: PointerEvent) {
+  const top = imageElement()?.getBoundingClientRect().top
+  if (!isResizing.value || top === undefined) {
+    return
+  }
+  event.preventDefault()
+  resizeTo(event.clientY - top)
+}
+
+function nudgeHeight(event: KeyboardEvent) {
+  const steps: Record<string, number> = { ArrowUp: -20, ArrowDown: 20, PageUp: -100, PageDown: 100 }
+  const step = steps[event.key]
+  if (step === undefined) {
+    return
+  }
+  event.preventDefault()
+  resizeTo(imageHeight.value + step)
 }
 
 function nudge(event: KeyboardEvent) {
@@ -157,9 +225,27 @@ function nudge(event: KeyboardEvent) {
     <div v-else-if="block.type === 'image' || block.type === 'video'">
       <template v-if="hasMedia">
         <!-- Shown exactly as a reader sees it, but nothing inside responds. -->
-        <div inert class="pointer-events-none">
-          <PageBlockView :block="block" :assets="assets" :collection="collection" :generate-route="generateRoute"
-            editing />
+        <div ref="imageFrame" class="group/image relative">
+          <div inert class="pointer-events-none">
+            <PageBlockView :block="block" :assets="assets" :collection="collection" :generate-route="generateRoute"
+              editing />
+          </div>
+          <!-- The picture is made taller or shorter by dragging its bottom edge. -->
+          <div v-if="block.type === 'image'" class="absolute inset-x-0 flex justify-center"
+            :style="`top:${imageBottom}px`">
+            <button type="button" role="slider" :aria-valuenow="imageHeight" :aria-valuemin="MIN_IMAGE_HEIGHT"
+              :aria-valuemax="MAX_IMAGE_HEIGHT" :aria-valuetext="`${imageHeight} pixels tall`"
+              aria-label="Picture height"
+              class="-mt-2 flex h-4 w-16 cursor-ns-resize touch-none items-center justify-center rounded-full bg-neutral-900/70 opacity-0 transition-opacity group-hover/image:opacity-100 focus-visible:opacity-100"
+              :class="isResizing && 'opacity-100'" @pointerdown="startResize" @pointermove="onResize"
+              @pointerup="isResizing = false" @pointercancel="isResizing = false" @keydown="nudgeHeight">
+              <span class="h-0.5 w-8 rounded-full bg-white" />
+            </button>
+            <span v-if="isResizing"
+              class="pointer-events-none absolute -top-7 rounded-md bg-neutral-900/80 px-2 py-0.5 text-xs text-white">
+              {{ imageHeight }} px
+            </span>
+          </div>
         </div>
         <Button type="button" variant="outline" size="sm" class="mt-2" @click="isPickerOpen = true">
           {{ block.type === "image" ? "Change picture" : "Change video" }}

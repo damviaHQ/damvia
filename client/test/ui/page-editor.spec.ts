@@ -168,7 +168,37 @@ test('a picture chosen from the library shows at once, before the page is saved'
   await page.getByRole('button', { name: 'Campaign.jpg' }).click()
 
   await expect(imageBlockFrame.locator('img')).toBeVisible()
+  // Library originals are print-resolution: a page draws the rendition instead.
+  await expect(imageBlockFrame.locator('img')).toHaveAttribute('src', libraryFile.thumbnailURL)
   expect(saves).toEqual([])
+  expect(errors).toEqual([])
+})
+
+test('a picture is made taller or shorter on the picture itself, and the height is saved', async ({ page }) => {
+  const { saves, errors } = await fixture(page)
+  await page.goto('/collections/campaign/edit')
+
+  const imageBlockFrame = page.locator('[data-block-index="1"]')
+  await imageBlockFrame.getByRole('button', { name: 'Add a picture' }).click()
+  await page.getByRole('button', { name: 'Campaign.jpg' }).click()
+
+  // The fixed sizes in the settings menu are gone; the handle replaces them.
+  await imageBlockFrame.hover()
+  await imageBlockFrame.getByRole('button', { name: 'Block settings' }).click()
+  await expect(page.getByRole('dialog')).not.toContainText('Size on the page')
+  await page.keyboard.press('Escape')
+
+  const handle = imageBlockFrame.getByRole('slider', { name: 'Picture height' })
+  await handle.focus()
+  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('ArrowUp')
+  const height = Number(await handle.getAttribute('aria-valuenow'))
+  expect(height).toBeLessThan(420)
+
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect.poll(() => saves.length).toBe(1)
+  const saved = saves[0].blocks.find((block: any) => block.type === 'image')
+  expect(saved.data.height).toBe(height)
   expect(errors).toEqual([])
 })
 

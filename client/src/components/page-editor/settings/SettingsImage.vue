@@ -16,7 +16,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useId } from "vue"
 import LinkField from "./LinkField.vue"
 
@@ -31,18 +30,6 @@ function patch(values: Record<string, unknown>) {
 
 <template>
   <div class="grid gap-3">
-    <FieldGroup>
-      <Label :for="`${fieldId}-height`">Size on the page</Label>
-      <Select :model-value="data.height ?? 'medium'" @update:model-value="patch({ height: $event })">
-        <SelectTrigger :id="`${fieldId}-height`"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="small">Small</SelectItem>
-          <SelectItem value="medium">Medium</SelectItem>
-          <SelectItem value="large">Large</SelectItem>
-          <SelectItem value="original">Full size</SelectItem>
-        </SelectContent>
-      </Select>
-    </FieldGroup>
     <FieldGroup>
       <Label :for="`${fieldId}-alt`">Description for screen readers</Label>
       <Input :id="`${fieldId}-alt`" type="text" :model-value="data.alt ?? ''"

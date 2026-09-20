@@ -33,7 +33,8 @@ const focus = computed(() => {
 <template>
   <section v-if="!isEmpty || editing"
     class="page-hero relative flex min-h-[220px] flex-col justify-end overflow-hidden rounded-md bg-neutral-100 p-6 md:min-h-[320px] md:p-10">
-    <img v-if="media" :src="media.url" alt="" class="absolute inset-0 h-full w-full object-cover" :style="focus" />
+    <img v-if="media" :src="media.displayURL" alt="" class="absolute inset-0 h-full w-full object-cover"
+      :style="focus" />
     <div v-if="media" aria-hidden="true" class="absolute inset-0 bg-linear-to-t from-black/70 to-black/10" />
     <div class="relative" :class="media ? 'text-white' : 'text-neutral-900'">
       <template v-if="!textHidden">

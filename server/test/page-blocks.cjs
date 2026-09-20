@@ -45,6 +45,17 @@ test('links reject anything that is not http, https or a known target', () => {
     assert.doesNotThrow(() => schema.parseBlockData('hero', { title: 'Hi', button: { label: 'Go', link: { kind: 'collection', collectionId: FILE_ID } } }))
 })
 
+test('a picture height is a number of pixels, and the old words still read', () => {
+    assert.equal(schema.parseBlockData('image', {}).height, schema.DEFAULT_IMAGE_HEIGHT)
+    assert.equal(schema.parseBlockData('image', { height: 512 }).height, 512)
+    assert.equal(schema.parseBlockData('image', { height: 'small' }).height, 220)
+    assert.equal(schema.parseBlockData('image', { height: 'original' }).height, schema.MAX_IMAGE_HEIGHT)
+    assert.equal(schema.parseBlockData('image', { height: 'whatever' }).height, schema.DEFAULT_IMAGE_HEIGHT)
+    for (const height of [0, 10, 9000, 42.5]) {
+        assert.throws(() => schema.parseBlockData('image', { height }), `${height} was accepted`)
+    }
+})
+
 test('a block cannot be saved with another block type payload', () => {
     assert.throws(() => schema.parseBlockData('collections', { collectionsId: ['not-a-uuid'] }))
     assert.throws(() => schema.parseBlockData('video', { media: { source: 'embed', provider: 'dailymotion', videoId: 'abcdef' } }))

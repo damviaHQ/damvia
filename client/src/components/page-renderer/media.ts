@@ -12,24 +12,43 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { DEFAULT_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT, MIN_IMAGE_HEIGHT } from "server/src/page-blocks/schema"
 import type { MediaRef, VideoRef } from "server/src/page-blocks/schema"
 import type { PageAssets } from "./types"
 
-export type ResolvedMedia = { url: string; thumbnailURL: string | null; name: string }
+// Heights are pixels, but pages written before the drag handle hold one of four
+// words, and a half-dragged value must stay inside what the server accepts.
+const LEGACY_HEIGHTS: Record<string, number> = { small: 220, medium: 420, large: 640, original: MAX_IMAGE_HEIGHT }
+
+export function imageHeightOf(height: unknown): number {
+  const pixels = typeof height === "string" ? LEGACY_HEIGHTS[height] : height
+  if (typeof pixels !== "number" || Number.isNaN(pixels)) {
+    return DEFAULT_IMAGE_HEIGHT
+  }
+  return Math.min(MAX_IMAGE_HEIGHT, Math.max(MIN_IMAGE_HEIGHT, Math.round(pixels)))
+}
+
+export type ResolvedMedia = { url: string; thumbnailURL: string | null; displayURL: string; name: string }
 
 // A reference the viewer cannot reach resolves to nothing, so a restricted file
 // never turns into a broken image or a leaked address.
+//
+// `url` is the file itself, which a video needs; `displayURL` is what a picture
+// on a page is drawn from. Library originals run to tens of megabytes, so a
+// picture shows the rendition the DAM already made instead.
 export function resolveMedia(media: MediaRef | VideoRef | null | undefined, assets?: PageAssets): ResolvedMedia | null {
   if (!media || !assets) {
     return null
   }
   if (media.source === "upload") {
     const url = assets.uploads?.[media.s3key]
-    return url ? { url, thumbnailURL: url, name: "" } : null
+    return url ? { url, thumbnailURL: url, displayURL: url, name: "" } : null
   }
   if (media.source === "file") {
     const file = assets.files?.[media.fileId]
-    return file ? { url: file.fileURL, thumbnailURL: file.thumbnailURL, name: file.name } : null
+    return file
+      ? { url: file.fileURL, thumbnailURL: file.thumbnailURL, displayURL: file.thumbnailURL ?? file.fileURL, name: file.name }
+      : null
   }
   return null
 }

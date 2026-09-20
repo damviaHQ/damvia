@@ -108,9 +108,12 @@ async function upload(event: Event) {
 }
 
 function chooseFile(file: any) {
+  // A picture is shown from the DAM's own rendition, not from the original,
+  // which can weigh tens of megabytes; a video has to be the file itself.
+  const preview = props.kind === "image" ? file.thumbnailURL ?? file.fileURL : file.fileURL ?? file.thumbnailURL
   emit("select", {
     media: { source: "file", fileId: file.id },
-    previewUrl: file.fileURL ?? file.thumbnailURL,
+    previewUrl: preview,
     name: file.name,
   })
   emit("update:modelValue", false)

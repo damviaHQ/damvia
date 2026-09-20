@@ -62,9 +62,21 @@ export type BlockLink = z.infer<typeof linkSchema>
 const layout = z.enum(['grid', 'list']).nullish()
 const title = z.string().max(120).nullish()
 
-// How much room a picture is allowed to take, in words rather than pixels.
-export const IMAGE_HEIGHTS = ['small', 'medium', 'large', 'original'] as const
-export type ImageHeight = typeof IMAGE_HEIGHTS[number]
+// How tall a picture is allowed to be, in pixels: the author drags the picture
+// itself rather than choosing among fixed words.
+export const MIN_IMAGE_HEIGHT = 80
+export const MAX_IMAGE_HEIGHT = 2400
+export const DEFAULT_IMAGE_HEIGHT = 420
+
+// Pages written before the handle existed stored one of four words.
+const LEGACY_IMAGE_HEIGHTS: Record<string, number> = {
+	small: 220, medium: 420, large: 640, original: MAX_IMAGE_HEIGHT,
+}
+
+const imageHeight = z.preprocess(
+	(value) => typeof value === 'string' ? LEGACY_IMAGE_HEIGHTS[value] ?? DEFAULT_IMAGE_HEIGHT : value,
+	z.number().int().min(MIN_IMAGE_HEIGHT).max(MAX_IMAGE_HEIGHT).default(DEFAULT_IMAGE_HEIGHT),
+)
 
 // Which part of a banner picture stays in frame when it is cropped.
 const focus = z.object({
@@ -83,7 +95,7 @@ export const blockDataSchemas = {
 	text: z.object({ html: z.string().max(50_000).default('') }),
 	image: z.object({
 		media: mediaRefSchema.nullish().default(null),
-		height: z.enum(IMAGE_HEIGHTS).default('medium'),
+		height: imageHeight,
 		alt: z.string().max(300).default(''),
 		caption: z.string().max(500).default(''),
 		link: linkSchema.nullish().default(null),

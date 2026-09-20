@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { embedSrc, resolveMedia } from '@/components/page-renderer/media'
+import { embedSrc, imageHeightOf, resolveMedia } from '@/components/page-renderer/media'
 
 const assets = {
   uploads: { 'blocks/page/one': 'https://files.test/one' },
@@ -25,12 +25,32 @@ const assets = {
 describe('block media', () => {
   test('an uploaded picture resolves to the address the server signed', () => {
     expect(resolveMedia({ source: 'upload', s3key: 'blocks/page/one' }, assets))
-      .toEqual({ url: 'https://files.test/one', thumbnailURL: 'https://files.test/one', name: '' })
+      .toEqual({ url: 'https://files.test/one', thumbnailURL: 'https://files.test/one', displayURL: 'https://files.test/one', name: '' })
   })
 
   test('a library file resolves to its original and its thumbnail', () => {
     expect(resolveMedia({ source: 'file', fileId: 'file-1' }, assets))
-      .toEqual({ url: 'https://files.test/full', thumbnailURL: 'https://files.test/thumb', name: 'photo.png' })
+      .toEqual({
+        url: 'https://files.test/full', thumbnailURL: 'https://files.test/thumb',
+        displayURL: 'https://files.test/thumb', name: 'photo.png',
+      })
+  })
+
+  // A library original can weigh tens of megabytes; a page shows the rendition
+  // the DAM already made, and only falls back when there is none.
+  test('a picture is displayed from the rendition, not from the original', () => {
+    const noThumbnail = { ...assets, files: { 'file-2': { name: 'raw.tif', mimeType: 'image/tiff', thumbnailURL: null, fileURL: 'https://files.test/raw' } } }
+    expect(resolveMedia({ source: 'file', fileId: 'file-2' }, noThumbnail as any)?.displayURL).toBe('https://files.test/raw')
+  })
+
+  test('a picture height is a number of pixels, whatever the page stored', () => {
+    expect(imageHeightOf(512)).toBe(512)
+    expect(imageHeightOf(undefined)).toBe(420)
+    expect(imageHeightOf('medium')).toBe(420)
+    expect(imageHeightOf('small')).toBe(220)
+    expect(imageHeightOf('original')).toBe(2400)
+    expect(imageHeightOf(10)).toBe(80)
+    expect(imageHeightOf(9000)).toBe(2400)
   })
 
   // A reader who cannot open the file gets no address for it at all.
