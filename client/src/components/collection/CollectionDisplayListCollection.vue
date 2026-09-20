@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { listTableClasses, listActionsClasses } from "./listStyles"
+import { collectionDisplayGroup } from "@/utils/displayPreferences"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionFavoriteButton from "@/components/collection/CollectionFavoriteButton.vue"
 import CollectionDropdownActions from "@/components/collection/CollectionDropdownActions.vue"
@@ -67,10 +69,7 @@ const visibleColumns = computed(() => {
         header: "Files",
       }),
     ].filter(column =>
-      collections.value.some(collection => {
-        const value = column.accessorFn?.(collection, 0)
-        return value !== undefined && value !== null && value !== ''
-      })
+      (globalStore.displayDetails.asset_folder?.columns ?? collectionDisplayGroup(collections.value).defaultColumns).includes(column.id!)
     ),
     columnHelper.display({
       id: "actions",
@@ -131,12 +130,12 @@ const table = useTable({
 </script>
 
 <template>
-  <div>
-    <table class="border-spacing-0 [&_th]:text-left [&_th]:text-[11px] [&_th]:font-medium [&_th]:text-neutral-500 [&_th]:whitespace-nowrap [&_td]:text-left [&_td]:text-[13px] [&_td]:whitespace-nowrap [&_tbody_tr]:border-b [&_tbody_tr]:border-neutral-100 [&_tbody_tr:hover]:bg-neutral-50 [&_tr:hover_.visible-on-hover]:opacity-100 collection-list-collections_table w-full text-neutral-600 [&_th:not(:last-child)]:pr-5 [&_td:not(:last-child)]:pr-5 [&_th:first-child]:pr-4 [&_th:first-child]:min-w-[200px] [&_td:first-child]:pr-4 [&_td:first-child]:min-w-[200px] [&_th:last-child]:pl-4 [&_th:last-child]:pr-2 [&_td:last-child]:pl-4 [&_td:last-child]:pr-2 [&_thead]:bg-neutral-50 [&_thead]:text-neutral-500 [&_thead]:border-b [&_thead]:border-neutral-200 [&_tbody_tr.hovered]:hover:bg-neutral-100 [&_tbody_tr.hovered_.collection-list-collections\_\_actions-container]:opacity-100 [&_tbody_tr:focus-within_.collection-list-collections\_\_actions-container]:opacity-100 [@media(hover:none)]:[&_.collection-list-collections\_\_actions-container]:opacity-100">
+  <div class="w-full min-w-0 max-w-full overflow-x-auto">
+    <table class="collection-list-collections_table" :class="listTableClasses">
       <thead>
         <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
           <th v-for="header in headerGroup.headers" :key="header.id" :colSpan="header.colSpan"
-            class="text-neutral-500 text-sm font-normal whitespace-nowrap">
+            class="text-neutral-600">
             <div v-if="header.column.id === 'name'" class="flex items-center gap-4">
               <CollectionCheckbox v-if="collections.length > 0" label="Select all" @click="toggleGlobalSelection()" :state="selection.length === collections.length
                 ? 'check'
@@ -156,8 +155,8 @@ const table = useTable({
         <tr v-if="table.getRowModel().rows.length" v-for="row in table.getRowModel().rows" :key="row.id"
           @mouseenter="hoveredRowId = row.id" @mouseleave="hoveredRowId = null"
           :class="{ hovered: hoveredRowId === row.id || openDropdownId === row.id }"
-          class="collection-list__row relative">
-          <td v-for="cell in row.getVisibleCells()" :key="cell.id" class="text-neutral-500 text-sm font-medium">
+          class="collection-list__row group">
+          <td v-for="cell in row.getVisibleCells()" :key="cell.id" class="text-body">
             <div v-if="cell.column.id === 'name'" class="collection-list-collections__name-container flex items-center gap-4">
               <CollectionCheckbox v-if="cell.row.original.numberOfFiles > 0" :label="`Select ${cell.row.original.name}`" @click="handleSelection(cell.row.original)"
                 :class="[
@@ -165,11 +164,11 @@ const table = useTable({
                   isCollectionSelected(cell.row.original) &&
                   'collection-list-collections__collection-selection--selected',
                 ]" :state="isCollectionSelected(cell.row.original) ? 'check' : false" />
-              <div v-else class="w-[18px] h-[18px]" />
+              <div v-else class="size-4 shrink-0" aria-hidden="true" />
 
               <router-link :to="generateRoute(cell.row.original)" class="flex items-center gap-1.5 no-underline">
-                <Folder class="fill-neutral-500 text-neutral-500" />
-                <div class="flex items-center gap-4 text-neutral-500 text-sm">
+                <Folder class="size-5 shrink-0 text-neutral-500" />
+                <div class="flex items-center gap-4 text-neutral-600 text-body">
                   {{ cell.row.original.name }}
                   <div v-if="cell.row.original.draft" class="flex items-center gap-1 text-neutral-500 font-light">
                     <EyeOff class="w-4 h-4" />
@@ -178,7 +177,7 @@ const table = useTable({
                 </div>
               </router-link>
             </div>
-            <div v-if="cell.column.id === 'actions'" class="collection-list-collections__actions-container pr-2 flex items-center justify-end gap-2 absolute top-0 right-0 bottom-0 [background-color:inherit] opacity-0 [transition:opacity_0.2s_ease-in-out]">
+            <div v-else-if="cell.column.id === 'actions'" class="collection-list-collections__actions-container" :class="[listActionsClasses, openDropdownId === row.id && 'opacity-100']">
               <CollectionFavoriteButton :collection="cell.row.original" />
               <CollectionDropdownActions :collection="cell.row.original"
                 @update:open="(isOpen) => (openDropdownId = isOpen ? row.id : null)" />

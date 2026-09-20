@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { listTableClasses } from "./listStyles"
+import { fileDisplayGroup } from "@/utils/displayPreferences"
 import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionModalGallery from "@/components/collection/CollectionModalDownloadUnique.vue"
@@ -31,6 +33,7 @@ import { formatFileSize } from "@/utils/fileSize.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   createColumnHelper,
+  type ColumnDef,
   FlexRender,
   columnOrderingFeature,
   columnVisibilityFeature,
@@ -155,15 +158,11 @@ async function copyToClipboard(text: string, cellId: string) {
   }
 }
 
-const globalAssetType = files.value.every(
-  (f: File) => f.assetTypeId === files.value[0].assetTypeId
-)
-  ? files.value[0]?.assetType
-  : null
-const listDisplayItems = globalAssetType?.listDisplayItems ?? []
+const displayGroup = computed(() => fileDisplayGroup(files.value))
+const listDisplayItems = computed(() => globalStore.displayDetails[displayGroup.value.id]?.columns ?? displayGroup.value.defaultColumns)
 const features = tableFeatures({ columnOrderingFeature, columnVisibilityFeature })
 const columnHelper = createColumnHelper<typeof features, File>()
-const columns = [
+const columns = computed<ColumnDef<typeof features, File, any>[]>(() => [
   columnHelper.display({
     id: "name",
     header: "",
@@ -194,63 +193,59 @@ const columns = [
     header: "Format",
     cell: (info) => info.getValue(),
   }),
+  columnHelper.accessor((row) => row.productView, {
+    id: "product_view",
+    header: "Product view",
+    cell: (info) => info.getValue(),
+  }),
   columnHelper.accessor((row) => row.license?.name, {
     id: "license",
     header: "License",
     cell: (info) => info.getValue(),
     enableHiding: true,
   }),
-  ...(globalAssetType?.productAttributes.map((attribute: any) =>
+  ...displayGroup.value.properties.filter(property => property.id.startsWith("product_attribute.")).map(attribute =>
     columnHelper.accessor(
       (row) =>
-        row.product?.attributes?.find((current: any) => current.id === attribute.id)
+        row.product?.attributes?.find((current: any) => `product_attribute.${current.id}` === attribute.id)
           ?.value,
       {
-        id: `product_attribute.${attribute.id}`,
-        header: attribute.displayName || attribute.name,
+        id: attribute.id,
+        header: attribute.label,
         cell: (info) => info.getValue(),
         enableHiding: true,
       }
     )
-  ) ?? []),
+  ),
   columnHelper.display({
     id: "actions",
     header: "",
   }),
-]
-
-const getVisibleColumns = computed(() => {
-  return columns.filter(column => {
-    if (!column.accessorFn) return true
-    return files.value.some((file: File) => column.accessorFn!(file, 0) != null && column.accessorFn!(file, 0) !== '')
-  })
-})
+])
 
 const table = useTable<typeof features, File>({
   features,
-  get data() {
-    return files.value
-  },
-  columns: getVisibleColumns.value,
-  initialState: {
-    columnOrder: ["name", ...listDisplayItems, "actions"],
-    columnVisibility: Object.fromEntries(
-      getVisibleColumns.value.map((column) => [
-        column.id,
-        ["name", "actions"].includes(column.id) || listDisplayItems.includes(column.id),
-      ])
-    ),
+  get data() { return files.value },
+  get columns() { return columns.value },
+  state: {
+    get columnOrder() { return ["name", ...listDisplayItems.value, "actions"] },
+    get columnVisibility() {
+      return Object.fromEntries(columns.value.map(column => [
+        column.id!, ["name", "actions"].includes(column.id!) || listDisplayItems.value.includes(column.id!),
+      ]))
+    },
   },
 })
+
 </script>
 
 <template>
   <div class="collection-list-files_table__wrapper w-full overflow-x-auto relative text-neutral-600">
-    <table class="border-spacing-0 [&_th]:text-left [&_th]:text-[11px] [&_th]:font-medium [&_th]:text-neutral-500 [&_th]:whitespace-nowrap [&_td]:text-left [&_td]:text-[13px] [&_td]:whitespace-nowrap [&_tbody_tr]:border-b [&_tbody_tr]:border-neutral-100 [&_tbody_tr:hover]:bg-neutral-50 [&_tr:hover_.visible-on-hover]:opacity-100 [&_tr:focus-within_.visible-on-hover]:opacity-100 [@media(hover:none)]:[&_.visible-on-hover]:opacity-100 collection-list-files_table w-full text-neutral-600 [&_th]:py-3 [&_th]:[min-width:80px] [&_td]:py-3 [&_td]:[min-width:80px] [&_th:not(:last-child)]:pr-5 [&_td:not(:last-child)]:pr-5 [&_th:first-child]:pr-5 [&_td:first-child]:pr-5 [&_th:last-child]:pl-4 [&_th:last-child]:pr-2 [&_th:last-child]:min-w-[100px] [&_td:last-child]:pl-4 [&_td:last-child]:pr-2 [&_td:last-child]:min-w-[100px] [&_thead]:bg-neutral-50 [&_thead]:text-neutral-500 [&_thead]:border-b [&_thead]:border-neutral-200 [&_tbody_tr:hover]:hover:bg-neutral-100">
+    <table class="collection-list-files_table [&_tr:hover_.visible-on-hover]:opacity-100 [&_tr:focus-within_.visible-on-hover]:opacity-100 [@media(hover:none)]:[&_.visible-on-hover]:opacity-100" :class="listTableClasses">
       <thead>
         <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
           <th v-for="header in headerGroup.headers" :key="header.id" :colSpan="header.colSpan"
-            class="text-neutral-500 text-sm font-normal whitespace-nowrap">
+            class="text-neutral-600">
             <div v-if="header.column.id === 'name'" class="flex items-center gap-4">
               <CollectionCheckbox v-if="files.length > 0" label="Select all" @click="toggleGlobalSelection()" :state="selection.length === files.length
                 ? 'check'
@@ -267,8 +262,8 @@ const table = useTable<typeof features, File>({
       </thead>
       <tbody>
         <tr v-if="table.getRowModel().rows.length" v-for="row in table.getRowModel().rows" :key="row.id"
-          @mouseenter="hoveredRowId = row.id" @mouseleave="hoveredRowId = null" class="relative">
-          <td v-for="cell in row.getVisibleCells()" :key="cell.id" class="text-neutral-500 text-sm font-normal">
+          @mouseenter="hoveredRowId = row.id" @mouseleave="hoveredRowId = null" class="group">
+          <td v-for="cell in row.getVisibleCells()" :key="cell.id" class="text-body">
             <div v-if="cell.column.id === 'name'" class="flex flex-row items-center gap-4">
               <CollectionCheckbox :label="`Select ${cell.row.original.name}`" @click="handleSelection(cell.row.original)" :class="[
                 'collection-list-files__file-selection',
@@ -311,7 +306,7 @@ const table = useTable<typeof features, File>({
                 </TooltipProvider>
               </div>
             </div>
-            <div v-if="cell.column.id === 'actions'" class="actions-cell top-0 right-0 bottom-0 [background-color:inherit] [z-index:1] flex items-center">
+            <div v-else-if="cell.column.id === 'actions'" class="actions-cell top-0 right-0 bottom-0 [background-color:inherit] [z-index:1] flex items-center">
               <div class="collection-list-files__actions-container flex items-center justify-end [background-color:inherit] gap-2">
                 <template v-if="haveAccessToFavorites">
                   <div v-if="isFavorite(cell.row.original)" class="favorite-button-container relative inline-flex items-center justify-center w-6 h-6 [&:hover_.file-is-favorite]:opacity-0 [&:hover_.star-off-button]:opacity-100">

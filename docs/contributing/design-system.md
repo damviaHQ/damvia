@@ -100,6 +100,18 @@ Keep CSS for generated semantic tokens, font declarations, base theme variables,
 
 Use the original client browsing layout as the reference. Keep collection selection and breadcrumbs in a single compact toolbar; do not add a duplicate collection title. Breadcrumbs use consistent 8px gaps, 16px separators and a shared text baseline. File cards use a 196px-high preview with 8px image padding and 24px gaps. Primary icon-only actions use 24px icons; do not globally shrink all button icons. Dialogs and popovers open and close immediately, without fade, zoom or slide effects. Avoid adding decorative motion or extra framing during modernization.
 
+### Reader views for files and collections
+
+A reader chooses how a set of files is shown from the Display preferences popover (`client/src/components/DisplayPreferences.vue`), whose trigger icon is the view currently in force and a sliders icon when several content groups disagree. The choice is per browser and per content group — an asset type, `asset_file` for untyped or mixed files, `asset_folder` for collections — and lives in `globalStore.displayPreferences`, with the finer settings in `displayDetails`.
+
+Files offer three views, collections only two:
+
+- **Grid** keeps the uniform 276px cards with a 196px preview, the name and the format and size beneath.
+- **List** is the table, whose visible columns the popover chooses.
+- **Masonry** (files only) fills the full width: the Picture size slider picks the smallest tile the reader wants, and the columns then share whatever width is left. Gaps are 8px, the same horizontally and vertically. Each tile takes its picture's own proportions so nothing is cropped: the tile starts from the dimensions the API returns and is corrected from the thumbnail once it loads, because a thumbnail does not always carry the proportions its file records — a PSD is flattened to its own preview. The caption moves into an overlay that appears on hover, on focus and on touch devices; nothing moves or scales, so closing a preview cannot leave a card stuck in a hover state. The geometry lives in `client/src/components/collection/gridStyles.ts` and rests on the measured container width, so no layout library is involved.
+
+A page block whose Display is set to Grid or List overrules the reader. The collection page says so in the popover rather than leaving the toggle looking broken.
+
 ### Shared form contract
 
 Shadcn-vue remains the foundation. `ui/field/styles.ts` owns the common classes used by `Label`, `Input`, `SelectTrigger`, `FormItem` and `FormDescription`. Use `FieldGroup` for plain forms and `FormItem` for validated forms; both use the same gap token. Use `FieldDescription` for supporting text. Do not nest a Label inside FormLabel, or put multiple children inside FormControl.

@@ -17,6 +17,7 @@ import CollectionDisplayGridFiles from "@/components/collection/CollectionDispla
 import CollectionDisplayListFiles from "@/components/collection/CollectionDisplayListFiles.vue"
 import { RouterOutput } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
+import type { DisplayView } from "@/utils/displayPreferences"
 import { computed } from "vue"
 
 type Collection = RouterOutput["collection"]["findById"]
@@ -28,10 +29,12 @@ const props = defineProps<{
   files?: CollectionFile[]
   placeholder?: string | null
   forceView?: "list" | "grid" | null
+  // The path tooltip only exists in the grid; the list has its own columns.
+  getPath?: (file: File) => string | undefined
 }>()
 const globalStore = useGlobalStore()
 
-const fileDisplayPreference = computed<"list" | "grid">(() => {
+const fileDisplayPreference = computed<DisplayView>(() => {
   const files = props.files || props.collection.files
   const assetType = files?.[0]?.assetType
   if (props.forceView) {
@@ -48,5 +51,6 @@ const fileDisplayPreference = computed<"list" | "grid">(() => {
 <template>
   <CollectionDisplayListFiles v-if="fileDisplayPreference === 'list'" :collection="collection" :files="files"
     :placeholder="placeholder" />
-  <CollectionDisplayGridFiles v-else :collection="collection" :files="files" :placeholder="placeholder" />
+  <CollectionDisplayGridFiles v-else :collection="collection" :files="files" :placeholder="placeholder"
+    :get-path="getPath" :uniform="forceView === 'grid'" />
 </template>

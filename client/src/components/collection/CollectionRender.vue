@@ -27,16 +27,20 @@ const props = defineProps<{
   generateRoute: (collection: Collection) => RouteLocationRaw
   placeholder?: string | null
   forceView?: "list" | "grid" | null
+  // The path tooltip only exists in the grid; the list has its own columns.
+  getPath?: (collection: Collection) => string | undefined
 }>()
 const globalStore = useGlobalStore()
 
-const folderDisplayPreference = computed<"list" | "grid">(
-  () => (props.forceView || globalStore.displayPreferences["asset_folder"]) ?? "grid"
+// Collections are cards or rows; masonry only ever applies to files.
+const folderDisplayPreference = computed<"list" | "grid">(() =>
+  (props.forceView || globalStore.displayPreferences["asset_folder"]) === "list" ? "list" : "grid"
 )
 </script>
 
 <template>
   <CollectionDisplayListCollection v-if="folderDisplayPreference === 'list'" :collections="collections"
     :generate-route="generateRoute" :placeholder="placeholder" />
-  <CollectionDisplayGrid v-else :collections="collections" :generate-route="generateRoute" :placeholder="placeholder" />
+  <CollectionDisplayGrid v-else :collections="collections" :generate-route="generateRoute" :placeholder="placeholder"
+    :get-path="getPath" />
 </template>

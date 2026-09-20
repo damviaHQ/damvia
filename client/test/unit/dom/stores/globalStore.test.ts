@@ -84,4 +84,16 @@ describe('global store', () => {
     expect(localStorage.getItem('dam_display_preferences')).toBeNull()
     expect(reloaded.displayPreferences).toEqual({})
   })
+
+  test('a stored masonry size survives a reload and an unknown one is dropped', () => {
+    localStorage.setItem('dam_display_details', JSON.stringify({
+      'type-1': { masonrySize: 4, columns: ['size'] },
+      'type-2': { masonrySize: 9 },
+      'type-3': { masonrySize: 'large' },
+    }))
+    const store = useGlobalStore()
+    expect(store.displayDetails['type-1']).toEqual({ masonrySize: 4, columns: ['size'] })
+    expect(store.displayDetails['type-2']).toEqual({})
+    expect(store.displayDetails['type-3']).toEqual({})
+  })
 })

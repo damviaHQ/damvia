@@ -13,18 +13,43 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import CollectionDisplayGrid from "@/components/collection/CollectionDisplayGrid.vue"
+import CollectionRender from "@/components/collection/CollectionRender.vue"
+import { useMyCollections } from "@/composables/useMyCollections"
+import { useGlobalStore } from "@/stores/globalStore"
+import { computed } from "vue"
 import { useCollectionFavorites } from "@/composables/useCollectionFavorites"
-import CollectionGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
+import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
+import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import Loader from "@/components/Loader.vue"
-import { trpc } from "@/services/server.ts"
-import { useQuery } from "@tanstack/vue-query"
+import { useFileFavorites } from "@/composables/useFileFavorites"
 
+const store = useGlobalStore()
+const { data: tree } = useMyCollections()
 const { data: collections, status: collectionsStatus, isLoading: collectionsLoading, error: collectionsError } = useCollectionFavorites()
-const { status, data: favorites, error } = useQuery({
-  queryKey: ["favorites"],
-  queryFn: () => trpc.favorite.list.query(),
+const { status, data: favorites, error } = useFileFavorites()
+
+const collectionPaths = computed(() => {
+  const paths = new Map<string, string>()
+  type TreeCollection = { id: string; name: string; public: boolean; ownerId?: string; children?: TreeCollection[] }
+  function visit(collection: TreeCollection, parents: string[]) {
+    const path = [...parents, collection.name]
+    paths.set(collection.id, path.join(' / '))
+    collection.children?.forEach(child => visit(child, path))
+  }
+  tree.value?.forEach((collection: TreeCollection) => visit(collection, [
+    !collection.public && collection.ownerId === store.user?.id ? 'My collections' : 'Library',
+  ]))
+  return paths
 })
+
+function collectionPath(collection: { id: string }) {
+  return collectionPaths.value.get(collection.id)
+}
+
+function filePath(file: { collectionId: string; name: string }) {
+  const parentPath = collectionPaths.value.get(file.collectionId)
+  return parentPath ? `${parentPath} / ${file.name}` : undefined
+}
 </script>
 
 <template>
@@ -35,16 +60,19 @@ const { status, data: favorites, error } = useQuery({
     {{ error?.message || collectionsError?.message }}
   </div>
   <div v-else-if="status === 'success'" class="favorites__container">
-    <h1 class="mb-7! text-[26px]! font-semibold! tracking-tight">Favorites</h1>
+    <div class="mb-6 flex min-h-10 items-center justify-between gap-3">
+      <h1 class="text-body font-semibold leading-5 tracking-normal">Favorites</h1>
+      <DisplayPreferences v-if="favorites?.length || collections?.length" :files="favorites ?? []" :collections="collections ?? []" />
+    </div>
     <div v-if="!favorites?.length && !collections?.length" class="grid justify-items-center gap-3 py-20 text-center [&_p]:max-w-sm [&_p]:text-sm [&_p]:text-neutral-500"><h2>No favorites yet</h2><p>Save collections and assets with the star icon to find them here.</p><router-link :to="{ name: 'search' }" class="dv-button">Browse assets</router-link></div>
     <div v-else class="grid gap-8">
       <section v-if="collections?.length" aria-labelledby="favorite-collections-heading">
         <h2 id="favorite-collections-heading" class="mb-4 text-body font-semibold">Collections</h2>
-        <CollectionDisplayGrid :collections="collections" :generate-route="collection => ({ name: 'collection', params: { id: collection.id } })" />
+        <CollectionRender :collections="collections" :get-path="collectionPath" :generate-route="collection => ({ name: 'collection', params: { id: collection.id } })" />
       </section>
       <section v-if="favorites?.length" aria-labelledby="favorite-assets-heading">
         <h2 id="favorite-assets-heading" class="mb-4 text-body font-semibold">Assets</h2>
-        <collection-grid-files :files="favorites" />
+        <CollectionRenderFiles :files="favorites" :get-path="filePath" />
       </section>
     </div>
   </div>

@@ -18,6 +18,7 @@ import { defineStore } from "pinia"
 import { computed, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
 import { RouterOutput, trpc } from "../services/server.ts"
+import { readDisplayDetails, type DisplayDetails, type DisplayView } from "../utils/displayPreferences"
 import { clearRecentSearches } from "../utils/recentSearches"
 
 export const useGlobalStore = defineStore('global', () => {
@@ -32,11 +33,25 @@ export const useGlobalStore = defineStore('global', () => {
 	const env = ref<RouterOutput['env']>()
 	const isAuthenticated = computed(() => authToken.value !== undefined)
 	const selection = ref<{ type: 'collection' | 'file', id: string }[]>([])
-	const displayPreferences = ref<{ [assetTypeId: string]: 'grid' | 'list' }>(
+	const displayPreferences = ref<{ [assetTypeId: string]: DisplayView }>(
 		JSON.parse(localStorage.getItem('dam_display_preferences') || '{}')
 	)
 
-	function setDisplayPreferences(assetTypeId: string, display: 'grid' | 'list') {
+	const displayDetails = ref(readDisplayDetails())
+
+	function setDisplayDetails(id: string, details: DisplayDetails) {
+		displayDetails.value[id] = { ...displayDetails.value[id], ...details }
+		localStorage.setItem('dam_display_details', JSON.stringify(displayDetails.value))
+	}
+
+	function resetDisplayPreference(id: string) {
+		delete displayPreferences.value[id]
+		delete displayDetails.value[id]
+		localStorage.setItem('dam_display_preferences', JSON.stringify(displayPreferences.value))
+		localStorage.setItem('dam_display_details', JSON.stringify(displayDetails.value))
+	}
+
+	function setDisplayPreferences(assetTypeId: string, display: DisplayView) {
 		displayPreferences.value[assetTypeId] = display
 		localStorage.setItem('dam_display_preferences', JSON.stringify(displayPreferences.value))
 	}
@@ -44,6 +59,8 @@ export const useGlobalStore = defineStore('global', () => {
 	function clearDisplayPreferences() {
 		displayPreferences.value = {}
 		localStorage.removeItem('dam_display_preferences')
+		displayDetails.value = {}
+		localStorage.removeItem('dam_display_details')
 	}
 
 	function fetchUser() {
@@ -91,6 +108,9 @@ export const useGlobalStore = defineStore('global', () => {
 		logout,
 		env,
 		displayPreferences,
+		displayDetails,
+		setDisplayDetails,
+		resetDisplayPreference,
 		clearDisplayPreferences,
 		setDisplayPreferences,
 		fetchEnv,

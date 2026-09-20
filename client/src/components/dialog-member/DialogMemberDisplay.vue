@@ -60,8 +60,10 @@ function setDisplayPreference(id: string, value: "grid" | "list") {
   globalStore.setDisplayPreferences(id, value)
 }
 
-function getDisplayPreference(id: string) {
-  return displayPreferences.value[id] ?? defaultValues.value[id]
+// These are the defaults a member keeps across collections; masonry is chosen
+// while browsing, so it shows here as the grid it is a flavour of.
+function getDisplayPreference(id: string): "grid" | "list" {
+  return (displayPreferences.value[id] ?? defaultValues.value[id]) === "list" ? "list" : "grid"
 }
 
 function resetDisplayPreferences() {

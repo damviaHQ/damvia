@@ -29,6 +29,7 @@ import {
   ChevronRight,
   FilePenLine,
   Link,
+  Search,
   Settings,
   Trash2,
 } from "@lucide/vue"
@@ -91,6 +92,14 @@ const selection = computed(() => {
       (item.type === "collection" && collectionIds.includes(item.id))
   )
 })
+
+// A page block can fix its own layout, which quietly wins over the reader's
+// choice; saying so beats a toggle that looks broken.
+const layoutLocked = computed(() =>
+  (collection.value?.page?.blocks ?? []).some((block: { type: string, data?: { layout?: string | null } }) =>
+    ["collections", "files", "last_files"].includes(block.type) && !!block.data?.layout
+  )
+)
 
 const collectionPath = computed(() => {
   if (!collection.value) {
@@ -210,13 +219,19 @@ function removeSelectedFiles() {
           size="icon-sm">
           <Settings class="text-neutral-500 hover:text-neutral-800" />
         </Button>
-        <Button aria-label="Edit page" title="Edit page" v-if="collection.canEdit && collection.page" as-child type="button"
+        <Button aria-label="Edit page" title="Edit page" v-if="collection.canEdit" as-child type="button"
           variant="ghost" size="icon-sm">
           <router-link :to="{ name: 'collection-edit', params: { id: collection.id } }">
             <FilePenLine class="text-neutral-500 hover:text-neutral-800" />
           </router-link>
         </Button>
-        <DisplayPreferences :files="collection.files" :collections="collection.children" />
+        <Button aria-label="Search in this collection" title="Search in this collection" as-child type="button"
+          variant="ghost" size="icon-sm">
+          <router-link :to="{ name: 'search', query: { from_collection: collection.id, search_scope: 'current_with_sub' } }">
+            <Search class="text-neutral-500 hover:text-neutral-800" />
+          </router-link>
+        </Button>
+        <DisplayPreferences :files="collection.files" :collections="collection.children" :layout-locked="layoutLocked" />
         <Button aria-label="Share collection" title="Share collection" v-if="collection.canEdit" @click="isShareModalOpen = true" type="button" variant="ghost"
           size="icon-sm">
           <Link class="text-neutral-500 hover:text-neutral-800" />
