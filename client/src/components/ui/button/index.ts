@@ -20,6 +20,7 @@ export const buttonVariants = cva(
         sm: 'min-h-8 px-2.5 py-1.5',
         lg: 'min-h-11 px-5 py-2.5',
         icon: 'size-10 p-2 [&_svg]:size-6',
+        'icon-sm': 'size-9 rounded-[6px] p-2 [&_svg]:size-5 [&_svg]:stroke-[1.75] [@media(pointer:coarse)]:size-10',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

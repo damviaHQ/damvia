@@ -55,7 +55,7 @@ test('empty My collections is a keyboard-accessible destination with a working c
   expect(errors).toEqual([])
 })
 
-test('personal trees match library rows and disclosure stays separate from navigation', async ({ page }) => {
+test('personal trees match library rows and the chevron toggles without navigating', async ({ page }) => {
   const tree = [personal('zulu', 'Zulu'), personal('alpha', 'Alpha', [personal('nested', 'Nested collection')]),
     { ...personal('public', 'Public collection'), public: true },
     { ...personal('shared', 'Someone else’s collection'), ownerId: 'other-user' }]
@@ -115,4 +115,46 @@ test('loading and failed requests do not show the empty collection invitation', 
   await page.route('**/trpc/collection.tree*', route => route.fulfill({ json: { result: { data: [] } } }))
   await page.getByRole('button', { name: 'Try again', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'No collections yet' })).toBeVisible()
+})
+
+
+test('My collections label toggles the tree while navigating, with aligned sidebar labels and icons', async ({ page }) => {
+  const errors = await fixture(page, [personal('alpha', 'Alpha')])
+  await page.goto('/favorites')
+  const sidebar = page.locator('aside')
+  const collections = sidebar.getByRole('link', { name: 'My collections', exact: true })
+  const favorites = sidebar.getByRole('link', { name: 'Favorites', exact: true })
+  const child = sidebar.getByRole('link', { name: 'Alpha', exact: true })
+  const favoriteLabel = (await favorites.locator('span').last().boundingBox())!
+  const collectionLabel = (await collections.locator('span').last().boundingBox())!
+  expect(favoriteLabel.x).toBe(collectionLabel.x)
+  const star = (await favorites.locator('svg').boundingBox())!
+  const chevron = (await sidebar.getByRole('button', { name: 'Expand My collections', exact: true }).locator('svg').boundingBox())!
+  expect(star.x + star.width / 2).toBe(chevron.x + chevron.width / 2)
+  await expect(collections).toHaveAttribute('aria-expanded', 'false')
+  await collections.click()
+  await expect(page).toHaveURL(/\/collections$/)
+  await expect(collections).toHaveAttribute('aria-expanded', 'true')
+  await expect(child).toBeVisible()
+  await collections.click()
+  await expect(page).toHaveURL(/\/collections$/)
+  await expect(collections).toHaveAttribute('aria-expanded', 'false')
+  await expect(child).toBeHidden()
+  await collections.focus()
+  await page.keyboard.press('Enter')
+  await expect(collections).toHaveAttribute('aria-expanded', 'true')
+  await expect(child).toBeVisible()
+  await child.click()
+  await expect(page).toHaveURL(/\/collections\/alpha$/)
+  await collections.click()
+  await expect(page).toHaveURL(/\/collections$/)
+  await expect(collections).toHaveAttribute('aria-expanded', 'false')
+  await expect(child).toBeHidden()
+  await favorites.click()
+  await collections.click()
+  await expect(page).toHaveURL(/\/collections$/)
+  await expect(child).toBeVisible()
+  await page.locator('main').hover()
+  await page.screenshot({ path: '/tmp/damvia-sidebar-alignment.png' })
+  expect(errors).toEqual([])
 })

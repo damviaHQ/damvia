@@ -13,7 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import CollectionDisplayGrid from "@/components/collection/CollectionDisplayGrid.vue"
+import CollectionRender from "@/components/collection/CollectionRender.vue"
+import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import CollectionDialogCreate from "@/components/collection/CollectionDialogCreate.vue"
 import Loader from "@/components/Loader.vue"
 import { Button } from "@/components/ui/button"
@@ -29,11 +30,14 @@ const isCreateOpen = ref(false)
 
 <template>
   <div>
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-      <h1 class="text-heading font-semibold tracking-tight">My collections</h1>
-      <Button v-if="myCollections.length" @click="isCreateOpen = true">
-        <Plus aria-hidden="true" /> Create collection
-      </Button>
+    <div class="mb-6 flex min-h-10 flex-wrap items-center justify-between gap-4">
+      <h1 class="text-body font-semibold leading-5 tracking-normal">My collections</h1>
+      <div v-if="myCollections.length" class="flex items-center gap-1">
+        <DisplayPreferences :collections="myCollections" />
+        <Button @click="isCreateOpen = true">
+          <Plus aria-hidden="true" /> Create collection
+        </Button>
+      </div>
     </div>
     <Loader v-if="status === 'pending'" :text="true" />
     <div v-else-if="status === 'error'" role="alert" class="grid justify-items-center gap-3 py-20 text-center">
@@ -46,7 +50,7 @@ const isCreateOpen = ref(false)
       <p class="max-w-sm text-body text-muted-foreground">Create your first collection to keep the assets you need together.</p>
       <Button @click="isCreateOpen = true"><Plus aria-hidden="true" /> Create your first collection</Button>
     </div>
-    <CollectionDisplayGrid v-else :collections="myCollections"
+    <CollectionRender v-else :collections="myCollections"
       :generate-route="collection => ({ name: 'collection', params: { id: collection.id } })" />
     <CollectionDialogCreate v-model="isCreateOpen"
       @created="router.push({ name: 'collection', params: { id: $event.id } })" />

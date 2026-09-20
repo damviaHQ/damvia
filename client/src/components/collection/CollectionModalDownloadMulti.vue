@@ -73,6 +73,12 @@ const totalSize = computed(() => {
     res.value?.files.reduce((total, file) => total + Number(file.size), 0) || 0
   return formatFileSize(sizeInBytes)
 })
+const hasCustomDownloadSettings = computed(() =>
+  (res.value?.files ?? []).some((file) =>
+    (file.mimeType.startsWith("image/") && form.value.imageFormat !== "original") ||
+    (file.mimeType.startsWith("video/") && form.value.videoFormat !== "original")
+  )
+)
 
 const hasLicenses = computed(() => {
   return res.value?.licenses && res.value.licenses.length > 0;
@@ -378,8 +384,11 @@ function removeFromSelection(file: { id: string }) {
             {{ isLoading ? "Preparing files..." : "Download" }}
           </Button>
           <div class="mt-2 text-sm text-neutral-600">
-            Total Size: {{ totalSize }}
+            Original files: {{ totalSize }}
           </div>
+          <p v-if="hasCustomDownloadSettings" class="mt-1 text-xs text-neutral-500">
+            Final size may vary.
+          </p>
         </div>
       </div>
     </div>

@@ -55,7 +55,7 @@ watch([menuItems, () => globalStore.user, collections, status, isFetchingMenu, i
 </script>
 
 <template>
-  <div v-if="showDefaultView" class="layout-home flex flex-col items-center justify-center w-full [font-size:1rem] p-4 m-0 [color:var(--dv-text-secondary)] font-medium">
+  <div v-if="showDefaultView" class="layout-home flex flex-col items-center justify-center w-full [font-size:1rem] m-0 [color:var(--dv-text-secondary)] font-medium">
     <h1>Welcome to our Internal asset platform.</h1>
     <p>The homepage is still work in progress but you can already navigate through collections on the left or <a
         href="/search"> search</a> assets
