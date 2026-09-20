@@ -14,11 +14,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
+import { RotateCcw } from "@lucide/vue"
 import { computed, useId } from "vue"
 import { useRoute } from "vue-router"
 import Treeselect from "vue3-treeselect-ts"
@@ -79,6 +81,12 @@ function patch(values: Record<string, unknown>) {
       <Treeselect :model-value="data.collectionsId ?? []" :options="collectionOptions" :clearable="true"
         :multiple="true" :flat="true" placeholder="The sub-collections of this collection"
         @update:model-value="patch({ collectionsId: $event?.length ? $event : null })" />
+      <!-- Going back to the default is otherwise a matter of noticing the
+           small cross that clears the field. -->
+      <Button v-if="data.collectionsId?.length" type="button" variant="ghost" size="sm" class="w-max px-0"
+        @click="patch({ collectionsId: null })">
+        <RotateCcw class="size-4" />Show the sub-collections instead
+      </Button>
     </FieldGroup>
     <FieldGroup v-else-if="type === 'files'">
       <Label :id="`${fieldId}-collection`">Collection (optional)</Label>

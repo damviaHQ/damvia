@@ -151,3 +151,44 @@ test('the collection being edited cannot be chosen as one of its own cards', asy
   await expect(page.locator('.vue-treeselect__option', { hasText: 'Child collection' }).first()).toBeVisible()
   expect(errors).toEqual([])
 })
+
+// Clearing a custom selection otherwise means noticing the small cross in the
+// field, and it is not obvious that emptying it restores the default.
+test('a custom selection can be handed back to the sub-collections', async ({ page }) => {
+  const card = {
+    id: 'child', name: 'Child collection', numberOfFiles: 0, draft: false, canEdit: false,
+    thumbnailURL: null, sampleFiles: [],
+  }
+  const chosen = {
+    ...subject,
+    page: {
+      ...subject.page,
+      blocks: [{ ...listBlock, data: { title: null, layout: null, collectionsId: ['child'] } }],
+      assets: { uploads: {}, files: {}, collections: { child: card }, pages: {} },
+    },
+  }
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+  await page.route('**/trpc/**', async route => {
+    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
+    let data: unknown = responses[name] ?? []
+    if (name === 'collection.findById') data = chosen
+    if (name === 'collection.tree') data = [parent]
+    await route.fulfill({ json: { result: { data } } })
+  })
+
+  await page.goto('/collections/campaign/edit')
+  const block = page.locator('[data-block-index="0"]')
+  await block.hover()
+  await block.getByRole('button', { name: 'Block settings' }).click()
+  await expect(block.getByText('Child collection')).toBeVisible()
+
+  const reset = page.getByRole('button', { name: 'Show the sub-collections instead' })
+  await expect(reset).toBeVisible()
+  await reset.click()
+
+  await expect(reset).toHaveCount(0)
+  await expect(block.getByText('Child collection')).toHaveCount(0)
+  expect(errors).toEqual([])
+})
