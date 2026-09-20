@@ -276,3 +276,24 @@ test('collection previews are available before a save, and only for what the cal
         await forbidden(caller(user).page.collectionPreviews({ collectionIds: [visible.id] }))
     }
 })
+
+// A card for the collection the page belongs to would lead a reader back to
+// the page they are already on.
+test('a collection is never listed as one of its own cards', async () => {
+    const other = await makeCollection({ name: 'Other' })
+    const { collection, page } = await makePage(member)
+
+    const saved = await caller(member).page.save({
+        pageId: page.id,
+        blocks: [{ type: 'collections', size: 'full', data: { collectionsId: [collection.id, other.id] } }],
+    })
+    assert.deepEqual(saved.blocks[0].data.collectionsId, [other.id])
+
+    // Naming only itself leaves the block back on the sub-collections it
+    // follows by default, rather than an empty list.
+    const alone = await caller(member).page.save({
+        pageId: page.id,
+        blocks: [{ id: saved.blocks[0].id, type: 'collections', size: 'full', data: { collectionsId: [collection.id] } }],
+    })
+    assert.equal(alone.blocks[0].data.collectionsId, null)
+})

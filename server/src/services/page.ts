@@ -80,7 +80,7 @@ export async function loadEditablePage(opts: FindPageOptions) {
 
 // The block payload is never trusted: it is parsed against the schema for its
 // own type, its text is sanitized and its uploads must belong to this page.
-export function normalizeBlockData(pageId: string, type: BlockType, data: unknown): BlockData {
+export function normalizeBlockData(page: Page, type: BlockType, data: unknown): BlockData {
 	let parsed: BlockData
 	try {
 		parsed = parseBlockData(type, data)
@@ -92,9 +92,16 @@ export function normalizeBlockData(pageId: string, type: BlockType, data: unknow
 		return { ...parsed, html: sanitizeBlockHtml((parsed as { html: string }).html) }
 	}
 	for (const key of uploadKeysOf(parsed)) {
-		if (!key.startsWith(blockPrefix(pageId))) {
+		if (!key.startsWith(blockPrefix(page.id))) {
 			throw new TRPCError({ code: 'BAD_REQUEST', message: 'This image does not belong to this page.' })
 		}
+	}
+	// A collection cannot be one of its own cards: the card would lead back to
+	// the page the reader is already on.
+	const listed = (parsed as { collectionsId?: string[] }).collectionsId
+	if (page.collectionId && listed?.includes(page.collectionId)) {
+		const kept = listed.filter((id) => id !== page.collectionId)
+		return { ...parsed, collectionsId: kept.length ? kept : null } as BlockData
 	}
 	return parsed
 }
@@ -118,13 +125,13 @@ export async function savePage({ em, page, blocks }: SavePageOptions) {
 			type: PageBlockType[input.type.toUpperCase()],
 			position,
 			size: input.size,
-			data: normalizeBlockData(page.id, input.type, input.data),
+			data: normalizeBlockData(page, input.type, input.data),
 		})
 		if (block) {
 			// The type is fixed at creation: changing it would orphan its payload.
 			target.position = position
 			target.size = input.size
-			target.data = normalizeBlockData(page.id, target.type as BlockType, input.data)
+			target.data = normalizeBlockData(page, target.type as BlockType, input.data)
 		}
 		saved.push(await repository.save(target))
 	}

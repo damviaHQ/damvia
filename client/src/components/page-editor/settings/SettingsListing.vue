@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 import { computed, useId } from "vue"
+import { useRoute } from "vue-router"
 import Treeselect from "vue3-treeselect-ts"
 
 // The three listing blocks share every option they have.
@@ -27,6 +28,10 @@ const props = defineProps<{ data: any; type: "collections" | "files" | "last_fil
 const emit = defineEmits<{ (e: "update", data: any): void }>()
 
 const fieldId = useId()
+const route = useRoute()
+// A collection cannot be a card on its own page, so it stays in the tree, for
+// its children's sake, but cannot be chosen.
+const currentCollectionId = computed(() => (route.name === "collection-edit" ? (route.params.id as string) : null))
 const { data: collections } = useQuery({
   queryKey: ["collection", "tree"],
   queryFn: () => trpc.collection.tree.query(),
@@ -35,7 +40,12 @@ const { data: collections } = useQuery({
 
 const collectionOptions = computed(() => {
   function format(items: any[]): any[] {
-    return items.map((item) => ({ id: item.id, label: item.name, children: item.children ? format(item.children) : undefined }))
+    return items.map((item) => ({
+      id: item.id,
+      label: item.name,
+      isDisabled: item.id === currentCollectionId.value,
+      children: item.children ? format(item.children) : undefined,
+    }))
   }
   return collections.value ? format(collections.value) : []
 })

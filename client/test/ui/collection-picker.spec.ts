@@ -121,3 +121,33 @@ test('a collection appears in the block as soon as it is chosen', async ({ page 
   expect(saves).toEqual([])
   expect(errors).toEqual([])
 })
+
+// Picking the collection the page belongs to would put a card on the page
+// leading back to itself.
+test('the collection being edited cannot be chosen as one of its own cards', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+  await page.route('**/trpc/**', async route => {
+    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
+    let data: unknown = responses[name] ?? []
+    if (name === 'collection.findById') data = subject
+    // The page's own collection sits in the tree, with a child of its own.
+    if (name === 'collection.tree') data = [{ ...subject, children: [child] }]
+    await route.fulfill({ json: { result: { data } } })
+  })
+
+  await page.goto('/collections/campaign/edit')
+  const block = page.locator('[data-block-index="0"]')
+  await block.hover()
+  await block.getByRole('button', { name: 'Block settings' }).click()
+  await page.getByRole('dialog').locator('.vue-treeselect__control').click()
+
+  const itself = page.locator('.vue-treeselect__option', { hasText: 'Autumn essentials' }).first()
+  await expect(itself).toHaveClass(/vue-treeselect__option--disabled/)
+
+  // Its children stay reachable, which is why it is disabled and not removed.
+  await itself.locator('.vue-treeselect__option-arrow-container').click()
+  await expect(page.locator('.vue-treeselect__option', { hasText: 'Child collection' }).first()).toBeVisible()
+  expect(errors).toEqual([])
+})

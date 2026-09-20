@@ -33,7 +33,11 @@ const props = defineProps<{
 // Chosen collections are resolved by the server alongside the page, with the
 // thumbnails their cards preview. Reading them from the collection tree gave
 // no previews, because that tree is built without sample files.
-const chosen = computed<string[]>(() => props.data?.collectionsId ?? [])
+// A page never shows a card for the collection it belongs to, including on
+// pages saved before that became impossible to choose.
+const chosen = computed<string[]>(() =>
+  (props.data?.collectionsId ?? []).filter((id: string) => id !== props.collection?.id)
+)
 
 // A collection picked a moment ago is not in the page's assets yet, since
 // those are resolved when the page is read. Asking for the missing ones keeps
