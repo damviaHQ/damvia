@@ -10,7 +10,9 @@
 :is(.dv-admin, .dv-client) .vue-treeselect:not(.vue-treeselect--disabled) .vue-treeselect__control:hover { border-color:var(--dv-text-secondary); }
 :is(.dv-admin, .dv-client) .vue-treeselect:focus-within .vue-treeselect__control { outline:2px solid hsl(var(--ring)); outline-offset:2px; }
 :is(.dv-admin, .dv-client) .vue-treeselect__menu { @apply border rounded-none shadow-md mt-1; background:var(--dv-surface-panel); color:var(--dv-text-primary); border-color:var(--dv-color-line); }
-:is(.dv-admin, .dv-client) .vue-treeselect__option { @apply p-1; }
+/* Only the vertical and right padding: the left padding carries the tree
+   indentation, one step per level, and setting it here flattens the tree. */
+:is(.dv-admin, .dv-client) .vue-treeselect__option { @apply py-1 pr-1; }
 :is(.dv-admin, .dv-client) .vue-treeselect__option--highlight { background:var(--dv-surface-canvas); }
 :is(.dv-admin, .dv-client) .vue-treeselect__option--selected { @apply bg-neutral-50; }
 :is(.dv-admin, .dv-client) :is(.vue-treeselect__placeholder, .vue-treeselect__single-value) { @apply flex items-center text-[length:var(--dv-field-label-size)] leading-[var(--dv-field-line-height)]; color:var(--dv-text-secondary); }
