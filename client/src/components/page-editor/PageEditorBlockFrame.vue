@@ -25,7 +25,7 @@ import { BLOCK_SIZES, type BlockSize } from "server/src/page-blocks/schema"
 import {
   ArrowDown, ArrowUp, Columns2, Columns3, Copy, GripVertical, RectangleHorizontal, Settings, Trash2,
 } from "@lucide/vue"
-import { computed } from "vue"
+import { computed, ref } from "vue"
 import { libraryItem } from "./blockLibrary"
 import SettingsHero from "./settings/SettingsHero.vue"
 import SettingsImage from "./settings/SettingsImage.vue"
@@ -43,6 +43,10 @@ const emit = defineEmits<{
 const SIZE_ICONS = { full: RectangleHorizontal, half: Columns2, third: Columns3 }
 const label = computed(() => libraryItem(props.block.type)?.name ?? props.block.type)
 const hasSettings = computed(() => props.block.type !== "text" && props.block.type !== "video")
+// The toolbar hides when the pointer leaves the block. While a menu is open
+// its trigger must stay in the layout, or the floating panel loses its anchor
+// and jumps to the corner of the screen.
+const isMenuOpen = ref(false)
 const listingType = computed(() =>
   ["collections", "files", "last_files"].includes(props.block.type) ? (props.block.type as any) : null
 )
@@ -52,7 +56,8 @@ const listingType = computed(() =>
   <div class="group relative rounded-md border border-transparent p-2 transition-colors hover:border-neutral-300 focus-within:border-neutral-300"
     :data-block-index="index">
     <div
-      class="absolute -top-4 right-2 z-10 hidden items-center gap-0.5 rounded-md border border-neutral-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex group-focus-within:flex">
+      class="absolute -top-4 right-2 z-10 items-center gap-0.5 rounded-md border border-neutral-200 bg-white px-1 py-0.5 shadow-sm group-hover:flex group-focus-within:flex"
+      :class="isMenuOpen ? 'flex' : 'hidden'">
       <span class="block-handle flex cursor-grab items-center px-1 text-neutral-400" :aria-label="`Drag ${label} block`"
         role="button" tabindex="-1"><GripVertical class="size-4" /></span>
       <span class="mr-1 text-xs font-medium text-neutral-500">{{ label }}</span>
@@ -67,13 +72,13 @@ const listingType = computed(() =>
         :disabled="index === count - 1" data-block-action="down" @click="emit('move', 'down')">
         <ArrowDown class="size-4" />
       </Button>
-      <Popover v-if="hasSettings">
+      <Popover v-if="hasSettings" @update:open="isMenuOpen = $event">
         <PopoverTrigger as-child>
           <Button type="button" variant="ghost" size="icon" class="size-7" aria-label="Block settings">
             <Settings class="size-4" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent class="w-80" align="end">
+        <PopoverContent class="w-80" align="end" :collision-padding="12">
           <SettingsListing v-if="listingType" :data="block.data" :type="listingType" @update="emit('update', $event)" />
           <SettingsImage v-else-if="block.type === 'image'" :data="block.data" @update="emit('update', $event)" />
           <SettingsHero v-else-if="block.type === 'hero'" :data="block.data" @update="emit('update', $event)" />
@@ -81,7 +86,7 @@ const listingType = computed(() =>
       </Popover>
       <Button type="button" variant="ghost" size="icon" class="size-7" aria-label="Duplicate block"
         @click="emit('duplicate')"><Copy class="size-4" /></Button>
-      <AlertDialog>
+      <AlertDialog @update:open="isMenuOpen = $event">
         <AlertDialogTrigger as-child>
           <Button type="button" variant="ghost" size="icon" class="size-7" aria-label="Delete block">
             <Trash2 class="size-4" />

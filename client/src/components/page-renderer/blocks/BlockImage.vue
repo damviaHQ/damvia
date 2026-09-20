@@ -20,12 +20,22 @@ import BlockLink from "./BlockLink.vue"
 
 const props = defineProps<{ data: any; assets?: PageAssets; editing?: boolean }>()
 const media = computed(() => resolveMedia(props.data?.media, props.assets))
+
+// Library originals are often enormous. A picture keeps its proportions and
+// stays within a chosen height rather than filling the whole page.
+const HEIGHTS: Record<string, string> = {
+  small: "max-height:220px",
+  medium: "max-height:420px",
+  large: "max-height:640px",
+  original: "",
+}
+const heightStyle = computed(() => HEIGHTS[props.data?.height ?? "medium"] ?? HEIGHTS.medium)
 </script>
 
 <template>
   <figure v-if="media" class="m-0">
     <BlockLink :link="data.link" :assets="assets" :disabled="editing">
-      <img :src="media.url" :alt="data.alt || ''" class="w-full h-auto" />
+      <img :src="media.url" :alt="data.alt || ''" class="h-auto w-full object-contain object-left" :style="heightStyle" />
     </BlockLink>
     <figcaption v-if="data.caption" class="mt-1 text-sm text-neutral-500">{{ data.caption }}</figcaption>
   </figure>

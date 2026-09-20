@@ -32,6 +32,42 @@ export function spanClass(size: BlockSize): string {
   return SPANS[size] ?? SPANS.full
 }
 
+export const COLUMNS = 6
+const SPAN_UNITS: Record<BlockSize, number> = { full: 6, half: 3, third: 2 }
+
+export function spanUnits(size: BlockSize): number {
+  return SPAN_UNITS[size] ?? COLUMNS
+}
+
+// Blocks flow like text: a line fills up to six columns, and a block that no
+// longer fits starts the next one.
+export function columnsLeftBefore(sizes: BlockSize[], index: number): number {
+  let used = 0
+  for (const size of sizes.slice(0, index)) {
+    const span = spanUnits(size)
+    used = used + span > COLUMNS ? span : used + span
+    // A line that is exactly full is closed: the next block starts a new one.
+    if (used === COLUMNS) {
+      used = 0
+    }
+  }
+  return COLUMNS - used
+}
+
+// A block dropped beside a narrower one takes the room that is left, so
+// dragging something next to a half-width block does not push it onto its own
+// line. A block dropped at the start of a fresh line keeps its own width.
+export function fitToLine(sizes: BlockSize[], index: number, current: BlockSize): BlockSize {
+  const left = columnsLeftBefore(sizes, index)
+  if (left >= COLUMNS || left <= 0) {
+    return current
+  }
+  if (spanUnits(current) <= left) {
+    return current
+  }
+  return left >= 3 ? 'half' : 'third'
+}
+
 export function moveItem<T>(items: T[], from: number, to: number): T[] {
   const next = [...items]
   if (from < 0 || from >= next.length || to < 0 || to >= next.length || from === to) {

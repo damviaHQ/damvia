@@ -62,9 +62,20 @@ export type BlockLink = z.infer<typeof linkSchema>
 const layout = z.enum(['grid', 'list']).nullish()
 const title = z.string().max(120).nullish()
 
+// How much room a picture is allowed to take, in words rather than pixels.
+export const IMAGE_HEIGHTS = ['small', 'medium', 'large', 'original'] as const
+export type ImageHeight = typeof IMAGE_HEIGHTS[number]
+
+// Which part of a banner picture stays in frame when it is cropped.
+const focus = z.object({
+	x: z.number().min(0).max(100).default(50),
+	y: z.number().min(0).max(100).default(50),
+}).default({ x: 50, y: 50 })
+
 export const blockDataSchemas = {
 	hero: z.object({
 		media: mediaRefSchema.nullish().default(null),
+		focus,
 		title: z.string().max(200).default(''),
 		subtitle: z.string().max(500).default(''),
 		button: z.object({ label: z.string().max(80), link: linkSchema }).nullish().default(null),
@@ -72,6 +83,7 @@ export const blockDataSchemas = {
 	text: z.object({ html: z.string().max(50_000).default('') }),
 	image: z.object({
 		media: mediaRefSchema.nullish().default(null),
+		height: z.enum(IMAGE_HEIGHTS).default('medium'),
 		alt: z.string().max(300).default(''),
 		caption: z.string().max(500).default(''),
 		link: linkSchema.nullish().default(null),

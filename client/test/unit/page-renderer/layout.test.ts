@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { insertAt, moveItem, spanClass } from '@/components/page-renderer/layout'
+import { columnsLeftBefore, fitToLine, insertAt, moveItem, spanClass } from '@/components/page-renderer/layout'
 
 describe('page layout', () => {
   test('a block spans the grid according to its size', () => {
@@ -36,6 +36,28 @@ describe('page layout', () => {
     expect(moveItem(blocks, 0, -1)).toEqual(['a', 'b'])
     expect(moveItem(blocks, 1, 5)).toEqual(['a', 'b'])
     expect(moveItem(blocks, 1, 1)).toEqual(['a', 'b'])
+  })
+
+  test('a line fills to six columns before the next one starts', () => {
+    expect(columnsLeftBefore(['full'], 1)).toBe(6)
+    expect(columnsLeftBefore(['half'], 1)).toBe(3)
+    expect(columnsLeftBefore(['third'], 1)).toBe(4)
+    expect(columnsLeftBefore(['third', 'third'], 2)).toBe(2)
+    expect(columnsLeftBefore(['half', 'half'], 2)).toBe(6)
+    // A block too wide for the room left takes a line of its own, and fills
+    // it, so whatever follows starts on a fresh line.
+    expect(columnsLeftBefore(['half', 'full'], 2)).toBe(6)
+    expect(columnsLeftBefore(['third', 'third', 'third'], 3)).toBe(6)
+  })
+
+  test('a block dropped beside a narrower one takes the room that is left', () => {
+    expect(fitToLine(['half', 'full'], 1, 'full')).toBe('half')
+    expect(fitToLine(['third', 'full'], 1, 'full')).toBe('half')
+    expect(fitToLine(['third', 'third', 'full'], 2, 'full')).toBe('third')
+    // A block that already fits, or that starts a fresh line, keeps its width.
+    expect(fitToLine(['half', 'third'], 1, 'third')).toBe('third')
+    expect(fitToLine(['full', 'full'], 1, 'full')).toBe('full')
+    expect(fitToLine(['full'], 0, 'full')).toBe('full')
   })
 
   test('inserting clamps to the ends of the page', () => {

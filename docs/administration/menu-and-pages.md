@@ -48,13 +48,13 @@ Blocks are an ordered list, not a grid. Each one is `full`, `half` or `third` of
 | --- | --- | --- |
 | `hero` | Banner | A picture with a title, a subtitle and an optional button |
 | `text` | Text | Titles and paragraphs |
-| `image` | Picture | One picture, with a description for screen readers, an optional caption and an optional link |
+| `image` | Picture | One picture, held to a chosen height, with a description for screen readers, an optional caption and an optional link |
 | `video` | Video | An uploaded video, a library file, or a YouTube or Vimeo address |
 | `collections` | Collections | Sub-collections, or a chosen selection |
 | `files` | Files | Every file of a collection |
 | `last_files` | Latest files | Recently added files |
 
-Each block type has its own payload, defined once in `server/src/page-blocks/schema.ts` and imported by the client, so the editor and the server agree on what is valid. Pictures and videos hold a reference rather than an address: either `{ source: 'upload', s3key }` for a file uploaded to the page, or `{ source: 'file', fileId }` for a file already in the library. Videos also accept `{ source: 'embed', provider, videoId }`.
+Each block type has its own payload, defined once in `server/src/page-blocks/schema.ts` and imported by the client, so the editor and the server agree on what is valid. A picture carries its `height`, and a banner carries the `focus` point that decides which part of it stays in frame; both have defaults, so blocks saved before these existed keep working. Pictures and videos hold a reference rather than an address: either `{ source: 'upload', s3key }` for a file uploaded to the page, or `{ source: 'file', fileId }` for a file already in the library. Videos also accept `{ source: 'embed', provider, videoId }`.
 
 ### The editor
 
@@ -64,7 +64,11 @@ Editing a page is its own screen, at `/collections/:id/edit` for a collection pa
 - The **top bar** names the page, says whether there are unsaved changes, and holds `Discard`, `Save` and `Exit`.
 - **Each block carries a toolbar** on hover or keyboard focus: a drag handle, the three width buttons, `Move block up` and `Move block down`, a settings popover for the types that have options, `Duplicate block` and `Delete block`. A keyboard move announces the block's new position to screen readers.
 - **Text is written on the page itself.** Selecting text raises a small toolbar with bold, italic, two heading levels, lists, quote and link.
-- **Pictures and videos open a chooser** with two tabs: upload a file, or pick one from the library. The library tab searches the same index as the rest of the application, without recording the search as library activity. Video has a third tab for a YouTube or Vimeo address.
+- **Pictures and videos open a chooser** with two tabs: upload a file, or pick one from the library, where each picture is shown in its own proportions. The library tab searches the same index as the rest of the application, without recording the search as library activity. Video has a third tab for a YouTube or Vimeo address. A chosen picture appears in the block straight away, before the page is saved.
+- **A picture keeps its proportions** and is held to Small, Medium, Large or Full size, chosen in the block settings, so a large original does not take over the page. A banner picture fills its frame instead, and `Move picture` lets the author drag, or arrow-key, the part that stays in view.
+- **Nothing inside a block responds to a reader's gestures while editing.** Collections and files are shown as they will appear, but they cannot be opened, selected or followed, so a click always acts on the block.
+- **An empty listing says what will fill it.** A collections or files block with nothing to show explains what it is for and why it is empty, rather than reporting that nothing was found.
+- **A block dropped beside a narrower one takes the room that is left**, so dragging something next to a half-width block does not push it onto a line of its own.
 
 Nothing is written until `Save`, which sends the whole page in one call. `Discard` returns the page to its last saved state, and leaving with unsaved changes asks for confirmation.
 

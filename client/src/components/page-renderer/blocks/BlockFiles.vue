@@ -14,6 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
+import { Files } from "@lucide/vue"
+import BlockPlaceholder from "./BlockPlaceholder.vue"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 import { computed } from "vue"
@@ -33,7 +35,11 @@ const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) 
 <template>
   <div v-if="collection && (editing || collection.files?.length)">
     <div v-if="data.title" class="mb-0.5 text-sm font-medium text-muted-foreground">{{ data.title }}</div>
-    <CollectionRenderFiles :collection="collection" :force-view="forceView"
-      :placeholder="editing ? 'No files found.' : null" />
+    <BlockPlaceholder v-if="editing && !collection.files?.length" :icon="Files" title="Files"
+      explanation="Every file of the collection appears here, with its preview and its download."
+      :reason="data.collectionId
+        ? 'The collection you chose holds no file yet.'
+        : 'This block shows the files of this collection, and there are none yet. They appear as soon as files are added.'" />
+    <CollectionRenderFiles v-else :collection="collection" :force-view="forceView" />
   </div>
 </template>

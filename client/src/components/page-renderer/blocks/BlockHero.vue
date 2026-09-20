@@ -22,12 +22,16 @@ import BlockLink from "./BlockLink.vue"
 const props = defineProps<{ data: any; assets?: PageAssets; editing?: boolean }>()
 const media = computed(() => resolveMedia(props.data?.media, props.assets))
 const isEmpty = computed(() => !media.value && !props.data?.title && !props.data?.subtitle)
+const focus = computed(() => {
+  const point = props.data?.focus ?? {}
+  return `object-position:${point.x ?? 50}% ${point.y ?? 50}%`
+})
 </script>
 
 <template>
   <section v-if="!isEmpty || editing"
     class="page-hero relative flex min-h-[220px] flex-col justify-end overflow-hidden rounded-md bg-neutral-100 p-6 md:min-h-[320px] md:p-10">
-    <img v-if="media" :src="media.url" alt="" class="absolute inset-0 h-full w-full object-cover" />
+    <img v-if="media" :src="media.url" alt="" class="absolute inset-0 h-full w-full object-cover" :style="focus" />
     <div v-if="media" aria-hidden="true" class="absolute inset-0 bg-linear-to-t from-black/70 to-black/10" />
     <div class="relative" :class="media ? 'text-white' : 'text-neutral-900'">
       <h2 v-if="data.title" class="text-3xl font-semibold text-balance md:text-4xl">{{ data.title }}</h2>

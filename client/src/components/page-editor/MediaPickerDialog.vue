@@ -27,7 +27,7 @@ import { computed, ref, useId, watch } from "vue"
 const props = defineProps<{ modelValue: boolean; pageId: string; kind: "image" | "video" }>()
 const emit = defineEmits<{
   (e: "update:modelValue", open: boolean): void
-  (e: "select", payload: { media: any; previewUrl?: string }): void
+  (e: "select", payload: { media: any; previewUrl?: string; name?: string }): void
 }>()
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]
@@ -98,7 +98,11 @@ async function upload(event: Event) {
 }
 
 function chooseFile(file: any) {
-  emit("select", { media: { source: "file", fileId: file.id }, previewUrl: file.thumbnailURL ?? file.fileURL })
+  emit("select", {
+    media: { source: "file", fileId: file.id },
+    previewUrl: file.fileURL ?? file.thumbnailURL,
+    name: file.name,
+  })
   emit("update:modelValue", false)
 }
 
@@ -135,9 +139,10 @@ function useEmbed() {
             <button v-for="file in results.results" :key="file.id" type="button"
               class="group overflow-hidden rounded-md border border-neutral-200 text-left hover:border-neutral-500"
               @click="chooseFile(file)">
-              <img v-if="file.thumbnailURL" :src="file.thumbnailURL" alt="" class="aspect-square w-full object-cover" />
-              <span v-else class="flex aspect-square items-center justify-center bg-neutral-100 text-xs text-neutral-500">
-                No preview
+              <span class="flex h-28 items-center justify-center bg-neutral-100 p-1">
+                <img v-if="file.thumbnailURL" :src="file.thumbnailURL" alt=""
+                  class="max-h-full max-w-full object-contain" />
+                <span v-else class="text-xs text-neutral-500">No preview</span>
               </span>
               <span class="block truncate px-2 py-1 text-xs text-neutral-700">{{ file.name }}</span>
             </button>

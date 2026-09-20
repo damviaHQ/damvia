@@ -14,6 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRender from "@/components/collection/CollectionRender.vue"
+import { LayoutGrid } from "@lucide/vue"
+import BlockPlaceholder from "./BlockPlaceholder.vue"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
 import { computed } from "vue"
@@ -54,7 +56,11 @@ const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) 
 <template>
   <div v-if="editing || collections.length">
     <div v-if="data.title" class="mb-0.5 text-sm font-medium text-muted-foreground">{{ data.title }}</div>
-    <CollectionRender :collections="collections" :generate-route="generateRoute" :force-view="forceView"
-      :placeholder="editing ? 'No collections found.' : null" />
+    <BlockPlaceholder v-if="editing && !collections.length" :icon="LayoutGrid" title="Collections"
+      explanation="Every collection listed here appears as a card, for readers to open."
+      :reason="data.collectionsId?.length
+        ? 'The collections you chose are not available at the moment.'
+        : 'This block follows the sub-collections of this collection, and there are none yet. Add one, or choose collections in the block settings.'" />
+    <CollectionRender v-else :collections="collections" :generate-route="generateRoute" :force-view="forceView" />
   </div>
 </template>

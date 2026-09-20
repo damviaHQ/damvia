@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { moveItem, spanClass } from "@/components/page-renderer/layout"
+import { fitToLine, moveItem, spanClass } from "@/components/page-renderer/layout"
 import type { Collection, EditorBlock, PageAssets, PageData } from "@/components/page-renderer/types"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -119,18 +119,49 @@ async function move(index: number, direction: "up" | "down") {
   document.querySelector<HTMLButtonElement>(`[data-block-index="${to}"] [data-block-action="${direction}"]:not(:disabled)`)?.focus()
 }
 
-// An upload has no presigned address until the page is reloaded, so the one the
-// server just returned is kept locally to show the picture straight away.
-function rememberPreview({ s3key, url }: { s3key: string; url: string }) {
-  assets.value = withUploads(assets.value, { [s3key]: url })
+// A picture chosen in the editor has no resolved address until the page is
+// saved and read back, so the one just obtained is kept locally and the block
+// shows it straight away.
+function rememberPreview({ media, url, name }: { media: any; url: string; name?: string }) {
+  const base = normalizeAssets(assets.value)
+  if (media?.source === "upload") {
+    base.uploads[media.s3key] = url
+  } else if (media?.source === "file") {
+    base.files[media.fileId] = { name: name ?? "", mimeType: "", thumbnailURL: url, fileURL: url }
+  }
+  assets.value = base
 }
 
-function withUploads(source: PageAssets, uploads: Record<string, string>): PageAssets {
+function normalizeAssets(source: PageAssets): any {
   return {
-    files: source?.files ?? {},
-    collections: source?.collections ?? {},
-    pages: source?.pages ?? {},
-    uploads: { ...(source?.uploads ?? {}), ...uploads },
+    files: { ...(source?.files ?? {}) },
+    collections: { ...(source?.collections ?? {}) },
+    pages: { ...(source?.pages ?? {}) },
+    uploads: { ...(source?.uploads ?? {}) },
+  }
+}
+
+// Keep the local previews on top of what the server just resolved, so a
+// picture does not blink out between the save and the next read.
+function mergeAssets(fresh: PageAssets, local: PageAssets): PageAssets {
+  const merged = normalizeAssets(fresh)
+  const previous = normalizeAssets(local)
+  merged.uploads = { ...previous.uploads, ...merged.uploads }
+  merged.files = { ...previous.files, ...merged.files }
+  return merged
+}
+
+// Dropping a block beside a narrower one makes it take the room that is left,
+// instead of falling onto a line of its own.
+function onDrop(event: any) {
+  const index = event?.added?.newIndex ?? event?.moved?.newIndex
+  if (index === undefined || index === null) {
+    return
+  }
+  const sizes = blocks.value.map((block) => block.size)
+  const fitted = fitToLine(sizes, index, sizes[index])
+  if (fitted !== sizes[index]) {
+    resize(index, fitted)
   }
 }
 
@@ -145,7 +176,7 @@ async function save() {
       blocks: blocks.value.map((block) => ({ id: block.id ?? null, type: block.type, size: block.size, data: block.data })),
     })
     blocks.value = toEditorBlocks(result as PageData)
-    assets.value = withUploads(result.assets as PageAssets, assets.value?.uploads ?? {})
+    assets.value = mergeAssets(result.assets as PageAssets, assets.value)
     saved.value = cloneDeep(blocks.value)
     if (props.collection) {
       await queryClient.invalidateQueries({ queryKey: ["collection", props.collection.id] })
@@ -198,7 +229,7 @@ function leaveWithoutSaving() {
       <main class="min-w-0 flex-1 overflow-y-auto p-4 md:p-8">
         <div class="mx-auto max-w-5xl rounded-md bg-white p-4 md:p-6">
           <draggable v-model="blocks" group="page-blocks" handle=".block-handle" item-key="id" :animation="150"
-            class="grid grid-cols-1 gap-4 md:grid-cols-6 md:items-start">
+            class="grid grid-cols-1 gap-4 md:grid-cols-6 md:items-start" @change="onDrop">
             <template #item="{ element, index }">
               <div :class="spanClass(element.size)">
                 <PageEditorBlockFrame :block="element" :index="index" :count="blocks.length"
