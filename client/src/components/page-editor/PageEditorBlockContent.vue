@@ -169,7 +169,7 @@ function nudge(event: KeyboardEvent) {
     <RichTextEditor v-if="block.type === 'text'" :model-value="block.data.html ?? ''"
       placeholder="Write a title or a paragraph…" @update:model-value="patch({ html: $event })" />
 
-    <div v-else-if="block.type === 'hero'" class="group/hero relative">
+    <div v-else-if="block.type === 'hero'" class="relative">
       <div ref="heroImage" :class="isRepositioning && hasMedia && 'cursor-move ring-2 ring-neutral-900'"
         @pointerdown="startReposition" @pointermove="event => event.buttons === 1 && reposition(event)">
         <BlockHero :data="block.data" :assets="assets" editing :text-hidden="!isRepositioning" />
@@ -183,11 +183,10 @@ function nudge(event: KeyboardEvent) {
           @update:model-value="patch({ subtitle: $event })" />
       </div>
 
-      <!-- Picture controls sit on the picture, away from the block toolbar,
-           and stay quiet until the block is hovered or holds keyboard focus. -->
+      <!-- Picture controls sit in the corner of the picture, away from the
+           block toolbar, and stay there whether or not the pointer is near. -->
       <div v-if="hasMedia"
-        class="absolute left-3 top-3 flex items-center gap-0.5 rounded-md bg-neutral-900/70 p-0.5 opacity-0 backdrop-blur-sm transition-opacity group-hover/hero:opacity-100 group-focus-within/hero:opacity-100"
-        :class="isRepositioning && 'opacity-100'">
+        class="absolute left-3 top-3 flex items-center gap-0.5 rounded-md bg-neutral-900/70 p-0.5 backdrop-blur-sm">
         <Tooltip>
           <TooltipTrigger as-child>
             <Button type="button" variant="ghost" size="icon"
@@ -225,20 +224,27 @@ function nudge(event: KeyboardEvent) {
     <div v-else-if="block.type === 'image' || block.type === 'video'">
       <template v-if="hasMedia">
         <!-- Shown exactly as a reader sees it, but nothing inside responds. -->
-        <div ref="imageFrame" class="group/image relative">
+        <div ref="imageFrame" class="relative">
           <div inert class="pointer-events-none">
             <PageBlockView :block="block" :assets="assets" :collection="collection" :generate-route="generateRoute"
               editing />
           </div>
+          <!-- On the picture, in its corner, and never hidden: the control an
+               author looks for first has nothing to do with where the pointer is. -->
+          <Button type="button" variant="secondary" size="sm"
+            class="absolute left-3 top-3 bg-white/90 shadow-sm backdrop-blur-sm hover:bg-white"
+            @click="isPickerOpen = true">
+            <ImageUp class="size-4" />{{ block.type === "image" ? "Change picture" : "Change video" }}
+          </Button>
           <!-- The picture is made taller or shorter by dragging its bottom edge. -->
           <div v-if="block.type === 'image'" class="absolute inset-x-0 flex justify-center"
             :style="`top:${imageBottom}px`">
             <button type="button" role="slider" :aria-valuenow="imageHeight" :aria-valuemin="MIN_IMAGE_HEIGHT"
               :aria-valuemax="MAX_IMAGE_HEIGHT" :aria-valuetext="`${imageHeight} pixels tall`"
               aria-label="Picture height"
-              class="-mt-2 flex h-4 w-16 cursor-ns-resize touch-none items-center justify-center rounded-full bg-neutral-900/70 opacity-0 transition-opacity group-hover/image:opacity-100 focus-visible:opacity-100"
-              :class="isResizing && 'opacity-100'" @pointerdown="startResize" @pointermove="onResize"
-              @pointerup="isResizing = false" @pointercancel="isResizing = false" @keydown="nudgeHeight">
+              class="-mt-2 flex h-4 w-16 cursor-ns-resize touch-none items-center justify-center rounded-full bg-neutral-900/70 shadow-sm"
+              @pointerdown="startResize" @pointermove="onResize" @pointerup="isResizing = false"
+              @pointercancel="isResizing = false" @keydown="nudgeHeight">
               <span class="h-0.5 w-8 rounded-full bg-white" />
             </button>
             <span v-if="isResizing"
@@ -247,9 +253,6 @@ function nudge(event: KeyboardEvent) {
             </span>
           </div>
         </div>
-        <Button type="button" variant="outline" size="sm" class="mt-2" @click="isPickerOpen = true">
-          {{ block.type === "image" ? "Change picture" : "Change video" }}
-        </Button>
       </template>
       <button v-else type="button"
         class="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-md border border-dashed border-neutral-400 text-sm text-neutral-600 hover:bg-neutral-50"

@@ -170,6 +170,17 @@ test('a picture chosen from the library shows at once, before the page is saved'
   await expect(imageBlockFrame.locator('img')).toBeVisible()
   // Library originals are print-resolution: a page draws the rendition instead.
   await expect(imageBlockFrame.locator('img')).toHaveAttribute('src', libraryFile.thumbnailURL)
+
+  // The control sits in the corner of the picture and is there to be seen,
+  // with no hovering: the pointer has not moved since the page loaded.
+  const change = imageBlockFrame.getByRole('button', { name: 'Change picture' })
+  await expect(change).toBeVisible()
+  await expect(change).toHaveCSS('opacity', '1')
+  const picture = await imageBlockFrame.locator('img').boundingBox()
+  const button = await change.boundingBox()
+  expect(button!.x).toBeGreaterThanOrEqual(picture!.x)
+  expect(button!.y).toBeGreaterThanOrEqual(picture!.y)
+  expect(button!.y + button!.height).toBeLessThanOrEqual(picture!.y + picture!.height)
   expect(saves).toEqual([])
   expect(errors).toEqual([])
 })
@@ -259,9 +270,10 @@ test('the banner picture controls stay out of the way of the block toolbar', asy
   const banner = page.locator('[data-block-index="3"]')
   const move = banner.getByRole('button', { name: 'Move the picture' })
   const change = banner.getByRole('button', { name: 'Change the picture' })
-  await banner.hover()
+  // No hovering: they are on the picture whatever the pointer is doing.
   await expect(move).toBeVisible()
   await expect(change).toBeVisible()
+  await expect(move.locator('xpath=..')).toHaveCSS('opacity', '1')
 
   // They are compact and sit on the left, clear of the toolbar on the right.
   const bannerBox = await banner.boundingBox()
