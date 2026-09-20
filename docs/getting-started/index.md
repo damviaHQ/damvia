@@ -3,7 +3,7 @@ title: Requirements
 description: "What you need before installing Damvia: runtime, services, a cloud storage app, and the media tools that make previews."
 sidebar:
   order: 1
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 Damvia is a Node.js server, a static single-page client, and three services it depends on. This page lists what to have ready; [Local setup](./local-setup.md) walks through running it on one machine, and [Deployment](../deployment/index.md) through running it for real.
@@ -47,16 +47,17 @@ Thumbnails are generated on the server, per file family, by external tools. With
 | `ffmpeg` (with `ffprobe`) | Video thumbnails and transcoding downloads to MP4 or WebM. |
 | `ghostscript` | PDF, EPS and AI previews. |
 | `libreoffice` | Office and text document previews (`doc`, `docx`, `xls`, `xlsx`, `ppt`, `pptx`, `odt`, `ods`, `odp`, `rtf`, `txt`, `csv`, `md`, `html`, ...). |
-| `imagemagick` | Image conversions that `sharp` does not handle. |
+| `imagemagick` | Image conversions that `sharp` does not handle, `psd` and `heic` among them. |
 | `coreutils` | Listed in the Dockerfile for the shell helpers the pipeline calls. |
 
 The exact install line from `server/Dockerfile`:
 
 ```bash
 apt-get install -y ffmpeg ghostscript libreoffice coreutils imagemagick
+apt-get install -y -t bookworm-backports libheif1
 ```
 
-Images (`jpg`, `png`, `gif`, `bmp`, `webp`, `tiff`, `svg`, `psd`) go through `sharp`, which is bundled with the Node dependencies. Fonts (`ttf`, `otf`) are rendered to a specimen thumbnail using ImageMagick `convert`.
+Images (`jpg`, `png`, `gif`, `bmp`, `webp`, `tiff`, `svg`) go through `sharp`, which is bundled with the Node dependencies. `psd`, `heic` and `heif` go through ImageMagick `convert` instead, because the bundled `sharp` cannot decode them. HEIC needs a recent libheif on top: the one in Debian bookworm refuses the files iPhones produce, which is why the Dockerfile takes `libheif1` from `bookworm-backports`. Fonts (`ttf`, `otf`) are rendered to a specimen thumbnail using ImageMagick `convert`.
 
 ## Sizing
 

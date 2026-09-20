@@ -3,7 +3,7 @@ title: What is Damvia
 description: Damvia is a self-hosted Digital Asset Management layer that sits on top of your Dropbox or OneDrive and adds access control, collections, pages and product search.
 sidebar:
   order: 1
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 This page explains what Damvia does, who it is built for, what it deliberately does not do, and what it is made of. Read it before [Getting started](../getting-started/index.md) to decide whether it fits your setup.
@@ -24,7 +24,7 @@ For each new file, and each file the daily integrity check re-queues, the `asset
 
 | Kind | Extensions | Tool |
 | --- | --- | --- |
-| Images | `jpg` `jpeg` `png` `gif` `bmp` `webp` `tiff` `tif` `svg` `psd` | sharp, with ImageMagick for the formats sharp cannot read |
+| Images | `jpg` `jpeg` `png` `gif` `bmp` `webp` `tiff` `tif` `svg` `psd` `heic` `heif` | sharp, with ImageMagick for the formats sharp cannot read |
 | Videos | `mp4` `mov` `avi` `mkv` `wmv` `flv` `webm` `m4v` | ffmpeg |
 | PDF and vector | `pdf` `eps` `ai` | Ghostscript |
 | Office and text | `doc` `docx` `xls` `xlsx` `ppt` `pptx` `odt` `ods` `odp` `rtf` `pps` `ppsx` `potx` `pot` `html` `htm` `xml` `json` `md` `yaml` `yml` `txt` `css` `js` `ts` `csv` | LibreOffice |

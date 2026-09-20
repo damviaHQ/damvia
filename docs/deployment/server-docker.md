@@ -3,7 +3,7 @@ title: Server with Docker
 description: Build the server image from the repository's Dockerfile and run it with the worker enabled.
 sidebar:
   order: 2
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 `server/Dockerfile` builds on Node 22 (Debian Bookworm; the server needs 22.12 or newer) and includes the media tools, compiled server and sources. The CLI still runs from TypeScript. See [Validation status](../reference/validation-status.md) for completed checks.
@@ -13,8 +13,10 @@ lastUpdated: 2026-09-19
 ```dockerfile
 FROM node:22-bookworm
 WORKDIR /app
+RUN echo 'deb http://deb.debian.org/debian bookworm-backports main' > /etc/apt/sources.list.d/backports.list
 RUN apt-get update
 RUN apt-get install -y ffmpeg ghostscript libreoffice coreutils imagemagick
+RUN apt-get install -y -t bookworm-backports libheif1
 COPY package.json .
 COPY package-lock.json .
 RUN npm ci
@@ -25,6 +27,7 @@ CMD ["npm", "start"]
 
 - `npm run build` runs `tsc` with `NODE_ENV=production` and writes `dist/`.
 - `npm start` runs `node dist/index.js` with `NODE_ENV=production`.
+- `libheif1` comes from `bookworm-backports`: HEIC thumbnails go through ImageMagick, and the libheif in bookworm itself refuses the files iPhones produce. Drop the backport and HEIC pictures get no thumbnail.
 - LibreOffice increases image size; measure the built image for your architecture. It is needed for office document previews; removing it from the `apt-get` line only loses those previews.
 - `mailconfig.json` is copied with the sources, so the file fallback works inside the container when `MAILCONFIG` is unset.
 
