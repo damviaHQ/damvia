@@ -86,7 +86,7 @@ Back up first and apply the migration with application writers stopped. Validate
 
 ## Records in this upgrade
 
-- Products are called records in the code, the database, the API and the documentation. What people see keeps the word "Products" until an administrator changes the label on `/admin/data-enrichment/settings`.
+- Products are called records in the code, the database, the API and the documentation. What people see keeps the word "Products" until an administrator changes the record label in **Settings** (`/admin/settings`). Settings is now the last entry of the admin menu.
 - The admin routes `/admin/products`, `/admin/products/import` and `/admin/products/attributes` redirect to their new addresses under `/admin/data-enrichment/`.
 - The tRPC procedures moved: `pim.listProducts` is `record.list`, `pim.removeAllProducts` is `record.removeAll`, `pim.updateProduct` is `record.update`, `productAttribute.*` is `recordAttribute.*`, `asset.listProductViews` is `asset.listRecordViews`, and the search input and facets say `recordViews`. Deploy the client with the server.
 - `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` keep their names for now.

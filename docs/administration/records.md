@@ -8,7 +8,7 @@ lastUpdated: 2026-09-21
 
 The Data enrichment area adds context to mirrored assets. Damvia imports a flat CSV catalogue of **records**, extracts a record key and optional view from each filename, and uses selected catalogue columns for search, filters and display.
 
-A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open `/admin/data-enrichment/settings` to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
+A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), section **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
 
 ## Plan the matching rule first
 

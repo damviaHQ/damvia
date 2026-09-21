@@ -118,10 +118,6 @@ const storageLevel = computed(() => {
               <ChartColumn class="w-4 h-4 mr-2" />
               Insights
             </router-link>
-            <router-link :to="{ name: 'admin-settings' }" class="menu-item">
-              <Settings class="w-4 h-4 mr-2" />
-              Settings
-            </router-link>
           </div>
           <!-- Content Management -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
@@ -193,7 +189,9 @@ const storageLevel = computed(() => {
               <FolderCog class="w-4 h-4 mr-2" />
               Folder rules
             </router-link>
-            <router-link :to="{ name: 'admin-enrichment-settings' }" class="menu-item">
+          </div>
+          <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
+            <router-link :to="{ name: 'admin-settings' }" class="menu-item">
               <Settings class="w-4 h-4 mr-2" />
               Settings
             </router-link>

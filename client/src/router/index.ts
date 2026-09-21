@@ -46,7 +46,7 @@ const router = createRouter({
 		{ name: 'admin-records', path: '/admin/data-enrichment/records', component: () => import('@/views/admin/records/index.vue'), meta: { layout: 'admin', title: 'Records' } },
 		{ name: 'admin-record-import', path: '/admin/data-enrichment/records/import', component: () => import('@/views/admin/records/admin-record-import.vue'), meta: { layout: 'admin', title: 'Import records' } },
 		{ name: 'admin-record-attributes', path: '/admin/data-enrichment/records/attributes', component: () => import('@/views/admin/records/admin-record-attributes.vue'), meta: { layout: 'admin', title: 'Record attributes' } },
-		{ name: 'admin-enrichment-settings', path: '/admin/data-enrichment/settings', component: () => import('@/views/admin/admin-enrichment-settings.vue'), meta: { layout: 'admin', title: 'Data enrichment settings' } },
+		{ path: '/admin/data-enrichment/settings', redirect: '/admin/settings' },
 		{ path: '/admin/products', redirect: '/admin/data-enrichment/records' },
 		{ path: '/admin/products/import', redirect: '/admin/data-enrichment/records/import' },
 		{ path: '/admin/products/attributes', redirect: '/admin/data-enrichment/records/attributes' },

@@ -15,9 +15,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
-import { onMounted, ref } from 'vue'
+import { useGlobalStore } from "@/stores/globalStore"
+import { onMounted, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 const queryClient = useQueryClient()
 const { data: logo, status: logoStatus, refetch: refetchLogo } = useQuery({ queryKey: ['client-logo'], queryFn: () => trpc.settings.getClientLogo.query() })
@@ -61,6 +64,27 @@ async function removeLogo() {
 }
 
 const toast = useGlobalToast()
+const store = useGlobalStore()
+const { data: enrichment, status: enrichmentStatus, refetch: refetchEnrichment } = useQuery({ queryKey: ['enrichment-settings'], queryFn: () => trpc.settings.getEnrichment.query() })
+const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '' })
+const recordLabelErrors = ref<Record<string, string>>({})
+const isSavingRecordLabel = ref(false)
+watch(enrichment, () => { if (enrichment.value) recordLabel.value = { ...enrichment.value } }, { immediate: true })
+async function saveRecordLabel() {
+  if (isSavingRecordLabel.value) return
+  isSavingRecordLabel.value = true
+  recordLabelErrors.value = {}
+  try {
+    await trpc.settings.updateEnrichment.mutate(recordLabel.value)
+    await queryClient.invalidateQueries({ queryKey: ['enrichment-settings'] })
+    await store.fetchEnv()
+    toast.success('Record label saved')
+  } catch (error) {
+    const result = extractErrors(error as Error)
+    recordLabelErrors.value = result.fieldErrors
+    if (!Object.keys(result.fieldErrors).length) toast.error(result.message)
+  } finally { isSavingRecordLabel.value = false }
+}
 const fileInput = ref<HTMLInputElement | null>(null)
 const backgroundImageUrl = ref<string | null>(null)
 const isLoading = ref(false)
@@ -159,6 +183,30 @@ const removeBackgroundImage = async () => {
           </Button>
         </div>
       </div>
+      <section class="dv-panel branding-settings" aria-labelledby="record-label-heading">
+        <h2 id="record-label-heading">Record label</h2>
+        <p>The name of the things your records describe, such as products, events or venues. It replaces the word everywhere records appear: the admin menu, the search filters and the asset type settings.</p>
+        <p v-if="enrichmentStatus === 'pending'" role="status">Loading record label…</p>
+        <div v-else-if="enrichmentStatus === 'error'" role="alert">The record label could not be loaded. <Button class="dv-button" variant="outline" @click="refetchEnrichment()">Try again</Button></div>
+        <form v-else class="record-label-form" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
+          <div class="record-label-fields">
+            <div class="record-label-field">
+              <Label for="recordLabelSingular">Singular</Label>
+              <Input id="recordLabelSingular" v-model="recordLabel.recordLabelSingular" placeholder="Product" :aria-invalid="!!recordLabelErrors.recordLabelSingular" />
+              <p v-if="recordLabelErrors.recordLabelSingular" class="admin-form-error">{{ recordLabelErrors.recordLabelSingular }}</p>
+            </div>
+            <div class="record-label-field">
+              <Label for="recordLabelPlural">Plural</Label>
+              <Input id="recordLabelPlural" v-model="recordLabel.recordLabelPlural" placeholder="Products" :aria-invalid="!!recordLabelErrors.recordLabelPlural" />
+              <p v-if="recordLabelErrors.recordLabelPlural" class="admin-form-error">{{ recordLabelErrors.recordLabelPlural }}</p>
+            </div>
+          </div>
+          <p class="branding-note">For example, the menu entry will read "{{ recordLabel.recordLabelPlural.trim() || 'Products' }}".</p>
+          <div class="flex flex-wrap gap-3">
+            <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || !recordLabel.recordLabelSingular.trim() || !recordLabel.recordLabelPlural.trim()">{{ isSavingRecordLabel ? 'Saving…' : 'Save label' }}</Button>
+          </div>
+        </form>
+      </section>
     </div>
   </div>
 </template>
@@ -173,6 +221,9 @@ const removeBackgroundImage = async () => {
 .logo-preview img { max-width:260px; max-height:80px; object-fit:contain; }
 .branding-background-preview { border-radius:var(--dv-radius-graphic); }
 .branding-settings .branding-note { margin-bottom:20px; }
+.record-label-fields { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
+.record-label-field { display:grid; gap:8px; align-content:start; }
+.branding-settings .record-label-field p { margin-top:0; }
 .branding-settings :deep(.dv-button) { height:auto; padding:9px 14px; box-shadow:none; border-radius:0; }
-@media(max-width:600px) { .branding-settings { padding:20px; } }
+@media(max-width:600px) { .branding-settings { padding:20px; } .record-label-fields { grid-template-columns:1fr; } }
 </style>

@@ -57,12 +57,12 @@ Collections organise references to assets. Copying a file into another collectio
 |---|---|---|
 | Dashboard | `/admin` | admin |
 | Insights | `/admin/analytics` | admin |
-| Branding | `/admin/settings` | admin |
+| Settings: branding and record label | `/admin/settings`, the last entry of the admin menu | admin |
 | Menu, collections and pages | `/admin/menu-items`, `/admin/collections`, `/admin/pages` | admin |
 | Assets, types and licences | `/admin/assets`, `/admin/asset-types`, `/admin/licenses` | admin |
 | Folder rules | `/admin/folder-rules` | admin |
 | Users | `/admin/users` | admin or manager for their region |
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
-| Records, attributes and the record label | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/records/attributes`, `/admin/data-enrichment/settings` | admin |
+| Records and attributes | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/records/attributes` | admin |
 
 The labels and exact layout may evolve; the permission and data consequences documented on each linked page are the durable contract.
