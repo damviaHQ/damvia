@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
+import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import Loader from "@/components/Loader.vue"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
@@ -126,7 +126,7 @@ function when(value: string | Date) {
       <p v-else-if="status === 'error'" role="alert" class="admin-form-error p-6">{{ error?.message }}</p>
       <template v-else-if="record">
         <header class="record-panel-header">
-          <img :src="record.thumbnailURL ?? thumbnailPlaceholder" alt="" class="record-panel-picture" />
+          <img v-if="record.thumbnailURL" :src="record.thumbnailURL" alt="" class="record-panel-picture" /><ThumbnailPlaceholder v-else class="record-panel-picture record-placeholder" aria-hidden="true" />
           <div class="min-w-0">
             <SheetTitle class="truncate">{{ record.recordKey }}</SheetTitle>
             <SheetDescription>
@@ -155,7 +155,7 @@ function when(value: string | Date) {
             </p>
             <ul v-if="record.files.direct.length" class="record-panel-files">
               <li v-for="file in record.files.direct" :key="file.id + file.strategy">
-                <img :src="file.thumbnailURL ?? thumbnailPlaceholder" alt="" loading="lazy" />
+                <img v-if="file.thumbnailURL" :src="file.thumbnailURL" alt="" loading="lazy" /><ThumbnailPlaceholder v-else class="record-placeholder" aria-hidden="true" />
                 <div class="min-w-0">
                   <strong class="block truncate" :title="file.name">{{ file.name }}</strong>
                   <span v-if="file.isPrimary && file.status === 'active'" class="record-chip">Primary</span>
@@ -168,7 +168,7 @@ function when(value: string | Date) {
               <h3 class="record-panel-subheading">Covering the range</h3>
               <ul class="record-panel-files">
                 <li v-for="file in record.files.range" :key="file.id + file.attributeValue">
-                  <img :src="file.thumbnailURL ?? thumbnailPlaceholder" alt="" loading="lazy" />
+                  <img v-if="file.thumbnailURL" :src="file.thumbnailURL" alt="" loading="lazy" /><ThumbnailPlaceholder v-else class="record-placeholder" aria-hidden="true" />
                   <div class="min-w-0">
                     <strong class="block truncate" :title="file.name">{{ file.name }}</strong>
                     <span class="admin-text-secondary block">{{ labelOf(file.attributeName) }} = {{ file.attributeValue }}</span>

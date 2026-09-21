@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
+import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { moveForKey, moveInGrid, startsTyping, type GridMove, type GridPosition } from "@/composables/useGridNavigation"
@@ -292,7 +292,7 @@ defineExpose({
             @mousedown="onCellMousedown({ row: r, column: c })" @click="onCellClick({ row: r, column: c })" @dblclick="startEdit({ row: r, column: c })" @focus="focused = { row: r, column: c }">
             <template v-if="column.kind === 'thumbnail'">
               <button type="button" tabindex="-1" class="records-grid-thumbnail" :aria-label="`Files of ${row.recordKey}`" @click.stop="emit('open', row, 'files')">
-                <img :src="row.thumbnailURL ?? thumbnailPlaceholder" alt="" loading="lazy" decoding="async" />
+                <img v-if="row.thumbnailURL" :src="row.thumbnailURL" alt="" loading="lazy" decoding="async" /><ThumbnailPlaceholder v-else class="record-placeholder" aria-hidden="true" />
               </button>
             </template>
             <div v-else-if="column.kind === 'key'" class="records-grid-key">
