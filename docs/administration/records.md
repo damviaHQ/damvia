@@ -57,7 +57,7 @@ The old job that applied the regex every 5 minutes still runs, but only on files
 
 | To | Do |
 |---|---|
-| Add a record | Type its key in the last row and press Enter, or use **Add product** at the top. The record opens as a card to fill in. A key already taken is refused in the row. |
+| Add a record | Type its key in the last row and press Enter, or use **Add product** at the top. The record opens as a card to fill in. A key already taken is refused in the row, with a **Go to** link that opens the page holding that record and highlights its row; search and filters that hide it are cleared first. |
 | Edit a value | Click a cell to select it, then click again, double-click, press Enter or Space to continue the value, or start typing to replace it. Enter saves and moves down, Tab saves and moves right, Esc cancels. A select opens its list of options; type to narrow it and add a missing option from there. |
 | Select several cells | Drag across them, Shift+click the far corner, or hold Shift with the arrow keys. Ctrl+A or ⌘+A selects every cell of the page, Esc goes back to one cell. |
 | Copy and paste | Ctrl+C or ⌘+C copies the selected cells as tab-separated rows, the form Sheets and Excel use, so a block goes both ways. Ctrl+V or ⌘+V pastes: one value fills every selected cell, a block the selection holds a whole number of times is repeated across it, and any other block is laid from the top-left cell. |
@@ -122,7 +122,7 @@ Open **Import CSV** on the records page (`/admin/data-enrichment/records/import`
 
 1. **File**: drop the CSV or choose it.
 2. **Columns**: check the key column, then say where each other column goes. A column goes into the field with the same name or display name, case aside; otherwise it becomes a new Text field. Pick another field, or **Don't import**, for any column. Sample values show what each column holds. Under **Empty cells**, choose whether an empty cell keeps the value already stored (the default) or clears it.
-3. **Review**: counts of new, changed, unchanged and not imported rows sit above the list; click one to show only those rows. A changed row lists each field as old value → new value. Tick the changed rows to apply, or tick the header box for all of them; unticked rows stay as stored. New rows are always created. The fields that will be created and the options that will be added to select fields are listed at the top.
+3. **Review**: counts of new, changed, unchanged and not imported rows sit above the list; click one to show only those rows. A changed row lists each field as old value → new value. Every changed row is ticked and will be applied; untick the ones to leave as stored, or use the header box to untick or tick them all. New rows are always created. The fields that will be created and the options that will be added to select fields are listed at the top.
 4. **Import** writes it all in one go: if it fails, nothing is written. Each created or changed record gets a history entry from the import.
 
 Rows are not imported when they have no key, when their key appears on several rows of the file, or when a value is refused by its field, such as text in a Number field. The review gives the reason for each; fix the file and import it again.

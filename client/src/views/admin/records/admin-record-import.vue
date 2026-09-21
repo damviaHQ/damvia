@@ -105,7 +105,8 @@ async function compare() {
   try {
     sent.value = buildRows(csv.value, keyColumn.value, targets.value, keepStored.value === "keep")
     comparison.value = await trpc.record.compareCsv.mutate({ keyColumnName: keyColumn.value, data: sent.value })
-    selected.value = {}
+    // Every change is applied unless unticked.
+    selected.value = Object.fromEntries(comparison.value.rows.filter((row) => row.status === "changed").map((row) => [row.key, true]))
     step.value = "review"
   } catch (failure) {
     compareError.value = (failure as Error).message
@@ -270,7 +271,9 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
       <footer class="import-footer">
         <Button variant="outline" :disabled="importing" @click="step = 'columns'">Back</Button>
         <span class="admin-text-secondary" role="status">
-          {{ plural(counts.create, "new", "new") }} · {{ counts.update }} of {{ plural(counts.changed, "change", "changes") }} applied<template v-if="counts.skipped"> · {{ counts.skipped }} not imported</template>
+          <template v-if="!rowsToImport.length && counts.changed">Every change is unticked. Tick the {{ recordLabel.lowerPlural.value }} to update in the first column.</template>
+          <template v-else-if="!rowsToImport.length">The file holds nothing new: every row is already stored as it is, or cannot be imported.</template>
+          <template v-else>{{ plural(counts.create, "new", "new") }} · {{ counts.update }} of {{ plural(counts.changed, "change", "changes") }} applied<template v-if="counts.skipped"> · {{ counts.skipped }} not imported</template></template>
         </span>
         <Button class="dv-button dv-button--primary" :disabled="importing || !rowsToImport.length" @click="runImport">
           <Loader v-if="importing" />{{ importing ? "Importing…" : rowsToImport.length ? `Import ${plural(rowsToImport.length, "row", "rows")}` : "Nothing to import" }}
