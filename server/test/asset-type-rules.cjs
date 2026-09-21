@@ -270,3 +270,22 @@ test('folder rules require an approved and verified admin', async () => {
         await forbidden(caller(user).assetTypeRule.reresolve(randomUUID()))
     }
 })
+
+test('a hand-set type waits for a running pass instead of being overwritten by it', async () => {
+    const type = await makeType('Held type')
+    const root = await makeFolder({ name: 'Held root' })
+    await runEnrichmentPass()
+    const holder = db.createQueryRunner()
+    await holder.connect()
+    await holder.startTransaction()
+    await holder.query('SELECT pg_advisory_xact_lock($1)', [harness.services.assetTypeRules.ENRICHMENT_LOCK])
+    let settled = false
+    const update = caller(fixtures.admin).asset.update({ id: root.id, assetTypeId: type.id }).then(() => { settled = true })
+    await new Promise(resolve => setTimeout(resolve, 200))
+    assert.equal(settled, false)
+    assert.deepEqual(await typed(root.id), [null, null, null])
+    await holder.commitTransaction()
+    await holder.release()
+    await update
+    assert.deepEqual(await typed(root.id), [type.id, 'manual', null])
+})
