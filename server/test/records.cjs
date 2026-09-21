@@ -165,11 +165,12 @@ test('a CSV import creates text fields, learns select options, skips invalid row
         { SKU: 'CSV-2', bf_name: 'Two', price: 'cheap' },
         { SKU: 'BLK-1', colour: 'Blue' },
         { SKU: 'BLK-2', colour: 'Red' },
+        { SKU: ' ', bf_name: 'No key' },
     ]
     const compared = await admin.record.compareCsv({ keyColumnName: 'SKU', data })
     assert.deepEqual(compared.newColumns, ['csv_new'])
     assert.deepEqual(compared.newOptions, { colour: ['Green'] })
-    assert.deepEqual(compared.rows.map(row => row.status), ['new', 'invalid', 'changed', 'unchanged'])
+    assert.deepEqual(compared.rows.map(row => row.status), ['new', 'invalid', 'changed', 'unchanged', 'missing_key'])
     assert.match(compared.rows[1].invalid.price, /must be a number/)
 
     const imported = await admin.record.importCsv({ keyColumnName: 'SKU', data })

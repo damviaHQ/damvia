@@ -15,492 +15,291 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import Loader from "@/components/Loader.vue"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import RecordImportReview from "@/components/records/RecordImportReview.vue"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { useGlobalToast } from "@/composables/useGlobalToast"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { trpc, type RouterOutput } from "@/services/server.ts"
-import { useMutation } from "@tanstack/vue-query"
-import { Pencil, Upload } from "@lucide/vue"
-import { parse } from "papaparse"
-import { computed, ref, watchEffect } from "vue"
-import { useRouter } from "vue-router"
+import { buildRows, defaultTargets, mappingErrors, readCsv, REVIEW_GROUP_OF, sampleValues, type ColumnTargets, type CsvFile } from "@/utils/recordImport"
+import { fieldLabel, VALUE_TYPE_LABELS } from "@/utils/recordValues"
+import { useQuery, useQueryClient } from "@tanstack/vue-query"
+import { CircleCheck, FileText, Upload } from "@lucide/vue"
+import { computed, ref, watch } from "vue"
 
-const toast = useGlobalToast()
-const parsedData = ref<Record<string, any>[]>([])
-const columns = ref<string[]>([])
-const selectedColumns = ref<{ [key: string]: boolean }>({})
-const keyColumnName = ref<string>("_placeholder")
-const existingColumns = ref<string[]>([])
 type Comparison = RouterOutput["record"]["compareCsv"]
-const comparison = ref<Comparison | null>(null)
-const comparisonResults = ref<Comparison["rows"]>([])
-const overrideAll = ref(false)
-const selectedOverrides = ref<{ [key: string]: boolean }>({})
-const isComparing = ref(false)
-const isImporting = ref(false)
+type Result = RouterOutput["record"]["importCsv"]
+type Step = "file" | "columns" | "review" | "done"
+
+const recordLabel = useRecordLabel()
+const queryClient = useQueryClient()
+const { data: fields, status: fieldsStatus } = useQuery({ queryKey: ["records", "attributes"], queryFn: () => trpc.recordAttribute.list.query() })
+const { data: catalogue, status: catalogueStatus } = useQuery({ queryKey: ["records", "import-context"], queryFn: () => trpc.record.list.query({ page: 1, size: 1 }) })
+const catalogueKey = computed(() => catalogue.value?.keyColumnName ?? null)
+
+const step = ref<Step>("file")
+const STEPS: { id: Step, label: string }[] = [{ id: "file", label: "File" }, { id: "columns", label: "Columns" }, { id: "review", label: "Review" }]
+const stepIndex = computed(() => STEPS.findIndex((entry) => entry.id === step.value))
+
+// File
 const fileInput = ref<HTMLInputElement | null>(null)
-const primaryKeyError = ref("")
+const dragging = ref(false)
+const fileError = ref("")
+const csv = ref<CsvFile | null>(null)
 
-const router = useRouter()
-
-const handleFileUpload = async (e: Event) => {
-  const fileInput = e.target as HTMLInputElement
-  const file = fileInput?.files?.[0]
-  if (file) {
-    parsedData.value = []
-    comparison.value = null
-    comparisonResults.value = []
-    selectedOverrides.value = {}
-    keyColumnName.value = "_placeholder"
-    primaryKeyError.value = ""
-
-    const parseConfig = {
-      header: true,
-      complete: function (results: any) {
-        columns.value = results.meta.fields
-        results.meta.fields.forEach((field: string) => {
-          selectedColumns.value[field] = true
-        })
-        parsedData.value = results.data
-      },
-    }
-    await parse(file, parseConfig)
-  }
-}
-
-const filteredColumnsForPrimaryKey = computed(() => {
-  return columns.value.filter(
-    (column) => selectedColumns.value[column] && column !== "_placeholder"
-  )
-})
-
-watchEffect(() => {
-  if (keyColumnName.value && !selectedColumns.value[keyColumnName.value]) {
-    keyColumnName.value = ""
-  }
-})
-
-const previewData = computed(() => {
-  return parsedData.value
-    .map((row) => {
-      const filteredRow: Record<string, string> = {}
-      for (const key in row) {
-        if (selectedColumns.value[key]) {
-          filteredRow[key] = row[key]
-        }
-      }
-      return filteredRow
-    })
-    .slice(0, 2)
-})
-
-const compareCsvMutation = useMutation({
-  mutationFn: (csvData: { keyColumnName: string; data: Record<string, string>[] }) => {
-    return trpc.record.compareCsv.mutate(csvData)
-  },
-  onSuccess: (response) => {
-    comparison.value = response
-    comparisonResults.value = response.rows
-  },
-  onError: (error) => {
-    toast.error(`Comparison failed: ${(error as Error).message}`)
-  },
-})
-
-const showComparisonDialog = ref(false)
-
-const handleCsvCompare = async () => {
-  if (!keyColumnName.value || keyColumnName.value === "_placeholder") {
-    primaryKeyError.value = "Please select a valid primary key column."
-    toast.error(primaryKeyError.value)
+async function open(file: File | undefined) {
+  if (!file) return
+  fileError.value = ""
+  if (!/\.(csv|tsv|txt)$/i.test(file.name)) {
+    fileError.value = `${file.name} is not a CSV file. Save the sheet as CSV (UTF-8) and choose it again.`
     return
   }
-  primaryKeyError.value = ""
-
-  const filteredData = parsedData.value.map((row) => {
-    const filteredRow: Record<string, string> = {}
-    for (const key in row) {
-      if (selectedColumns.value[key]) {
-        filteredRow[key] = row[key]
-      }
-    }
-    return filteredRow
-  })
-
-  isComparing.value = true
-  showComparisonDialog.value = true
-
   try {
-    await compareCsvMutation.mutateAsync({
-      keyColumnName: keyColumnName.value,
-      data: filteredData,
-    })
-  } finally {
-    isComparing.value = false
-  }
-}
-
-const closeComparisonDialog = () => {
-  showComparisonDialog.value = false
-}
-
-const importCsvMutation = useMutation({
-  mutationFn: (csvData: { keyColumnName: string; data: Record<string, string>[] }) => {
-    return trpc.record.importCsv.mutate(csvData)
-  },
-  onSuccess: (result) => {
-    toast.success(`${result.newRecords.length} created, ${result.updatedRecords.length} updated`)
-    if (result.skipped.length) {
-      const keys = [...new Set(result.skipped.map((row) => row.key))]
-      toast.error(`${keys.length} ${keys.length === 1 ? "row was" : "rows were"} skipped for invalid values: ${keys.slice(0, 5).join(", ")}${keys.length > 5 ? "…" : ""}`)
-    }
-    router.push({ name: 'admin-records' })
-  },
-  onError: (error) => {
-    toast.error(`Import failed: ${(error as Error).message}`)
-  },
-})
-
-const handleCsvImport = () => {
-  if (!keyColumnName.value) {
-    primaryKeyError.value = "Please select a primary key column."
-    toast.error(primaryKeyError.value)
+    csv.value = await readCsv(file)
+  } catch (failure) {
+    fileError.value = `${file.name} could not be read: ${(failure as Error).message}`
     return
   }
-
-  isImporting.value = true
-
-  const dataToImport = comparisonResults.value
-    .filter(
-      (result) =>
-        result.status === "new" ||
-        (result.status === "changed" &&
-          (overrideAll.value || selectedOverrides.value[result.new[keyColumnName.value]]))
-    )
-    .map((result) => {
-      const filteredRow: Record<string, string> = {}
-      for (const key in result.new) {
-        if (
-          result.status === "new" ||
-          overrideAll.value ||
-          (result.status === "changed" &&
-            (result.differences[key] ||
-              selectedOverrides.value[result.new[keyColumnName.value]]))
-        ) {
-          filteredRow[key] = result.new[key]
-        } else {
-          filteredRow[key] = result.existing[key]
-        }
-      }
-      return filteredRow
-    })
-
-  importCsvMutation.mutate(
-    { keyColumnName: keyColumnName.value, data: dataToImport },
-    {
-      onSettled: () => {
-        isImporting.value = false
-      },
-    }
-  )
+  const columns = csv.value.columns
+  keyColumn.value = catalogueKey.value && columns.includes(catalogueKey.value) ? catalogueKey.value : columns[0]
+  targets.value = defaultTargets(columns, fields.value)
+  keepStored.value = "keep"
+  compareError.value = ""
+  step.value = "columns"
+}
+function onDrop(event: DragEvent) {
+  dragging.value = false
+  open(event.dataTransfer?.files?.[0])
+}
+function onPick(event: Event) {
+  const input = event.target as HTMLInputElement
+  open(input.files?.[0])
+  input.value = ""
 }
 
-watchEffect(() => {
-  if (comparisonResults.value.length > 0) {
-    existingColumns.value = Object.keys(comparisonResults.value[0].existing)
+// Columns
+const keyColumn = ref("")
+const targets = ref<ColumnTargets>({})
+const keepStored = ref<"keep" | "clear">("keep")
+const keyLocked = computed(() => !!catalogueKey.value && !!csv.value?.columns.includes(catalogueKey.value))
+const keyLabel = computed(() => catalogueKey.value ?? keyColumn.value ?? "Key")
+const fieldNames = computed(() => new Set((fields.value ?? []).map((field) => field.name)))
+const dataColumns = computed(() => (csv.value?.columns ?? []).filter((column) => column !== keyColumn.value))
+const errors = computed(() => mappingErrors(targets.value, keyColumn.value, catalogueKey.value))
+const importedColumns = computed(() => dataColumns.value.filter((column) => targets.value[column]))
+const samples = computed(() => Object.fromEntries(dataColumns.value.map((column) => [column, sampleValues(csv.value?.rows ?? [], column)])))
+const missingKeys = computed(() => (csv.value?.rows ?? []).filter((row) => !row[keyColumn.value]?.trim()).length)
+const labels = computed(() => Object.fromEntries((fields.value ?? []).map((field) => [field.name, fieldLabel(field)])))
+
+// Review
+const comparison = ref<Comparison | null>(null)
+const sent = ref<Record<string, string>[]>([])
+const comparing = ref(false)
+const compareError = ref("")
+const selected = ref<Record<string, boolean>>({})
+
+async function compare() {
+  if (!csv.value || Object.keys(errors.value).length) return
+  comparing.value = true
+  compareError.value = ""
+  try {
+    sent.value = buildRows(csv.value, keyColumn.value, targets.value, keepStored.value === "keep")
+    comparison.value = await trpc.record.compareCsv.mutate({ keyColumnName: keyColumn.value, data: sent.value })
+    selected.value = {}
+    step.value = "review"
+  } catch (failure) {
+    compareError.value = (failure as Error).message
+  } finally {
+    comparing.value = false
+  }
+}
+
+const rowsToImport = computed(() => (comparison.value?.rows ?? []).flatMap((row, index) =>
+  row.status === "new" || (row.status === "changed" && selected.value[row.key]) ? [sent.value[index]] : []))
+const counts = computed(() => {
+  const rows = comparison.value?.rows ?? []
+  const changed = rows.filter((row) => row.status === "changed")
+  return {
+    create: rows.filter((row) => row.status === "new").length,
+    update: changed.filter((row) => selected.value[row.key]).length,
+    changed: changed.length,
+    skipped: rows.filter((row) => REVIEW_GROUP_OF[row.status] === "skipped").length,
   }
 })
 
-const isNewColumn = (column: string) => {
-  return comparison.value ? comparison.value.newColumns.includes(column) : !existingColumns.value.includes(column)
+// Import
+const importing = ref(false)
+const importError = ref("")
+const result = ref<Result | null>(null)
+
+async function runImport() {
+  if (!rowsToImport.value.length) return
+  importing.value = true
+  importError.value = ""
+  try {
+    result.value = await trpc.record.importCsv.mutate({ keyColumnName: keyColumn.value, data: rowsToImport.value })
+    step.value = "done"
+    await queryClient.invalidateQueries({ queryKey: ["records"] })
+  } catch (failure) {
+    importError.value = (failure as Error).message
+  } finally {
+    importing.value = false
+  }
 }
 
-const invalidCount = computed(() => comparisonResults.value.filter((result) => result.status === "invalid").length)
-const importCount = computed(() => comparisonResults.value.filter((result) =>
-  result.status === "new" || (result.status === "changed" && (overrideAll.value || selectedOverrides.value[result.new[keyColumnName.value]]))).length)
+function restart() {
+  csv.value = null
+  comparison.value = null
+  result.value = null
+  step.value = "file"
+}
 
+watch(step, () => window.scrollTo({ top: 0 }))
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 </script>
 
 <template>
-  <div class="admin-page admin-resource-page">
-    <div class="flex flex-col gap-5 mb-6">
-      <AdminPageHeader />
-    </div>
+  <div class="admin-page admin-resource-page admin-record-import">
+    <AdminPageHeader :title="`Import ${recordLabel.lowerPlural.value}`"
+      :description="`Create and update ${recordLabel.lowerPlural.value} from a CSV file. You see every change before anything is saved.`" />
 
-    <div class="dv-panel p-6">
-      <h2 class="text-lg font-medium mb-6">Upload a CSV file</h2>
+    <ol v-if="step !== 'done'" class="import-steps">
+      <li v-for="(entry, index) in STEPS" :key="entry.id" :class="{ 'is-done': index < stepIndex, 'is-current': index === stepIndex }"
+        :aria-current="index === stepIndex ? 'step' : undefined">
+        <span class="import-step-number" aria-hidden="true">{{ index + 1 }}</span>{{ entry.label }}
+      </li>
+    </ol>
 
-      <div class="mb-8">
-        <div class="flex items-center gap-4">
-          <input ref="fileInput" type="file" @change="handleFileUpload" class="hidden" accept=".csv"
-            aria-label="Choose CSV file" />
-          <Button type="button" variant="outline" class="flex items-center gap-2" @click="fileInput?.click()">
-            <Upload />
-            Choose CSV file
-          </Button>
-          <span role="status" class="text-body text-[var(--dv-color-success)]">
-            {{ parsedData.length > 0 ? "CSV ready for review" : "" }}
-          </span>
-        </div>
-        <Alert v-if="parsedData.length === 0" variant="default" class="mt-2">
-          <AlertTitle>Make sure your CSV has a valid header</AlertTitle>
-          <AlertDescription>
-            <ul class="list-disc pl-4">
-              <li>The first row of the CSV are the column names.</li>
-              <li>Data starts from the second row.</li>
-              <li>Do not use Excel files. Do not import files styled with empty rows.</li>
-            </ul>
-          </AlertDescription>
-        </Alert>
+    <Loader v-if="fieldsStatus === 'pending' || catalogueStatus === 'pending'" :text="true" />
+
+    <!-- 1. File -->
+    <section v-else-if="step === 'file'" class="dv-panel import-panel">
+      <div class="import-drop" :class="{ 'is-dragging': dragging }" @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop">
+        <Upload class="size-6" aria-hidden="true" />
+        <p><strong>Drop a CSV file here</strong> or</p>
+        <Button variant="outline" @click="fileInput?.click()">Choose a file</Button>
+        <input ref="fileInput" type="file" accept=".csv,.tsv,.txt,text/csv" class="sr-only" tabindex="-1" aria-label="Choose a CSV file" @change="onPick" />
+      </div>
+      <p v-if="fileError" class="admin-error" role="alert">{{ fileError }}</p>
+      <ul class="import-tips">
+        <li>The first row names the columns, and each row after it is one {{ recordLabel.lower.value }}.</li>
+        <li>One column holds the {{ catalogueKey ?? "key" }} of each {{ recordLabel.lower.value }}. Rows with a {{ catalogueKey ?? "key" }} already stored update that {{ recordLabel.lower.value }}; the others create one.</li>
+        <li>Save from Excel, Numbers or Google Sheets as CSV (UTF-8). Commas, semicolons and tabs all work.</li>
+        <li>To update what is stored, start from <router-link :to="{ name: 'admin-records' }">Export</router-link> on the {{ recordLabel.lowerPlural.value }} page.</li>
+      </ul>
+    </section>
+
+    <!-- 2. Columns -->
+    <section v-else-if="step === 'columns' && csv" class="dv-panel import-panel">
+      <div class="import-file">
+        <FileText class="size-5" aria-hidden="true" />
+        <div><strong>{{ csv.name }}</strong><span class="admin-text-secondary">{{ plural(csv.rows.length, "row", "rows") }} · {{ plural(csv.columns.length, "column", "columns") }}</span></div>
+        <Button variant="ghost" size="sm" @click="restart">Choose another file</Button>
       </div>
 
-      <div v-if="previewData.length > 0 && !comparisonResults.length" class="mt-8 mb-8">
-        <div class="text-md font-semibold">Preview CSV Data:</div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead v-for="column in filteredColumnsForPrimaryKey" :key="column">
-                {{ column }}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-for="row in previewData" :key="row[keyColumnName]">
-              <TableCell v-for="column in filteredColumnsForPrimaryKey" :key="column">
-                {{ row[column] }}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+      <div class="import-setting">
+        <Label for="import-key">Column holding the {{ keyLabel }}</Label>
+        <select id="import-key" v-model="keyColumn" class="record-native-select" :disabled="keyLocked" aria-describedby="import-key-hint">
+          <option v-for="column in csv.columns" :key="column" :value="column">{{ column }}</option>
+        </select>
+        <p id="import-key-hint" class="admin-text-secondary">
+          <template v-if="keyLocked">{{ recordLabel.plural.value }} are identified by their {{ catalogueKey }}, and this file has that column.</template>
+          <template v-else-if="catalogueKey">This file has no {{ catalogueKey }} column. The values of the column you choose are matched against the {{ catalogueKey }} of stored {{ recordLabel.lowerPlural.value }}.</template>
+          <template v-else>Its values identify each {{ recordLabel.lower.value }}, so each must be unique.</template>
+        </p>
+        <p v-if="missingKeys" class="import-warning">{{ plural(missingKeys, "row has", "rows have") }} no value in this column and will be left out.</p>
       </div>
 
-      <div v-if="columns.length > 0" class="flex flex-col gap-8">
-        <div class="flex flex-col space-y-2">
-          <h3 id="primary-key-heading" class="text-lg font-semibold mb-2">1. Select Primary Key Column</h3>
-          <p class="text-body admin-text-secondary">
-            This column will be used to identify your record reference.
-          </p>
+      <div class="import-setting">
+        <span id="import-blank-label" class="import-setting-label">Empty cells</span>
+        <RadioGroup v-model="keepStored" aria-labelledby="import-blank-label" class="import-radios">
+          <div><RadioGroupItem id="import-blank-keep" value="keep" /><Label for="import-blank-keep">Keep the stored value</Label></div>
+          <div><RadioGroupItem id="import-blank-clear" value="clear" /><Label for="import-blank-clear">Clear the stored value</Label></div>
+        </RadioGroup>
+      </div>
 
-          <div class="w-full max-w-xs">
-            <Select v-model="keyColumnName" @update:model-value="primaryKeyError = ''">
-              <SelectTrigger aria-labelledby="primary-key-heading" :aria-invalid="!!primaryKeyError || undefined"
-                :aria-describedby="primaryKeyError ? 'primary-key-error' : undefined">
-                <SelectValue placeholder="Select the Primary Key column" />
-              </SelectTrigger>
-              <SelectContent class="max-h-[300px] overflow-y-auto">
-                <SelectItem value="_placeholder" disabled>Select the Primary Key column</SelectItem>
-                <SelectItem v-for="column in filteredColumnsForPrimaryKey" :key="column" :value="column">
-                  {{ column }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <p v-if="primaryKeyError" id="primary-key-error" class="admin-form-error" role="alert">
-            {{ primaryKeyError }}
-          </p>
-          <p class="text-body admin-text-secondary">
-            The primary key is a unique identifier for each row in your data.
-          </p>
-        </div>
-
-        <div class="flex flex-col gap-2">
-          <h3 class="text-lg font-semibold mb-2">2. Select Columns to Import:</h3>
-          <div class="grid grid-cols-3 gap-4">
-            <div v-for="column in columns" :key="column" class="flex items-center space-x-2">
-              <Checkbox :id="column" v-model="selectedColumns[column]" />
-              <Label :for="column">{{ column }}</Label>
-            </div>
-          </div>
-        </div>
-        <div class="flex flex-col gap-2">
-          <h3 class="text-lg font-semibold">3. Compare with existing data:</h3>
-          <p class="text-body admin-text-secondary">
-            Before saving compare your data with the existing record database.
-          </p>
-          <Button v-if="columns.length > 0 && parsedData.length > 0" :disabled="keyColumnName === ''" type="button"
-            @click="handleCsvCompare" class="mt-4 w-fit">
-            Compare now
-          </Button>
-        </div>
-
-        <Dialog v-model:open="showComparisonDialog">
-          <DialogContent class="admin-dialog--large flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Review record changes</DialogTitle>
-              <DialogDescription>Choose which changed values to replace before importing.</DialogDescription>
-            </DialogHeader>
-            <div v-if="isComparing" class="flex-grow flex items-center justify-center">
-              <Loader :text="true" />
-            </div>
-            <div v-else class="flex-grow overflow-auto">
-              <Alert variant="default" class="mb-4">
-                <AlertTitle>Review the comparison results and select the records you want to
-                  override.</AlertTitle>
-                <AlertDescription>
-                  Grey values are already stored and unchanged.
-                  <br />
-                  Green rows are new and will be added.
-                  <br />
-                  Red rows repeat a key and will be ignored.
-                  <br />
-                  Rows marked "Not imported" hold a value their field refuses; fix the file and compare again.
-                  <br />
-                  Yellow values marked with a pencil differ from what is stored. Check the override box to replace them.
-                </AlertDescription>
-              </Alert>
-              <Alert v-if="comparison?.newColumns.length" variant="default" class="mb-4">
-                <AlertTitle>{{ comparison.newColumns.length }} new {{ comparison.newColumns.length === 1 ? "column" : "columns" }} will be added as text fields</AlertTitle>
-                <AlertDescription>{{ comparison.newColumns.join(", ") }}. Change their type afterwards from the Fields screen.</AlertDescription>
-              </Alert>
-              <Alert v-if="comparison && Object.keys(comparison.newOptions).length" variant="default" class="mb-4">
-                <AlertTitle>New options will be added to select fields</AlertTitle>
-                <AlertDescription>
-                  <ul class="list-disc pl-4">
-                    <li v-for="(options, name) in comparison.newOptions" :key="name">{{ name }}: {{ options.join(", ") }}</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
-              <Alert v-if="invalidCount" variant="destructive" class="mb-4">
-                <AlertTitle>{{ invalidCount }} {{ invalidCount === 1 ? "row" : "rows" }} will not be imported</AlertTitle>
-                <AlertDescription>Each holds a value its field refuses, such as text in a number field. The reason shows in the cell.</AlertDescription>
-              </Alert>
-              <div v-if="comparisonResults.some((result) => result.status === 'changed')"
-                class="ml-4 mb-2 flex items-center">
-                <Checkbox id="override-all" v-model="overrideAll" />
-                <Label for="override-all" class="ml-2"> Override all changes </Label>
+      <table class="import-table import-mapping">
+        <thead>
+          <tr><th>Column in the file</th><th>Sample values</th><th>Import into</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="column in dataColumns" :key="column" :class="{ 'is-off': !targets[column] }">
+            <td class="import-key">{{ column }}</td>
+            <td>
+              <div class="import-samples">
+                <span v-for="sample in samples[column]" :key="sample" class="record-chip">{{ sample }}</span>
+                <span v-if="!samples[column].length" class="admin-text-secondary">Empty</span>
               </div>
-              <Table class="bg-white" :class="{ 'opacity-50': isImporting }">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead v-if="
-                      comparisonResults.some((result) => result.status === 'changed' || result.status === 'invalid')
-                    ">
-                      <span class="sr-only">Override</span>
-                    </TableHead>
-                    <TableHead v-for="column in filteredColumnsForPrimaryKey" :key="column"
-                      :class="{ 'new-column': isNewColumn(column) }">
-                      {{ column }}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow v-for="result in comparisonResults" :key="result.new[keyColumnName]" :class="{
-                    'new-entry': result.status === 'new',
-                    'duplicate-entry': result.status === 'duplicate',
-                    'invalid-entry': result.status === 'invalid',
-                  }">
-                    <TableCell v-if="
-                      comparisonResults.some((result) => result.status === 'changed' || result.status === 'invalid')
-                    ">
-                      <span v-if="result.status === 'invalid'" class="record-chip">Not imported</span>
-                      <Checkbox v-else-if="result.status === 'changed'"
-                        v-model="selectedOverrides[result.new[keyColumnName]]" :disabled="overrideAll"
-                        :aria-label="`Override ${result.new[keyColumnName]}`" />
-                    </TableCell>
-                    <TableCell v-for="column in filteredColumnsForPrimaryKey" :key="column">
-                      <div v-if="result.status !== 'new' && column !== keyColumnName" class="existing-value">
-                        {{ result.existing[column] }}
-                      </div>
-                      <div class="new-value" :class="{
-                        highlight: result.differences[column],
-                        'new-entry': result.status === 'new',
-                      }">
-                        <Pencil v-if="result.differences[column]" class="inline size-[var(--dv-icon-compact)] mr-1" aria-hidden="true" />
-                        {{ result.new[column] }}
-                        <span v-if="result.differences[column]" class="sr-only">(changed)</span>
-                      </div>
-                      <div v-if="result.invalid[column]" class="admin-form-error">{{ result.invalid[column] }}</div>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-            <DialogFooter class="mt-4">
-              <Button variant="outline" :disabled="isImporting" @click="closeComparisonDialog">Cancel</Button>
-              <Button @click="handleCsvImport" variant="default" :disabled="isImporting || !importCount">
-                <Loader v-if="isImporting" />
-                {{ isImporting ? "Importing..." : `Import ${importCount} ${importCount === 1 ? "row" : "rows"}` }}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </td>
+            <td>
+              <select v-model="targets[column]" class="record-native-select" :aria-label="`Import ${column} into`" :aria-invalid="!!errors[column] || undefined">
+                <option value="">Don't import</option>
+                <option v-if="!fieldNames.has(column)" :value="column">New text field “{{ column }}”</option>
+                <optgroup v-if="fields?.length" label="Existing fields">
+                  <option v-for="field in fields" :key="field.id" :value="field.name">{{ fieldLabel(field) }} · {{ VALUE_TYPE_LABELS[field.valueType] }}</option>
+                </optgroup>
+              </select>
+              <p v-if="errors[column]" class="admin-form-error" role="alert">{{ errors[column] }}</p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p v-if="compareError" class="admin-error" role="alert">{{ compareError }}</p>
+      <footer class="import-footer">
+        <span class="admin-text-secondary">{{ plural(importedColumns.length, "column", "columns") }} imported besides the {{ keyLabel }}</span>
+        <Button class="dv-button dv-button--primary" :disabled="comparing || Object.keys(errors).length > 0" @click="compare">
+          <Loader v-if="comparing" />{{ comparing ? "Comparing…" : `Compare with stored ${recordLabel.lowerPlural.value}` }}
+        </Button>
+      </footer>
+    </section>
+
+    <!-- 3. Review -->
+    <section v-else-if="step === 'review' && comparison" class="dv-panel import-panel">
+      <ul v-if="comparison.newColumns.length || Object.keys(comparison.newOptions).length" class="import-notes">
+        <li v-if="comparison.newColumns.length">
+          <strong>{{ plural(comparison.newColumns.length, "new field", "new fields") }}</strong>, created as text: {{ comparison.newColumns.join(", ") }}. Change their type afterwards on
+          <router-link :to="{ name: 'admin-fields' }">Fields</router-link>.
+        </li>
+        <li v-for="(options, name) in comparison.newOptions" :key="name">
+          <strong>{{ labels[name] ?? name }}</strong> gains {{ plural(options.length, "option", "options") }}: {{ options.join(", ") }}.
+        </li>
+      </ul>
+      <RecordImportReview v-model:selected="selected" :comparison="comparison" :key-column="keyColumn" :key-label="keyLabel" :labels="labels" />
+      <p v-if="importError" class="admin-error" role="alert">{{ importError }}</p>
+      <footer class="import-footer">
+        <Button variant="outline" :disabled="importing" @click="step = 'columns'">Back</Button>
+        <span class="admin-text-secondary" role="status">
+          {{ plural(counts.create, "new", "new") }} · {{ counts.update }} of {{ plural(counts.changed, "change", "changes") }} applied<template v-if="counts.skipped"> · {{ counts.skipped }} not imported</template>
+        </span>
+        <Button class="dv-button dv-button--primary" :disabled="importing || !rowsToImport.length" @click="runImport">
+          <Loader v-if="importing" />{{ importing ? "Importing…" : rowsToImport.length ? `Import ${plural(rowsToImport.length, "row", "rows")}` : "Nothing to import" }}
+        </Button>
+      </footer>
+    </section>
+
+    <!-- 4. Done -->
+    <section v-else-if="step === 'done' && result" class="dv-panel import-panel import-done">
+      <CircleCheck class="size-8" aria-hidden="true" />
+      <h2>Import finished</h2>
+      <p>
+        {{ plural(result.newRecords.length, `${recordLabel.lower.value} created`, `${recordLabel.lowerPlural.value} created`) }},
+        {{ plural(result.updatedRecords.length, "updated", "updated") }}.
+        <template v-if="counts.skipped || counts.changed > counts.update">
+          {{ plural(counts.skipped + counts.changed - counts.update, "row was", "rows were") }} left out.
+        </template>
+        Each change is in the {{ recordLabel.lower.value }}'s history.
+      </p>
+      <table v-if="result.skipped.length" class="import-table">
+        <thead><tr><th>{{ keyLabel }}</th><th>Field</th><th>Not imported because</th></tr></thead>
+        <tbody>
+          <tr v-for="entry in result.skipped" :key="`${entry.key}-${entry.column}`"><td>{{ entry.key }}</td><td>{{ labels[entry.column] ?? entry.column }}</td><td>{{ entry.message }}</td></tr>
+        </tbody>
+      </table>
+      <div class="import-done-actions">
+        <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-records' }">View {{ recordLabel.lowerPlural.value }}</router-link></Button>
+        <Button variant="outline" @click="restart">Import another file</Button>
       </div>
-    </div>
+    </section>
   </div>
 </template>
-
-<style scoped>
-@reference "../../../style.css";
-
-.new-column {
-  @apply bg-green-100;
-}
-
-.new-entry .new-value {
-  @apply bg-green-100;
-}
-
-.duplicate-entry {
-  @apply bg-red-100;
-}
-
-.invalid-entry {
-  box-shadow: inset 3px 0 0 var(--dv-color-danger);
-}
-
-.existing-value {
-  color: var(--dv-text-secondary);
-}
-
-.new-value {
-  color: var(--dv-text-primary);
-}
-
-.highlight {
-  @apply bg-yellow-100;
-}
-
-.dialog-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.dialog-body {
-  flex-grow: 1;
-  overflow-y: auto;
-}
-
-.max-w-xs {
-  max-width: 20rem;
-}
-
-:deep(.select-content) {
-  max-height: 200px;
-  overflow-y: auto;
-}
-</style>

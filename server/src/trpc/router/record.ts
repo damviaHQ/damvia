@@ -187,11 +187,13 @@ export default router({
         newColumns: analysis.newColumns,
         newOptions: analysis.newOptions,
         rows: analysis.rows.map((row) => ({
+          key: row.key,
           existing: row.existing ? { ...row.existing.metaData, [analysis.keyColumnName]: row.key } : {},
           new: row.row,
           differences: row.differences,
           invalid: row.invalid,
-          status: row.duplicate ? 'duplicate' as const
+          status: !row.key ? 'missing_key' as const
+            : row.duplicate ? 'duplicate' as const
             : Object.keys(row.invalid).length ? 'invalid' as const
             : !row.existing ? 'new' as const
             : Object.keys(row.differences).length ? 'changed' as const

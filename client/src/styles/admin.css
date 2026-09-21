@@ -286,3 +286,71 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 @media(max-width:760px) { .dv-admin .records-grid .is-sticky-key, .dv-admin .records-grid .is-thumbnail { position:static; } .dv-admin .records-grid-wrap { max-height:none; } }
 .dv-admin .record-chip.is-invalid { background:var(--dv-color-danger-soft); color:var(--dv-color-danger); }
 .dv-admin .record-option-hint { margin-left:auto; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
+
+/* Records: CSV import */
+.dv-admin .import-steps { display:flex; gap:28px; margin:0 0 16px; padding:0; list-style:none; font-size:var(--dv-size-body); color:var(--dv-text-secondary); }
+.dv-admin .import-steps li { display:flex; align-items:center; gap:8px; }
+.dv-admin .import-steps li.is-current { color:var(--dv-text-primary); font-weight:600; }
+.dv-admin .import-step-number { display:grid; place-items:center; width:22px; height:22px; border-radius:999px; border:1px solid var(--dv-color-line-strong); font-size:var(--dv-size-caption); font-weight:600; }
+.dv-admin .import-steps li.is-current .import-step-number { border-color:var(--dv-action-primary); background:var(--dv-action-primary); color:var(--dv-surface-panel); }
+.dv-admin .import-steps li.is-done .import-step-number { border-color:var(--dv-color-success); color:var(--dv-color-success); }
+.dv-admin .import-panel { display:flex; flex-direction:column; gap:20px; padding:24px; }
+.dv-admin .import-drop { display:flex; flex-direction:column; align-items:center; gap:10px; padding:48px 24px; border:1px dashed var(--dv-color-line-strong); background:var(--dv-surface-canvas); color:var(--dv-text-secondary); text-align:center; }
+.dv-admin .import-drop p { color:var(--dv-text-primary); }
+.dv-admin .import-drop.is-dragging { border-color:var(--dv-action-primary); background:var(--dv-action-soft); }
+.dv-admin .import-tips { display:grid; gap:6px; padding-left:18px; list-style:disc; color:var(--dv-text-secondary); font-size:var(--dv-size-body); }
+.dv-admin .import-tips a, .dv-admin .import-notes a { color:var(--dv-action-primary); text-decoration:underline; }
+.dv-admin .import-file { display:flex; align-items:center; gap:12px; padding-bottom:16px; border-bottom:1px solid var(--dv-color-line); }
+.dv-admin .import-file > div { display:flex; flex-direction:column; flex:1; min-width:0; }
+.dv-admin .import-file > div > span { font-size:var(--dv-size-caption); }
+.dv-admin .import-setting { display:grid; gap:8px; max-width:640px; }
+.dv-admin .import-setting > label, .dv-admin .import-setting-label { font-weight:600; font-size:var(--dv-size-body); }
+.dv-admin .import-setting .record-native-select { max-width:320px; }
+.dv-admin .import-setting p { font-size:var(--dv-size-caption); }
+.dv-admin .import-warning { color:var(--dv-color-warning); }
+.dv-admin .import-radios { display:flex; flex-wrap:wrap; gap:20px; }
+.dv-admin .import-radios > div { display:flex; align-items:center; gap:8px; }
+.dv-admin .import-radios [role=radio] { border-radius:999px; }
+.dv-admin .import-table-wrap { overflow:auto; max-height:calc(100dvh - 360px); border:1px solid var(--dv-color-line); }
+.dv-admin .import-table { width:100%; border-collapse:separate; border-spacing:0; font-size:var(--dv-size-body); }
+.dv-admin .import-table th { position:sticky; top:0; z-index:1; padding:9px 12px; background:var(--dv-surface-canvas); border-bottom:1px solid var(--dv-color-line); text-align:left; font-weight:500; color:var(--dv-text-secondary); }
+.dv-admin .import-table td { padding:9px 12px; border-bottom:1px solid var(--dv-color-line); vertical-align:top; }
+.dv-admin .import-table tbody tr:last-child td { border-bottom:0; }
+.dv-admin .import-mapping { border:1px solid var(--dv-color-line); }
+.dv-admin .import-mapping td { vertical-align:middle; }
+.dv-admin .import-samples { display:flex; flex-wrap:wrap; gap:4px; max-width:420px; }
+.dv-admin .import-mapping .record-native-select { width:100%; max-width:300px; }
+.dv-admin .import-mapping tr.is-off td:not(:last-child) { opacity:.5; }
+.dv-admin .import-check { width:44px; }
+.dv-admin .import-key { font-weight:500; white-space:nowrap; }
+.dv-admin .import-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; margin-bottom:12px; }
+.dv-admin .import-summary-item { display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:10px 14px; border:1px solid var(--dv-color-line); border-left-width:3px; background:var(--dv-surface-panel); text-align:left; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
+.dv-admin .import-summary-item strong { font-size:20px; line-height:1.2; color:var(--dv-text-primary); }
+.dv-admin .import-summary-item:hover:not(:disabled) { background:var(--dv-surface-canvas); }
+.dv-admin .import-summary-item:disabled { opacity:.5; }
+.dv-admin .import-summary-item[aria-pressed=true] { border-color:var(--dv-action-primary); background:var(--dv-action-soft); }
+.dv-admin .import-summary-item:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; }
+.dv-admin .import-summary-item.is-new { border-left-color:var(--dv-color-success); }
+.dv-admin .import-summary-item.is-changed { border-left-color:var(--dv-color-warning); }
+.dv-admin .import-summary-item.is-skipped { border-left-color:var(--dv-color-danger); }
+.dv-admin .import-status { display:inline-block; padding:1px 8px; border-radius:999px; background:var(--dv-surface-canvas); font-size:var(--dv-size-caption); line-height:18px; white-space:nowrap; }
+.dv-admin .import-status.is-new { background:var(--dv-color-success-soft); color:var(--dv-color-success); }
+.dv-admin .import-status.is-changed { background:var(--dv-color-warning-soft); color:var(--dv-color-warning); }
+.dv-admin .import-status.is-skipped { background:var(--dv-color-danger-soft); color:var(--dv-color-danger); }
+.dv-admin .import-changes, .dv-admin .import-values { display:grid; gap:4px; }
+.dv-admin .import-changes li { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.dv-admin .import-changes svg { color:var(--dv-text-secondary); flex:none; }
+.dv-admin .import-field { margin-right:6px; font-size:var(--dv-size-caption); font-weight:600; color:var(--dv-text-secondary); }
+.dv-admin .import-old { color:var(--dv-text-secondary); text-decoration:line-through; }
+.dv-admin .import-new { font-weight:500; }
+.dv-admin .import-error { color:var(--dv-color-danger); }
+.dv-admin .import-more { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:12px; font-size:var(--dv-size-caption); }
+.dv-admin .import-notes { display:grid; gap:6px; padding:12px 16px; background:var(--dv-surface-canvas); font-size:var(--dv-size-body); }
+.dv-admin .import-footer { position:sticky; bottom:0; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:12px; margin:0 -24px -24px; padding:14px 24px; border-top:1px solid var(--dv-color-line); background:var(--dv-surface-panel); font-size:var(--dv-size-caption); }
+.dv-admin .import-footer > span { margin-right:auto; }
+.dv-admin .import-done { align-items:center; text-align:center; }
+.dv-admin .import-done > svg { color:var(--dv-color-success); }
+.dv-admin .import-done h2 { font-size:var(--dv-size-section-title, 18px); font-weight:600; }
+.dv-admin .import-done > p { max-width:560px; color:var(--dv-text-secondary); }
+.dv-admin .import-done .import-table { max-width:720px; border:1px solid var(--dv-color-line); text-align:left; }
+.dv-admin .import-done-actions { display:flex; gap:10px; }

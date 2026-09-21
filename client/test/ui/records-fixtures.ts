@@ -30,6 +30,26 @@ const history = { items: [
   { id: 'h1', action: 'create', source: 'csv', changes: { name: { old: null, new: 'Canvas tote' } }, changedBy: { id: 'u', name: 'Alex Morgan' }, importBatchId: 'b', createdAt: '2026-09-01T10:00:00Z' },
 ], hasMore: false }
 
+export const importCsv = [
+  'SKU,Name,Colour,Price,Supplier',
+  'WX5678-100,Canvas tote,Sand,49,Acme',
+  'WX5678-200,Wool scarf,Moss,cheap,Acme',
+  '',
+  'WX9999-001,Linen shirt,Ink,59,',
+  ',Orphan,,,',
+].join('\n')
+const comparison = {
+  keyColumnName: 'SKU',
+  newColumns: ['Supplier'],
+  newOptions: { colour: ['Moss'] },
+  rows: [
+    { key: 'WX5678-100', status: 'changed', existing: records[0].metaData, new: { SKU: 'WX5678-100', name: 'Canvas tote', colour: 'Sand', price: '49', Supplier: 'Acme' }, differences: { price: { old: '45', new: '49' }, Supplier: { old: '', new: 'Acme' } }, invalid: {} },
+    { key: 'WX5678-200', status: 'invalid', existing: records[1].metaData, new: { SKU: 'WX5678-200', name: 'Wool scarf', colour: 'Moss', price: 'cheap', Supplier: 'Acme' }, differences: {}, invalid: { price: 'Price must be a number.' } },
+    { key: 'WX9999-001', status: 'new', existing: {}, new: { SKU: 'WX9999-001', name: 'Linen shirt', colour: 'Ink', price: '59' }, differences: {}, invalid: {} },
+    { key: '', status: 'missing_key', existing: {}, new: { SKU: '', name: 'Orphan' }, differences: {}, invalid: {} },
+  ],
+}
+
 export async function fixture(page: Page) {
   const errors: string[] = []
   const calls: { name: string, input: unknown }[] = []
@@ -46,6 +66,8 @@ export async function fixture(page: Page) {
       : name === 'record.get' ? detail
       : name === 'record.history' ? history
       : name === 'record.patch' ? { id: records[0].id, metaData: records[0].metaData, updatedAt: '2026-09-21T10:00:00Z' }
+      : name === 'record.compareCsv' ? comparison
+      : name === 'record.importCsv' ? { newRecords: ['WX9999-001'], updatedRecords: ['WX5678-100'], skipped: [], importBatchId: 'b' }
       : name === 'enrichment.badges' ? { unmatched: 0, unnamedAxes: 0 }
       : responses[name] ?? []
     await route.fulfill({ json: { result: { data } } })

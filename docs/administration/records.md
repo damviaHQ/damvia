@@ -88,9 +88,9 @@ Add a field from the ⋮ menu, from **Columns**, from a record's card, or on **F
 
 ## Prepare the CSV
 
-The first row must contain column names and the following rows contain one record per row. Choose one stable, unique primary-key column such as `sku`. Damvia accepts CSV, not Excel, and large files padded with empty rows should be cleaned first.
+The first row holds the column names and each row after it is one record. One column holds a stable, unique key such as `sku`. Save the sheet as CSV (UTF-8) from Excel, Numbers or Google Sheets; commas, semicolons and tabs all work, and blank lines are ignored.
 
-The primary-key column name is fixed by the first record, imported or created on screen. Later imports must use the same key name. A column the catalogue does not know yet becomes a Text field. A record that lacks a column simply has no value in that field; an import never writes empty values into records it does not list.
+The key column name is fixed by the first record, imported or created on screen. When a file does not have that column, you choose the column whose values are matched against the stored keys. The easiest way to update what is stored is to start from **Export** on the records page, edit it, and import it back.
 
 Write values in the form of their field: numbers with a dot or a comma, dates as `YYYY-MM-DD`, links with `https://`, and the options of a multiple select joined by `|`. An option a select field does not have yet is added to its list.
 
@@ -104,16 +104,14 @@ ABC123-002,Example bag,Black,Accessories
 
 ## Compare before importing
 
-Open `/admin/data-enrichment/records/import`:
+Open **Import CSV** on the records page (`/admin/data-enrichment/records/import`). Nothing is saved before the last step.
 
-1. Choose the CSV file.
-2. Select the columns to import.
-3. Select the primary-key column.
-4. Compare with the existing catalogue.
-5. Review new, changed, unchanged, duplicate and invalid rows, the columns that will become new fields, and the options that will be added to select fields.
-6. Select which changed rows may overwrite existing data, then import.
+1. **File**: drop the CSV or choose it.
+2. **Columns**: check the key column, then say where each other column goes. A column goes into the field with the same name or display name, case aside; otherwise it becomes a new Text field. Pick another field, or **Don't import**, for any column. Sample values show what each column holds. Under **Empty cells**, choose whether an empty cell keeps the value already stored (the default) or clears it.
+3. **Review**: counts of new, changed, unchanged and not imported rows sit above the list; click one to show only those rows. A changed row lists each field as old value → new value. Tick the changed rows to apply, or tick the header box for all of them; unticked rows stay as stored. New rows are always created. The fields that will be created and the options that will be added to select fields are listed at the top.
+4. **Import** writes it all in one go: if it fails, nothing is written. Each created or changed record gets a history entry from the import.
 
-Rows with an empty key are skipped. Duplicate keys in the same file are reported for review. A row holding a value its field refuses, such as text in a Number field, is marked **Not imported** with the reason in the cell and is skipped whole; fix the file and import again. The import creates new records and applies only the changed rows you approved, in one go: if it fails, nothing is written. Each created or changed record gets a history entry from the import.
+Rows are not imported when they have no key, when their key appears on several rows of the file, or when a value is refused by its field, such as text in a Number field. The review gives the reason for each; fix the file and import it again.
 
 CSV is parsed in the browser and sent as JSON. The API body limit is 5 MiB, so the JSON request may exceed the limit even when the original CSV does not. Split large catalogues into batches with the same key column.
 

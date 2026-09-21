@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { fixture } from './records-fixtures'
+import { fixture, importCsv } from './records-fixtures'
 
 // A focus outline cut by a scrolling or clipping container hides where the
 // keyboard is. Each control of the records screen is focused in turn and its
@@ -52,4 +52,17 @@ test('no focus outline of the records screen is cut by its container', async ({ 
   await page.getByRole('button', { name: 'Edit the field Colour' }).click()
   await page.getByRole('dialog', { name: /Edit Colour/ }).waitFor()
   expect(await page.evaluate(AUDIT), 'field dialog').toEqual([])
+})
+
+test('no focus outline of the CSV import is cut by its container', async ({ page }) => {
+  await fixture(page)
+  await page.goto('/admin/data-enrichment/records/import')
+  await page.getByRole('button', { name: 'Choose a file' }).waitFor()
+  expect(await page.evaluate(AUDIT), 'file').toEqual([])
+  await page.getByLabel('Choose a CSV file').setInputFiles({ name: 'catalogue.csv', mimeType: 'text/csv', buffer: Buffer.from(importCsv) })
+  await page.getByLabel('Import Name into').waitFor()
+  expect(await page.evaluate(AUDIT), 'columns').toEqual([])
+  await page.getByRole('button', { name: 'Compare with stored products' }).click()
+  await page.getByRole('checkbox', { name: 'Apply every change' }).waitFor()
+  expect(await page.evaluate(AUDIT), 'review').toEqual([])
 })
