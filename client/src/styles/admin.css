@@ -146,7 +146,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .records-sort-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:var(--dv-action-soft); font-size:var(--dv-size-caption); }
 .dv-admin .records-sort-chip button { display:grid; place-items:center; }
 .dv-admin .records-fetching { font-size:var(--dv-size-caption); }
-.dv-admin .records-panel { padding:0; overflow:hidden; }
+.dv-admin .admin-page.admin-records { display:flex; flex-direction:column; height:100%; max-width:none; padding:24px 28px 16px; }
+.dv-admin .admin-records > * { flex:none; }
+.dv-admin .admin-records > .records-panel { display:flex; flex:1 1 auto; min-height:240px; padding:0; overflow:hidden; }
 .dv-admin .records-panel + .records-footer, .dv-admin .records-footer { display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-top:14px; font-size:var(--dv-size-caption); }
 .dv-admin .records-footer nav { margin-left:auto; }
 .dv-admin .records-page-size { display:inline-flex; align-items:center; gap:8px; }
@@ -156,7 +158,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .record-native-select { height:36px; min-width:0; border:1px solid var(--dv-color-line-strong); border-radius:0; background:var(--dv-surface-panel); padding:0 8px; font-size:var(--dv-size-body); }
 .dv-admin .record-native-select:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; }
 
-.dv-admin .records-grid-wrap { overflow:auto; max-height:calc(100dvh - 300px); }
+.dv-admin .records-grid-wrap { flex:1; min-width:0; overflow:auto; overscroll-behavior:contain; }
 .dv-admin .records-grid { border-collapse:separate; border-spacing:0; table-layout:fixed; width:max-content; min-width:100%; font-size:var(--dv-size-body); }
 .dv-admin .records-grid th { position:sticky; top:0; z-index:3; height:38px; padding:0; background:var(--dv-surface-canvas); border-bottom:1px solid var(--dv-color-line); border-right:1px solid var(--dv-color-line); text-align:left; font-weight:500; color:var(--dv-text-secondary); }
 .dv-admin .records-grid td { height:36px; padding:0; border-bottom:1px solid var(--dv-color-line); border-right:1px solid var(--dv-color-line); background:var(--dv-surface-panel); position:relative; white-space:nowrap; overflow:hidden; }
@@ -165,10 +167,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .records-grid tbody tr.is-selected .record-chip { background:var(--dv-surface-panel); }
 .dv-admin .records-grid .records-grid-select { position:sticky; left:0; z-index:2; width:40px; text-align:center; }
 .dv-admin .records-grid th.records-grid-select { z-index:4; }
-.dv-admin .records-grid .is-thumbnail { position:sticky; left:40px; z-index:2; text-align:center; }
-.dv-admin .records-grid th.is-thumbnail { z-index:4; }
-.dv-admin .records-grid .is-sticky-key { position:sticky; left:96px; z-index:2; box-shadow:1px 0 0 var(--dv-color-line-strong); }
-.dv-admin .records-grid th.is-sticky-key { z-index:4; }
+.dv-admin .records-grid .is-thumbnail { text-align:center; }
+.dv-admin .records-grid .is-frozen { position:sticky; z-index:2; }
+.dv-admin .records-grid th.is-frozen { z-index:4; }
+.dv-admin .records-grid .is-frozen-edge { box-shadow:1px 0 0 var(--dv-color-line-strong); }
 .dv-admin .records-grid td[data-cell] { cursor:default; }
 .dv-admin .records-grid td.is-editable { cursor:cell; }
 .dv-admin .records-grid td[data-cell]:focus { outline:2px solid var(--dv-action-primary); outline-offset:-2px; z-index:1; }
@@ -194,6 +196,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .records-grid-new-form { display:flex; align-items:center; gap:12px; height:100%; }
 .dv-admin .records-grid-new-form input { flex:0 1 420px; height:36px; padding:0 10px; background:transparent; border:0; font:inherit; }
 .dv-admin .records-grid-new-form input:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; background:var(--dv-surface-panel); }
+.dv-admin .records-grid-reveal { margin-left:8px; color:var(--dv-action-primary); font-weight:500; text-decoration:underline; text-underline-offset:2px; }
+.dv-admin .records-grid-reveal:hover { text-decoration-thickness:2px; }
+.dv-admin .records-grid tbody tr.is-flashed td { animation:records-row-flash 2s ease-out; }
+@keyframes records-row-flash { 0%, 40% { background:var(--dv-action-soft); } }
+@media (prefers-reduced-motion: reduce) { .dv-admin .records-grid tbody tr.is-flashed td { animation:none; background:var(--dv-action-soft); } }
 .dv-admin .records-grid-new-form .admin-form-error { margin:0; }
 
 .dv-admin .record-value { display:flex; align-items:center; gap:6px; height:36px; padding:0 10px; overflow:hidden; text-overflow:ellipsis; }
@@ -243,17 +250,22 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .record-panel-tab[data-state=active] { color:var(--dv-text-primary); border-bottom-color:var(--dv-action-primary); background:transparent; }
 .dv-admin .record-panel-tab:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; box-shadow:none; }
 .dv-admin .record-panel-count { margin-left:6px; padding:0 7px; border-radius:999px; background:var(--dv-surface-canvas); font-size:var(--dv-size-caption); line-height:18px; }
-.dv-admin .record-panel-field-label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-.dv-admin .record-panel-field-label label { font-size:var(--dv-size-caption); font-weight:600; color:var(--dv-text-secondary); }
-.dv-admin .record-panel-field-edit { display:grid; place-items:center; width:24px; height:24px; color:var(--dv-text-secondary); opacity:.6; }
-.dv-admin .record-panel-field:hover .record-panel-field-edit, .dv-admin .record-panel-field-edit:focus-visible { opacity:1; }
+.dv-admin .record-panel-field-label { display:flex; align-items:center; gap:8px; min-height:38px; min-width:0; }
+.dv-admin .record-panel-field-label label { min-width:0; overflow-wrap:anywhere; font-size:var(--dv-size-body); color:var(--dv-text-secondary); }
+.dv-admin .record-panel-field-type { width:16px; height:16px; flex-shrink:0; color:var(--dv-text-secondary); }
+.dv-admin .record-panel-field-edit { display:grid; place-items:center; flex-shrink:0; width:24px; height:24px; border-radius:var(--dv-radius-sm); color:var(--dv-text-secondary); opacity:0; transition:opacity .12s; }
+.dv-admin .record-panel-field:hover .record-panel-field-edit, .dv-admin .record-panel-field:focus-within .record-panel-field-edit, .dv-admin .record-panel-field-edit:focus-visible { opacity:1; }
+@media (hover: none) { .dv-admin .record-panel-field-edit { opacity:1; } }
 .dv-admin .record-panel-field-edit:hover { color:var(--dv-action-primary); background:var(--dv-action-soft); }
 .dv-admin .record-panel-body { flex:1; min-height:0; overflow:auto; padding:16px 4px 24px; margin:0 -4px; display:flex; flex-direction:column; gap:16px; }
 .dv-admin .record-panel-body:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; box-shadow:none; }
 .dv-admin.admin-sheet [data-dialog-close] { top:16px; right:16px; width:32px; height:32px; }
 .dv-admin.admin-sheet [data-dialog-close]:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; }
 .dv-admin .records-grid button:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; }
-.dv-admin .record-panel-field { display:grid; gap:6px; }
+.dv-admin .record-panel-field { display:grid; grid-template-columns:minmax(0, 170px) minmax(0, 1fr); gap:6px 16px; align-items:start; }
+.dv-admin .record-panel-field .record-field-control, .dv-admin .record-panel-field .record-field-select { border-color:var(--dv-color-line); border-radius:var(--dv-radius-field); }
+.dv-admin .record-panel-field .record-field-control:hover, .dv-admin .record-panel-field .record-field-select:hover { border-color:var(--dv-color-line-strong); }
+@media (max-width: 480px) { .dv-admin .record-panel-field { grid-template-columns:minmax(0, 1fr); } .dv-admin .record-panel-field-label { min-height:0; } }
 .dv-admin .record-panel-subheading { font-size:var(--dv-size-body); font-weight:600; margin-top:8px; }
 .dv-admin .record-panel-files { display:grid; gap:10px; }
 .dv-admin .record-panel-files li { display:grid; grid-template-columns:64px 1fr; gap:12px; align-items:center; font-size:var(--dv-size-caption); }
@@ -275,6 +287,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .record-columns ul { display:grid; gap:2px; max-height:360px; overflow:auto; }
 .dv-admin .record-columns-item { display:flex; align-items:center; gap:8px; padding:4px 2px; }
 .dv-admin .record-columns-item button:disabled { opacity:.3; }
+.dv-admin .record-columns-frozen { display:flex; align-items:center; gap:8px; padding:6px 2px; color:var(--dv-action-primary); font-size:var(--dv-size-caption); font-weight:550; }
+.dv-admin .record-columns-frozen-line { flex:1; height:2px; background:currentColor; }
+.dv-admin .record-columns-frozen button:disabled { opacity:.3; }
 .dv-admin .record-columns-handle { cursor:grab; color:var(--dv-text-secondary); }
 .dv-admin .record-options-editor { display:flex; flex-wrap:wrap; gap:6px; }
 .dv-admin .record-options-editor li { display:inline-flex; align-items:center; gap:2px; }
@@ -284,7 +299,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .records-bulk-bar strong { margin-right:auto; }
 .dv-admin .records-bulk-bar button { background:transparent; color:#fff; border-color:rgb(255 255 255 / .4); }
 .dv-admin .records-bulk-bar button:hover { background:rgb(255 255 255 / .12); color:#fff; }
-@media(max-width:760px) { .dv-admin .records-grid .is-sticky-key, .dv-admin .records-grid .is-thumbnail { position:static; } .dv-admin .records-grid-wrap { max-height:none; } }
+@media(max-width:760px) { .dv-admin .records-grid .is-frozen { position:static; } .dv-admin .admin-page.admin-records { height:auto; padding:28px 20px; } .dv-admin .admin-records > .records-panel { display:block; } .dv-admin .records-grid-wrap { max-height:75dvh; } }
 .dv-admin .record-chip.is-invalid { background:var(--dv-color-danger-soft); color:var(--dv-color-danger); }
 .dv-admin .record-option-hint { margin-left:auto; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
 
@@ -312,7 +327,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .import-radios { display:flex; flex-wrap:wrap; gap:20px; }
 .dv-admin .import-radios > div { display:flex; align-items:center; gap:8px; }
 .dv-admin .import-radios [role=radio] { border-radius:999px; }
-.dv-admin .import-table-wrap { overflow:auto; max-height:calc(100dvh - 360px); border:1px solid var(--dv-color-line); }
+.dv-admin .import-table-wrap { overflow:auto; max-height:70dvh; border:1px solid var(--dv-color-line); }
+/* The review fills the screen like the records grid: only the table scrolls. */
+.dv-admin .admin-page.admin-record-import.is-review { display:flex; flex-direction:column; height:100%; max-width:none; padding:24px 28px 16px; }
+.dv-admin .admin-record-import.is-review > * { flex:none; }
+.dv-admin .admin-record-import.is-review > .import-panel { flex:1 1 auto; min-height:320px; overflow:hidden; }
+.dv-admin .admin-record-import.is-review .import-panel > * { flex:none; }
+.dv-admin .admin-record-import.is-review .import-panel > .import-review { display:flex; flex:1 1 auto; flex-direction:column; min-height:0; }
+.dv-admin .admin-record-import.is-review .import-review > * { flex:none; }
+.dv-admin .admin-record-import.is-review .import-review > .import-table-wrap { flex:1 1 auto; min-height:0; max-height:none; overscroll-behavior:contain; }
+@media(max-width:760px) { .dv-admin .admin-page.admin-record-import.is-review { display:block; height:auto; padding:28px 20px; } .dv-admin .admin-record-import.is-review .import-review > .import-table-wrap { max-height:70dvh; } }
 .dv-admin .import-table { width:100%; border-collapse:separate; border-spacing:0; font-size:var(--dv-size-body); }
 .dv-admin .import-table th { position:sticky; top:0; z-index:1; padding:9px 12px; background:var(--dv-surface-canvas); border-bottom:1px solid var(--dv-color-line); text-align:left; font-weight:500; color:var(--dv-text-secondary); }
 .dv-admin .import-table td { padding:9px 12px; border-bottom:1px solid var(--dv-color-line); vertical-align:top; }

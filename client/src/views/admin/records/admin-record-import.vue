@@ -160,7 +160,7 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
 </script>
 
 <template>
-  <div class="admin-page admin-resource-page admin-record-import">
+  <div class="admin-page admin-resource-page admin-record-import" :class="{ 'is-review': step === 'review' && comparison }">
     <AdminPageHeader :title="`Import ${recordLabel.lowerPlural.value}`"
       :description="`Create and update ${recordLabel.lowerPlural.value} from a CSV file. You see every change before anything is saved.`" />
 

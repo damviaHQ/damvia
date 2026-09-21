@@ -89,3 +89,62 @@ test('filters, columns, bulk actions and fields are one click away', async ({ pa
   await shot('records-field')
   expect(errors).toEqual([])
 })
+
+// Typing a key that exists links to its row, on whatever page it falls, and
+// only the grid scrolls, never the page around it.
+test('an existing key jumps to its row on its page', async ({ page }) => {
+  const { errors, calls } = await fixture(page)
+  await page.route('**/trpc/record.create*', route => route.fulfill({ status: 409, json: { error: { message: 'A record with key WX5678-200 already exists.', code: -32009, data: { code: 'CONFLICT', httpStatus: 409 } } } }))
+  await page.route('**/trpc/record.locate*', route => route.fulfill({ json: { result: { data: { id: records[1].id, position: 150 } } } }))
+  await page.goto('/admin/data-enrichment/records')
+  const grid = page.getByRole('grid', { name: 'product list' })
+  await expect(grid.locator('[data-cell="0-1"]')).toContainText('WX5678-100')
+  expect(await page.locator('#admin-content').evaluate(element => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1)
+
+  await grid.getByRole('textbox', { name: 'SKU of a new product' }).fill('WX5678-200')
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('alert').filter({ hasText: 'already exists' })).toBeVisible()
+  await page.getByRole('button', { name: 'Go to WX5678-200' }).click()
+  await expect.poll(() => calls.filter(call => call.name === 'record.list').some(call => (call.input as { page: number }).page === 2)).toBe(true)
+  await expect(grid.locator('[data-cell="1-1"]')).toBeFocused()
+  await expect(grid.locator('tr.is-flashed')).toContainText('WX5678-200')
+  await expect(page.getByRole('button', { name: 'Go to WX5678-200' })).toHaveCount(0)
+  expect(errors).toEqual([])
+})
+
+// Columns moved before the key stay frozen with it, and a picture moved after
+// it scrolls away; nothing slides under the frozen columns.
+test('frozen columns follow the column order', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('damvia_records_grid', JSON.stringify({ order: ['field:name', 'key', 'thumbnail'], hidden: [], widths: {}, sort: null, pageSize: 100, wrap: false })))
+  const { errors } = await fixture(page)
+  await page.setViewportSize({ width: 900, height: 700 })
+  await page.goto('/admin/data-enrichment/records')
+  const grid = page.getByRole('grid', { name: 'product list' })
+  await expect(grid.locator('[data-cell="0-1"]')).toContainText('WX5678-100')
+  await page.locator('.records-grid-wrap').evaluate(element => { element.scrollLeft = 400 })
+  const box = (cell: string) => grid.locator(`[data-cell="${cell}"]`).boundingBox()
+  const [name, key, picture] = [await box('0-0'), await box('0-1'), await box('0-2')]
+  expect(key!.x).toBeGreaterThanOrEqual(name!.x + name!.width - 1)
+  expect(picture!.x + picture!.width).toBeLessThanOrEqual(key!.x + 1)
+  expect(errors).toEqual([])
+})
+
+// The frozen line is an entry of the Columns list: what is above it stays put.
+test('the frozen line moves in the Columns list', async ({ page }) => {
+  const { errors } = await fixture(page)
+  await page.goto('/admin/data-enrichment/records')
+  const grid = page.getByRole('grid', { name: 'product list' })
+  await expect(grid.locator('[data-cell="0-1"]')).toContainText('WX5678-100')
+  await expect(grid.locator('[data-cell="0-1"]')).toHaveClass(/is-frozen-edge/)
+  await page.getByRole('button', { name: 'Columns' }).click()
+  await expect(page.getByRole('checkbox', { name: 'SKU' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Move the frozen line up' }).click()
+  await expect(grid.locator('[data-cell="0-1"]')).not.toHaveClass(/is-frozen/)
+  await expect(grid.locator('[data-cell="0-0"]')).toHaveClass(/is-frozen-edge/)
+  await page.getByRole('button', { name: 'Move the frozen line down' }).click()
+  await page.getByRole('button', { name: 'Move the frozen line down' }).click()
+  await expect(grid.locator('[data-cell="0-2"]')).toHaveClass(/is-frozen-edge/)
+  await page.screenshot({ path: process.env.RECORDS_SHOTS ? `${process.env.RECORDS_SHOTS}/records-frozen.png` : undefined })
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('damvia_records_grid')!).order.slice(0, 4))).toEqual(['thumbnail', 'key', 'field:name', 'frozen'])
+  expect(errors).toEqual([])
+})

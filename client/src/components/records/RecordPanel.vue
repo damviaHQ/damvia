@@ -20,9 +20,9 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { trpc, type RouterOutput } from "@/services/server"
-import { fieldLabel, formatRecordValue } from "@/utils/recordValues"
+import { fieldLabel, formatRecordValue, type RecordValueType } from "@/utils/recordValues"
 import { useQuery } from "@tanstack/vue-query"
-import { PencilLine, Plus, Trash2 } from "@lucide/vue"
+import { AlignLeft, Calendar, CircleChevronDown, Hash, Link, ListChecks, PencilLine, Plus, Trash2, Type } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 import RecordFieldInput from "./RecordFieldInput.vue"
 import type { GridField } from "./RecordsGrid.vue"
@@ -31,6 +31,16 @@ type Detail = RouterOutput["record"]["get"]
 type HistoryItem = RouterOutput["record"]["history"]["items"][number]
 type DirectFile = Detail["files"]["direct"][number]
 export type PanelTab = "fields" | "files" | "history"
+
+const TYPE_ICONS: Record<RecordValueType, typeof Type> = {
+  text: Type,
+  long_text: AlignLeft,
+  number: Hash,
+  date: Calendar,
+  single_select: CircleChevronDown,
+  multi_select: ListChecks,
+  url: Link,
+}
 
 const props = defineProps<{
   recordId: string | null
@@ -144,6 +154,7 @@ function when(value: string | Date) {
             <p v-if="!fields.length" class="admin-text-secondary">No field yet.</p>
             <div v-for="field in fields" :key="field.id" class="record-panel-field">
               <div class="record-panel-field-label">
+                <component :is="TYPE_ICONS[field.valueType]" class="record-panel-field-type" aria-hidden="true" />
                 <label :for="`panel-${field.id}`">{{ fieldLabel(field) }}</label>
                 <button type="button" class="record-panel-field-edit" :aria-label="`Edit the field ${fieldLabel(field)}`" :title="`Edit the field: name, type, options`" @click="emit('editField', field)">
                   <PencilLine class="size-3.5" />

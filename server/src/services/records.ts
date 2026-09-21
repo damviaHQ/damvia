@@ -317,6 +317,26 @@ export async function listRecords(em: EntityManager, query: RecordQuery, page: {
 	}
 }
 
+// Where a record sits in the list: its 0-based position under the search,
+// filters and sort, or null when they leave it out.
+export async function locateRecord(em: EntityManager, recordKey: string, query: RecordQuery): Promise<{ id: string, position: number | null } | null> {
+	const [record] = await em.query('SELECT id FROM records WHERE record_key = $1', [recordKey.trim()])
+	if (!record) return null
+	const [fields, keyColumnName] = await Promise.all([loadFields(em), catalogueKeyColumnName(em)])
+	const parameters: unknown[] = [record.id]
+	const { where, orderBy } = recordQuerySql(query, fields, keyColumnName, parameters)
+	const source = orderBy.includes('file_count') ? `(SELECT r.*, ${FILE_COUNT} AS file_count FROM records r)` : 'records'
+	const [row] = await em.query(`
+		SELECT position FROM (
+			SELECT r.id, (row_number() OVER (ORDER BY ${orderBy}) - 1)::int AS position
+			FROM ${source} r
+			WHERE ${where}
+		) ranked
+		WHERE id = $1
+	`, parameters)
+	return { id: record.id, position: row ? row.position : null }
+}
+
 export type CsvRow = Record<string, string>
 export type CsvAnalysis = {
 	keyColumnName: string

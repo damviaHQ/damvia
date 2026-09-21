@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import Loader from "@/components/Loader.vue"
 import FieldEditorDialog from "@/components/records/FieldEditorDialog.vue"
-import RecordColumns from "@/components/records/RecordColumns.vue"
+import RecordColumns, { FROZEN_LINE, type ColumnChoice } from "@/components/records/RecordColumns.vue"
 import RecordFieldsSheet from "@/components/records/RecordFieldsSheet.vue"
 import RecordFilters from "@/components/records/RecordFilters.vue"
 import RecordPanel, { type PanelTab } from "@/components/records/RecordPanel.vue"
@@ -40,7 +40,7 @@ import { refDebounced } from "@vueuse/core"
 import { ArrowDown, ArrowUp, Blocks, Columns3, Download, EllipsisVertical, FileUp, Filter, PackageX, Plus, Search, X } from "@lucide/vue"
 import { unparse } from "papaparse"
 import { toast as sonner } from "vue-sonner"
-import { computed, ref, watch } from "vue"
+import { computed, nextTick, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 type Field = RouterOutput["recordAttribute"]["list"][number]
@@ -65,9 +65,11 @@ const debouncedFilters = refDebounced(completeFilters, 300)
 const narrowed = computed(() => !!debouncedSearch.value.trim() || debouncedFilters.value.length > 0)
 
 // A new search, filter, order or page size starts again from page 1 with
-// nothing selected.
+// nothing selected, unless a jump to a record cleared them for its page.
+let jumpPage: number | null = null
 watch([debouncedSearch, debouncedFilters, () => preferences.value.sort, () => preferences.value.pageSize], () => {
-  page.value = 1
+  page.value = jumpPage ?? 1
+  if (!narrowed.value) jumpPage = null
   selected.value = []
 }, { deep: true })
 
@@ -101,16 +103,31 @@ const allColumns = computed<GridColumn[]>(() => [
   { id: "files", kind: "files", label: "Files", width: 90, sortKey: "fileCount" },
   { id: "filled", kind: "filled", label: "Filled", width: 130 },
 ])
-// The saved order first, then columns it does not know yet in their natural place.
+// The saved order first, then columns it does not know yet in their natural
+// place. The frozen line sits in the order too: columns above it stay in place
+// when the grid scrolls sideways; by default it follows the key.
+const orderedIds = computed(() => {
+  const ids = new Set(allColumns.value.map((column) => column.id))
+  const known = preferences.value.order.filter((id) => ids.has(id) || id === FROZEN_LINE)
+  const order = [...known, ...[...ids].filter((id) => !known.includes(id))]
+  if (!order.includes(FROZEN_LINE)) order.splice(order.indexOf("key") + 1, 0, FROZEN_LINE)
+  return order
+})
 const orderedColumns = computed(() => {
   const byId = new Map(allColumns.value.map((column) => [column.id, column]))
-  const known = preferences.value.order.filter((id) => byId.has(id))
-  return [...known, ...allColumns.value.map((column) => column.id).filter((id) => !known.includes(id))].map((id) => byId.get(id)!)
+  return orderedIds.value.filter((id) => id !== FROZEN_LINE).map((id) => byId.get(id)!)
 })
+const isVisible = (column: GridColumn) => column.kind === "key" || !preferences.value.hidden.includes(column.id)
 const columns = computed(() => orderedColumns.value
-  .filter((column) => column.kind === "key" || !preferences.value.hidden.includes(column.id))
+  .filter(isVisible)
   .map((column) => ({ ...column, width: preferences.value.widths[column.id] ?? column.width })))
-const columnChoices = computed(() => orderedColumns.value.filter((column) => column.kind !== "key").map((column) => ({ id: column.id, label: column.label, hidden: preferences.value.hidden.includes(column.id) })))
+const frozenCount = computed(() => orderedIds.value.slice(0, orderedIds.value.indexOf(FROZEN_LINE))
+  .filter((id) => { const column = orderedColumns.value.find((item) => item.id === id); return column && isVisible(column) }).length)
+const columnChoices = computed<ColumnChoice[]>(() => orderedIds.value.map((id) => {
+  if (id === FROZEN_LINE) return { id, label: "Frozen", hidden: false, divider: true }
+  const column = orderedColumns.value.find((item) => item.id === id)!
+  return { id, label: column.label, hidden: !isVisible(column), locked: column.kind === "key" }
+}))
 const sortLabel = computed(() => {
   const sort = preferences.value.sort
   if (!sort) return null
@@ -118,10 +135,7 @@ const sortLabel = computed(() => {
 })
 
 function setOrder(ids: string[]) {
-  const key = orderedColumns.value.find((column) => column.kind === "key")!
-  const rest = ids.filter((id) => id !== key.id)
-  const keyIndex = orderedColumns.value.indexOf(key)
-  preferences.value.order = [...rest.slice(0, keyIndex), key.id, ...rest.slice(keyIndex)]
+  preferences.value.order = ids
 }
 function toggleColumn(id: string, visible: boolean) {
   preferences.value.hidden = visible ? preferences.value.hidden.filter((item) => item !== id) : [...new Set([...preferences.value.hidden, id])]
@@ -236,6 +250,32 @@ async function createRecord(key: string) {
   announce(`${recordLabel.singular.value} ${created.recordKey} added`)
   openRecord(created.id, "fields")
 }
+
+// Jumps to the page of an existing record and shows its row; search and
+// filters that leave it out are cleared first.
+const revealId = ref<string | null>(null)
+async function revealRecord(recordKey: string) {
+  try {
+    const pageOf = (position: number) => Math.floor(position / preferences.value.pageSize) + 1
+    const located = await trpc.record.locate.query({ recordKey, ...query.value })
+    if (located.position === null) {
+      const unfiltered = await trpc.record.locate.query({ recordKey, sort: query.value.sort })
+      jumpPage = pageOf(unfiltered.position ?? 0)
+      clearNarrowing()
+      toast.info(`Search and filters cleared to show ${recordKey}`)
+    } else {
+      page.value = pageOf(located.position)
+    }
+    revealId.value = located.id
+  } catch (failure) {
+    toast.error((failure as Error).message)
+  }
+}
+watch([() => data.value?.records, revealId], ([records, id]) => {
+  if (!id || !records?.some((record) => record.id === id)) return
+  revealId.value = null
+  nextTick(() => grid.value?.revealRow(id))
+})
 
 async function removeRecords(ids: string[]) {
   const { removed } = await trpc.record.remove.mutate({ ids })
@@ -358,17 +398,17 @@ watch(() => data.value?.total, (count) => {
   <div class="admin-page admin-resource-page admin-records">
     <AdminPageHeader :title="recordLabel.plural.value" :description="`Create, correct and complete your ${recordLabel.lowerPlural.value}. Changes save as you go and are kept in each ${recordLabel.lower.value}'s history.`">
       <Button as-child variant="outline"><router-link :to="{ name: 'admin-record-import' }"><FileUp class="size-4" />Import CSV</router-link></Button>
-      <Button class="dv-button dv-button--primary" @click="grid?.focusNewRow()"><Plus class="size-4" />Add {{ recordLabel.lower.value }}</Button>
+      <Button class="dv-button dv-button--primary" @click="grid?.focusNewRow()"><Plus />Add {{ recordLabel.lower.value }}</Button>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button variant="ghost" size="icon" aria-label="More actions"><EllipsisVertical class="size-5" /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem :disabled="exporting || !total" @select="exportCsv"><Download class="size-4" />Export {{ narrowed ? "matching" : "all" }} {{ recordLabel.lowerPlural.value }} (CSV)</DropdownMenuItem>
-          <DropdownMenuItem @select="editField(null)"><Plus class="size-4" />Add a field</DropdownMenuItem>
-          <DropdownMenuItem @select="fieldsOpen = true"><Blocks class="size-4" />Manage fields</DropdownMenuItem>
+          <DropdownMenuItem :disabled="exporting || !total" @select="exportCsv"><Download />Export {{ narrowed ? "matching" : "all" }} {{ recordLabel.lowerPlural.value }} (CSV)</DropdownMenuItem>
+          <DropdownMenuItem @select="editField(null)"><Plus />Add a field</DropdownMenuItem>
+          <DropdownMenuItem @select="fieldsOpen = true"><Blocks />Manage fields</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem :disabled="!total && !narrowed" class="text-destructive" @select="showRemoveAll = true"><PackageX class="size-4" />Remove all {{ recordLabel.lowerPlural.value }}</DropdownMenuItem>
+          <DropdownMenuItem :disabled="!total && !narrowed" variant="destructive" @select="showRemoveAll = true"><PackageX />Remove all {{ recordLabel.lowerPlural.value }}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </AdminPageHeader>
@@ -418,12 +458,12 @@ watch(() => data.value?.total, (count) => {
         <Button variant="outline" @click="clearNarrowing">Clear search and filters</Button>
       </section>
       <div class="dv-panel records-panel">
-        <RecordsGrid ref="grid" v-model:selected="selected" :rows="data?.records ?? []" :columns="columns" :field-count="fields.length" :wrap="preferences.wrap"
+        <RecordsGrid ref="grid" v-model:selected="selected" :rows="data?.records ?? []" :columns="columns" :field-count="fields.length" :frozen="frozenCount" :wrap="preferences.wrap"
           :sort="preferences.sort" :record-label="recordLabel.lower.value" :key-label="keyLabel"
           :commit="commitCell" :commit-many="commitCells" :add-option="addOption" :create="createRecord"
           @open="(row, tab) => openRecord(row.id, tab)" @sort="(sort: GridSort) => preferences.sort = sort"
           @resize="(id, width) => preferences.widths = { ...preferences.widths, [id]: width }" @hide="(id) => toggleColumn(id, false)"
-          @filter="filterBy" @edit-field="editField" @remove-field="askRemoveField" />
+          @filter="filterBy" @edit-field="editField" @remove-field="askRemoveField" @reveal="revealRecord" />
       </div>
       <footer v-if="total" class="records-footer">
         <span class="admin-text-secondary">{{ firstShown }}–{{ lastShown }} of {{ total }}</span>

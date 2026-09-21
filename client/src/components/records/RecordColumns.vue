@@ -12,13 +12,17 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+<script lang="ts">
+export type ColumnChoice = { id: string, label: string, hidden: boolean, locked?: boolean, divider?: boolean }
+// The frozen line in the column order: columns above it stay in place.
+export const FROZEN_LINE = "frozen"
+</script>
+
 <script setup lang="ts">
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowDown, ArrowUp, GripVertical, Plus } from "@lucide/vue"
+import { ArrowDown, ArrowUp, GripVertical, Plus, Snowflake } from "@lucide/vue"
 import Draggable from "vuedraggable"
-
-export type ColumnChoice = { id: string, label: string, hidden: boolean }
 
 // Which columns show and in which order, for this browser.
 const props = defineProps<{ columns: ColumnChoice[] }>()
@@ -37,9 +41,17 @@ function move(index: number, delta: number) {
   <div class="record-columns">
     <Draggable :model-value="columns" item-key="id" handle=".record-columns-handle" tag="ul" @update:model-value="(items: ColumnChoice[]) => emit('order', items.map((item) => item.id))">
       <template #item="{ element, index }">
-        <li class="record-columns-item">
+        <li v-if="element.divider" class="record-columns-frozen">
           <GripVertical class="record-columns-handle size-4" aria-hidden="true" />
-          <Checkbox :id="`column-${element.id}`" :model-value="!element.hidden" @update:model-value="(value) => emit('toggle', element.id, value === true)" />
+          <Snowflake class="size-3.5" aria-hidden="true" />
+          <span>Frozen above</span>
+          <span class="record-columns-frozen-line" aria-hidden="true" />
+          <button type="button" aria-label="Move the frozen line up" :disabled="index === 0" @click="move(index, -1)"><ArrowUp class="size-3.5" /></button>
+          <button type="button" aria-label="Move the frozen line down" :disabled="index === columns.length - 1" @click="move(index, 1)"><ArrowDown class="size-3.5" /></button>
+        </li>
+        <li v-else class="record-columns-item">
+          <GripVertical class="record-columns-handle size-4" aria-hidden="true" />
+          <Checkbox :id="`column-${element.id}`" :model-value="!element.hidden" :disabled="element.locked" @update:model-value="(value) => emit('toggle', element.id, value === true)" />
           <label :for="`column-${element.id}`" class="truncate flex-1">{{ element.label }}</label>
           <button type="button" :aria-label="`Move ${element.label} up`" :disabled="index === 0" @click="move(index, -1)"><ArrowUp class="size-3.5" /></button>
           <button type="button" :aria-label="`Move ${element.label} down`" :disabled="index === columns.length - 1" @click="move(index, 1)"><ArrowDown class="size-3.5" /></button>

@@ -34,6 +34,9 @@ const props = defineProps<{
   rows: GridRecord[]
   columns: GridColumn[]
   fieldCount: number
+  // How many of the columns, from the left, stay in place when scrolling
+  // sideways; up to the key when not given.
+  frozen?: number
   wrap?: boolean
   sort: GridSort
   selected: string[]
@@ -53,6 +56,7 @@ const emit = defineEmits<{
   filter: [column: GridColumn]
   editField: [field: GridField]
   removeField: [field: GridField]
+  reveal: [recordKey: string]
 }>()
 
 const root = ref<HTMLElement | null>(null)
@@ -70,9 +74,25 @@ const fillRange = computed(() => fillTo.value === null ? null : { ...range.value
 const rangeMessage = ref("")
 // The table is exactly as wide as its columns, so a long value never widens one.
 const tableWidth = computed(() => 40 + props.columns.reduce((total, column) => total + column.width, 0))
+// Frozen columns stay in place when the grid scrolls sideways; each one sits
+// after the widths of the columns before it.
+const frozenCount = computed(() => props.frozen ?? props.columns.findIndex((column) => column.kind === "key") + 1)
+const frozenLefts = computed(() => {
+  let left = 40
+  return props.columns.map((column, index) => {
+    const frozen = index < frozenCount.value ? left : null
+    left += column.width
+    return frozen
+  })
+})
+const frozenWidth = computed(() => 40 + props.columns.slice(0, frozenCount.value).reduce((total, column) => total + column.width, 0))
+const frozenStyle = (index: number) => frozenLefts.value[index] === null ? undefined : { left: `${frozenLefts.value[index]}px` }
 const newKey = ref("")
 const newKeyError = ref("")
+// The key typed when it belongs to a record that already exists.
+const conflictKey = ref<string | null>(null)
 const creating = ref(false)
+const flashed = ref<string | null>(null)
 
 const shape = computed(() => ({
   rows: props.rows.length,
@@ -381,11 +401,13 @@ async function submitNewKey() {
   if (!key || creating.value) return
   creating.value = true
   newKeyError.value = ""
+  conflictKey.value = null
   try {
     await props.create(key)
     newKey.value = ""
   } catch (error) {
     newKeyError.value = (error as Error).message
+    if ((error as { data?: { code?: string } }).data?.code === "CONFLICT") conflictKey.value = key
   } finally {
     creating.value = false
   }
@@ -396,11 +418,25 @@ defineExpose({
     newKeyInput.value?.scrollIntoView({ block: "nearest" })
     newKeyInput.value?.focus()
   },
+  // Focuses the key cell of a row on the current page and flashes the row.
+  revealRow: (id: string) => {
+    const row = props.rows.findIndex((record) => record.id === id)
+    if (row < 0) return false
+    const column = Math.max(0, props.columns.findIndex((item) => item.kind === "key"))
+    head.value = null
+    focusCell({ row, column })
+    nextTick(() => cellElement({ row, column })?.scrollIntoView({ block: "center", inline: "nearest" }))
+    flashed.value = id
+    setTimeout(() => { if (flashed.value === id) flashed.value = null }, 2000)
+    newKeyError.value = ""
+    conflictKey.value = null
+    return true
+  },
 })
 </script>
 
 <template>
-  <div ref="root" class="records-grid-wrap">
+  <div ref="root" class="records-grid-wrap" :style="{ scrollPaddingLeft: `${frozenWidth}px` }">
     <p class="sr-only" role="status" aria-live="polite">{{ rangeMessage }}</p>
     <table class="records-grid" :class="{ 'is-wrapped': wrap }" :style="{ width: `${tableWidth}px` }" role="grid" aria-multiselectable="true" :aria-label="`${recordLabel} list`" :aria-rowcount="rows.length + 1">
       <colgroup>
@@ -413,8 +449,8 @@ defineExpose({
             <Checkbox :model-value="allSelected ? true : someSelected ? 'indeterminate' : false" :aria-label="`Select every ${recordLabel} on this page`"
               :disabled="!rows.length" @update:model-value="(value) => toggleAll(value === true)" />
           </th>
-          <th v-for="column in columns" :key="column.id" scope="col" :aria-sort="ariaSort(column)"
-            :class="{ 'is-sticky-key': column.kind === 'key', 'is-thumbnail': column.kind === 'thumbnail' }">
+          <th v-for="(column, c) in columns" :key="column.id" scope="col" :aria-sort="ariaSort(column)" :style="frozenStyle(c)"
+            :class="{ 'is-frozen': frozenLefts[c] !== null, 'is-frozen-edge': c === frozenCount - 1, 'is-thumbnail': column.kind === 'thumbnail' }">
             <div class="records-grid-heading">
               <span v-if="column.kind === 'thumbnail'" class="sr-only">{{ column.label }}</span>
               <DropdownMenu v-else>
@@ -428,15 +464,15 @@ defineExpose({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <template v-if="column.sortKey">
-                    <DropdownMenuItem @select="emit('sort', { column: column.sortKey!, direction: 'asc' })"><ArrowUp class="size-4" />Sort ascending</DropdownMenuItem>
-                    <DropdownMenuItem @select="emit('sort', { column: column.sortKey!, direction: 'desc' })"><ArrowDown class="size-4" />Sort descending</DropdownMenuItem>
+                    <DropdownMenuItem @select="emit('sort', { column: column.sortKey!, direction: 'asc' })"><ArrowUp />Sort ascending</DropdownMenuItem>
+                    <DropdownMenuItem @select="emit('sort', { column: column.sortKey!, direction: 'desc' })"><ArrowDown />Sort descending</DropdownMenuItem>
                   </template>
-                  <DropdownMenuItem v-if="column.kind === 'field' || column.kind === 'key'" @select="emit('filter', column)"><Filter class="size-4" />Filter by this field</DropdownMenuItem>
-                  <DropdownMenuItem v-if="column.kind !== 'key'" @select="emit('hide', column.id)"><EyeOff class="size-4" />Hide</DropdownMenuItem>
+                  <DropdownMenuItem v-if="column.kind === 'field' || column.kind === 'key'" @select="emit('filter', column)"><Filter />Filter by this field</DropdownMenuItem>
+                  <DropdownMenuItem v-if="column.kind !== 'key'" @select="emit('hide', column.id)"><EyeOff />Hide</DropdownMenuItem>
                   <template v-if="column.field">
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem @select="emit('editField', column.field!)"><PencilLine class="size-4" />Edit field</DropdownMenuItem>
-                    <DropdownMenuItem @select="emit('removeField', column.field!)"><Trash2 class="size-4" />Remove field</DropdownMenuItem>
+                    <DropdownMenuItem @select="emit('editField', column.field!)"><PencilLine />Edit field</DropdownMenuItem>
+                    <DropdownMenuItem variant="destructive" @select="emit('removeField', column.field!)"><Trash2 />Remove field</DropdownMenuItem>
                   </template>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -448,18 +484,19 @@ defineExpose({
         </tr>
       </thead>
       <tbody @keydown="onKeydown" @copy="onCopy" @paste="onPaste">
-        <tr v-for="(row, r) in rows" :key="row.id" :aria-selected="selected.includes(row.id)" :class="{ 'is-selected': selected.includes(row.id) }">
+        <tr v-for="(row, r) in rows" :key="row.id" :aria-selected="selected.includes(row.id)" :class="{ 'is-selected': selected.includes(row.id), 'is-flashed': flashed === row.id }">
           <td class="records-grid-select">
             <Checkbox :model-value="selected.includes(row.id)" :aria-label="`Select ${row.recordKey}`" @update:model-value="(value) => toggleRow(row.id, value === true)" />
           </td>
           <td v-for="(column, c) in columns" :key="column.id" role="gridcell" :data-cell="`${r}-${c}`"
             :tabindex="focused.row === r && focused.column === c ? 0 : -1"
             :aria-readonly="column.kind !== 'field' || undefined"
-            :aria-selected="multi && inRange(range, r, c) ? true : undefined"
+            :aria-selected="multi && inRange(range, r, c) ? true : undefined" :style="frozenStyle(c)"
             :class="[cellClasses(r, c), {
+              'is-frozen': frozenLefts[c] !== null,
+              'is-frozen-edge': c === frozenCount - 1,
               'is-editable': column.kind === 'field',
               'is-editing': editing?.row === r && editing?.column === c,
-              'is-sticky-key': column.kind === 'key',
               'is-thumbnail': column.kind === 'thumbnail',
             }]"
             @mousedown="onCellMousedown({ row: r, column: c }, $event)" @mouseenter="onCellMouseenter({ row: r, column: c }, $event)" @click="onCellClick({ row: r, column: c })" @dblclick="startEdit({ row: r, column: c })" @focus="focused = { row: r, column: c }">
@@ -494,8 +531,11 @@ defineExpose({
             <form class="records-grid-new-form" @submit.prevent="submitNewKey">
               <input ref="newKeyInput" v-model="newKey" type="text" :disabled="creating" :aria-invalid="!!newKeyError || undefined"
                 :aria-describedby="newKeyError ? 'new-record-error' : undefined" :aria-label="`${keyLabel} of a new ${recordLabel}`"
-                :placeholder="`Add a ${recordLabel}: type its ${keyLabel} and press Enter`" @input="newKeyError = ''" />
-              <span v-if="newKeyError" id="new-record-error" role="alert" class="admin-form-error">{{ newKeyError }}</span>
+                :placeholder="`Add a ${recordLabel}: type its ${keyLabel} and press Enter`" @input="newKeyError = ''; conflictKey = null" />
+              <span v-if="newKeyError" id="new-record-error" role="alert" class="admin-form-error">
+                {{ newKeyError }}
+                <button v-if="conflictKey" type="button" class="records-grid-reveal" @click="emit('reveal', conflictKey)">Go to {{ conflictKey }}</button>
+              </span>
             </form>
           </td>
         </tr>

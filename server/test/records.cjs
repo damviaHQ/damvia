@@ -33,7 +33,7 @@ before(async () => {
     admin = caller(fixtures.admin)
     // Records imported before fields had types: undo the migration, write the
     // catalogue as it was, and migrate again.
-    await db.undoLastMigration()
+    while ((await db.query("SELECT 1 FROM migrations WHERE name = 'RecordFields1790985600000'")).length) await db.undoLastMigration()
     await db.query(`INSERT INTO records (record_key, key_column_name, meta_data) VALUES
         ('BF-1', 'SKU', 'SKU=>BF-1, bf_name=>Shirt, bf_colour=>Blue'::hstore),
         ('BF-2', 'SKU', 'SKU=>BF-2, bf_name=>Bag, bf_size=>L'::hstore)`)
@@ -132,6 +132,14 @@ test('the list searches every value, filters, sorts numbers as numbers and count
     await rejects(list({ filters: [{ column: 'nope', op: 'is', value: 'x' }] }), 'BAD_REQUEST')
     const page = await admin.record.list({ page: 2, size: 1, filters: [{ column: 'recordKey', op: 'contains', value: 'LST-' }] })
     assert.deepEqual([page.total, keys(page)], [3, ['LST-2']])
+
+    const lst = [{ column: 'recordKey', op: 'contains', value: 'LST-' }]
+    const locate = input => admin.record.locate({ filters: lst, ...input })
+    assert.deepEqual(await locate({ recordKey: 'LST-3', sort: { column: 'recordKey', direction: 'desc' } }), { id: broken, position: 0 })
+    assert.equal((await locate({ recordKey: 'LST-1', sort: { column: 'price', direction: 'desc' } })).position, 1)
+    assert.equal((await locate({ recordKey: 'LST-2', sort: { column: 'fileCount', direction: 'asc' } })).position, 1)
+    assert.equal((await locate({ recordKey: 'LST-1', search: 'beta' })).position, null, 'a record the search leaves out has no position')
+    await rejects(locate({ recordKey: 'LST-404' }), 'NOT_FOUND')
 })
 
 test('bulk edits and removals write one history row per record and leave links dangling', async () => {
@@ -251,6 +259,7 @@ test('every record and field procedure needs an approved admin', async () => {
     const calls = [
         c => c.record.list({ page: 1, size: 1 }),
         c => c.record.get(id),
+        c => c.record.locate({ recordKey: 'LST-1' }),
         c => c.record.create({ recordKey: 'SEC-1' }),
         c => c.record.patch({ id, values: { price: '1' }, source: 'grid' }),
         c => c.record.bulkPatch({ ids: [id], values: { price: '1' } }),

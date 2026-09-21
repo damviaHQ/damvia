@@ -19,7 +19,7 @@ import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { rerunEntityStage } from "../../services/enrichment"
 import { linkedFilesOf } from "../../services/record-files"
-import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, patchEach, patchRecords, removeRecords, RecordRow } from "../../services/records"
+import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, locateRecord, patchEach, patchRecords, removeRecords, RecordRow } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
 const filter = z.object({
@@ -87,6 +87,18 @@ export default router({
           range: await Promise.all(files.range.map(async ({ thumbnailStorageKey, ...file }) => ({ ...file, thumbnailURL: await presign(thumbnailStorageKey) }))),
         },
       }
+    }),
+  // The page a record falls on, so the grid can jump to it.
+  locate: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ recordKey: z.string().trim().min(1).max(200), ...query }))
+    .query(async ({ input }) => {
+      const { recordKey, ...rest } = input
+      const located = await locateRecord(dataSource.manager, recordKey, rest)
+      if (!located) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: `There is no record with key ${recordKey}.` })
+      }
+      return located
     }),
   create: publicProcedure
     .use(authMiddleware(userAdmin))
