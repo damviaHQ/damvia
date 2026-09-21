@@ -176,6 +176,45 @@ export function buildSearchQuery(
 	return query
 }
 
+// A file shared by several visible collections is one result: its first
+// visible collection file stands for it, whatever the order asked for.
+export function onePerFile(query: SelectQueryBuilder<CollectionFile>, candidates: SelectQueryBuilder<CollectionFile>) {
+	const first = candidates.select('collection_file.id').distinctOn(['asset_file.id']).orderBy('asset_file.id').addOrderBy('collection_file.id')
+	return query.andWhere(`collection_file.id IN (${first.getQuery()})`).setParameters(first.getParameters())
+}
+
+// Files linked to a range (an attribute value) that records matching the text
+// query share. They are listed apart from the exact results and never repeat
+// one of them.
+function addRangeConditions(user: User, query: SelectQueryBuilder<CollectionFile>, input: SearchInput, context: SearchContext) {
+	const tokens = input.exactMatch && input.query ? [input.query] : searchTokens(input.query)
+	const matches = tokens.map((token, index) => {
+		query.setParameter(`range${index}`, `%${token}%`)
+		return [
+			`range_record.record_key ILIKE :range${index}`,
+			...context.searchableAttributes.map((_, attribute) => `(range_record.meta_data -> :attribute${attribute}) ILIKE :range${index}`),
+		].join(' OR ')
+	})
+	const exact = buildSearchQuery(user, input, context).select('asset_file.id')
+	return query
+		.andWhere(`EXISTS (
+			SELECT 1 FROM asset_entity_links range_link
+			INNER JOIN records range_record ON (range_record.meta_data -> range_link.attribute_name) = range_link.attribute_value
+			WHERE range_link.asset_file_id = asset_file.id AND range_link.target_kind = 'attribute' AND range_link.status = 'active'
+				AND (${matches.map((match) => `(${match})`).join(' OR ')})
+		)`)
+		.andWhere(`asset_file.id NOT IN (${exact.getQuery()})`)
+		.setParameters(exact.getParameters())
+}
+
+export function buildRangeQuery(user: User, input: SearchInput, context: SearchContext): SelectQueryBuilder<CollectionFile> | null {
+	if (!input.query?.trim()) return null
+	const scope = { ...input, query: null }
+	const query = addRangeConditions(user, buildSearchQuery(user, scope, context), input, context)
+	onePerFile(query, addRangeConditions(user, buildSearchQuery(user, scope, context), input, context))
+	return query.orderBy('asset_file.name', 'ASC').addOrderBy('asset_file.id', 'ASC')
+}
+
 export function applySearchOrder(query: SelectQueryBuilder<CollectionFile>, input: SearchInput, context: SearchContext, sort?: SearchSort | null) {
 	const tokens = searchTokens(input.query)
 	const effectiveSort: SearchSort = sort ?? (tokens.length ? 'relevance' : 'name')
@@ -219,9 +258,9 @@ function toCounts(rows: CountRow[]): Record<string, number> {
 async function countBy(query: SelectQueryBuilder<CollectionFile>, expression: string): Promise<Record<string, number>> {
 	const rows = await query
 		.select(expression, 'key')
-		.addSelect('COUNT(*)', 'count')
+		.addSelect('COUNT(DISTINCT asset_file.id)', 'count')
 		.groupBy(expression)
-		.orderBy('COUNT(*)', 'DESC')
+		.orderBy('COUNT(DISTINCT asset_file.id)', 'DESC')
 		.limit(FACET_VALUES_LIMIT)
 		.getRawMany<CountRow>()
 	return toCounts(rows)

@@ -47,7 +47,7 @@ Collections organise references to assets. Copying a file into another collectio
 
 ## Data enrichment and reporting
 
-- [Records](./records.md): import CSV data of products, events or anything files are about, choose the key column, name the records and configure searchable/filterable attributes.
+- [Records](./records.md): import CSV data of products, events or anything files are about, name the records, say how files find their record, fix the unmatched ones and configure searchable/filterable attributes.
 - [Insights](./analytics.md): interpret recorded activity and retention.
 - [Dashboard](./dashboard.md): storage usage, source state and items needing attention.
 
@@ -64,5 +64,6 @@ Collections organise references to assets. Copying a file into another collectio
 | Users | `/admin/users` | admin or manager for their region |
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
 | Records and attributes | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/records/attributes` | admin |
+| Matching and unmatched files | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
 
 The labels and exact layout may evolve; the permission and data consequences documented on each linked page are the durable contract.

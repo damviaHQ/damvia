@@ -25,6 +25,18 @@ export class EnrichmentSettings {
 	@Column({ default: 'Products' })
 	recordLabelPlural: string
 
+	@Column({ default: true })
+	viewsEnabled: boolean
+
+	@Column({ default: '.' })
+	viewSeparator: string
+
+	@Column({ type: 'int', default: 2 })
+	viewDigits: number
+
+	@Column({ default: '00' })
+	thumbnailView: string
+
 	@UpdateDateColumn()
 	updatedAt: Date
 }

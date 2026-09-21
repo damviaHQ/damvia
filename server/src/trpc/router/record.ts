@@ -12,9 +12,11 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 import { AssetFile } from "../../entity/asset-file"
 import { DataRecord } from "../../entity/data-record"
+import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
@@ -55,13 +57,14 @@ export default router({
         .take(size)
         .getManyAndCount()
 
+      const { thumbnailView } = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })
       const recordsWithThumbnails = await Promise.all(
         records.map(async (record) => {
           const assetFile = await assetFileRepository.findOne({
             where: {
               recordId: record.id,
               hasThumbnail: true,
-              recordView: process.env.PIM_PRODUCT_VIEW,
+              recordView: thumbnailView,
             },
           })
 
@@ -227,6 +230,44 @@ export default router({
 
       await recordRepository.save(record)
       return record
+    }),
+
+  linkedFiles: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.uuid())
+    .query(async ({ input }) => {
+      const record = await dataSource.getRepository(DataRecord).findOneBy({ id: input })
+      if (!record) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Record not found.' })
+      }
+      const direct: { id: string, name: string, path: string, strategy: string, status: string, source_path: string | null, pattern: string | null, created_by: string | null, created_at: Date | null }[] = await dataSource.query(`
+        SELECT a.id, a.name, f.path, l.strategy, l.status, sf.path AS source_path, s.config ->> 'pattern' AS pattern, u.name AS created_by, l.created_at
+        FROM asset_entity_links l
+        INNER JOIN asset_files a ON a.id = l.asset_file_id
+        INNER JOIN asset_folders f ON f.id = a.folder_id
+        LEFT JOIN asset_folders sf ON sf.id = l.source_folder_id
+        LEFT JOIN asset_type_resolver_steps s ON s.id = l.resolver_step_id
+        LEFT JOIN users u ON u.id = l.created_by_id
+        WHERE l.target_kind = 'record' AND l.record_key = $1
+        UNION ALL
+        SELECT a.id, a.name, f.path, 'legacy', 'active', NULL, NULL, NULL, NULL
+        FROM asset_files a INNER JOIN asset_folders f ON f.id = a.folder_id
+        WHERE a.record_id = $2 AND NOT EXISTS (SELECT 1 FROM asset_entity_links l WHERE l.asset_file_id = a.id AND l.target_kind = 'record')
+        ORDER BY 2 LIMIT 500
+      `, [record.recordKey, record.id])
+      const range: { id: string, name: string, path: string, attribute_name: string, attribute_value: string, strategy: string }[] = await dataSource.query(`
+        SELECT a.id, a.name, f.path, l.attribute_name, l.attribute_value, l.strategy
+        FROM asset_entity_links l
+        INNER JOIN asset_files a ON a.id = l.asset_file_id
+        INNER JOIN asset_folders f ON f.id = a.folder_id
+        INNER JOIN records r ON r.id = $1 AND (r.meta_data -> l.attribute_name) = l.attribute_value
+        WHERE l.target_kind = 'attribute' AND l.status = 'active'
+        ORDER BY a.name LIMIT 500
+      `, [record.id])
+      return {
+        direct: direct.map((row) => ({ id: row.id, name: row.name, path: row.path, strategy: row.strategy, status: row.status, sourcePath: row.source_path, pattern: row.pattern, createdBy: row.created_by, createdAt: row.created_at })),
+        range: range.map((row) => ({ id: row.id, name: row.name, path: row.path, attributeName: row.attribute_name, attributeValue: row.attribute_value, strategy: row.strategy })),
+      }
     }),
 
 })

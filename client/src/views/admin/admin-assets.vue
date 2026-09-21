@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import AdminAssetsLinkTree from "@/components/admin/AdminAssetsLinkTree.vue"
+import RecordPicker, { type RecordTarget } from "@/components/admin/RecordPicker.vue"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import Loader from "@/components/Loader.vue"
 import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +46,7 @@ import {
   FolderOpen,
   GripVertical,
   HardDrive,
+  Link2,
   Server,
 } from "@lucide/vue"
 import type { AcceptableValue } from "reka-ui"
@@ -135,6 +138,36 @@ const openAssets = computed(() => {
   return assetPaths.value.find((item) => item[item.length - 1] === route.params.id)
 })
 const rootAssets = computed(() => assets.value?.filter((asset) => !asset.parentId) ?? [])
+const recordLabel = useRecordLabel()
+const { data: attachments } = useQuery({
+  queryKey: computed(() => ["entity-resolution", "attachments", route.params.id]),
+  queryFn: () => trpc.entityResolution.folderAttachments.query(String(route.params.id)),
+  enabled: computed(() => !!route.params.id),
+})
+const pickerOpen = ref(false)
+const linking = ref(false)
+async function attachFolder(target: RecordTarget) {
+  linking.value = true
+  try {
+    const result = await trpc.entityResolution.attach.mutate({ target, folderId: String(route.params.id) })
+    toast.success(`${result.files} ${result.files === 1 ? "file" : "files"} linked`)
+    pickerOpen.value = false
+    await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+  } catch (error) {
+    toast.error((error as Error).message)
+  } finally {
+    linking.value = false
+  }
+}
+async function detachFolder(attachmentId: string) {
+  try {
+    await trpc.entityResolution.detach.mutate({ attachmentId })
+    toast.success("Link removed")
+    await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+  } catch (error) {
+    toast.error((error as Error).message)
+  }
+}
 const { data: folderRules } = useQuery({
   queryKey: ["asset-type-rules"],
   queryFn: () => trpc.assetTypeRule.list.query(),
@@ -275,6 +308,29 @@ function getFileExtension(filename: string): string {
             </div>
           </section>
 
+          <section class="asset-settings dv-panel" aria-labelledby="asset-links-heading">
+            <div class="asset-settings__intro">
+              <span class="asset-settings__icon"><Link2 /></span>
+              <div>
+                <h2 id="asset-links-heading">Linked {{ recordLabel.lower.value }}</h2>
+                <p>Every file in this folder and its subfolders is linked to what you choose here, whatever the matching steps find.</p>
+              </div>
+            </div>
+            <ul v-if="attachments?.length" class="asset-links">
+              <li v-for="attachment in attachments" :key="attachment.id">
+                <span>
+                  <strong>{{ attachment.targetKind === 'record' ? attachment.recordKey : `${attachment.attributeName} = ${attachment.attributeValue}` }}</strong>
+                  <small v-if="attachment.inherited"> · from {{ attachment.path }}</small>
+                  <small v-else-if="attachment.createdBy"> · set by {{ attachment.createdBy }}</small>
+                </span>
+                <Button v-if="!attachment.inherited" type="button" variant="ghost" size="sm" @click="detachFolder(attachment.id)">Detach</Button>
+              </li>
+            </ul>
+            <p v-else class="admin-text-secondary">Nothing linked by hand. Files are matched by the steps of their asset type.</p>
+            <div><Button type="button" variant="outline" @click="pickerOpen = true">Link a {{ recordLabel.lower.value }} or a range</Button></div>
+          </section>
+          <RecordPicker :open="pickerOpen" :title="`Link ${asset.name}`" description="Every file in this folder and its subfolders is linked, and files added later follow." :saving="linking" @update:open="(open) => (pickerOpen = open)" @confirm="attachFolder" />
+
           <section v-if="childFolders.length" class="asset-browser__section" aria-labelledby="folders-heading">
             <div class="asset-browser__section-heading">
               <div>
@@ -383,6 +439,9 @@ function getFileExtension(filename: string): string {
 </template>
 
 <style scoped>
+.asset-links { display:grid; gap:6px; }
+.asset-links li { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.asset-links small { color:var(--dv-text-secondary); }
 .asset-browser__sidebar { background:var(--dv-surface-panel); }
 .asset-browser__sidebar-inner { height:100%; overflow-y:auto; padding:24px 16px; }
 .asset-browser__sidebar-heading { display:flex; align-items:center; gap:12px; padding:0 8px 20px; border-bottom:1px solid var(--dv-color-line); }

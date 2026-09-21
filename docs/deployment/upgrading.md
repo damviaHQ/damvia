@@ -84,6 +84,13 @@ Before restarting, set a randomly generated `APP_SECRET` of at least 32 bytes. T
 
 Back up first and apply the migration with application writers stopped. Validate a restricted collection, an invited guest and an administrator before reopening access.
 
+## Matching in this upgrade
+
+- Keep `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` set for the first start: the migration copies the regex into a File name step of every asset type marked Related to records, and the view into Settings. Types that are not marked get no step; mark them in Asset types, then add a step on the Matching screen, or use its **Use PRODUCT_MATCHING_REGEX** button.
+- The first pass after the restart finds the existing links in place and changes no `record_id` on files the step agrees with. Files of record-related types that no step can match appear in the new Unmatched queue.
+- The old every-5-minutes job keeps linking the files no step owns. Set `ENABLE_LEGACY_PRODUCT_MATCHING=false` once every record-related type has steps; the two variables can then be removed.
+- Search lists each file once even when it sits in several collections, and facet counts count files rather than collection entries: totals can drop on instances where the same folder is mirrored by more than one collection.
+
 ## Records in this upgrade
 
 - Products are called records in the code, the database, the API and the documentation. What people see keeps the word "Products" until an administrator changes the record label in **Settings** (`/admin/settings`). Settings is now the last entry of the admin menu.
@@ -127,6 +134,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1790035200000-collection-favorites` | `user_collection_favorites` table (each user's starred collections) with its index on `collection_id`; starts empty |
 | `1790208000000-page-block-layout` | Rewrites `page_blocks` for the new page editor: adds `position` and `size`, converts `data` from text to `jsonb` with one shape per block type, and drops `row`, `column` and `width`. Reading order is preserved; a row that held two blocks becomes two `half` blocks, three becomes `third`, anything else becomes `full`. Text alignment chosen in the old editor is dropped, since the new editor has no alignment control. Rolling this migration back puts every block on a row of its own and deletes `hero` blocks, which the old schema cannot represent |
 | `1790121600000-asset-sources` | `source_key` on `asset_folders` and `asset_files` (empty for existing rows, adopted at the next start), unique index on (`source_key`, `external_id`) replacing the unique `external_id`, and the `asset_sources` table holding each configured source's last run |
+| `1790640000000-entity-links` | `asset_type_resolver_steps`, `asset_entity_links`, `asset_file_resolutions`, `asset_folder_entity_attachments`; the view columns of `enrichment_settings`. Backfills one `filename_regex` link per file of a record-related type that has a `record_id`, seeds a first `filename_regex` step from `PRODUCT_MATCHING_REGEX` for every record-related type, and copies `PIM_PRODUCT_VIEW` into the thumbnail view. Rolling back drops the four tables and the view columns; `asset_files.record_id` is untouched |
 | `1790553600000-records` | Renames `products` to `records` (`product_key` to `record_key`, `primary_key_name` to `key_column_name`), `product_attributes` to `record_attributes`, `asset_files.product_id` and `product_view` to `record_id` and `record_view`, `asset_types.is_related_to_products` to `is_related_to_records`; rewrites the `product_attribute.` prefix of `list_display_items` to `record_attribute.`; creates the single-row `enrichment_settings` table holding the record label. Renames only; rolling back reverses them |
 | `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |
 | `1790467200000-asset-type-rules` | `asset_type_rules` table; `asset_type_source` and `asset_type_rule_id` on `asset_folders`. Existing typed folders whose type differs from their parent's, and typed roots, are marked `manual`; the others `inherited`. Rolling back drops the table and the three columns and loses nothing the previous version reads |

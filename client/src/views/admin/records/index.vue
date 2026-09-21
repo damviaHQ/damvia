@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import Loader from "@/components/Loader.vue"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -51,6 +52,21 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 
 const toast = useGlobalToast()
 const recordLabel = useRecordLabel()
+const linkedRecord = ref<{ id: string; recordKey: string } | null>(null)
+const { data: linkedFiles, status: linkedStatus } = useQuery({
+  queryKey: computed(() => ["records", "linked-files", linkedRecord.value?.id]),
+  queryFn: () => trpc.record.linkedFiles.query(linkedRecord.value!.id),
+  enabled: computed(() => !!linkedRecord.value),
+})
+function provenance(file: { strategy: string; sourcePath: string | null; pattern: string | null; createdBy: string | null; createdAt: string | Date | null }) {
+  const date = file.createdAt ? new Date(file.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : ""
+  if (file.strategy === "filename_regex") return file.pattern ? `file name, ${file.pattern}` : "file name"
+  if (file.strategy === "folder_regex") return file.pattern ? `folder path, ${file.pattern}` : "folder path"
+  if (file.strategy === "manual_folder") return `folder ${file.sourcePath ?? ""}`
+  if (file.strategy === "manual_file") return file.createdBy ? `set by hand by ${file.createdBy} on ${date}` : "set by hand"
+  if (file.strategy === "legacy") return "file name, PRODUCT_MATCHING_REGEX job"
+  return file.strategy
+}
 const currentPage = ref(1)
 const pageSize = ref(200)
 const queryClient = useQueryClient()
@@ -681,6 +697,7 @@ onUnmounted(() => {
                   <template v-else>
                     <div class="cell-content">
                       {{ cell.getValue() }}
+                      <button v-if="cell.column.id === 'recordKey'" type="button" tabindex="-1" class="record-files-button" :aria-label="`Files linked to ${row.original.recordKey}`" @click.stop="linkedRecord = row.original">Files</button>
                     </div>
                   </template>
                 </td>
@@ -727,6 +744,33 @@ onUnmounted(() => {
       <img :src="enlargedImage.src" alt="Enlarged record image" />
     </div>
   </Teleport>
+  <Dialog :open="!!linkedRecord" @update:open="(open) => !open && (linkedRecord = null)">
+    <DialogContent class="admin-dialog--wide flex flex-col">
+      <DialogHeader>
+        <DialogTitle>Files linked to {{ linkedRecord?.recordKey }}</DialogTitle>
+        <DialogDescription>Each file with what linked it. Range files are linked to every {{ recordLabel.lower.value }} sharing the value.</DialogDescription>
+      </DialogHeader>
+      <Loader v-if="linkedStatus === 'pending'" />
+      <template v-else-if="linkedFiles">
+        <p v-if="!linkedFiles.direct.length && !linkedFiles.range.length" class="admin-text-secondary">No file is linked to this {{ recordLabel.lower.value }} yet.</p>
+        <ul v-if="linkedFiles.direct.length" class="record-linked-files">
+          <li v-for="file in linkedFiles.direct" :key="file.id + file.strategy">
+            <strong>{{ file.name }}</strong>
+            <span class="admin-text-secondary">{{ file.path }} · {{ provenance(file) }}<template v-if="file.status === 'dangling'"> · waiting for the {{ recordLabel.lower.value }}</template></span>
+          </li>
+        </ul>
+        <template v-if="linkedFiles.range.length">
+          <h3 class="font-semibold mt-2">Covering the range</h3>
+          <ul class="record-linked-files">
+            <li v-for="file in linkedFiles.range" :key="file.id + file.attributeValue">
+              <strong>{{ file.name }}</strong>
+              <span class="admin-text-secondary">{{ file.path }} · {{ file.attributeName }} = {{ file.attributeValue }}</span>
+            </li>
+          </ul>
+        </template>
+      </template>
+    </DialogContent>
+  </Dialog>
   <AlertDialog :open="showDeleteDialog" @update:open="open => { if (!isDeleting) showDeleteDialog = open }">
     <AlertDialogContent @escape-key-down="event => { if (isDeleting) event.preventDefault() }">
       <AlertDialogHeader><AlertDialogTitle>Remove all {{ recordLabel.lowerPlural.value }}?</AlertDialogTitle><AlertDialogDescription>This removes all records, including records outside the current filters. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
@@ -736,7 +780,11 @@ onUnmounted(() => {
   </AlertDialog>
 </template>
 
-<style scoped>.data-grid {
+<style scoped>
+.record-files-button { margin-left:8px; font-size:var(--dv-size-caption); text-decoration:underline; color:var(--dv-text-secondary); }
+.record-linked-files { display:grid; gap:8px; max-height:60vh; overflow:auto; }
+.record-linked-files li { display:grid; gap:2px; }
+.data-grid {
   width: 100%;
   height: 100%;
   overflow: auto;

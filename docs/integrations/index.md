@@ -29,7 +29,12 @@ One run of one source does the following:
 3. Marks every folder and file **of this source** that was **not** in the listing as `pending_deletion`, in batches of 1,000, unless they exceed `ASSET_SYNC_MAX_DELETION_PERCENT` of the source (see [Sources](./sources.md#how-the-runs-work)). Rows of other sources, and rows of a source key that is no longer configured, are never touched. The `asset/process-deletion` job checks them every minute, including their objects in the assets bucket.
 4. Inserts a `collection_files` row for every asset file whose folder is linked to a collection, so linked collections pick up new files without waiting for the `collection/synchronization` job.
 
-After the last source of the cycle, the enrichment pass runs once (`services/enrichment.ts`, logged as `enrichment.asset-types` with the counts): it refreshes the stored path of every folder, applies the [folder rules](../administration/asset-types.md#assign-it-by-a-rule-on-the-folder-path) and writes the resulting asset type to the changed folders and their files. One pass runs at a time, through a Postgres advisory lock; a save or re-apply from the admin waits for a running pass. The pass reads the database only and never calls a provider.
+After the last source of the cycle, the enrichment pass runs once (`services/enrichment.ts`), in stages that each commit on their own and log one line with their counts:
+
+1. `enrichment.asset-types`: refreshes the stored path of every folder, applies the [folder rules](../administration/asset-types.md#assign-it-by-a-rule-on-the-folder-path) and writes the resulting asset type to the changed folders and their files.
+2. `enrichment.entities`: runs the [matching steps](../administration/records.md#set-the-matching-steps) and the links set by hand, and writes the record links, the unmatched queue and each file's primary record.
+
+One pass runs at a time, through a Postgres advisory lock; a save, attach or re-apply from the admin waits for a running pass. Every stage writes only what changed, so a pass on unchanged data writes nothing. The pass reads the database only and never calls a provider.
 
 Step 3 is why every driver stops before it on an empty listing, and when any item failed to upsert: either would delete part or all of the library.
 

@@ -104,7 +104,8 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 |---|---|---|---|
 | `tree` | query | `userApproved` | Collections visible to the user, as a tree |
 | `treeAdmin` | query | `userAdmin` | Public collection tree for the admin screen |
-| `search` | query | `userApproved` | Files matching text, asset types, file formats, record facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored. Values of one attribute are alternatives, different attributes narrow each other. `sort` is `relevance` (default with a query: files matching more words first, then names starting with a word), `name` or `newest`; the order is stable across pages. `extensions` keeps only files whose name ends in one of the given extensions, compared in lower case and with a leading dot ignored. `minSize` and `maxSize` bound the file size in bytes and either may be omitted. The response carries `facets`: counts per asset type, file type (`image`, `video`, `document`, `other`), file extension, product view and facetable attribute value, computed over the whole result set with the dimension's own filter left out |
+| `search` | query | `userApproved` | Files matching text, asset types, file formats, record facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored. Values of one attribute are alternatives, different attributes narrow each other. `sort` is `relevance` (default with a query: files matching more words first, then names starting with a word), `name` or `newest`; the order is stable across pages. `extensions` keeps only files whose name ends in one of the given extensions, compared in lower case and with a leading dot ignored. `minSize` and `maxSize` bound the file size in bytes and either may be omitted. The response carries `facets`: counts per asset type, file type (`image`, `video`, `document`, `other`), file extension, product view and facetable attribute value, computed over the whole result set with the dimension's own filter left out. Each asset file appears once even when it sits in several visible collections (the first visible `collection_files` row stands for it) and facet counts count files. With a query, the first page also returns `rangeResults` (at most 60) and `rangeTotal`: files linked through an attribute value (a range) shared by the records whose key or searchable attribute matches the query, under the same visibility and filters, never one of the exact results |
+| `rangeSearch` | query | `userApproved` | The range results of a query, 300 per `page`, with `total`, `totalPages` and `nextPage` |
 | `searchNotFound` | query | `userApproved` | Returns the search terms found neither in a visible file name nor in a searchable attribute, within the same scope, asset type, record view, file type and extension filters |
 | `findById` | query | `userApproved` | One collection with files, children, invitations |
 | `lastAddedFiles` | query | `userApproved` | 10 most recent collection files, optionally under one collection |
@@ -168,6 +169,26 @@ Records were called products until the 2026-09-21 rename; the tables, columns, p
 | `recordAttribute.create`, `update`, `remove` | mutation | `userAdmin` | CRUD |
 | `settings.getEnrichment` | query | `userAdmin` | `recordLabelSingular` and `recordLabelPlural` |
 | `settings.updateEnrichment` | mutation | `userAdmin` | Sets both labels (1 to 30 characters each); `env` returns them as `recordLabel` |
+| `record.linkedFiles` | query | `userAdmin` | `direct`: files linked to the record with the strategy, status, source folder path, step pattern and author of each link, plus files whose `record_id` only the old job set (`strategy: 'legacy'`); `range`: files linked through an attribute value the record has. 500 rows each at most |
+
+### `resolverStep` and `entityResolution`
+
+Every procedure requires `userAdmin`. Writes re-run the entity stage of the enrichment pass under its advisory lock and return its counts (`files`, `matched`, `unmatched`, `conflicts`, `linksAdded`, `linksRemoved`, `linksUpdated`, `filesUpdated`).
+
+| Procedure | Kind | Purpose |
+|---|---|---|
+| `resolverStep.list` | query | Every asset type with `isRelatedToRecords`, its file count and its ordered steps (`strategy`, `config`, `enabled`, `lastError`), plus `legacyPattern` (`PRODUCT_MATCHING_REGEX`), `legacyEnabled`, the view settings, the generated view part and the attribute names of the records |
+| `resolverStep.save` | mutation | Replaces the steps of one asset type, in order (`filename_regex`, `folder_regex`; at most 20). Each step is compiled first; a broken one is refused with `BAD_REQUEST` naming its position |
+| `resolverStep.preview` | query | Runs unsaved steps on up to 40 files of a folder subtree and returns, per file, the key found, the view, the status and the links. Writes nothing |
+| `resolverStep.rerun` | mutation | Re-runs the entity stage |
+| `entityResolution.counts` | query | `unmatched`, `conflicts`, `dangling` and the number of folders holding unmatched files |
+| `entityResolution.unmatchedFolders`, `unmatchedFiles`, `conflicts`, `dangling` | query | The four tabs of the Unmatched screen; files paginated by 100 with `search` and `folderId`, the others capped at 500 |
+| `entityResolution.findTargets` | query | Records whose key or searchable attribute contains `query` (20), or the values of `attributeName` containing it, with their record count |
+| `entityResolution.folderAttachments` | query | The attachments of the nearest folder carrying any, from the folder up, with `inherited` |
+| `entityResolution.attach` | mutation | `target` is `{ kind: 'record', key, create? }` or `{ kind: 'attribute', name, value }`; with `folderId` it attaches the folder, with `fileIds` (at most 500) it pins `manual_file` links. `create: true` creates a missing record with the key only; without it a missing key is `NOT_FOUND`. Returns `files`, `recordCreated` and the stage counts |
+| `entityResolution.detach` | mutation | Removes a `manual_file` link (`linkId`) or a folder attachment (`attachmentId`); links made by steps are `NOT_FOUND` |
+| `entityResolution.createRecord` | mutation | Creates a record with the key only, so dangling links to it become active; `BAD_REQUEST` when it exists |
+| `entityResolution.fileLinks` | query | The links of one file |
 
 ### `menuItem`, `page`, `settings`
 

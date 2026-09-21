@@ -35,7 +35,8 @@ import { FILE_TYPE_OPTIONS } from "@/utils/searchQuery"
 import { keepPreviousData, useQuery } from "@tanstack/vue-query"
 import groupBy from "lodash/groupBy"
 import { storeToRefs } from "pinia"
-import { computed } from "vue"
+import { useRecordLabel } from "@/composables/useRecordLabel"
+import { computed, ref, watch } from "vue"
 
 const PER_PAGE = 300
 const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange } = useSearchState()
@@ -67,6 +68,21 @@ const { data: notFound } = useQuery({
   queryFn: () => trpc.collection.searchNotFound.query(notFoundInput.value),
   placeholderData: keepPreviousData,
 })
+
+// Files linked to a range the matched records share, kept apart from the
+// exact results; the first 60 come with the search, the rest on demand.
+const recordLabel = useRecordLabel()
+const rangeResults = computed<any[]>(() => search.value?.rangeResults ?? [])
+const rangeTotal = computed(() => search.value?.rangeTotal ?? 0)
+const rangePage = ref(0)
+watch(() => form.value, () => { rangePage.value = 0 }, { deep: true })
+const { data: rangeAll, isFetching: rangeLoading } = useQuery({
+  enabled: computed(() => rangePage.value > 0 && !!form.value.query),
+  queryKey: computed(() => ["search-range", form.value, rangePage.value]),
+  queryFn: () => trpc.collection.rangeSearch.query({ ...form.value, query: form.value.query ?? "", page: rangePage.value }),
+  placeholderData: keepPreviousData,
+})
+const rangeFiles = computed<any[]>(() => rangePage.value > 0 && rangeAll.value ? rangeAll.value.results : rangeResults.value)
 
 const emptyFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {} }
 const facets = computed(() => search.value?.facets ?? emptyFacets)
@@ -238,6 +254,23 @@ function focusTerms() {
           </nav>
         </Pagination>
       </template>
+
+      <section v-if="rangeFiles.length" class="search__result-group mb-6" aria-labelledby="search-range-heading">
+        <h2 id="search-range-heading" class="search__asset-type-name mb-1 text-body text-neutral-500">
+          Covering the range
+          <span class="text-[color:var(--dv-text-secondary)]">({{ rangeTotal }})</span>
+        </h2>
+        <p class="mb-2 text-caption text-[color:var(--dv-text-secondary)]">Files made for a whole range of {{ recordLabel.lowerPlural.value }}, such as a collection or a season, that the {{ recordLabel.lowerPlural.value }} you searched belong to.</p>
+        <CollectionDisplayGridFiles :files="rangeFiles" />
+        <div class="mt-3 flex items-center gap-3">
+          <Button v-if="rangePage === 0 && rangeTotal > rangeResults.length" variant="outline" @click="rangePage = 1">See all {{ rangeTotal }}</Button>
+          <template v-else-if="rangePage > 0 && rangeAll">
+            <Button variant="outline" :disabled="rangePage === 1 || rangeLoading" @click="rangePage--">Previous</Button>
+            <span class="text-caption text-[color:var(--dv-text-secondary)]">Page {{ rangePage }} of {{ rangeAll.totalPages }}</span>
+            <Button variant="outline" :disabled="!rangeAll.nextPage || rangeLoading" @click="rangePage++">Next</Button>
+          </template>
+        </div>
+      </section>
       </div>
     </template>
   </div>

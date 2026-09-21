@@ -123,7 +123,7 @@ test('the pass stores the path, follows renames and moves, keeps a hand-set type
     await save(AssetTypeRule, { pattern: '/Packshots$', assetTypeId: packshot.id })
     state.fetchedFiles.length = 0
     state.uploads.length = 0
-    const first = await runEnrichmentPass()
+    const first = (await runEnrichmentPass()).assetTypes
     assert.deepEqual(first, { paths: 4, folders: 3, files: 2 })
     assert.equal((await folderRow(packs.id)).path, '/Library/SS26/Packshots')
     assert.deepEqual((await typed(season.id)).slice(0, 2), [shooting.id, 'rule'])
@@ -132,12 +132,12 @@ test('the pass stores the path, follows renames and moves, keeps a hand-set type
     assert.equal((await fileRow(file.id)).assetTypeId, packshot.id)
     assert.equal((await fileRow(lookFile.id)).assetTypeId, shooting.id)
     const before = await db.query('SELECT id, updated_at FROM asset_folders ORDER BY id')
-    assert.deepEqual(await runEnrichmentPass(), { paths: 0, folders: 0, files: 0 })
+    assert.deepEqual((await runEnrichmentPass()).assetTypes, { paths: 0, folders: 0, files: 0 })
     assert.deepEqual(await db.query('SELECT id, updated_at FROM asset_folders ORDER BY id'), before)
     assert.deepEqual([state.fetchedFiles, state.uploads], [[], []])
 
     await upsertFolder({ externalId: packs.externalId, parentExternalId: season.externalId, name: 'Renamed' })
-    assert.deepEqual(await runEnrichmentPass(), { paths: 1, folders: 1, files: 1 })
+    assert.deepEqual((await runEnrichmentPass()).assetTypes, { paths: 1, folders: 1, files: 1 })
     assert.equal((await folderRow(packs.id)).path, '/Library/SS26/Renamed')
     assert.deepEqual((await typed(packs.id)).slice(0, 2), [shooting.id, 'rule'])
     assert.equal((await fileRow(file.id)).assetTypeId, shooting.id)

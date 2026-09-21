@@ -30,7 +30,7 @@ import {
 	userCollectionFilesQuery,
 	userCollectionsQuery
 } from "../../services/collection"
-import { applySearchOrder, buildSearchQuery, loadSearchContext, searchFacets } from "../../services/search"
+import { applySearchOrder, buildRangeQuery, buildSearchQuery, loadSearchContext, onePerFile, searchFacets } from "../../services/search"
 import { collectionSynchronizationQueue } from "../../worker"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 import invitationRouter, { formatInvitation } from "./collection/invitation"
@@ -190,6 +190,7 @@ export async function formatCollectionFile({ file, recordAttributes }: FormatCol
 }
 
 const searchScope = z.enum(['all', 'current', 'current_with_sub']).optional().nullable()
+const RANGE_RESULTS = 60
 
 export default router({
 	invitation: invitationRouter,
@@ -232,12 +233,14 @@ export default router({
 		}))
 		.query(async ({ input, ctx }) => {
 			const context = await loadSearchContext(input)
-			const query = applySearchOrder(buildSearchQuery(ctx.user, input, context), input, context, input.sort)
+			const query = applySearchOrder(onePerFile(buildSearchQuery(ctx.user, input, context), buildSearchQuery(ctx.user, input, context)), input, context, input.sort)
+			const range = input.page === 1 ? buildRangeQuery(ctx.user, input, context) : null
 
 			const perPage = 300
-			const [[results, total], facets] = await Promise.all([
+			const [[results, total], facets, [rangeResults, rangeTotal]] = await Promise.all([
 				query.offset(Math.max((input.page - 1) * perPage, 0)).limit(perPage).getManyAndCount(),
 				searchFacets(ctx.user, input, context),
+				range ? range.limit(RANGE_RESULTS).getManyAndCount() : Promise.resolve([[], 0] as [CollectionFile[], number]),
 			])
 			const totalPages = Math.ceil(total / perPage)
 			const searchTerm = input.query?.trim().toLowerCase()
@@ -260,6 +263,38 @@ export default router({
 				previousPage: input.page > 1 ? input.page - 1 : null,
 				nextPage: totalPages > input.page ? input.page + 1 : null,
 				facets,
+				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes }))),
+				rangeResults: await Promise.all(rangeResults.map(file => formatCollectionFile({ file, recordAttributes }))),
+				rangeTotal,
+			}
+		}),
+	rangeSearch: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({
+			page: z.number().int().min(1).default(1),
+			query: z.string().min(1).max(2000),
+			collectionId: z.uuid().nullable().optional(),
+			assetTypes: z.uuid().array().optional().nullable(),
+			fileTypes: z.string().array().optional().nullable(),
+			extensions: z.string().max(20).array().max(50).optional().nullable(),
+			minSize: z.number().int().min(0).max(1e15).optional().nullable(),
+			maxSize: z.number().int().min(0).max(1e15).optional().nullable(),
+			searchScope: searchScope,
+			exactMatch: z.boolean().optional().nullable(),
+			attributes: z.record(z.string(), z.string().array().nullable()).nullable().optional(),
+		}))
+		.query(async ({ input, ctx }) => {
+			const context = await loadSearchContext(input)
+			const perPage = 300
+			const [results, total] = await buildRangeQuery(ctx.user, input, context)!
+				.offset((input.page - 1) * perPage).limit(perPage).getManyAndCount()
+			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
+			const totalPages = Math.ceil(total / perPage)
+			return {
+				total,
+				page: input.page,
+				totalPages,
+				nextPage: totalPages > input.page ? input.page + 1 : null,
 				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes }))),
 			}
 		}),

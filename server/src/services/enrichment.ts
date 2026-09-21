@@ -12,21 +12,56 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { EntityManager } from "typeorm"
 import { dataSource, logger } from "../env"
 import { applyFolderAssetTypes, ENRICHMENT_LOCK, refreshFolderPaths, resolveAllFolders } from "./asset-type-rules"
+import { EntityStageResult, runEntityStage } from "./entity-resolution"
 
-// Runs after every sync, before the next one. One pass at a time: a second
-// caller waits on the advisory lock. Each stage is idempotent, so a crash is
-// repaired by the next pass.
-export async function runEnrichmentPass(): Promise<{ paths: number, folders: number, files: number }> {
-	const started = Date.now()
-	const result = await dataSource.transaction(async (em) => {
+export type EnrichmentPassResult = {
+	assetTypes: { paths: number, folders: number, files: number }
+	entities: EntityStageResult
+}
+
+// Runs after every sync, before the next one. One pass at a time: the session
+// lock makes a second caller wait, and the admin actions take the same lock
+// inside their own transaction. Each stage commits on its own and is
+// idempotent, so a crash is repaired by the next pass.
+export async function runEnrichmentPass(): Promise<EnrichmentPassResult> {
+	const runner = dataSource.createQueryRunner()
+	await runner.connect()
+	try {
+		await runner.query('SELECT pg_advisory_lock($1)', [ENRICHMENT_LOCK])
+		const stage = async <T>(name: string, work: (em: EntityManager) => Promise<T>): Promise<T> => {
+			const started = Date.now()
+			await runner.startTransaction()
+			try {
+				const result = await work(runner.manager)
+				await runner.commitTransaction()
+				logger.info(`enrichment.${name}`, { ...result, durationMs: Date.now() - started })
+				return result
+			} catch (error) {
+				await runner.rollbackTransaction()
+				throw error
+			}
+		}
+		const assetTypes = await stage('asset-types', async (em) => {
+			const paths = await refreshFolderPaths(em)
+			const { resolution } = await resolveAllFolders(em)
+			return { paths, ...await applyFolderAssetTypes(em, resolution.changes) }
+		})
+		const entities = await stage('entities', (em) => runEntityStage(em))
+		return { assetTypes, entities }
+	} finally {
+		await runner.query('SELECT pg_advisory_unlock($1)', [ENRICHMENT_LOCK]).catch(() => {})
+		await runner.release()
+	}
+}
+
+// An admin change (attach, detach, steps saved) re-runs the entity stage
+// straight away instead of waiting up to five minutes for the next sync.
+export async function rerunEntityStage(): Promise<EntityStageResult> {
+	return dataSource.transaction(async (em) => {
 		await em.query('SELECT pg_advisory_xact_lock($1)', [ENRICHMENT_LOCK])
-		const paths = await refreshFolderPaths(em)
-		const { resolution } = await resolveAllFolders(em)
-		const applied = await applyFolderAssetTypes(em, resolution.changes)
-		return { paths, ...applied }
+		return runEntityStage(em)
 	})
-	logger.info('enrichment.asset-types', { ...result, durationMs: Date.now() - started })
-	return result
 }

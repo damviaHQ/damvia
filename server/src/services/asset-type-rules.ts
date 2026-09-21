@@ -42,12 +42,12 @@ export type Overlap = { ruleId: string, otherRuleId: string, folderId: string, p
 // Admin regexes run in Node only, never in Postgres. The sample run goes
 // through the vm timeout because a catastrophic pattern does not come back to
 // be timed: V8 only interrupts the backtracking on a script termination.
-export function compileRule(pattern: string): RegExp {
+export function compileRule(pattern: string, flags = 'i'): RegExp {
 	if (pattern.length === 0) throw new Error('The pattern is empty.')
 	if (pattern.length > PATTERN_MAX_LENGTH) throw new Error(`The pattern is longer than ${PATTERN_MAX_LENGTH} characters.`)
 	let regex: RegExp
 	try {
-		regex = new RegExp(pattern, 'i')
+		regex = new RegExp(pattern, flags)
 	} catch (error) {
 		throw new Error(`Not a valid regular expression: ${error.message}`)
 	}

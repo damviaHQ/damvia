@@ -10,20 +10,33 @@ The Data enrichment area adds context to mirrored assets. Damvia imports a flat 
 
 A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), section **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
 
-## Plan the matching rule first
+## Two questions, two tools
 
-`PRODUCT_MATCHING_REGEX` runs against each asset filename. Capture group 1 must return the record key exactly as it appears in the CSV. Optional group 2 becomes the record view.
+- **Folder rules** answer "what kind of file is this?": they give an [asset type](./asset-types.md) from the folder path (packshot, video, logo).
+- **Matching** answers "which record is this file about?": it finds a record key in the file name or the folder path (product `WX5678-100`, event `EVT-25028`).
 
-For example:
+Matching only runs on files whose asset type is marked **Related to records**. Files of other types, such as logos or fonts, are left out and never appear in the Unmatched queue.
 
-```dotenv
-PRODUCT_MATCHING_REGEX=^(.{6}-\d{3})(?:\.(\d{2}))?
-PIM_PRODUCT_VIEW=00
-```
+## Set the matching steps
 
-`ABC123-001.02.jpg` becomes record key `ABC123-001`, view `02`. `PIM_PRODUCT_VIEW=00` asks the record list to use a matching `00` file as the representative picture when one has a preview.
+Open **Data enrichment → Matching** (`/admin/data-enrichment/matching`). Choose an asset type on the left, then add its steps:
 
-Test the expression on representative filenames before importing a large catalogue. Write it without surrounding slashes or flags. A bad rule can leave assets unlinked or associate them with the wrong records every five minutes.
+| Step | What it reads | What its group gives |
+|---|---|---|
+| File name | The file name, without its folder, case-sensitive | The record key. An optional **view group** gives the view, for example `02` in `ABC123-001.02.jpg`. |
+| Folder path | The full folder path, such as `/Dropbox/EVENTS/2025/EVT-25028 Festival Aurora 2025`, case-insensitive | Either the record key, or the value of an attribute, which links the file to a **range**: every record sharing that value, such as every product of a collection. |
+
+Every enabled step runs on every file. When two steps find a different record key, the file becomes a **conflict** and nothing is chosen for you. Steps are refused when the pattern has no group in parentheses, names a group it does not have, or takes more than 50 ms on a sample.
+
+**Test on a folder** runs the steps on screen, saved or not, on up to 40 files of a folder and its subfolders, and shows the key found, the record and the result of each file. **Save and re-run** writes the steps and recomputes the links of every file straight away. Nothing is ever written to the cloud storage.
+
+A pattern such as `^(.{6}-\d{3})` with views enabled in Settings reads `ABC123-001.02.jpg` as key `ABC123-001` and view `02`: the view part is added after the key from the **Views** settings (separator `.` and two digits by default). A step that names its own view group keeps it.
+
+### The old `PRODUCT_MATCHING_REGEX` becomes the first step
+
+At the upgrade that brought this screen, `PRODUCT_MATCHING_REGEX` was copied into a **File name** step, group 1 key and group 2 view, for every asset type then marked Related to records, and `PIM_PRODUCT_VIEW` became the thumbnail view in Settings. From then on the admin screen is where they are edited.
+
+The old job that applied the regex every 5 minutes still runs, but only on files that no step owns: files of a type without steps, or of a type not related to records. It leaves alone files linked by hand. Once every record-related type has steps, set `ENABLE_LEGACY_PRODUCT_MATCHING=false` to stop it. The **Use PRODUCT_MATCHING_REGEX** button adds the old regex as a step to a type that has none.
 
 ## Prepare the CSV
 
@@ -56,11 +69,33 @@ CSV is parsed in the browser and sent as JSON. The API body limit is 5 MiB, so t
 
 Removing all records clears record links from assets before deleting the catalogue. It does not delete source files.
 
-## Let the scheduled matcher link files
+## How a file ends up linked
 
-Every five minutes, Damvia applies `PRODUCT_MATCHING_REGEX` to asset filenames. A captured key that exists in the catalogue sets the record link; capture group 2 sets the view. A matching key that no longer exists clears an old record link.
+After every sync, and straight away after an admin change, Damvia computes the links of every file of a record-related type:
 
-Changing the regex does not rename assets. It changes their record associations on subsequent matching runs. Check a representative record, including its intended thumbnail view, after every regex or catalogue change.
+- A file can be linked to several records and to ranges. Each link remembers what made it: file name, folder path, folder set by hand, file set by hand.
+- One of the record links is the **primary**; it decides the thumbnail, the view and the record attributes shown on the file. Links set on the file by hand come first, then links set on a folder by hand, then file name, then folder path.
+- A key that no record has is kept as a **dangling** link, with its reason ("no record with key EVT-25041"). Importing the record later attaches the file on the next pass. Deleting a record does the reverse.
+- Changing a step or moving a file in the cloud recomputes the links made by steps. Links set by hand are never touched by a step.
+
+The records screen shows, from **Files** next to each key, every file linked to that record and what linked it, with the files covering its ranges.
+
+## Fix what matching could not
+
+Open **Data enrichment → Unmatched** (`/admin/data-enrichment/unmatched`). The menu badge counts unmatched files and conflicts.
+
+| Tab | Lists | Action |
+|---|---|---|
+| Folders | Folders holding unmatched files, largest first | **Attach** links every file of the folder and its subfolders, now and after each sync, to one record or one range |
+| Files | Every unmatched file and why | **Attach** one file or the selected ones by hand |
+| Conflicts | Files where steps found different keys | **Use** one of the keys, or **Other**. The choice is kept and no step changes it later |
+| Dangling | Links to a key or value no record has | **Create record** with the key only, filled by the next CSV import, or **Detach** a link set by hand |
+
+The attach dialog searches records by key and by searchable attribute, or picks a range by attribute and value. When the key does not exist, **Create record with this key** creates it. A folder can also be linked from its panel in [Assets](./assets-tree.md).
+
+## Search shows exact files and range files apart
+
+A search now lists each file once, even when it sits in several collections the reader can see, and facet counts count files. When the text finds records (by key or searchable attribute), files linked to a range those records share appear in a separate **Covering the range** section after the exact results: the first 60, then **See all**. A file never appears in both. Range files follow the same visibility, licence and filter rules as any result.
 
 ## Configure record attributes
 

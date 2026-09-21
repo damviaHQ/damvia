@@ -30,11 +30,13 @@ import {
   Folders,
   HardDrive,
   KeyRound,
+  Link2,
   LayoutDashboard,
   Menu,
   Package,
   Settings,
   SquareChevronLeft,
+  Unlink,
   Users,
 } from "@lucide/vue"
 import { computed, ref, watch, provide } from "vue"
@@ -80,6 +82,13 @@ const { data: orphans } = useQuery({
   queryFn: () => trpc.collection.listOrphaned.query(),
   enabled: isAdmin,
 })
+const { data: resolutionCounts } = useQuery({
+  queryKey: ['entity-resolution', 'counts'],
+  queryFn: () => trpc.entityResolution.counts.query(),
+  enabled: isAdmin,
+  staleTime: 60 * 1000,
+})
+const unmatchedBadge = computed(() => (resolutionCounts.value?.unmatched ?? 0) + (resolutionCounts.value?.conflicts ?? 0))
 const storagePercent = computed(() => Math.round(storage.value?.percent ?? 0))
 const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent != null && storage.value.percent >= 80)
 const storageLevel = computed(() => {
@@ -188,6 +197,15 @@ const storageLevel = computed(() => {
             <router-link :to="{ name: 'admin-folder-rules' }" class="menu-item">
               <FolderCog class="w-4 h-4 mr-2" />
               Folder rules
+            </router-link>
+            <router-link :to="{ name: 'admin-matching' }" class="menu-item">
+              <Link2 class="w-4 h-4 mr-2" />
+              Matching
+            </router-link>
+            <router-link :to="{ name: 'admin-unmatched' }" class="menu-item">
+              <Unlink class="w-4 h-4 mr-2" />
+              Unmatched
+              <span v-if="unmatchedBadge" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${unmatchedBadge} files unmatched or in conflict`">{{ unmatchedBadge }}</span>
             </router-link>
           </div>
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">

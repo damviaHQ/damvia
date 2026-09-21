@@ -24,6 +24,7 @@ import authorizedDomainRouter from "./authorized-domain"
 import collectionRouter from "./collection"
 import dashboardRouter from "./dashboard"
 import downloadRouter from "./download"
+import entityResolutionRouter from "./entity-resolution"
 import favoriteRouter from "./favorite"
 import groupRouter from "./group"
 import licenseRouter from "./license"
@@ -32,6 +33,7 @@ import pageRouter from "./page"
 import recordRouter from "./record"
 import recordAttributeRouter from "./record-attribute"
 import regionRouter from "./region"
+import resolverStepRouter from "./resolver-step"
 import settingsRouter from "./settings"
 import userRouter from "./user"
 
@@ -45,6 +47,8 @@ const appRouter = router({
 	asset: assetRouter,
 	assetType: assetTypeRouter,
 	assetTypeRule: assetTypeRuleRouter,
+	resolverStep: resolverStepRouter,
+	entityResolution: entityResolutionRouter,
 	favorite: favoriteRouter,
 	license: licenseRouter,
 	download: downloadRouter,
