@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { In, IsNull, Not } from "typeorm"
-import { dataSource, logger } from "../env"
+import { assetSyncMaxDeletionPercent, dataSource, logger } from "../env"
 import { AssetFile, AssetFileStatus } from "../entity/asset-file"
 import { AssetFolder, AssetFolderStatus } from "../entity/asset-folder"
 import { upsertFile, upsertFolder, UpsertFileOptions, UpsertFolderOptions } from "../services/asset"
@@ -104,10 +104,22 @@ export default class AssetUpdater {
 			this.getAllAssetFolderIds(),
 			this.getAllAssetFileIds()
 		])
+		const foldersToDelete = this.arrayDifference(allAssetFolderIds, syncFolderIds)
+		const filesToDelete = this.arrayDifference(allAssetFileIds, syncFileIds)
+
+		// A listing cut short by the provider looks like a mass deletion. Above
+		// the configured share of the library, nothing is marked and the
+		// operator decides (ASSET_SYNC_MAX_DELETION_PERCENT).
+		const limit = assetSyncMaxDeletionPercent()
+		const known = allAssetFolderIds.length + allAssetFileIds.length
+		const missing = foldersToDelete.length + filesToDelete.length
+		if (limit < 100 && missing > 20 && missing * 100 > known * limit) {
+			throw new Error(`${missing} of ${known} ${this.providerName} items of source ${this.key} are absent from the listing (limit ${limit}%), skipping the deletion pass. Raise ASSET_SYNC_MAX_DELETION_PERCENT if the deletion is intended.`)
+		}
 
 		await Promise.all([
-			this.deleteAssetFoldersInBatches(this.arrayDifference(allAssetFolderIds, syncFolderIds)),
-			this.deleteAssetFilesInBatches(this.arrayDifference(allAssetFileIds, syncFileIds))
+			this.deleteAssetFoldersInBatches(foldersToDelete),
+			this.deleteAssetFilesInBatches(filesToDelete)
 		])
 	}
 

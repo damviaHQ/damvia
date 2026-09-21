@@ -56,6 +56,23 @@ export function storageQuota(): number | null {
   return configuredStorageQuota
 }
 
+function parseDeletionPercent(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === '') {
+    return 20
+  }
+  const percent = Number(raw)
+  if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
+    throw new Error('ASSET_SYNC_MAX_DELETION_PERCENT must be a whole number between 0 and 100.')
+  }
+  return percent
+}
+
+const configuredDeletionPercent = parseDeletionPercent(process.env.ASSET_SYNC_MAX_DELETION_PERCENT)
+
+export function assetSyncMaxDeletionPercent(): number {
+  return configuredDeletionPercent
+}
+
 export function serverAlertEmails(): string[] {
   return (process.env.SERVER_ALERT_EMAILS ?? '').split(',').map((email) => email.trim().toLowerCase()).filter(Boolean)
 }
