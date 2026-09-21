@@ -51,10 +51,10 @@ describe('grid preferences', () => {
   const storage = (value: string | null) => ({ getItem: (key: string) => key === RECORDS_GRID_KEY ? value : null })
 
   test('a stored layout is read back and malformed parts fall back to the defaults', () => {
-    const stored = readRecordsGridPreferences(storage(JSON.stringify({ hidden: ['files', 3], order: ['key'], widths: { key: 240, bad: 5000, worse: 'x' }, sort: { column: 'price', direction: 'desc' }, pageSize: 200 })))
-    expect(stored).toEqual({ hidden: ['files'], order: ['key'], widths: { key: 240 }, sort: { column: 'price', direction: 'desc' }, pageSize: 200 })
-    for (const value of [null, 'not json', '"text"', '[]', JSON.stringify({ sort: { column: 1, direction: 'up' }, pageSize: 7 })]) {
-      expect(readRecordsGridPreferences(storage(value))).toEqual({ hidden: [], order: [], widths: {}, sort: null, pageSize: 100 })
+    const stored = readRecordsGridPreferences(storage(JSON.stringify({ hidden: ['files', 3], order: ['key'], widths: { key: 240, bad: 5000, worse: 'x' }, sort: { column: 'price', direction: 'desc' }, pageSize: 200, wrap: true })))
+    expect(stored).toEqual({ hidden: ['files'], order: ['key'], widths: { key: 240 }, sort: { column: 'price', direction: 'desc' }, pageSize: 200, wrap: true })
+    for (const value of [null, 'not json', '"text"', '[]', JSON.stringify({ sort: { column: 1, direction: 'up' }, pageSize: 7, wrap: 'yes' })]) {
+      expect(readRecordsGridPreferences(storage(value))).toEqual({ hidden: [], order: [], widths: {}, sort: null, pageSize: 100, wrap: false })
     }
   })
 })

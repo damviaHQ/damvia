@@ -9,9 +9,10 @@ const fields = [
   { id: 'f-tags', name: 'tags', displayName: 'Tags', valueType: 'multi_select', options: ['Eco', 'New', 'Sale'], position: 2, facetable: true, viewable: true, searchable: false },
   { id: 'f-price', name: 'price', displayName: 'Price', valueType: 'number', options: [], position: 3, facetable: false, viewable: true, searchable: false },
   { id: 'f-launch', name: 'launch', displayName: 'Launch', valueType: 'date', options: [], position: 4, facetable: false, viewable: true, searchable: false },
+  { id: 'f-story', name: 'story', displayName: 'Story', valueType: 'long_text', options: [], position: 5, facetable: false, viewable: true, searchable: true },
 ]
 export const records = [
-  { id: '00000000-0000-4000-8000-000000000001', recordKey: 'WX5678-100', keyColumnName: 'SKU', metaData: { SKU: 'WX5678-100', name: 'Canvas tote', colour: 'Sand', tags: 'Eco|New', price: '49', launch: '2026-10-01' }, thumbnailURL: picture('#c29570'), fileCount: 4, filledCount: 5, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
+  { id: '00000000-0000-4000-8000-000000000001', recordKey: 'WX5678-100', keyColumnName: 'SKU', metaData: { SKU: 'WX5678-100', name: 'Canvas tote', colour: 'Sand', tags: 'Eco|New', price: '49', launch: '2026-10-01', story: 'Cut from heavy organic canvas with reinforced handles, it carries a laptop, a day of groceries and a rolled towel without losing its shape.\nMade in Porto.' }, thumbnailURL: picture('#c29570'), fileCount: 4, filledCount: 5, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
   { id: '00000000-0000-4000-8000-000000000002', recordKey: 'WX5678-200', keyColumnName: 'SKU', metaData: { SKU: 'WX5678-200', name: 'Wool scarf', colour: 'Forest', tags: 'Sale', price: 'n/a' }, thumbnailURL: picture('#354d45'), fileCount: 1, filledCount: 4, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
   { id: '00000000-0000-4000-8000-000000000003', recordKey: 'WX5678-300', keyColumnName: 'SKU', metaData: { SKU: 'WX5678-300', name: 'Leather belt' }, thumbnailURL: null, fileCount: 0, filledCount: 1, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
 ]

@@ -20,19 +20,20 @@ import RecordColumns from "@/components/records/RecordColumns.vue"
 import RecordFilters from "@/components/records/RecordFilters.vue"
 import RecordPanel, { type PanelTab } from "@/components/records/RecordPanel.vue"
 import RecordsBulkBar from "@/components/records/RecordsBulkBar.vue"
-import RecordsGrid, { type GridColumn, type GridField, type GridRecord, type GridSort } from "@/components/records/RecordsGrid.vue"
+import RecordsGrid, { type GridColumn, type GridField, type GridRecord, type GridSort, type GridWrite } from "@/components/records/RecordsGrid.vue"
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Pagination, PaginationEllipsis, PaginationFirst, PaginationLast, PaginationList, PaginationListItem, PaginationNext, PaginationPrev } from "@/components/ui/pagination"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Switch } from "@/components/ui/switch"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { PAGE_SIZES, useRecordsGridPreferences } from "@/composables/useRecordsGridPreferences"
 import { trpc, type RouterOutput } from "@/services/server"
 import { filterIsComplete, operatorsFor, type RecordFilter } from "@/utils/recordFilters"
-import { csvSafe, fieldLabel } from "@/utils/recordValues"
+import { csvSafe, fieldLabel, normaliseValue } from "@/utils/recordValues"
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { refDebounced } from "@vueuse/core"
 import { ArrowDown, ArrowUp, Blocks, Columns3, Download, EllipsisVertical, FileUp, Filter, PackageX, Plus, Search, X } from "@lucide/vue"
@@ -164,6 +165,51 @@ async function commitCell(record: GridRecord, field: GridField, value: string) {
     throw failure
   } finally {
     refreshRecord(record.id)
+  }
+}
+
+// A pasted, filled or cleared range: every value is checked first, the cells
+// show at once, and the whole range is saved, undone or refused together.
+async function commitCells(writes: GridWrite[], skipped: number) {
+  const changes = new Map<string, { record: GridRecord, values: Record<string, string>, old: Record<string, string> }>()
+  let cells = 0
+  for (const write of writes) {
+    const checked = normaliseValue(write.field, write.value)
+    if ("error" in checked) {
+      toast.error(`${write.record.recordKey}: ${checked.error}`)
+      return
+    }
+    const old = write.record.metaData[write.field.name] ?? ""
+    if (checked.value === old) continue
+    const change = changes.get(write.record.id) ?? { record: write.record, values: {}, old: {} }
+    change.values[write.field.name] = checked.value
+    change.old[write.field.name] = old
+    changes.set(write.record.id, change)
+    cells++
+  }
+  const readOnly = skipped ? ` ${skipped} read-only ${skipped === 1 ? "cell was" : "cells were"} left as they are.` : ""
+  if (!cells) {
+    if (skipped) sonner(`Nothing changed.${readOnly}`)
+    return
+  }
+  const previous = queryClient.getQueryData<ListResult>(listKey.value)
+  for (const change of changes.values()) patchCachedRow(change.record.id, (row) => ({ ...row, metaData: { ...row.metaData, ...change.values } }))
+  const payload = (key: "values" | "old") => [...changes.values()].map((change) => ({ id: change.record.id, values: change[key] }))
+  try {
+    await trpc.record.patchMany.mutate({ changes: payload("values") })
+    sonner(`${cells} ${cells === 1 ? "cell" : "cells"} updated on ${changes.size} ${changes.size === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value}.${readOnly}`, {
+      action: {
+        label: "Undo",
+        onClick: () => trpc.record.patchMany.mutate({ changes: payload("old") })
+          .then(() => queryClient.invalidateQueries({ queryKey: ["records"] }))
+          .catch((failure: Error) => toast.error(failure.message)),
+      },
+    })
+  } catch (failure) {
+    queryClient.setQueryData(listKey.value, previous)
+    toast.error((failure as Error).message)
+  } finally {
+    queryClient.invalidateQueries({ queryKey: ["records", "list"] })
   }
 }
 
@@ -333,6 +379,7 @@ watch(() => data.value?.total, (count) => {
       <Popover>
         <PopoverTrigger as-child><Button variant="outline"><Columns3 class="size-4" />Columns</Button></PopoverTrigger>
         <PopoverContent align="start" class="records-popover">
+          <label class="records-wrap-switch"><Switch v-model="preferences.wrap" />Wrap text</label>
           <RecordColumns :columns="columnChoices" @order="setOrder" @toggle="toggleColumn" @reset="resetLayout" @add-field="editField(null)" />
         </PopoverContent>
       </Popover>
@@ -361,9 +408,9 @@ watch(() => data.value?.total, (count) => {
         <Button variant="outline" @click="clearNarrowing">Clear search and filters</Button>
       </section>
       <div class="dv-panel records-panel">
-        <RecordsGrid ref="grid" v-model:selected="selected" :rows="data?.records ?? []" :columns="columns" :field-count="fields.length"
+        <RecordsGrid ref="grid" v-model:selected="selected" :rows="data?.records ?? []" :columns="columns" :field-count="fields.length" :wrap="preferences.wrap"
           :sort="preferences.sort" :record-label="recordLabel.lower.value" :key-label="keyLabel"
-          :commit="commitCell" :add-option="addOption" :create="createRecord"
+          :commit="commitCell" :commit-many="commitCells" :add-option="addOption" :create="createRecord"
           @open="(row, tab) => openRecord(row.id, tab)" @sort="(sort: GridSort) => preferences.sort = sort"
           @resize="(id, width) => preferences.widths = { ...preferences.widths, [id]: width }" @hide="(id) => toggleColumn(id, false)"
           @filter="filterBy" @edit-field="editField" @remove-field="askRemoveField" />

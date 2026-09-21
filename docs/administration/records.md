@@ -21,7 +21,7 @@ The menu splits data enrichment in two. **Data Enrichment** holds the screens us
 | 3 | **Fields**, optional | What do readers see and search: record columns and photo metadata? |
 | 4 | **Variants**, optional | Which files are versions of one creative? |
 
-**Enrichment Setup → Setup guide** (`/admin/data-enrichment`) lists the four steps with where each stands: types defined and folders still without one, types with matching steps (or that no record exists yet), photo metadata fields shown, types grouping variants and axes waiting for a name. A step is ticked when it is done, and its button opens its screen. Under **Every day** it counts the records and the files linked, not linked or in conflict. It also shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
+**Enrichment Setup → Setup guide** (`/admin/data-enrichment`) lists the four steps with where each stands: types defined and folders still without one, types with matching steps (or that no record exists yet), photo metadata fields shown, types grouping variants and axes waiting for a name. A step is ticked when it is done, and its button opens its screen. It also shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
 
 ## Two questions, two tools
 
@@ -59,11 +59,16 @@ The old job that applied the regex every 5 minutes still runs, but only on files
 |---|---|
 | Add a record | Type its key in the last row and press Enter, or use **Add product** at the top. The record opens as a card to fill in. A key already taken is refused in the row. |
 | Edit a value | Click a cell to select it, then click again, double-click, press Enter or start typing. Enter saves and moves down, Tab saves and moves right, Esc cancels. A select opens its list of options; type to narrow it and add a missing option from there. |
-| Clear or copy a value | Delete or Backspace clears the selected cell. Ctrl+C or ⌘+C copies its value, Ctrl+V or ⌘+V pastes one value into it. |
+| Select several cells | Drag across them, Shift+click the far corner, or hold Shift with the arrow keys. Ctrl+A or ⌘+A selects every cell of the page, Esc goes back to one cell. |
+| Copy and paste | Ctrl+C or ⌘+C copies the selected cells as tab-separated rows, the form Sheets and Excel use, so a block goes both ways. Ctrl+V or ⌘+V pastes: one value fills every selected cell, a block the selection holds a whole number of times is repeated across it, and any other block is laid from the top-left cell. |
+| Duplicate values down | Drag the small square at the corner of the selection up or down: the selected rows repeat over the rows you cover. Double-click the square to fill to the last row of the page, or press Ctrl+D or ⌘+D to copy the first row of the selection into the rows below it. |
+| Clear values | Delete or Backspace clears every selected cell. |
 | Undo an edit | Use **Undo** on the notice that confirms the edit. The undo is a change of its own in the history. |
+
+A paste, fill or clear over several cells is checked before anything is sent: one value its field refuses and nothing is saved. It is saved in one go, can be undone in one go, and each record it changes gets one history entry. The key, picture and count columns are never written; the notice says how many of their cells were left out. A paste or fill stops at the last row of the page.
 | Find records | The search box looks in the key and every value. **Filters** narrow by field (contains, is, is not, is empty, is any of the options), and several filters narrow each other. |
 | Sort | Open a column's menu. Numbers and dates sort by value; values that do not fit their type come last. |
-| Arrange columns | **Columns** shows, hides and reorders them, and each column can be resized from its right edge. The layout is kept in this browser only. **Files** counts the files linked to each record and **Filled** how many of its fields hold a value. |
+| Arrange columns | **Columns** shows, hides and reorders them, and each column can be resized from its right edge; a long value never widens its column. **Wrap text** at the top of **Columns** shows up to four lines per cell, line breaks included, instead of one. The layout is kept in this browser only. **Files** counts the files linked to each record and **Filled** how many of its fields hold a value. |
 | Act on several records | Tick them, across pages if needed: **Set a field** gives them one value, **Export CSV** exports them, **Delete** removes them. |
 | Export | **Export CSV** in the ⋮ menu exports every record the search and filters find, or the selection when there is one, never only the visible page. At most 10,000 records per export. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet never runs them as formulas. |
 
@@ -172,11 +177,11 @@ Choosing the file compares it with the current mapping before anything is writte
 
 ## Set the views
 
-A view is the angle or version a file shows of a record, written after the key in the file name, such as the `02` of `ABC123-001.02.jpg`. In **Settings**, section **Views**:
+Views are made for brands that sell products. A product is usually shot several times (front, back, side, close-up, in use), and a number after the product key in the file name tells these pictures apart: `ABC123-001.01.jpg`, `ABC123-001.02.jpg` and `ABC123-001.03.jpg` are three views of product `ABC123-001`. With views on, these files are linked to the same record, search can be filtered by view, and one view is used as the record's picture. Leave views off when each file shows its record once, as for events or venues. In **Settings**, section **Record label**, under **Views**. Separator, Digits and Thumbnail view show only while the switch is on:
 
 | Setting | Effect |
 |---|---|
-| Files can carry a view number after the key | On by default. Off hides the view filter from search and stops reading views. |
+| Files show several views of each record | Off on new installs; turned on at the upgrade when `PRODUCT_MATCHING_REGEX` or `PIM_PRODUCT_VIEW` was set. Off hides the view filter from search and stops reading views, except in steps that name their own view group. |
 | Separator | One character, `.` by default. |
 | Digits | 1 to 4, `2` by default. |
 | Thumbnail view | The view used as the record's picture in the admin list, `00` by default or the old `PIM_PRODUCT_VIEW`. |

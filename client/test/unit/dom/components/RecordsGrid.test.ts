@@ -30,11 +30,12 @@ const rows = [
 ]
 
 function setup(commit = vi.fn().mockResolvedValue(undefined), create = vi.fn().mockResolvedValue(undefined)) {
+  const commitMany = vi.fn().mockResolvedValue(undefined)
   const wrapper = mount(RecordsGrid, {
     attachTo: document.body,
-    props: { rows, columns, fieldCount: 2, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, addOption: vi.fn(), create },
+    props: { rows, columns, fieldCount: 2, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, commitMany, addOption: vi.fn(), create },
   })
-  return { wrapper, commit, create }
+  return { wrapper, commit, commitMany, create }
 }
 const cell = (wrapper: ReturnType<typeof setup>['wrapper'], row: number, column: number) => wrapper.get(`[data-cell="${row}-${column}"]`)
 
@@ -110,7 +111,7 @@ describe('RecordsGrid', () => {
     const commit = vi.fn().mockResolvedValue(undefined)
     const wrapper = mount(RecordsGrid, {
       attachTo: document.body,
-      props: { rows: [{ ...rows[0], metaData: { Tags: 'Eco' } }], columns: [...columns.slice(0, 2), { id: 'field:Tags', kind: 'field', label: 'Tags', width: 200, field: tags }], fieldCount: 1, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, addOption: vi.fn(), create: vi.fn() },
+      props: { rows: [{ ...rows[0], metaData: { Tags: 'Eco' } }], columns: [...columns.slice(0, 2), { id: 'field:Tags', kind: 'field', label: 'Tags', width: 200, field: tags }], fieldCount: 1, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, commitMany: vi.fn(), addOption: vi.fn(), create: vi.fn() },
     })
     await cell(wrapper, 0, 2).trigger('click')
     await cell(wrapper, 0, 2).trigger('keydown', { key: 'Enter' })
@@ -123,6 +124,51 @@ describe('RecordsGrid', () => {
     ;(document.body.querySelector('.record-option-done') as HTMLElement).click()
     await flushPromises()
     expect(commit).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), tags, 'Eco|Sale')
+    wrapper.unmount()
+  })
+
+  test('Shift+arrows select a range that copies as tab-separated rows and clears at once', async () => {
+    const { wrapper, commitMany } = setup()
+    await cell(wrapper, 0, 2).trigger('click')
+    await cell(wrapper, 0, 2).trigger('keydown', { key: 'ArrowDown', shiftKey: true })
+    await cell(wrapper, 0, 2).trigger('keydown', { key: 'ArrowRight', shiftKey: true })
+    expect(cell(wrapper, 1, 3).attributes('aria-selected')).toBe('true')
+    const setData = vi.fn()
+    await cell(wrapper, 0, 2).trigger('copy', { clipboardData: { setData } })
+    expect(setData).toHaveBeenCalledWith('text/plain', 'Blue\t10\n\tn/a')
+    expect(cell(wrapper, 0, 2).classes()).toContain('copied-top')
+    await cell(wrapper, 0, 2).trigger('keydown', { key: 'Delete' })
+    expect(commitMany).toHaveBeenCalledWith([
+      { record: rows[0], field: colour, value: '' }, { record: rows[0], field: price, value: '' },
+      { record: rows[1], field: colour, value: '' }, { record: rows[1], field: price, value: '' },
+    ], 0)
+    wrapper.unmount()
+  })
+
+  test('a pasted block lands from the focused cell, and read-only cells are counted, not written', async () => {
+    const { wrapper, commitMany } = setup()
+    await cell(wrapper, 0, 2).trigger('click')
+    await cell(wrapper, 0, 2).trigger('paste', { clipboardData: { getData: () => 'Red\t5\r\nGreen\t6\r\n' } })
+    expect(commitMany).toHaveBeenLastCalledWith([
+      { record: rows[0], field: colour, value: 'Red' }, { record: rows[0], field: price, value: '5' },
+      { record: rows[1], field: colour, value: 'Green' }, { record: rows[1], field: price, value: '6' },
+    ], 0)
+    expect(cell(wrapper, 1, 3).attributes('aria-selected')).toBe('true')
+    await cell(wrapper, 0, 1).trigger('click')
+    await cell(wrapper, 0, 1).trigger('paste', { clipboardData: { getData: () => 'X' } })
+    expect(commitMany).toHaveBeenLastCalledWith([], 1)
+    wrapper.unmount()
+  })
+
+  test('the fill handle and Ctrl+D copy a value into the cells below', async () => {
+    const { wrapper, commit } = setup()
+    await cell(wrapper, 0, 2).trigger('click')
+    await cell(wrapper, 0, 2).get('.records-grid-fill-handle').trigger('dblclick')
+    expect(commit).toHaveBeenLastCalledWith(rows[1], colour, 'Blue')
+    await cell(wrapper, 0, 3).trigger('click')
+    await cell(wrapper, 0, 3).trigger('keydown', { key: 'ArrowDown', shiftKey: true })
+    await cell(wrapper, 0, 3).trigger('keydown', { key: 'd', ctrlKey: true })
+    expect(commit).toHaveBeenLastCalledWith(rows[1], price, '10')
     wrapper.unmount()
   })
 })

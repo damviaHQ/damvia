@@ -20,11 +20,12 @@ export type RecordsGridPreferences = {
   widths: Record<string, number>
   sort: { column: string, direction: 'asc' | 'desc' } | null
   pageSize: number
+  wrap: boolean
 }
 
 export const RECORDS_GRID_KEY = 'damvia_records_grid'
 export const PAGE_SIZES = [50, 100, 200, 500]
-const DEFAULTS: RecordsGridPreferences = { hidden: [], order: [], widths: {}, sort: null, pageSize: 100 }
+const DEFAULTS: RecordsGridPreferences = { hidden: [], order: [], widths: {}, sort: null, pageSize: 100, wrap: false }
 
 const strings = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 
@@ -41,6 +42,7 @@ export function readRecordsGridPreferences(storage: Pick<Storage, 'getItem'> | u
       widths,
       sort,
       pageSize: PAGE_SIZES.includes(parsed.pageSize) ? parsed.pageSize : DEFAULTS.pageSize,
+      wrap: parsed.wrap === true,
     }
   } catch {
     return structuredClone(DEFAULTS)

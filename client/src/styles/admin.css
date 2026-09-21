@@ -355,3 +355,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .import-done > p { max-width:560px; color:var(--dv-text-secondary); }
 .dv-admin .import-done .import-table { max-width:720px; border:1px solid var(--dv-color-line); text-align:left; }
 .dv-admin .import-done-actions { display:flex; gap:10px; }
+
+/* Records grid: cell ranges, copy, fill and wrapped text */
+.dv-admin .records-grid td[data-cell]:not(.is-editing) { user-select:none; -webkit-user-select:none; }
+.dv-admin .records-grid td { --range-t:0px; --range-b:0px; --range-l:0px; --range-r:0px; }
+.dv-admin .records-grid tbody td.in-range { background:color-mix(in srgb, var(--dv-action-primary) 9%, var(--dv-surface-panel)); box-shadow:inset 0 var(--range-t) 0 var(--dv-action-primary), inset 0 calc(-1 * var(--range-b)) 0 var(--dv-action-primary), inset var(--range-l) 0 0 var(--dv-action-primary), inset calc(-1 * var(--range-r)) 0 0 var(--dv-action-primary); }
+.dv-admin .records-grid td.in-range-top { --range-t:2px; }
+.dv-admin .records-grid td.in-range-bottom { --range-b:2px; }
+.dv-admin .records-grid td.in-range-left { --range-l:2px; }
+.dv-admin .records-grid td.in-range-right { --range-r:2px; }
+.dv-admin .records-grid td.in-range[data-cell]:focus { outline:none; }
+.dv-admin .records-grid td.copied::after, .dv-admin .records-grid td.fill::after { content:""; position:absolute; inset:0; pointer-events:none; border:0 dashed var(--dv-action-primary); }
+.dv-admin .records-grid td.copied-top::after, .dv-admin .records-grid td.fill-top::after { border-top-width:2px; }
+.dv-admin .records-grid td.copied-bottom::after, .dv-admin .records-grid td.fill-bottom::after { border-bottom-width:2px; }
+.dv-admin .records-grid td.copied-left::after, .dv-admin .records-grid td.fill-left::after { border-left-width:2px; }
+.dv-admin .records-grid td.copied-right::after, .dv-admin .records-grid td.fill-right::after { border-right-width:2px; }
+.dv-admin .records-grid-fill-handle { position:absolute; right:0; bottom:0; z-index:2; width:8px; height:8px; background:var(--dv-action-primary); border:1px solid var(--dv-surface-panel); cursor:crosshair; touch-action:none; }
+.dv-admin .records-wrap-switch { display:flex; align-items:center; gap:10px; padding-bottom:12px; margin-bottom:10px; border-bottom:1px solid var(--dv-color-line); font-size:var(--dv-size-body); }
+.dv-admin .records-grid.is-wrapped td { white-space:normal; vertical-align:top; }
+.dv-admin .records-grid.is-wrapped .record-value:not(.record-chips):not(.is-number):not(.record-url) { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; line-clamp:4; height:auto; min-height:20px; margin:8px 10px; padding:0; line-height:20px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.dv-admin .records-grid.is-wrapped .record-chips { flex-wrap:wrap; height:auto; min-height:36px; padding-top:7px; padding-bottom:7px; }
+.dv-admin .records-grid.is-wrapped .records-grid-key, .dv-admin .records-grid.is-wrapped .records-grid-filled, .dv-admin .records-grid.is-wrapped .records-grid-count { height:36px; }

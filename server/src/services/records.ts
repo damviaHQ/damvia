@@ -145,6 +145,49 @@ export async function patchRecords(em: EntityManager, ids: string[], values: Rec
 	return { updated, found: rows.length }
 }
 
+// Sets different values on different records, as a pasted or filled range of
+// cells does. Every value is checked before anything is written, so the range
+// is saved whole or not at all; each changed record gets one history row.
+export async function patchEach(em: EntityManager, changes: { id: string, values: Record<string, string> }[], actor: Actor): Promise<{ updated: string[], missing: string[] }> {
+	const keyColumnName = await catalogueKeyColumnName(em)
+	const fields = await loadFields(em)
+	const ids = [...new Set(changes.map((change) => change.id))]
+	const rows: { id: string, record_key: string, key_column_name: string, meta_data: Record<string, string> | null }[] = await em.query(`
+		SELECT id, record_key, key_column_name, hstore_to_json(meta_data) AS meta_data FROM records WHERE id = ANY($1) ORDER BY id FOR UPDATE
+	`, [ids])
+	const byId = new Map(rows.map((row) => [row.id, row]))
+	const merged = new Map<string, Record<string, string>>()
+	for (const change of changes) {
+		const row = byId.get(change.id)
+		if (!row) continue
+		let values: Record<string, string>
+		try {
+			values = normaliseValues(fields, keyColumnName ?? row.key_column_name, change.values)
+		} catch (error) {
+			if (error instanceof TRPCError) throw new TRPCError({ code: error.code, message: `${row.record_key}: ${error.message}` })
+			throw error
+		}
+		merged.set(row.id, { ...merged.get(row.id), ...values })
+	}
+	const history: RecordChangeRow[] = []
+	const written: { id: string, values: Record<string, string> }[] = []
+	for (const [id, values] of merged) {
+		const row = byId.get(id)!
+		const diff = diffValues(row.meta_data, values)
+		if (!Object.keys(diff).length) continue
+		history.push({ recordId: id, recordKey: row.record_key, action: 'update', source: actor.source, changes: diff, changedById: actor.userId })
+		written.push({ id, values: Object.fromEntries(Object.keys(diff).map((name) => [name, values[name]])) })
+	}
+	if (written.length) {
+		await em.query(`
+			UPDATE records r SET meta_data = coalesce(r.meta_data, ''::hstore) || ${JSON_TO_HSTORE}, updated_at = now()
+			FROM unnest($1::uuid[], $2::json[]) AS u(id, m) WHERE r.id = u.id
+		`, [written.map((row) => row.id), written.map((row) => JSON.stringify(row.values))])
+		await writeRecordChanges(em, history)
+	}
+	return { updated: written.map((row) => row.id), missing: ids.filter((id) => !byId.has(id)) }
+}
+
 const SNAPSHOT = `(SELECT coalesce(jsonb_object_agg(e.key, jsonb_build_object('old', e.value, 'new', NULL)), '{}'::jsonb) FROM each(r.meta_data) e)`
 
 // Deletes records, keeping their last values in the history. Links set on

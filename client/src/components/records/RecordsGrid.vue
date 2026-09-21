@@ -17,9 +17,10 @@ import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { moveForKey, moveInGrid, startsTyping, type GridMove, type GridPosition } from "@/composables/useGridNavigation"
+import { fillDownPlan, fillPlan, inRange, pastePlan, parseClipboard, rangeOf, rangeSize, toClipboard, type CellWrite, type GridRange } from "@/utils/gridRange"
 import { VALUE_TYPE_LABELS, type ValueField } from "@/utils/recordValues"
 import { ArrowDown, ArrowUp, ChevronDown, EyeOff, Filter, Maximize2, PencilLine, Plus, Trash2 } from "@lucide/vue"
-import { computed, nextTick, ref } from "vue"
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
 import RecordCellEditor, { type EditorMove } from "./RecordCellEditor.vue"
 import RecordCellValue from "./RecordCellValue.vue"
 
@@ -27,16 +28,19 @@ export type GridField = ValueField & { id: string }
 export type GridRecord = { id: string, recordKey: string, metaData: Record<string, string>, thumbnailURL: string | null, fileCount: number, filledCount: number }
 export type GridColumn = { id: string, kind: "thumbnail" | "key" | "field" | "files" | "filled", label: string, width: number, sortKey?: string, field?: GridField }
 export type GridSort = { column: string, direction: "asc" | "desc" } | null
+export type GridWrite = { record: GridRecord, field: GridField, value: string }
 
 const props = defineProps<{
   rows: GridRecord[]
   columns: GridColumn[]
   fieldCount: number
+  wrap?: boolean
   sort: GridSort
   selected: string[]
   recordLabel: string
   keyLabel: string
   commit: (record: GridRecord, field: GridField, value: string) => Promise<void>
+  commitMany: (writes: GridWrite[], skipped: number) => Promise<void>
   addOption: (field: GridField, option: string) => Promise<void>
   create: (key: string) => Promise<void>
 }>()
@@ -55,6 +59,17 @@ const root = ref<HTMLElement | null>(null)
 const newKeyInput = ref<HTMLInputElement | null>(null)
 const focused = ref<GridPosition>({ row: 0, column: 0 })
 const editing = ref<{ row: number, column: number, initial: string, typed?: string, draft?: string } | null>(null)
+// The selected range runs from the focused cell to "head"; null is the focused
+// cell alone. "copied" keeps the dashed outline of the last copy.
+const head = ref<GridPosition | null>(null)
+const copied = ref<GridRange | null>(null)
+const fillTo = ref<number | null>(null)
+const range = computed(() => rangeOf(focused.value, head.value ?? focused.value))
+const multi = computed(() => !!head.value && (head.value.row !== focused.value.row || head.value.column !== focused.value.column))
+const fillRange = computed(() => fillTo.value === null ? null : { ...range.value, top: Math.min(range.value.top, fillTo.value), bottom: Math.max(range.value.bottom, fillTo.value) })
+const rangeMessage = ref("")
+// The table is exactly as wide as its columns, so a long value never widens one.
+const tableWidth = computed(() => 40 + props.columns.reduce((total, column) => total + column.width, 0))
 const newKey = ref("")
 const newKeyError = ref("")
 const creating = ref(false)
@@ -128,11 +143,17 @@ function onCancel() {
   if (edit) focusCell({ row: edit.row, column: edit.column })
 }
 
-async function onKeydown(event: KeyboardEvent) {
+function onKeydown(event: KeyboardEvent) {
   if (editing.value || !(event.target as HTMLElement).matches("[data-cell]")) return
   const position = focused.value
   const move = moveForKey(event)
+  if (move && event.shiftKey && move !== "next" && move !== "previous") {
+    event.preventDefault()
+    extendTo(moveInGrid(head.value ?? position, move, shape.value))
+    return
+  }
   if (move) {
+    head.value = null
     const next = moveInGrid(position, move, shape.value)
     if ((move === "next" || move === "previous") && next.row === position.row && next.column === position.column) return
     event.preventDefault()
@@ -140,14 +161,21 @@ async function onKeydown(event: KeyboardEvent) {
     return
   }
   const shortcut = event.ctrlKey || event.metaKey
-  if (event.key === "Enter" || event.key === "F2") activate(position)
-  else if ((event.key === "Delete" || event.key === "Backspace") && shape.value.editable(position.column)) save(position, "")
-  else if (shortcut && event.key.toLowerCase() === "c") navigator.clipboard?.writeText(valueAt(position))
-  else if (shortcut && event.key.toLowerCase() === "v" && shape.value.editable(position.column)) {
-    const text = await navigator.clipboard?.readText().catch(() => null)
-    if (text != null) save(position, text.replace(/\r?\n$/, ""))
+  if (event.key === "Escape" && (multi.value || copied.value)) { head.value = null; copied.value = null; rangeMessage.value = "" }
+  else if (event.key === "Enter" || event.key === "F2") { head.value = null; activate(position) }
+  else if (event.key === "Delete" || event.key === "Backspace") {
+    const writes: CellWrite[] = []
+    for (let row = range.value.top; row <= range.value.bottom; row++) {
+      for (let column = range.value.left; column <= range.value.right; column++) if (shape.value.editable(column)) writes.push({ row, column, value: "" })
+    }
+    if (writes.length) writeCells(writes)
   }
-  else if (startsTyping(event) && shape.value.editable(position.column)) startEdit(position, event.key)
+  else if (shortcut && event.key.toLowerCase() === "a") select({ row: 0, column: 0 }, { row: shape.value.rows - 1, column: shape.value.columns - 1 })
+  else if (shortcut && event.key.toLowerCase() === "d") {
+    const writes = fillDownPlan(range.value, valueAt)
+    if (writes.length) writeCells(writes)
+  }
+  else if (startsTyping(event) && shape.value.editable(position.column)) { head.value = null; startEdit(position, event.key) }
   else return
   event.preventDefault()
 }
@@ -156,17 +184,158 @@ function isEditing(position: GridPosition) {
   return editing.value?.row === position.row && editing.value?.column === position.column
 }
 
+function select(anchor: GridPosition, to: GridPosition | null) {
+  focusCell(anchor)
+  head.value = to
+  const size = rangeSize(rangeOf(anchor, to ?? anchor))
+  rangeMessage.value = size.rows * size.columns > 1 ? `${size.rows} rows by ${size.columns} columns selected` : ""
+}
+
+function extendTo(position: GridPosition) {
+  head.value = position
+  const size = rangeSize(range.value)
+  rangeMessage.value = `${size.rows} rows by ${size.columns} columns selected`
+  nextTick(() => cellElement(position)?.scrollIntoView({ block: "nearest", inline: "nearest" }))
+}
+
+function rangeValues(target: GridRange): string[][] {
+  const block: string[][] = []
+  for (let row = target.top; row <= target.bottom; row++) {
+    const line: string[] = []
+    for (let column = target.left; column <= target.right; column++) line.push(valueAt({ row, column }))
+    block.push(line)
+  }
+  return block
+}
+
+// Writes to read-only cells (key, picture, counts) are dropped and counted.
+async function writeCells(writes: CellWrite[]) {
+  const accepted: GridWrite[] = []
+  for (const write of writes) {
+    const column = props.columns[write.column]
+    const row = props.rows[write.row]
+    if (column?.kind === "field" && column.field && row) accepted.push({ record: row, field: column.field, value: write.value })
+  }
+  const skipped = writes.length - accepted.length
+  if (accepted.length === 1 && !skipped) {
+    const only = writes[0]
+    return save({ row: only.row, column: only.column }, only.value)
+  }
+  await props.commitMany(accepted, skipped)
+}
+
+function onCopy(event: ClipboardEvent) {
+  if (editing.value || !(event.target as HTMLElement).matches("[data-cell]")) return
+  event.preventDefault()
+  event.clipboardData?.setData("text/plain", toClipboard(rangeValues(range.value)))
+  copied.value = { ...range.value }
+  const size = rangeSize(range.value)
+  rangeMessage.value = `${size.rows * size.columns === 1 ? "Cell" : `${size.rows * size.columns} cells`} copied`
+}
+
+function onPaste(event: ClipboardEvent) {
+  if (editing.value || !(event.target as HTMLElement).matches("[data-cell]")) return
+  const text = event.clipboardData?.getData("text/plain")
+  if (text == null || text === "") return
+  event.preventDefault()
+  const writes = pastePlan(parseClipboard(text), range.value, shape.value)
+  if (!writes.length) return
+  const last = writes[writes.length - 1]
+  if (writes.length > 1) select({ row: writes[0].row, column: writes[0].column }, { row: last.row, column: last.column })
+  copied.value = null
+  writeCells(writes)
+}
+
+function applyFill(toRow: number) {
+  const plan = fillPlan(range.value, toRow, valueAt)
+  if (!plan.writes.length) return
+  select({ row: plan.range.top, column: plan.range.left }, { row: plan.range.bottom, column: plan.range.right })
+  writeCells(plan.writes)
+}
+
+function startFill(event: PointerEvent) {
+  const handle = event.currentTarget as HTMLElement
+  handle.setPointerCapture(event.pointerId)
+  fillTo.value = range.value.bottom
+  const onMove = (move: PointerEvent) => {
+    const cell = document.elementFromPoint(move.clientX, move.clientY)?.closest<HTMLElement>("[data-cell]")
+    if (cell && root.value?.contains(cell)) fillTo.value = Number(cell.dataset.cell!.split("-")[0])
+  }
+  const onUp = () => {
+    handle.removeEventListener("pointermove", onMove)
+    handle.removeEventListener("pointerup", onUp)
+    const to = fillTo.value
+    fillTo.value = null
+    if (to !== null) applyFill(to)
+  }
+  handle.addEventListener("pointermove", onMove)
+  handle.addEventListener("pointerup", onUp)
+}
+
+function edgeClass(target: GridRange | null, prefix: string, r: number, c: number): string[] {
+  if (!target || !inRange(target, r, c)) return []
+  const edges = [prefix]
+  if (r === target.top) edges.push(`${prefix}-top`)
+  if (r === target.bottom) edges.push(`${prefix}-bottom`)
+  if (c === target.left) edges.push(`${prefix}-left`)
+  if (c === target.right) edges.push(`${prefix}-right`)
+  return edges
+}
+
+function cellClasses(r: number, c: number): string[] {
+  return [
+    ...(multi.value ? edgeClass(range.value, "in-range", r, c) : []),
+    ...edgeClass(copied.value, "copied", r, c),
+    ...(fillRange.value && !inRange(range.value, r, c) ? edgeClass(fillRange.value, "fill", r, c) : []),
+  ]
+}
+
+const showFillHandle = (r: number, c: number) => !editing.value && r === range.value.bottom && c === range.value.right && props.columns[c]?.kind === "field"
+
+// Dragging across cells selects a range.
+let dragging = false
+function stopDragging() { dragging = false }
+window.addEventListener("mouseup", stopDragging)
+onBeforeUnmount(() => window.removeEventListener("mouseup", stopDragging))
+function onCellMouseenter(position: GridPosition, event: MouseEvent) {
+  if (!dragging || !(event.buttons & 1)) return
+  extendTo(position)
+}
+
+watch(() => props.rows.map((row) => row.id).join(), () => {
+  head.value = null
+  copied.value = null
+  if (focused.value.row >= props.rows.length) focused.value = { row: Math.max(0, props.rows.length - 1), column: focused.value.column }
+})
+
 // A cell takes focus on mouse down, before its click: whether it already had
 // focus is read then, so the first click selects and the second edits.
+// Shift+click stretches the range instead.
 let focusedBeforeClick = false
-function onCellMousedown(position: GridPosition) {
-  focusedBeforeClick = focused.value.row === position.row && focused.value.column === position.column && document.activeElement === cellElement(position)
+let extendedByClick = false
+function onCellMousedown(position: GridPosition, event: MouseEvent) {
+  extendedByClick = false
+  if (event.button !== 0 || isEditing(position)) return
+  if (event.shiftKey) {
+    event.preventDefault()
+    extendTo(position)
+    extendedByClick = true
+    return
+  }
+  focusedBeforeClick = focused.value.row === position.row && focused.value.column === position.column && document.activeElement === cellElement(position) && !multi.value
+  head.value = null
+  rangeMessage.value = ""
+  dragging = true
 }
 
 function onCellClick(position: GridPosition) {
+  if (extendedByClick) { extendedByClick = false; return }
   if (isEditing(position)) return
   if (focusedBeforeClick) activate(position)
-  else focusCell(position)
+  else if (!multi.value || !inRange(range.value, position.row, position.column) || document.activeElement !== cellElement(position)) {
+    head.value = null
+    focusCell(position)
+  }
   focusedBeforeClick = false
 }
 
@@ -230,7 +399,8 @@ defineExpose({
 
 <template>
   <div ref="root" class="records-grid-wrap">
-    <table class="records-grid" role="grid" :aria-label="`${recordLabel} list`" :aria-rowcount="rows.length + 1">
+    <p class="sr-only" role="status" aria-live="polite">{{ rangeMessage }}</p>
+    <table class="records-grid" :class="{ 'is-wrapped': wrap }" :style="{ width: `${tableWidth}px` }" role="grid" aria-multiselectable="true" :aria-label="`${recordLabel} list`" :aria-rowcount="rows.length + 1">
       <colgroup>
         <col style="width: 40px" />
         <col v-for="column in columns" :key="column.id" :style="{ width: `${column.width}px` }" />
@@ -275,7 +445,7 @@ defineExpose({
           </th>
         </tr>
       </thead>
-      <tbody @keydown="onKeydown">
+      <tbody @keydown="onKeydown" @copy="onCopy" @paste="onPaste">
         <tr v-for="(row, r) in rows" :key="row.id" :aria-selected="selected.includes(row.id)" :class="{ 'is-selected': selected.includes(row.id) }">
           <td class="records-grid-select">
             <Checkbox :model-value="selected.includes(row.id)" :aria-label="`Select ${row.recordKey}`" @update:model-value="(value) => toggleRow(row.id, value === true)" />
@@ -283,13 +453,14 @@ defineExpose({
           <td v-for="(column, c) in columns" :key="column.id" role="gridcell" :data-cell="`${r}-${c}`"
             :tabindex="focused.row === r && focused.column === c ? 0 : -1"
             :aria-readonly="column.kind !== 'field' || undefined"
-            :class="{
+            :aria-selected="multi && inRange(range, r, c) ? true : undefined"
+            :class="[cellClasses(r, c), {
               'is-editable': column.kind === 'field',
               'is-editing': editing?.row === r && editing?.column === c,
               'is-sticky-key': column.kind === 'key',
               'is-thumbnail': column.kind === 'thumbnail',
-            }"
-            @mousedown="onCellMousedown({ row: r, column: c })" @click="onCellClick({ row: r, column: c })" @dblclick="startEdit({ row: r, column: c })" @focus="focused = { row: r, column: c }">
+            }]"
+            @mousedown="onCellMousedown({ row: r, column: c }, $event)" @mouseenter="onCellMouseenter({ row: r, column: c }, $event)" @click="onCellClick({ row: r, column: c })" @dblclick="startEdit({ row: r, column: c })" @focus="focused = { row: r, column: c }">
             <template v-if="column.kind === 'thumbnail'">
               <button type="button" tabindex="-1" class="records-grid-thumbnail" :aria-label="`Files of ${row.recordKey}`" @click.stop="emit('open', row, 'files')">
                 <img v-if="row.thumbnailURL" :src="row.thumbnailURL" alt="" loading="lazy" decoding="async" /><ThumbnailPlaceholder v-else class="record-placeholder" aria-hidden="true" />
@@ -311,6 +482,8 @@ defineExpose({
               <span class="records-grid-meter" aria-hidden="true"><span :style="{ width: `${fieldCount ? Math.round(row.filledCount / fieldCount * 100) : 0}%` }" /></span>
               {{ row.filledCount }}/{{ fieldCount }}
             </span>
+            <span v-if="showFillHandle(r, c)" class="records-grid-fill-handle" aria-hidden="true" title="Drag to fill, double-click to fill to the last row"
+              @mousedown.stop.prevent @click.stop @pointerdown.stop.prevent="startFill" @dblclick.stop="applyFill(rows.length - 1)" />
           </td>
         </tr>
         <tr class="records-grid-new">

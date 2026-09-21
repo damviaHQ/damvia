@@ -159,6 +159,25 @@ test('bulk edits and removals write one history row per record and leave links d
     assert.equal(rest.hasMore, false)
 })
 
+test('a pasted range sets different values per record, whole or not at all', async () => {
+    const a = await admin.record.create({ recordKey: 'RNG-1', values: { price: '10' } })
+    const b = await admin.record.create({ recordKey: 'RNG-2' })
+    await assert.rejects(admin.record.patchMany({ changes: [{ id: a.id, values: { price: '12' } }, { id: b.id, values: { price: 'cheap' } }] }), /RNG-2: .*number/)
+    assert.equal((await admin.record.get(a.id)).metaData.price, '10')
+
+    const pasted = await admin.record.patchMany({ changes: [
+        { id: a.id, values: { price: '12,5', bf_name: 'Cap' } },
+        { id: b.id, values: { price: '20' } },
+        { id: b.id, values: { bf_name: 'Scarf' } },
+    ] })
+    assert.deepEqual(pasted, { updated: 2 })
+    assert.deepEqual([(await admin.record.get(a.id)).metaData, (await admin.record.get(b.id)).metaData].map(m => [m.price, m.bf_name]), [['12.5', 'Cap'], ['20', 'Scarf']])
+    const last = (await changesOf('RNG-2')).at(-1)
+    assert.deepEqual([last.source, last.changes], ['grid', { price: { old: null, new: '20' }, bf_name: { old: null, new: 'Scarf' } }])
+    assert.deepEqual(await admin.record.patchMany({ changes: [{ id: a.id, values: { price: '12.5' } }] }), { updated: 0 })
+    await assert.rejects(admin.record.patchMany({ changes: [{ id: a.id, values: { SKU: 'X' } }] }), /key/)
+})
+
 test('a CSV import creates text fields, learns select options, skips invalid rows whole and never back-fills', async () => {
     const data = [
         { SKU: 'CSV-1', bf_name: 'One', colour: 'Green', csv_new: 'x' },
@@ -235,6 +254,7 @@ test('every record and field procedure needs an approved admin', async () => {
         c => c.record.create({ recordKey: 'SEC-1' }),
         c => c.record.patch({ id, values: { price: '1' }, source: 'grid' }),
         c => c.record.bulkPatch({ ids: [id], values: { price: '1' } }),
+        c => c.record.patchMany({ changes: [{ id, values: { price: '1' } }] }),
         c => c.record.remove({ ids: [id] }),
         c => c.record.removeAll(),
         c => c.record.history({ id }),

@@ -19,7 +19,7 @@ import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { rerunEntityStage } from "../../services/enrichment"
 import { linkedFilesOf } from "../../services/record-files"
-import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, patchRecords, removeRecords, RecordRow } from "../../services/records"
+import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, patchEach, patchRecords, removeRecords, RecordRow } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
 const filter = z.object({
@@ -108,6 +108,27 @@ export default router({
       if (result.updated.length && await fieldIsLinked(dataSource.manager, Object.keys(input.values))) await rerunEntityStage()
       const [row] = await dataSource.query('SELECT hstore_to_json(meta_data) AS meta_data, updated_at FROM records WHERE id = $1', [input.id])
       return { id: input.id, metaData: (row?.meta_data ?? {}) as Record<string, string>, updatedAt: row?.updated_at as Date }
+    }),
+  // A pasted or filled range of grid cells: different values per record,
+  // saved whole or refused whole.
+  patchMany: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({
+      changes: z.array(z.object({ id: z.uuid(), values: values.refine((value) => Object.keys(value).length >= 1 && Object.keys(value).length <= 50, 'Send between 1 and 50 fields.') }))
+        .min(1).max(LIST_MAX)
+        .refine((changes) => changes.reduce((total, change) => total + Object.keys(change.values).length, 0) <= 5000, 'Send at most 5000 cells at once.'),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await dataSource.transaction(async (em) => {
+        const result = await patchEach(em, input.changes, { userId: ctx.user.id, source: 'grid' })
+        if (result.missing.length) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: `${result.missing.length === 1 ? 'A record was' : `${result.missing.length} records were`} removed meanwhile. Reload the page.` })
+        }
+        return result
+      })
+      const names = [...new Set(input.changes.flatMap((change) => Object.keys(change.values)))]
+      if (result.updated.length && await fieldIsLinked(dataSource.manager, names)) await rerunEntityStage()
+      return { updated: result.updated.length }
     }),
   bulkPatch: publicProcedure
     .use(authMiddleware(userAdmin))
