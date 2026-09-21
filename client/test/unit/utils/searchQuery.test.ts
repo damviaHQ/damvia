@@ -25,17 +25,28 @@ describe('search query parsing', () => {
 
   test('route query maps onto the search input with defaults', () => {
     expect(parseSearchQuery({}, 'all')).toEqual({
-      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], recordViews: [], fileTypes: [], extensions: [], minSize: undefined, maxSize: undefined, searchScope: 'all', exactMatch: false, attributes: {}, sort: undefined,
+      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], recordViews: [], fileTypes: [], extensions: [], minSize: undefined, maxSize: undefined, searchScope: 'all', exactMatch: false, attributes: {}, metadata: {}, sort: undefined,
     })
     expect(parseSearchQuery({
       q: 'red hat', page: '2', from_collection: 'c1', asset_types: 't1', record_views: ['front', 'back'], file_types: 'image', search_scope: 'current', exact_match: 'true', sort: 'newest', extensions: 'jpg', size_min: '2', size_max: '50',
     }, 'all')).toEqual({
-      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], recordViews: ['front', 'back'], fileTypes: ['image'], extensions: ['jpg'], minSize: 2097152, maxSize: 52428800, searchScope: 'current', exactMatch: true, attributes: {}, sort: 'newest',
+      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], recordViews: ['front', 'back'], fileTypes: ['image'], extensions: ['jpg'], minSize: 2097152, maxSize: 52428800, searchScope: 'current', exactMatch: true, attributes: {}, metadata: {}, sort: 'newest',
     })
     expect(parseSearchQuery({ sort: 'random' }, 'all').sort).toBeUndefined()
     expect(parseSearchQuery({ size_min: 'abc', size_max: '-3' }, 'all')).toMatchObject({ minSize: undefined, maxSize: undefined })
     expect(parseSearchQuery({ size_max: '0.5' }, 'all').maxSize).toBe(524288)
     expect(parseSearchQuery({ exact_match: 'yes', page: 'x' }, 'all')).toMatchObject({ exactMatch: false, page: undefined })
+  })
+
+  test('metadata filters come from the URL: values for text fields, a day range for dates, bad days ignored', () => {
+    const form = parseSearchQuery({ 'metadata[f1]': ['Barros', 'Salazar'], 'metadata_from[f2]': '2026-05-01', 'metadata_to[f2]': '2026-05-21', 'metadata_to[f3]': 'yesterday' }, 'all')
+    expect(form.metadata).toEqual({ f1: ['Barros', 'Salazar'], f2: { from: '2026-05-01', to: '2026-05-21' } })
+    expect(activeFilters(form).filter((filter) => filter.group.startsWith('metadata'))).toEqual([
+      { key: 'metadata[f1]', value: 'Barros', group: 'metadata', attributeId: 'f1' },
+      { key: 'metadata[f1]', value: 'Salazar', group: 'metadata', attributeId: 'f1' },
+      { key: 'metadata_range[f2]', value: '2026-05-01 to 2026-05-21', group: 'metadata_range', attributeId: 'f2' },
+    ])
+    expect(clearFilterQuery({ q: 'a', 'metadata[f1]': 'x', 'metadata_from[f2]': '2026-01-01' })).toEqual({ q: 'a' })
   })
 
   test('repeated scalar params keep their first value and the page is a positive integer', () => {

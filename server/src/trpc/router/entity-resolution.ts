@@ -89,15 +89,21 @@ export default router({
 			}
 			const where = filters.join(' AND ')
 			const [{ total }] = await dataSource.query(`SELECT count(*)::int AS total FROM asset_file_resolutions r INNER JOIN asset_files a ON a.id = r.asset_file_id WHERE ${where}`, parameters)
-			const rows: { id: string, name: string, path: string, type: string | null, reason: string | null }[] = await dataSource.query(`
-				SELECT a.id, a.name, f.path, t.name AS type, r.reason
+			const rows: { id: string, name: string, path: string, type: string | null, reason: string | null, suggestion: string | null, suggestion_field: string | null }[] = await dataSource.query(`
+				SELECT a.id, a.name, f.path, t.name AS type, r.reason, suggestion.key AS suggestion, suggestion.field AS suggestion_field
 				FROM asset_file_resolutions r
 				INNER JOIN asset_files a ON a.id = r.asset_file_id
 				INNER JOIN asset_folders f ON f.id = a.folder_id
 				LEFT JOIN asset_types t ON t.id = a.asset_type_id
+				LEFT JOIN LATERAL (
+					SELECT v.value_text AS key, coalesce(mf.display_name, mf.name) AS field FROM asset_file_metadata_values v
+					INNER JOIN metadata_fields mf ON mf.id = v.metadata_field_id AND mf.can_link AND mf.link_target = 'record_key'
+					INNER JOIN records rec ON rec.record_key = v.value_text
+					WHERE v.asset_file_id = a.id ORDER BY mf.name LIMIT 1
+				) suggestion ON true
 				WHERE ${where} ORDER BY f.path, a.name LIMIT 100 OFFSET ${(input.page - 1) * 100}
 			`, parameters)
-			return { total, files: rows }
+			return { total, files: rows.map((row) => ({ id: row.id, name: row.name, path: row.path, type: row.type, reason: row.reason, suggestion: row.suggestion, suggestionField: row.suggestion_field })) }
 		}),
 	conflicts: publicProcedure
 		.use(authMiddleware(userAdmin))

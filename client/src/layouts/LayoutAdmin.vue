@@ -53,7 +53,6 @@ watch(() => route.fullPath, () => { mobileOpen.value = false })
 // Child routes highlight no sidebar entry, so the breadcrumb is their only locator.
 const adminParents: Record<string, string> = {
   'admin-record-import': 'admin-records',
-  'admin-record-attributes': 'admin-records',
   'admin-page': 'admin-pages',
 }
 const routeTitle = (name: string) => String(router.resolve({ name }).meta.title ?? name)
@@ -190,9 +189,9 @@ const storageLevel = computed(() => {
               <Package class="w-4 h-4 mr-2" />
               {{ recordLabel.plural.value }}
             </router-link>
-            <router-link :to="{ name: 'admin-record-attributes' }" class="menu-item">
+            <router-link :to="{ name: 'admin-fields' }" class="menu-item">
               <Blocks class="w-4 h-4 mr-2" />
-              Attributes
+              Fields
             </router-link>
             <router-link :to="{ name: 'admin-folder-rules' }" class="menu-item">
               <FolderCog class="w-4 h-4 mr-2" />

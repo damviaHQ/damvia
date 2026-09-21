@@ -46,13 +46,13 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `server.ts` | Fastify instance, CORS, tRPC plugin, `/v1/downloads/:downloadId` |
 | `env.ts` | `logger` (winston, console transport, `timestamp` + `splat` + `simple` format), `dataSource`, S3 clients, mail transporter, `assetUpdater()` selection, `mailConfig()` |
 | `worker.ts` | pg-boss instance, `createQueue` helper, every queue definition |
-| `cli.ts` | `commander` program with the `check-integrity` command |
+| `cli.ts` | `commander` program: `check-integrity`, the source commands and `metadata:backfill` |
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
-| `entity/` | 28 TypeORM entities and their enums |
+| `entity/` | 31 TypeORM entities and their enums |
 | `migrations/` | Hand-written SQL migrations, run at startup |
-| `services/` | `asset.ts` (upsert, deletion, thumbnails, record matching), `asset-type-rules.ts` (folder rule compilation, the pure resolution of folder asset types, the set-based write), `enrichment.ts` (`runEnrichmentPass()`, the post-sync pass under an advisory lock, one committed transaction per stage), `entity-resolution.ts` (matching steps, folder attachments and links set by hand: pure strategies and merge, then the set-based write of links, resolutions and the derived `record_id`), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation), `search-insights.ts` (search demand, daily spikes and contactable search audiences) |
+| `services/` | `asset.ts` (upsert, deletion, thumbnails, record matching), `asset-type-rules.ts` (folder rule compilation, the pure resolution of folder asset types, the set-based write), `enrichment.ts` (`runEnrichmentPass()`, the post-sync pass under an advisory lock, one committed transaction per stage), `file-metadata.ts` (EXIF and IPTC reading, the values of visible fields for a page of results), `entity-resolution.ts` (matching steps, CSV mappings, trusted metadata, folder attachments and links set by hand: pure strategies and merge, then the set-based write of links, resolutions and the derived `record_id`), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation), `search-insights.ts` (search demand, daily spikes and contactable search audiences) |
 | `trpc/index.ts` | tRPC init, context, `authMiddleware` and the four predicates |
-| `trpc/router/` | 20 domain routers plus `collection/invitation.ts`, merged in `index.ts` with the public `env` query |
+| `trpc/router/` | 22 domain routers plus `collection/invitation.ts`, merged in `index.ts` with the public `env` query |
 | `util/array.ts` | `compact()` |
 
 ## Folder map of `client/src`

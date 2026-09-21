@@ -20,7 +20,7 @@ import { AssetType } from "../../entity/asset-type"
 import { AssetTypeResolverStep } from "../../entity/asset-type-resolver-step"
 import { dataSource } from "../../env"
 import { rerunEntityStage } from "../../services/enrichment"
-import { CompiledStep, compileStep, ExistingLink, fullFilenamePattern, loadAttachments, loadCatalogue, loadFilesToResolve, loadViewSettings, resolveFile } from "../../services/entity-resolution"
+import { CompiledStep, compileStep, ExistingLink, fullFilenamePattern, loadAttachments, loadCatalogue, loadFilesToResolve, loadResolutionSources, loadViewSettings, resolveFile } from "../../services/entity-resolution"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
 const PREVIEW_FILES = 40
@@ -58,7 +58,11 @@ type StepInput = z.infer<typeof stepInput>
 // the save and names its position.
 async function compileInputSteps(steps: StepInput[]): Promise<CompiledStep[]> {
 	const views = await loadViewSettings(dataSource.manager)
+	const trusted: { id: string }[] = await dataSource.query('SELECT id FROM metadata_fields WHERE can_link')
 	return steps.filter((step) => step.enabled).map((step, index) => {
+		if (step.strategy === 'metadata' && step.config.metadataFieldId && !trusted.some((field) => field.id === step.config.metadataFieldId)) {
+			throw new TRPCError({ code: 'BAD_REQUEST', message: `Step ${index + 1}: only a metadata field marked "Can link" in Fields can link files.` })
+		}
 		if (step.strategy === 'folder_regex' && step.config.target === 'attribute' && !step.config.attributeName) {
 			throw new TRPCError({ code: 'BAD_REQUEST', message: `Step ${index + 1}: choose the attribute the folder gives.` })
 		}
@@ -84,7 +88,11 @@ export default router({
 			`)
 			const attributes: { name: string }[] = await dataSource.query('SELECT DISTINCT skeys(meta_data) AS name FROM records ORDER BY 1')
 			const views = await loadViewSettings(dataSource.manager)
+			const trustedFields: { id: string, name: string, display_name: string | null, link_target: string | null, link_attribute_name: string | null }[] = await dataSource.query(`
+				SELECT id, name, display_name, link_target, link_attribute_name FROM metadata_fields WHERE can_link ORDER BY name
+			`)
 			return {
+				trustedFields: trustedFields.map((field) => ({ id: field.id, name: field.name, displayName: field.display_name, linkTarget: field.link_target, linkAttributeName: field.link_attribute_name })),
 				types: types.map((type) => ({
 					id: type.id,
 					name: type.name,
@@ -141,7 +149,12 @@ export default router({
 			const [{ mpath }] = await dataSource.query('SELECT mpath FROM asset_folders WHERE id = $1', [folder.id])
 			const files = await loadFilesToResolve(dataSource.manager, `AND f.mpath LIKE $1 || '%' ORDER BY f.path, a.name LIMIT ${PREVIEW_FILES}`, [mpath])
 			const attachments = await loadAttachments(dataSource.manager)
-			const attributeNames = input.steps.map((step) => step.config.attributeName).filter((name): name is string => !!name)
+			const sources = await loadResolutionSources(dataSource.manager, steps, files.map((file) => file.id))
+			const attributeNames = [
+				...input.steps.map((step) => step.config.attributeName),
+				...[...sources.csv.values()].flat().map((row) => row.attributeName),
+				...[...sources.fields.values()].map((field) => field.linkAttributeName),
+			].filter((name): name is string => !!name)
 			const catalogue = await loadCatalogue(dataSource.manager, attributeNames)
 			const manual: ExistingLink[] = files.length ? await dataSource.query(`
 				SELECT id, asset_file_id AS "assetFileId", target_kind AS "targetKind", record_id AS "recordId", record_key AS "recordKey",
@@ -150,7 +163,7 @@ export default router({
 				FROM asset_entity_links WHERE strategy = 'manual_file' AND asset_file_id = ANY($1)
 			`, [files.map((file) => file.id)]) : []
 			return files.map((file) => {
-				const resolution = resolveFile(file, steps, attachments, manual.filter((link) => link.assetFileId === file.id), catalogue)
+				const resolution = resolveFile(file, steps, attachments, manual.filter((link) => link.assetFileId === file.id), catalogue, sources)
 				const primary = resolution.links.find((link) => link.isPrimary)
 				return {
 					id: file.id,

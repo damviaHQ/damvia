@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/tooltip"
 import { useFileFavorites } from "@/composables/useFileFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
@@ -60,6 +61,7 @@ const emit = defineEmits<{
   (e: "update:modelValue", currentCollectionId: string | null): void
 }>()
 const toast = useGlobalToast()
+const recordLabel = useRecordLabel()
 const props = defineProps<Props>()
 const viewedAt = new Map<string, number>()
 const queryClient = useQueryClient()
@@ -526,6 +528,26 @@ watch(() => props.modelValue, (newValue) => {
             </div>
           </RadioGroup>
         </div>
+        <div v-if="currentFile.record?.attributes?.length || currentFile.metadata?.length" class="grid gap-4">
+          <div v-if="currentFile.record?.attributes?.length">
+            <div class="mb-2 text-[13px] font-semibold">{{ recordLabel.singular.value }}</div>
+            <dl class="file-facts">
+              <template v-for="attribute in currentFile.record.attributes" :key="attribute?.id">
+                <dt>{{ attribute?.displayName || attribute?.name }}</dt>
+                <dd>{{ attribute?.value }}</dd>
+              </template>
+            </dl>
+          </div>
+          <div v-if="currentFile.metadata?.length">
+            <div class="mb-2 text-[13px] font-semibold">From the file</div>
+            <dl class="file-facts">
+              <template v-for="field in currentFile.metadata" :key="field.id">
+                <dt>{{ field.displayName || field.name }}</dt>
+                <dd>{{ field.value }}</dd>
+              </template>
+            </dl>
+          </div>
+        </div>
         <div v-if="hasLicense">
           <div class="mb-3 text-[13px] font-semibold">Usage Licensing Agreement</div>
           <div class="flex-col gap-1">
@@ -591,3 +613,9 @@ watch(() => props.modelValue, (newValue) => {
   </FocusScope>
   </Teleport>
 </template>
+
+<style scoped>
+.file-facts { display:grid; grid-template-columns:minmax(0,max-content) minmax(0,1fr); gap:4px 16px; font-size:var(--dv-size-caption); }
+.file-facts dt { color:var(--dv-text-secondary); }
+.file-facts dd { overflow-wrap:anywhere; }
+</style>

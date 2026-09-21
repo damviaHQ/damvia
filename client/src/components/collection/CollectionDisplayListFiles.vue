@@ -226,6 +226,17 @@ const columns = computed<ColumnDef<typeof features, File, any>[]>(() => [
     cell: (info) => info.getValue(),
     enableHiding: true,
   }),
+  ...displayGroup.value.properties.filter(property => property.id.startsWith("metadata_field.")).map(field =>
+    columnHelper.accessor(
+      (row) => row.metadata?.find((current: any) => `metadata_field.${current.id}` === field.id)?.value,
+      {
+        id: field.id,
+        header: field.label,
+        cell: (info) => info.getValue(),
+        enableHiding: true,
+      }
+    )
+  ),
   ...displayGroup.value.properties.filter(property => property.id.startsWith("record_attribute.")).map(attribute =>
     columnHelper.accessor(
       (row) =>

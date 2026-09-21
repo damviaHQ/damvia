@@ -63,7 +63,7 @@ Collections organise references to assets. Copying a file into another collectio
 | Folder rules | `/admin/folder-rules` | admin |
 | Users | `/admin/users` | admin or manager for their region |
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
-| Records and attributes | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/records/attributes` | admin |
+| Records, fields and metadata | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/fields` | admin |
 | Matching and unmatched files | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
 
 The labels and exact layout may evolve; the permission and data consequences documented on each linked page are the durable contract.

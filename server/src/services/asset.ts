@@ -29,6 +29,7 @@ import {DataRecord} from "../entity/data-record"
 import {assetsS3, assetsS3Bucket, assetUpdaterFor, dataSource, logger} from "../env"
 import {assetUpdateContentQueue, collectionSynchronizationQueue} from "../worker"
 import {destroySynchronizedCollections, moveSynchronizedCollections, reparentSubtree} from "./collection"
+import {extractFileMetadata} from "./file-metadata"
 import {commitStorage, releaseStorage, reserveStorage, StorageQuotaExceededError} from "./storage"
 import {
 	convertOfficeToPng,
@@ -130,6 +131,12 @@ async function uploadFileContent(file: AssetFile, size: number): Promise<void> {
 			}
 		} catch (error) {
 			logger.warn('asset.dimensions-failed', { assetFileId: file.id, error: error.message })
+		}
+
+		try {
+			await extractFileMetadata(file, contentPath)
+		} catch (error) {
+			logger.warn('asset.metadata-failed', { assetFileId: file.id, error: error.message })
 		}
 
 		file.status = AssetFileStatus.UP_TO_DATE

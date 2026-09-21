@@ -84,6 +84,12 @@ Before restarting, set a randomly generated `APP_SECRET` of at least 32 bytes. T
 
 Back up first and apply the migration with application writers stopped. Validate a restricted collection, an invited guest and an administrator before reopening access.
 
+## File metadata in this upgrade
+
+- Images are read for EXIF and IPTC metadata as they are downloaded. For the images already in the library, run `npm run cli -- metadata:backfill` once after the restart, off-peak on a large library: it queues one `asset/extract-metadata` job per image, which reads the copy in the assets bucket without asking the cloud source.
+- Fields appear switched off on **Data enrichment → Fields**, tab **File metadata**; nothing changes for readers until an admin switches one on. The Attributes screen moved to the first tab of Fields; its old address redirects.
+- The server has a new dependency, `exif-reader`, installed by `npm ci`; no system package is added.
+
 ## Matching in this upgrade
 
 - Keep `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` set for the first start: the migration copies the regex into a File name step of every asset type marked Related to records, and the view into Settings. Types that are not marked get no step; mark them in Asset types, then add a step on the Matching screen, or use its **Use PRODUCT_MATCHING_REGEX** button.
@@ -134,6 +140,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1790035200000-collection-favorites` | `user_collection_favorites` table (each user's starred collections) with its index on `collection_id`; starts empty |
 | `1790208000000-page-block-layout` | Rewrites `page_blocks` for the new page editor: adds `position` and `size`, converts `data` from text to `jsonb` with one shape per block type, and drops `row`, `column` and `width`. Reading order is preserved; a row that held two blocks becomes two `half` blocks, three becomes `third`, anything else becomes `full`. Text alignment chosen in the old editor is dropped, since the new editor has no alignment control. Rolling this migration back puts every block on a row of its own and deletes `hero` blocks, which the old schema cannot represent |
 | `1790121600000-asset-sources` | `source_key` on `asset_folders` and `asset_files` (empty for existing rows, adopted at the next start), unique index on (`source_key`, `external_id`) replacing the unique `external_id`, and the `asset_sources` table holding each configured source's last run |
+| `1790726400000-file-metadata` | `metadata_fields`, `asset_file_metadata_values` and `asset_entity_csv_mappings`, empty. Rolling back drops them |
 | `1790640000000-entity-links` | `asset_type_resolver_steps`, `asset_entity_links`, `asset_file_resolutions`, `asset_folder_entity_attachments`; the view columns of `enrichment_settings`. Backfills one `filename_regex` link per file of a record-related type that has a `record_id`, seeds a first `filename_regex` step from `PRODUCT_MATCHING_REGEX` for every record-related type, and copies `PIM_PRODUCT_VIEW` into the thumbnail view. Rolling back drops the four tables and the view columns; `asset_files.record_id` is untouched |
 | `1790553600000-records` | Renames `products` to `records` (`product_key` to `record_key`, `primary_key_name` to `key_column_name`), `product_attributes` to `record_attributes`, `asset_files.product_id` and `product_view` to `record_id` and `record_view`, `asset_types.is_related_to_products` to `is_related_to_records`; rewrites the `product_attribute.` prefix of `list_display_items` to `record_attribute.`; creates the single-row `enrichment_settings` table holding the record label. Renames only; rolling back reverses them |
 | `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |

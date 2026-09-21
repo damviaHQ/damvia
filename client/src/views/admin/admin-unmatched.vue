@@ -177,8 +177,13 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
                 <TableCell><Checkbox :model-value="selected.includes(file.id)" :aria-label="`Select ${file.name}`" @update:model-value="(checked) => toggle(file.id, checked)" /></TableCell>
                 <TableCell>{{ file.name }}</TableCell>
                 <TableCell><code>{{ file.path }}</code></TableCell>
-                <TableCell class="admin-text-secondary">{{ file.reason }}</TableCell>
-                <TableCell><Button variant="outline" size="sm" @click="attachFiles([file.id], file.name)">Attach</Button></TableCell>
+                <TableCell class="admin-text-secondary">{{ file.reason }}<p v-if="file.suggestion">{{ file.suggestionField }} says <strong>{{ file.suggestion }}</strong></p></TableCell>
+                <TableCell>
+                  <div class="flex gap-2">
+                    <Button v-if="file.suggestion" size="sm" @click="useCandidate(file.id, file.suggestion)">Accept</Button>
+                    <Button variant="outline" size="sm" @click="attachFiles([file.id], file.name)">Attach</Button>
+                  </div>
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>

@@ -53,6 +53,7 @@ import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { CirclePlus, GripVertical, Trash2 } from "@lucide/vue"
 import type { AcceptableValue } from "reka-ui"
 import { computed, ref, watch } from "vue"
+import { parse } from "papaparse"
 import Treeselect from "vue3-treeselect-ts"
 import Draggable from "vuedraggable"
 
@@ -88,19 +89,101 @@ const dirty = computed(() => JSON.stringify(drafts.value.map(({ key, lastError, 
 
 const strategies = [
   { value: "filename_regex", label: "File name", help: "Applied to the file name without its folder. The first group in parentheses is the key." },
+  { value: "metadata", label: "File metadata", help: "Uses one metadata field written inside the file. Only fields marked “Can link” in Fields are offered." },
   { value: "folder_regex", label: "Folder path", help: "Applied to the folder path, for example ^/Dropbox/EVENTS/[^/]+/(EVT-\\d+) gives the key from the folder name." },
 ]
 const strategyHelp = (value: string) => strategies.find((strategy) => strategy.value === value)?.help ?? ""
 
 function addStep(strategy: StepInput["strategy"], pattern = "") {
-  drafts.value.push({ key: `new-${sequence++}`, strategy, enabled: true, config: strategy === "folder_regex" ? { pattern, target: "record", keyGroup: 1 } : { pattern, keyGroup: 1 } })
+  drafts.value.push({ key: `new-${sequence++}`, strategy, enabled: true, config: strategy === "folder_regex" ? { pattern, target: "record", keyGroup: 1 } : strategy === "metadata" ? { metadataFieldId: data.value?.trustedFields[0]?.id } : { pattern, keyGroup: 1 } })
 }
 function useLegacy() {
   drafts.value.unshift({ key: `new-${sequence++}`, strategy: "filename_regex", enabled: true, config: { pattern: data.value?.legacyPattern ?? "", keyGroup: 1, viewGroup: 2 } })
 }
 function onStrategy(step: Draft, value: AcceptableValue) {
   step.strategy = String(value) as StepInput["strategy"]
-  step.config = step.strategy === "folder_regex" ? { pattern: step.config.pattern, target: "record", keyGroup: 1 } : { pattern: step.config.pattern, keyGroup: 1 }
+  step.config = step.strategy === "folder_regex" ? { pattern: step.config.pattern, target: "record", keyGroup: 1 }
+    : step.strategy === "metadata" ? { metadataFieldId: data.value?.trustedFields[0]?.id }
+    : { pattern: step.config.pattern, keyGroup: 1 }
+}
+const fieldMeaning = (id?: string) => {
+  const field = data.value?.trustedFields.find((current) => current.id === id)
+  if (!field) return ""
+  return field.linkTarget === "record_key" ? `Its value is a ${label.lower.value} key.` : `Its value is a ${field.linkAttributeName}, which links a range.`
+}
+
+// CSV mapping: a file name, then a record key or an attribute and its value.
+// A new import replaces the previous one entirely, after a comparison.
+const { data: csvSummary } = useQuery({ queryKey: ["entity-csv"], queryFn: () => trpc.entityCsv.summary.query() })
+const csvRows = ref<CsvRow[] | null>(null)
+const csvError = ref("")
+const csvComparison = ref<RouterOutput["entityCsv"]["compare"] | null>(null)
+const csvBusy = ref(false)
+type CsvRow = RouterInput["entityCsv"]["compare"]["rows"][number]
+function readCsv(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  csvRows.value = null
+  csvComparison.value = null
+  csvError.value = ""
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) {
+    csvError.value = "The file is larger than 5 MB. Split it in several imports."
+    return
+  }
+  parse<Record<string, string>>(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: async (result) => {
+      const columns = (result.meta.fields ?? []).map((column) => column.trim().toLowerCase())
+      const has = (name: string) => columns.includes(name)
+      if (!has("file_name") || !(has("record_key") || (has("attribute") && has("value")))) {
+        csvError.value = `The first row must name the columns file_name and record_key, or file_name, attribute and value. Found: ${columns.join(", ") || "nothing"}.`
+        return
+      }
+      if (result.data.length > 50000) {
+        csvError.value = "The file has more than 50,000 rows. Split it in several imports."
+        return
+      }
+      const pick = (row: Record<string, string>, name: string) => Object.entries(row).find(([key]) => key.trim().toLowerCase() === name)?.[1]?.trim() || undefined
+      csvRows.value = result.data.map((row) => ({ fileName: pick(row, "file_name") ?? "", recordKey: pick(row, "record_key"), attribute: pick(row, "attribute"), value: pick(row, "value") }))
+      csvBusy.value = true
+      try {
+        csvComparison.value = await trpc.entityCsv.compare.mutate({ rows: csvRows.value })
+      } catch (err) {
+        csvError.value = extractErrors(err as Error).message
+      } finally {
+        csvBusy.value = false
+      }
+    },
+    error: (err) => { csvError.value = err.message },
+  })
+}
+async function applyCsv() {
+  if (!csvRows.value) return
+  csvBusy.value = true
+  try {
+    const result = await trpc.entityCsv.replace.mutate({ rows: csvRows.value })
+    toast.success(`Mapping imported: ${result.matched} files matched, ${result.unmatched} unmatched`)
+    csvRows.value = null
+    csvComparison.value = null
+    await queryClient.invalidateQueries({ queryKey: ["entity-csv"] })
+    await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+  } catch (err) {
+    toast.error(extractErrors(err as Error).message)
+  } finally {
+    csvBusy.value = false
+  }
+}
+async function clearCsv() {
+  try {
+    await trpc.entityCsv.clear.mutate()
+    toast.success("Mapping removed")
+    await queryClient.invalidateQueries({ queryKey: ["entity-csv"] })
+    await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+  } catch (err) {
+    toast.error(extractErrors(err as Error).message)
+  }
 }
 function numberOrNull(value: string | number) {
   const parsed = parseInt(String(value), 10)
@@ -167,6 +250,7 @@ async function save() {
             <Button v-if="data.legacyPattern && !drafts.some((step) => step.strategy === 'filename_regex')" variant="outline" size="sm" @click="useLegacy">Use PRODUCT_MATCHING_REGEX</Button>
             <Button variant="outline" size="sm" @click="addStep('filename_regex')"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />File name step</Button>
             <Button variant="outline" size="sm" @click="addStep('folder_regex')"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />Folder path step</Button>
+            <Button variant="outline" size="sm" @click="addStep('metadata')"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />Metadata step</Button>
           </div>
         </div>
         <p v-if="!selectedType.isRelatedToRecords" class="admin-form-note">
@@ -202,7 +286,16 @@ async function save() {
               </div>
               <p class="admin-text-secondary">{{ strategyHelp(step.strategy) }}</p>
               <div class="matching-step__fields">
-                <div class="matching-step__field matching-step__field--wide">
+                <div v-if="step.strategy === 'metadata'" class="matching-step__field matching-step__field--wide">
+                  <Label :for="`field-${step.key}`">Metadata field</Label>
+                  <Select :model-value="step.config.metadataFieldId ?? ''" @update:model-value="(value: AcceptableValue) => { step.config.metadataFieldId = String(value) }">
+                    <SelectTrigger :id="`field-${step.key}`"><SelectValue placeholder="Choose a trusted field" /></SelectTrigger>
+                    <SelectContent><SelectItem v-for="field in data.trustedFields" :key="field.id" :value="field.id">{{ field.displayName || field.name }}</SelectItem></SelectContent>
+                  </Select>
+                  <p v-if="!data.trustedFields.length" class="admin-text-secondary">No field can link yet: tick “Can link” on a field in <router-link :to="{ name: 'admin-fields', query: { tab: 'metadata' } }" class="underline">Fields</router-link> first.</p>
+                  <p v-else class="admin-text-secondary">{{ fieldMeaning(step.config.metadataFieldId) }}</p>
+                </div>
+                <div v-else class="matching-step__field matching-step__field--wide">
                   <Label :for="`pattern-${step.key}`">Pattern</Label>
                   <Input :id="`pattern-${step.key}`" v-model="step.config.pattern" :placeholder="step.strategy === 'folder_regex' ? '/(EVT-\\d+) [^/]+$' : '^(EVT-\\d+)'" />
                 </div>
@@ -225,7 +318,7 @@ async function save() {
                     </Select>
                   </div>
                 </template>
-                <div class="matching-step__field matching-step__field--narrow">
+                <div v-if="step.strategy !== 'metadata'" class="matching-step__field matching-step__field--narrow">
                   <Label :for="`group-${step.key}`">Group</Label>
                   <Input v-if="step.strategy === 'folder_regex' && step.config.target === 'attribute'" :id="`group-${step.key}`" type="number" min="1" :model-value="step.config.valueGroup ?? 1" @update:model-value="(value) => { step.config.valueGroup = numberOrNull(value) ?? 1 }" />
                   <Input v-else :id="`group-${step.key}`" type="number" min="1" :model-value="step.config.keyGroup ?? 1" @update:model-value="(value) => { step.config.keyGroup = numberOrNull(value) ?? 1 }" />
@@ -277,6 +370,32 @@ async function save() {
               </TableRow>
             </TableBody>
           </Table>
+        </section>
+
+        <section class="matching-preview dv-panel" aria-labelledby="matching-csv-heading">
+          <h3 id="matching-csv-heading">CSV mapping</h3>
+          <p class="admin-text-secondary">For files whose name and folder say nothing: a CSV with the columns <code>file_name</code> and <code>record_key</code>, or <code>file_name</code>, <code>attribute</code> and <code>value</code> for a range. The file name may leave out its extension; case does not matter. It applies to every asset type related to {{ label.lowerPlural.value }}. A new import replaces the previous one entirely.</p>
+          <p v-if="csvSummary?.rows" class="admin-text-secondary">Current mapping: {{ csvSummary.rows }} rows<template v-if="csvSummary.importedBy">, imported by {{ csvSummary.importedBy }}</template><template v-if="csvSummary.importedAt"> on {{ new Date(csvSummary.importedAt).toLocaleDateString() }}</template>.</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <Input type="file" accept=".csv,text/csv" class="max-w-sm" aria-label="Choose a CSV mapping" :disabled="csvBusy" @change="readCsv" />
+            <AlertDialog v-if="csvSummary?.rows">
+              <AlertDialogTrigger as-child><Button variant="ghost" size="sm">Remove the mapping</Button></AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove the CSV mapping?</AlertDialogTitle>
+                  <AlertDialogDescription>The {{ csvSummary.rows }} rows go and the links they made are removed on the spot. Links set by hand are kept. Nothing is written to the cloud storage.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="clearCsv">Remove</AlertDialogAction></AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+          <p v-if="csvError" class="admin-form-error" role="alert">{{ csvError }}</p>
+          <p v-if="csvBusy" role="status" class="admin-text-secondary">Comparing…</p>
+          <div v-if="csvComparison" class="admin-form-note grid gap-2">
+            <p>{{ csvComparison.rows }} rows naming {{ csvComparison.filesFound }} files found in the library: {{ csvComparison.added }} new, {{ csvComparison.changed }} changed, {{ csvComparison.removed }} removed from the current mapping.</p>
+            <p v-if="csvComparison.unknownKeyCount">{{ csvComparison.unknownKeyCount }} keys have no {{ label.lower.value }} yet and will be listed as dangling: {{ csvComparison.unknownKeys.slice(0, 10).join(", ") }}<template v-if="csvComparison.unknownKeyCount > 10">, …</template></p>
+            <div><Button :disabled="csvBusy" @click="applyCsv">Replace the mapping with these {{ csvComparison.rows }} rows</Button></div>
+          </div>
         </section>
       </section>
     </div>

@@ -16,10 +16,12 @@ import { EntityManager } from "typeorm"
 import { dataSource, logger } from "../env"
 import { applyFolderAssetTypes, ENRICHMENT_LOCK, refreshFolderPaths, resolveAllFolders } from "./asset-type-rules"
 import { EntityStageResult, runEntityStage } from "./entity-resolution"
+import { refreshMetadataFieldCounts } from "./file-metadata"
 
 export type EnrichmentPassResult = {
 	assetTypes: { paths: number, folders: number, files: number }
 	entities: EntityStageResult
+	metadata: { fields: number }
 }
 
 // Runs after every sync, before the next one. One pass at a time: the session
@@ -50,7 +52,8 @@ export async function runEnrichmentPass(): Promise<EnrichmentPassResult> {
 			return { paths, ...await applyFolderAssetTypes(em, resolution.changes) }
 		})
 		const entities = await stage('entities', (em) => runEntityStage(em))
-		return { assetTypes, entities }
+		const metadata = await stage('metadata', (em) => refreshMetadataFieldCounts(em))
+		return { assetTypes, entities, metadata }
 	} finally {
 		await runner.query('SELECT pg_advisory_unlock($1)', [ENRICHMENT_LOCK]).catch(() => {})
 		await runner.release()

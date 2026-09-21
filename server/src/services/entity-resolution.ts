@@ -162,6 +162,35 @@ export function resolveByFolderAttachment(mpath: string, attachments: Map<string
 	return { candidates: [], folderId: null }
 }
 
+export type CsvMapping = { fileName: string, targetKind: 'record' | 'attribute', recordKey: string | null, attributeName: string | null, attributeValue: string | null }
+
+// A CSV row names a file with or without its extension, in any case.
+export function resolveByCsv(name: string, mappings: Map<string, CsvMapping[]>): ResolutionCandidate[] {
+	const lower = name.toLowerCase()
+	const withoutExtension = lower.replace(/\.[^.]+$/, '')
+	const rows = [...(mappings.get(lower) ?? []), ...(withoutExtension !== lower ? mappings.get(withoutExtension) ?? [] : [])]
+	return rows.map((row) => row.targetKind === 'record'
+		? { strategy: 'csv', stepId: null, kind: 'record', key: row.recordKey! }
+		: { strategy: 'csv', stepId: null, kind: 'attribute', attributeName: row.attributeName!, attributeValue: row.attributeValue! })
+}
+
+export type LinkingField = { id: string, canLink: boolean, linkTarget: 'record_key' | 'attribute' | null, linkAttributeName: string | null }
+
+// Only a field an admin trusts can link, and only through a step naming it.
+export function resolveByMetadata(values: Map<string, string[]> | undefined, step: CompiledStep, fields: Map<string, LinkingField>): ResolutionCandidate[] {
+	const field = fields.get(step.config.metadataFieldId ?? '')
+	if (!field?.canLink || !field.linkTarget) return []
+	return (values?.get(field.id) ?? []).flatMap((value): ResolutionCandidate[] => field.linkTarget === 'record_key'
+		? [{ strategy: 'metadata', stepId: step.id, kind: 'record', key: value }]
+		: field.linkAttributeName ? [{ strategy: 'metadata', stepId: step.id, kind: 'attribute', attributeName: field.linkAttributeName, attributeValue: value }] : [])
+}
+
+export type ResolutionSources = {
+	csv: Map<string, CsvMapping[]>
+	metadata: Map<string, Map<string, string[]>>
+	fields: Map<string, LinkingField>
+}
+
 export const attributeKey = (name: string, value: string) => `${name}\u0000${value}`
 
 const rank = (strategy: EntityLinkStrategy) => STRATEGY_ORDER.indexOf(strategy)
@@ -235,14 +264,16 @@ export function mergeCandidates(candidates: ResolutionCandidate[], manual: Exist
 	}
 }
 
-export function resolveFile(file: FileToResolve, steps: CompiledStep[], attachments: Map<string, Attachment[]>, manual: ExistingLink[], catalogue: Catalogue, extra: ResolutionCandidate[] = []): FileResolution {
+export function resolveFile(file: FileToResolve, steps: CompiledStep[], attachments: Map<string, Attachment[]>, manual: ExistingLink[], catalogue: Catalogue, sources: ResolutionSources | null = null, extra: ResolutionCandidate[] = []): FileResolution {
 	const candidates: ResolutionCandidate[] = []
 	const folder = resolveByFolderAttachment(file.mpath, attachments)
 	candidates.push(...folder.candidates)
+	if (sources) candidates.push(...resolveByCsv(file.name, sources.csv))
 	candidates.push(...extra)
 	for (const step of steps) {
 		if (step.strategy === 'filename_regex') candidates.push(...resolveByFilenameRegex(file.name, step))
 		else if (step.strategy === 'folder_regex') candidates.push(...resolveByFolderRegex(file.path, step))
+		else if (step.strategy === 'metadata' && sources) candidates.push(...resolveByMetadata(sources.metadata.get(file.id), step, sources.fields))
 	}
 	return mergeCandidates(candidates, manual, catalogue, folder.folderId)
 }
@@ -290,6 +321,36 @@ export async function loadAttachments(em: EntityManager): Promise<Map<string, At
 	return byFolder
 }
 
+export async function loadResolutionSources(em: EntityManager, steps: Iterable<CompiledStep>, assetFileIds: string[] | null = null): Promise<ResolutionSources> {
+	const csvRows: CsvMapping[] = await em.query(`
+		SELECT lower(file_name) AS "fileName", target_kind AS "targetKind", record_key AS "recordKey", attribute_name AS "attributeName", attribute_value AS "attributeValue"
+		FROM asset_entity_csv_mappings
+	`)
+	const csv = new Map<string, CsvMapping[]>()
+	for (const row of csvRows) {
+		const list = csv.get(row.fileName) ?? []
+		list.push(row)
+		csv.set(row.fileName, list)
+	}
+	const fieldIds = [...new Set([...steps].map((step) => step.config.metadataFieldId).filter((id): id is string => !!id))]
+	const fieldRows: LinkingField[] = fieldIds.length ? await em.query(`
+		SELECT id, can_link AS "canLink", link_target AS "linkTarget", link_attribute_name AS "linkAttributeName" FROM metadata_fields WHERE id = ANY($1)
+	`, [fieldIds]) : []
+	const fields = new Map(fieldRows.map((field) => [field.id, field]))
+	const trusted = fieldRows.filter((field) => field.canLink).map((field) => field.id)
+	const values: { asset_file_id: string, metadata_field_id: string, value_text: string }[] = trusted.length ? await em.query(`
+		SELECT asset_file_id, metadata_field_id, value_text FROM asset_file_metadata_values
+		WHERE metadata_field_id = ANY($1) ${assetFileIds ? 'AND asset_file_id = ANY($2)' : ''}
+	`, assetFileIds ? [trusted, assetFileIds] : [trusted]) : []
+	const metadata = new Map<string, Map<string, string[]>>()
+	for (const row of values) {
+		const byField = metadata.get(row.asset_file_id) ?? new Map<string, string[]>()
+		byField.set(row.metadata_field_id, [...(byField.get(row.metadata_field_id) ?? []), row.value_text])
+		metadata.set(row.asset_file_id, byField)
+	}
+	return { csv, metadata, fields }
+}
+
 export async function loadViewSettings(em: EntityManager): Promise<ViewSettings> {
 	const [row] = await em.query('SELECT views_enabled, view_separator, view_digits FROM enrichment_settings WHERE id = 1')
 	return { enabled: row.views_enabled, separator: row.view_separator, digits: row.view_digits }
@@ -332,6 +393,9 @@ export async function runEntityStage(em: EntityManager, extraCandidates: (file: 
 		FROM asset_entity_links
 	`)
 	for (const link of existingLinks) if (link.attributeName) attributeNames.add(link.attributeName)
+	const sources = await loadResolutionSources(em, [...steps.values()].flat())
+	for (const list of sources.csv.values()) for (const row of list) if (row.attributeName) attributeNames.add(row.attributeName)
+	for (const field of sources.fields.values()) if (field.linkAttributeName) attributeNames.add(field.linkAttributeName)
 	const catalogue = await loadCatalogue(em, [...attributeNames])
 	const linksByFile = new Map<string, ExistingLink[]>()
 	for (const link of existingLinks) {
@@ -362,10 +426,10 @@ export async function runEntityStage(em: EntityManager, extraCandidates: (file: 
 				if (recordId !== link.recordId) updates.push({ ...link, recordId, status: recordId || link.targetKind === 'attribute' ? 'active' : 'dangling' })
 			}
 		} else {
-			resolution = resolveFile(file, typeSteps, attachments, manual, catalogue, extraCandidates(file))
+			resolution = resolveFile(file, typeSteps, attachments, manual, catalogue, sources, extraCandidates(file))
 			// A type with no step and a file nobody linked by hand stays with the
 			// old filename job, which still owns its record link.
-			if (!typeSteps.length && !manual.length && !resolution.links.some((link) => link.strategy === 'manual_folder')) {
+			if (!typeSteps.length && !manual.length && !resolution.links.some((link) => link.strategy === 'manual_folder' || link.strategy === 'csv')) {
 				resolution.keepRecord = true
 				if (resolution.status === 'unmatched') resolution.reason = 'this asset type has no matching step'
 			}

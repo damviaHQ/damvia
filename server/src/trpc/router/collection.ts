@@ -30,6 +30,7 @@ import {
 	userCollectionFilesQuery,
 	userCollectionsQuery
 } from "../../services/collection"
+import { loadViewableMetadata, ViewableMetadata } from "../../services/file-metadata"
 import { applySearchOrder, buildRangeQuery, buildSearchQuery, loadSearchContext, onePerFile, searchFacets } from "../../services/search"
 import { collectionSynchronizationQueue } from "../../worker"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
@@ -42,6 +43,7 @@ export type FormatCollectionOptions = {
 	user?: User,
 	userVisibleCollections?: Collection[],
 	recordAttributes?: RecordAttribute[],
+	metadata?: Map<string, ViewableMetadata[]>,
 	sampleFiles?: CollectionFile[],
 }
 
@@ -65,6 +67,7 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 			? await Promise.all(collection.files.map(file => formatCollectionFile({
 				file,
 				recordAttributes: opts.recordAttributes,
+				metadata: opts.metadata,
 			})))
 			: undefined,
 		page: collection.page ? await formatPage(collection.page, opts.user) : null,
@@ -130,9 +133,10 @@ export async function buildTree({ collections, user, parent, sampleFiles }: Buil
 export type FormatCollectionFileOptions = {
 	file: CollectionFile,
 	recordAttributes?: RecordAttribute[],
+	metadata?: Map<string, ViewableMetadata[]>,
 }
 
-export async function formatCollectionFile({ file, recordAttributes }: FormatCollectionFileOptions) {
+export async function formatCollectionFile({ file, recordAttributes, metadata }: FormatCollectionFileOptions) {
 	const attributes = recordAttributes
 		? Object
 			.entries(file.assetFile.record?.metaData ?? {})
@@ -165,6 +169,7 @@ export async function formatCollectionFile({ file, recordAttributes }: FormatCol
 				})) ?? [],
 		} : null,
 		recordView: file.assetFile.recordView,
+		metadata: metadata ? metadata.get(file.assetFile.id) ?? [] : null,
 		size: parseInt(file.assetFile.size, 10),
 		collectionId: file.collectionId,
 		updatedAt: file.assetFile.updatedAt,
@@ -191,6 +196,7 @@ export async function formatCollectionFile({ file, recordAttributes }: FormatCol
 
 const searchScope = z.enum(['all', 'current', 'current_with_sub']).optional().nullable()
 const RANGE_RESULTS = 60
+const metadataInput = z.record(z.string(), z.union([z.string().max(500).array().max(200), z.object({ from: z.iso.date().nullable().optional(), to: z.iso.date().nullable().optional() })]).nullable()).nullable().optional()
 
 export default router({
 	invitation: invitationRouter,
@@ -227,6 +233,7 @@ export default router({
 			searchScope: searchScope,
 			exactMatch: z.boolean().optional().nullable(),
 			attributes: z.record(z.string(), z.string().array().nullable()).nullable().optional(),
+			metadata: metadataInput,
 			sort: z.enum(['relevance', 'name', 'newest']).optional().nullable(),
 			// Picking an image inside the page editor is not a library search.
 			silent: z.boolean().optional(),
@@ -255,6 +262,7 @@ export default router({
 				`, [ctx.user.id, ['current', 'current_with_sub'].includes(input.searchScope ?? '') ? input.collectionId : null, JSON.stringify({ query: searchTerm, total }), searchTerm])
 			}
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
+			const metadata = await loadViewableMetadata([...results, ...rangeResults].map((file) => file.assetFileId))
 
 			return {
 				total,
@@ -263,8 +271,8 @@ export default router({
 				previousPage: input.page > 1 ? input.page - 1 : null,
 				nextPage: totalPages > input.page ? input.page + 1 : null,
 				facets,
-				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes }))),
-				rangeResults: await Promise.all(rangeResults.map(file => formatCollectionFile({ file, recordAttributes }))),
+				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes, metadata }))),
+				rangeResults: await Promise.all(rangeResults.map(file => formatCollectionFile({ file, recordAttributes, metadata }))),
 				rangeTotal,
 			}
 		}),
@@ -282,6 +290,7 @@ export default router({
 			searchScope: searchScope,
 			exactMatch: z.boolean().optional().nullable(),
 			attributes: z.record(z.string(), z.string().array().nullable()).nullable().optional(),
+			metadata: metadataInput,
 		}))
 		.query(async ({ input, ctx }) => {
 			const context = await loadSearchContext(input)
@@ -289,13 +298,14 @@ export default router({
 			const [results, total] = await buildRangeQuery(ctx.user, input, context)!
 				.offset((input.page - 1) * perPage).limit(perPage).getManyAndCount()
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
+			const metadata = await loadViewableMetadata(results.map((file) => file.assetFileId))
 			const totalPages = Math.ceil(total / perPage)
 			return {
 				total,
 				page: input.page,
 				totalPages,
 				nextPage: totalPages > input.page ? input.page + 1 : null,
-				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes }))),
+				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes, metadata }))),
 			}
 		}),
 	searchNotFound: publicProcedure
@@ -356,11 +366,13 @@ export default router({
 				: []
 
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
+			const metadata = await loadViewableMetadata(collection.files.map((file) => file.assetFileId))
 			return formatCollection({
 				collection,
 				user: ctx.user,
 				userVisibleCollections,
 				recordAttributes,
+				metadata,
 				sampleFiles,
 			})
 		}),
@@ -384,7 +396,8 @@ export default router({
 
 			const files = await filesQuery.getMany()
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
-			return Promise.all(files.map((file) => formatCollectionFile({ file, recordAttributes })))
+			const metadata = await loadViewableMetadata(files.map((file) => file.assetFileId))
+			return Promise.all(files.map((file) => formatCollectionFile({ file, recordAttributes, metadata })))
 		}),
 	create: publicProcedure
 		.use(authMiddleware(userApproved))

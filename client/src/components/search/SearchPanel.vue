@@ -22,19 +22,23 @@ import { Switch } from "@/components/ui/switch"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { useSearchState } from "@/composables/useSearchState"
+import { useGlobalStore } from "@/stores/globalStore"
 import { type SearchScope } from "@/utils/searchQuery"
 import { RouterOutput, trpc } from "@/services/server"
 import { keepPreviousData, useQuery } from "@tanstack/vue-query"
 import { ArrowLeft, Copy, Trash2 } from "@lucide/vue"
 import { computed } from "vue"
 
-const { form, terms, hasQuery, filters, setTerms, setExactMatch, setScope, toggleValue, clearFilters } = useSearchState()
+const { form, terms, hasQuery, filters, setTerms, setExactMatch, setScope, toggleValue, clearFilters, setMetadataRange } = useSearchState()
+const globalStore = useGlobalStore()
+const viewsEnabled = computed(() => globalStore.env?.viewsEnabled !== false)
 const toast = useGlobalToast()
 const recordLabel = useRecordLabel()
 
 const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
 const { data: recordViews } = useQuery({ queryKey: ["record-views"], queryFn: () => trpc.asset.listRecordViews.query() })
 const { data: recordFacets } = useQuery({ queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
+const { data: metadataFacets } = useQuery({ queryKey: ["metadata-fields", "facets"], queryFn: () => trpc.metadataField.listFacets.query() })
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
@@ -64,7 +68,7 @@ const { data: notFound } = useQuery({
 const missing = computed(() => (form.value.exactMatch ? [] : notFound.value ?? []))
 
 type SearchFacets = RouterOutput["collection"]["search"]["facets"]
-const emptyFacets: SearchFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {} }
+const emptyFacets: SearchFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {}, metadata: {}, metadataRanges: {} }
 const facets = computed<SearchFacets>(() => search.value?.facets ?? emptyFacets)
 const collectionName = computed(() => collection.value?.name ?? "this collection")
 
@@ -91,6 +95,35 @@ const attributeGroups = computed(() =>
     }
   })
 )
+
+// Metadata written inside the files: text fields list their values, dates
+// take a from/to range bounded by what the results hold.
+const metadataGroups = computed(() =>
+  (metadataFacets.value ?? []).filter((facet) => facet.valueType !== "date").map((facet) => {
+    const counts = facets.value.metadata[facet.id] ?? {}
+    const selected = form.value.metadata[facet.id]
+    const values = new Set<string>([...facet.values, ...(Array.isArray(selected) ? selected : [])])
+    return {
+      id: facet.id,
+      title: facet.displayName || facet.name,
+      truncated: facet.truncated,
+      options: Array.from(values).map((value) => ({ id: value, label: value, count: counts[value] ?? 0 })).sort((a, b) => a.label.localeCompare(b.label)),
+    }
+  })
+)
+const day = (value: string | Date | null | undefined) => (value ? new Date(value).toISOString().slice(0, 10) : "")
+const dateGroups = computed(() =>
+  (metadataFacets.value ?? []).filter((facet) => facet.valueType === "date").map((facet) => {
+    const selected = form.value.metadata[facet.id]
+    const range = selected && !Array.isArray(selected) ? selected : {}
+    const bounds = facets.value.metadataRanges[facet.id]
+    return { id: facet.id, title: facet.displayName || facet.name, from: range.from ?? "", to: range.to ?? "", min: day(bounds?.min ?? facet.min), max: day(bounds?.max ?? facet.max) }
+  })
+)
+function applyRange(fieldId: string, event: Event) {
+  const data = new FormData(event.target as HTMLFormElement)
+  setMetadataRange(fieldId, { from: String(data.get("from") ?? ""), to: String(data.get("to") ?? "") })
+}
 
 const backTarget = computed(() =>
   form.value.collectionId ? { name: "collection", params: { id: form.value.collectionId } } : { name: "home" }
@@ -183,8 +216,17 @@ function removeMissing() {
     </section>
 
     <SearchFacetGroup id="search-asset-types" title="Asset type" :options="assetTypeOptions" :selected="form.assetTypes" @toggle="toggleValue('asset_types', $event)" />
-    <SearchFacetGroup v-if="recordViewOptions.length" id="search-record-views" :title="`${recordLabel.singular.value} view`" :options="recordViewOptions" :selected="form.recordViews" :open="form.recordViews.length > 0" @toggle="toggleValue('record_views', $event)" />
+    <SearchFacetGroup v-if="viewsEnabled && recordViewOptions.length" id="search-record-views" :title="`${recordLabel.singular.value} view`" :options="recordViewOptions" :selected="form.recordViews" :open="form.recordViews.length > 0" @toggle="toggleValue('record_views', $event)" />
     <SearchFacetGroup v-for="group in attributeGroups" :id="`search-facet-${group.id}`" :key="group.id" :title="group.title" :options="group.options" :selected="form.attributes[group.id] ?? []" :open="(form.attributes[group.id]?.length ?? 0) > 0 || attributeGroups.length <= 3" @toggle="toggleValue(`attributes[${group.id}]`, $event)" />
+    <SearchFacetGroup v-for="group in metadataGroups" :id="`search-metadata-${group.id}`" :key="group.id" :title="group.truncated ? `${group.title} (first 200)` : group.title" :options="group.options" :selected="Array.isArray(form.metadata[group.id]) ? form.metadata[group.id] as string[] : []" :open="Array.isArray(form.metadata[group.id])" @toggle="toggleValue(`metadata[${group.id}]`, $event)" />
+    <section v-for="group in dateGroups" :key="group.id" :aria-labelledby="`search-date-${group.id}`" class="flex min-w-0 flex-col gap-1 border-t border-neutral-200 pt-1 pb-2">
+      <h2 :id="`search-date-${group.id}`" :class="sidebarSectionTitleClasses" class="flex h-8 items-center">{{ group.title }}</h2>
+      <form class="grid grid-cols-2 gap-2 px-3" @submit.prevent="applyRange(group.id, $event)">
+        <label class="grid gap-1 text-caption text-[color:var(--dv-text-secondary)]">From<input name="from" type="date" class="dv-input" :value="group.from" :min="group.min" :max="group.max" /></label>
+        <label class="grid gap-1 text-caption text-[color:var(--dv-text-secondary)]">To<input name="to" type="date" class="dv-input" :value="group.to" :min="group.min" :max="group.max" /></label>
+        <Button type="submit" variant="outline" class="col-span-2 h-8">Apply</Button>
+      </form>
+    </section>
 
     </div>
     <div v-if="filters.length" class="-mx-3 shrink-0 border-t border-neutral-200 bg-neutral-50 px-3 pt-2">

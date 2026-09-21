@@ -65,6 +65,9 @@ export function fileDisplayGroup(files: DisplayFile[]): DisplayGroup {
     for (const attribute of [...(file.assetType?.recordAttributes ?? []), ...(file.record?.attributes ?? [])]) {
       if (attribute) attributes.set(attribute.id, { id: `record_attribute.${attribute.id}`, label: attribute.displayName || attribute.name })
     }
+    for (const field of file.metadata ?? []) {
+      attributes.set(field.id, { id: `metadata_field.${field.id}`, label: field.displayName || field.name })
+    }
   }
   return {
     id: type?.id ?? 'asset_file',

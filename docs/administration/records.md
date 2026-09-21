@@ -93,13 +93,45 @@ Open **Data enrichment → Unmatched** (`/admin/data-enrichment/unmatched`). The
 
 The attach dialog searches records by key and by searchable attribute, or picks a range by attribute and value. When the key does not exist, **Create record with this key** creates it. A folder can also be linked from its panel in [Assets](./assets-tree.md).
 
+## Use the metadata written inside the files
+
+Damvia reads the EXIF (camera, lens, date taken, GPS) and IPTC (title, caption, keywords, credit, city, copyright) metadata of every image it processes. Each tag becomes a field on the **File metadata** tab of **Fields**, created switched off the first time a file carries it, so nothing shows to readers until an admin decides. Images processed before this feature have none until `npm run cli -- metadata:backfill` is run once on the server.
+
+| Switch | Effect |
+|---|---|
+| Searchable | Free-text search also looks in this field. |
+| Filter | The field becomes a filter in search: its values for text, a from/to range for dates. A GPS position cannot be a filter. Text fields show their 200 most used values. |
+| Visible | The value is shown under **From the file** in the file preview and can be chosen as a list column on an asset type. |
+| Can link | The field may link files to records, through a **Metadata** step on the Matching screen. Say whether the value is a record key or the value of an attribute (a range). |
+
+Metadata belongs to the file, so these filters also work on files no record is linked to. Cameras write some fields reliably; people write others, which can be wrong or outdated. Only tick **Can link** for a field your team fills reliably: until then, a value equal to a record key links nothing. When a trusted field has a record key on an unmatched file, the Unmatched screen suggests it with **Accept**. Dates are stored as the camera wrote them, without time zone conversion.
+
+## Map files to records with a CSV
+
+For files whose name, folder and metadata say nothing, the **CSV mapping** section of the Matching screen imports a CSV with the columns `file_name` and `record_key`, or `file_name`, `attribute` and `value` for a range. The file name may leave out its extension and case does not matter. The first row must name the columns; the file is limited to 5 MB and 50,000 rows.
+
+Choosing the file compares it with the current mapping before anything is written: rows new, changed and removed, keys no record has, and how many files of the library it names. **Replace the mapping** then applies it: a new import replaces the previous one entirely and links from the old one go. Links set by hand are kept. CSV links apply to every record-related asset type, after links set by hand and before file name steps.
+
+## Set the views
+
+A view is the angle or version a file shows of a record, written after the key in the file name, such as the `02` of `ABC123-001.02.jpg`. In **Settings**, section **Views**:
+
+| Setting | Effect |
+|---|---|
+| Files can carry a view number after the key | On by default. Off hides the view filter from search and stops reading views. |
+| Separator | One character, `.` by default. |
+| Digits | 1 to 4, `2` by default. |
+| Thumbnail view | The view used as the record's picture in the admin list, `00` by default or the old `PIM_PRODUCT_VIEW`. |
+
+The view part is added after the pattern of every file name step that does not name its own view group, and the Matching screen shows the full pattern. Changing the separator, the digits or the switch re-runs matching straight away.
+
 ## Search shows exact files and range files apart
 
 A search now lists each file once, even when it sits in several collections the reader can see, and facet counts count files. When the text finds records (by key or searchable attribute), files linked to a range those records share appear in a separate **Covering the range** section after the exact results: the first 60, then **See all**. A file never appears in both. Range files follow the same visibility, licence and filter rules as any result.
 
 ## Configure record attributes
 
-Open `/admin/data-enrichment/records/attributes` and declare how each imported column behaves:
+Open **Data enrichment → Fields** (`/admin/data-enrichment/fields`), tab **Record attributes**, and declare how each imported column behaves:
 
 | Setting | Effect |
 |---|---|

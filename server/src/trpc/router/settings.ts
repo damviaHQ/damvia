@@ -17,6 +17,7 @@ import sharp from "sharp"
 import { z } from "zod"
 import { adminClientLogoEnabled, createLogoUpload, getClientLogo, removeClientLogo, LOGO_MIME_TYPES, processClientLogo } from "../../services/branding"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
+import { rerunEntityStage } from "../../services/enrichment"
 import { dataSource, logger, mainS3, mainS3Bucket } from "../../env"
 import { tmpFile } from "../../services/asset"
 import { authMiddleware, publicProcedure, router, userAdmin, userManagerOrAdmin } from "../index"
@@ -30,13 +31,32 @@ export default router({
     .use(authMiddleware(userAdmin))
     .query(async () => {
       const settings = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })
-      return { recordLabelSingular: settings.recordLabelSingular, recordLabelPlural: settings.recordLabelPlural }
+      return {
+        recordLabelSingular: settings.recordLabelSingular,
+        recordLabelPlural: settings.recordLabelPlural,
+        viewsEnabled: settings.viewsEnabled,
+        viewSeparator: settings.viewSeparator,
+        viewDigits: settings.viewDigits,
+        thumbnailView: settings.thumbnailView,
+      }
     }),
   updateEnrichment: publicProcedure
     .use(authMiddleware(userAdmin))
-    .input(z.object({ recordLabelSingular: z.string().trim().min(1).max(30), recordLabelPlural: z.string().trim().min(1).max(30) }))
+    .input(z.object({
+      recordLabelSingular: z.string().trim().min(1).max(30),
+      recordLabelPlural: z.string().trim().min(1).max(30),
+      viewsEnabled: z.boolean().optional(),
+      viewSeparator: z.string().length(1).optional(),
+      viewDigits: z.number().int().min(1).max(4).optional(),
+      thumbnailView: z.string().trim().min(1).max(10).optional(),
+    }))
     .mutation(async ({ input }) => {
+      const before = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })
       await dataSource.getRepository(EnrichmentSettings).update({ id: 1 }, input)
+      // The view part is added to file name steps, so changing it re-runs matching.
+      if ((input.viewsEnabled ?? before.viewsEnabled) !== before.viewsEnabled || (input.viewSeparator ?? before.viewSeparator) !== before.viewSeparator || (input.viewDigits ?? before.viewDigits) !== before.viewDigits) {
+        await rerunEntityStage()
+      }
       return input
     }),
   getClientLogoUpload: publicProcedure

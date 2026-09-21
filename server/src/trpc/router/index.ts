@@ -24,11 +24,13 @@ import authorizedDomainRouter from "./authorized-domain"
 import collectionRouter from "./collection"
 import dashboardRouter from "./dashboard"
 import downloadRouter from "./download"
+import entityCsvRouter from "./entity-csv"
 import entityResolutionRouter from "./entity-resolution"
 import favoriteRouter from "./favorite"
 import groupRouter from "./group"
 import licenseRouter from "./license"
 import menuItemRouter from "./menu-item"
+import metadataFieldRouter from "./metadata-field"
 import pageRouter from "./page"
 import recordRouter from "./record"
 import recordAttributeRouter from "./record-attribute"
@@ -49,6 +51,8 @@ const appRouter = router({
 	assetTypeRule: assetTypeRuleRouter,
 	resolverStep: resolverStepRouter,
 	entityResolution: entityResolutionRouter,
+	entityCsv: entityCsvRouter,
+	metadataField: metadataFieldRouter,
 	favorite: favoriteRouter,
 	license: licenseRouter,
 	download: downloadRouter,
@@ -66,6 +70,7 @@ const appRouter = router({
 			appName: process.env.APP_NAME ?? 'Damvia - Open Source Digital Asset Management',
 			regions: regions.map((region) => ({ id: region.id, name: region.name })),
 			recordLabel: { singular: enrichment.recordLabelSingular, plural: enrichment.recordLabelPlural },
+			viewsEnabled: enrichment.viewsEnabled,
 		}
 	})
 })

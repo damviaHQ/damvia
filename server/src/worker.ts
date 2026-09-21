@@ -19,6 +19,7 @@ import { Download, DownloadStatus } from "./entity/download"
 import { User } from "./entity/user"
 import {dataSource, logger} from "./env"
 import { assignProductsToAssetFiles, processDeletion, updateFileContent } from "./services/asset"
+import { extractStoredFileMetadata } from "./services/file-metadata"
 import { synchronizeCollection } from "./services/collection"
 import { pruneActivityEvents } from "./services/analytics"
 import { measureStorageUsage, StorageQuotaExceededError } from "./services/storage"
@@ -243,6 +244,14 @@ export const assetUpdateContentQueue = createQueue<{ assetFileId: string }>({
 				logger.warn('storage.quota-exceeded', { assetFileId: error.assetFileId, size: error.size })
 			}),
 	workerOptions: { batchSize: 10 },
+})
+
+export const assetExtractMetadataQueue = createQueue<{ assetFileId: string }>({
+	name: 'asset/extract-metadata',
+	processor: (data) =>
+		dataSource.getRepository(AssetFile).findOneBy({ id: data.assetFileId })
+			.then((file) => file && file.status === AssetFileStatus.UP_TO_DATE ? extractStoredFileMetadata(file) : undefined),
+	workerOptions: { batchSize: 5 },
 })
 
 export const assetProcessDeletionQueue = createQueue<void>({

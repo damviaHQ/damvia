@@ -39,10 +39,11 @@ import { useRecordLabel } from "@/composables/useRecordLabel"
 import { computed, ref, watch } from "vue"
 
 const PER_PAGE = 300
-const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange } = useSearchState()
+const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange, setMetadataRange } = useSearchState()
 
 const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
 const { data: recordFacets } = useQuery({ queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
+const { data: metadataFacets } = useQuery({ queryKey: ["metadata-fields", "facets"], queryFn: () => trpc.metadataField.listFacets.query() })
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
@@ -84,7 +85,7 @@ const { data: rangeAll, isFetching: rangeLoading } = useQuery({
 })
 const rangeFiles = computed<any[]>(() => rangePage.value > 0 && rangeAll.value ? rangeAll.value.results : rangeResults.value)
 
-const emptyFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {} }
+const emptyFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {}, metadata: {}, metadataRanges: {} }
 const facets = computed(() => search.value?.facets ?? emptyFacets)
 const results = computed<any[]>(() => search.value?.results ?? [])
 const total = computed(() => search.value?.total ?? results.value.length)
@@ -129,6 +130,10 @@ const chips = computed<FilterChip[]>(() =>
       return { key: filter.key, value: filter.value, label: `Format: ${filter.value.toUpperCase()}`, category: "Format", displayValue: filter.value.toUpperCase() }
     } else if (filter.group === "record_views") {
       return { key: filter.key, value: filter.value, label: `View: ${filter.value}`, category: "View", displayValue: filter.value }
+    } else if (filter.group === "metadata" || filter.group === "metadata_range") {
+      const field = metadataFacets.value?.find((entry) => entry.id === filter.attributeId)
+      const name = field?.displayName || field?.name || "File metadata"
+      return { key: filter.key, value: filter.value, label: `${name}: ${filter.value}`, category: name, displayValue: filter.value }
     }
     const facet = recordFacets.value?.find((entry: any) => entry.id === filter.attributeId)
     return { key: filter.key, value: filter.value, label: `${facet?.displayName || facet?.name || "Attribute"}: ${filter.value}`, category: facet?.displayName || facet?.name || "Attribute", displayValue: filter.value }
@@ -165,6 +170,11 @@ function displayFor(assetType: any): DisplayView {
 function removeChip(chip: FilterChip) {
   if (chip.key === "size") {
     setSizeRange({ min: "", max: "" })
+    return
+  }
+  const range = /^metadata_range\[(.+)]$/.exec(chip.key)
+  if (range) {
+    setMetadataRange(range[1], { from: "", to: "" })
     return
   }
   toggleValue(chip.key, chip.value)

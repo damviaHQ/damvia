@@ -77,6 +77,7 @@ Run the same commands before opening a pull request. There is no ESLint or Prett
 | `matching.cjs` | The record matching cron as it behaves today: capture groups for key and view, files without a match left alone, an unknown key erasing an earlier link, no-op without the regex |
 | `asset-type-rules.cjs` | Folder rules: pattern guard, the pure resolution (deepest start wins, ties, hand-set anchors), the post-sync pass (paths, moves, idempotence, invalid rules skipped, scoped re-apply), the router and its admin-only access |
 | `entity-resolution.cjs` | Matching: the file name step against the old job, folder steps, attachments, the merge rules (agreement, conflict, range, primary order, dangling), the pass (idempotence, re-attach after import, moves), the matching and unmatched routers, search deduplication and range results, the upgrade seed, admin-only access |
+| `file-metadata.cjs` | IPTC and EXIF parsing, a real JPEG, fields created switched off, trusted metadata linking, metadata search, facets and date ranges, the CSV mapping compare and replace, the views setting, admin-only access |
 | `search.cjs` | Token and exact search, attribute, scope, file type and asset type filters, pagination, search activity events, `searchNotFound` |
 | `download.cjs` | Single-file and archive downloads, entry names, access refusals |
 | `users.cjs` | Sign-up approval and default groups, password-less mode, session tokens |

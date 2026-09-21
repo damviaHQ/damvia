@@ -82,6 +82,10 @@ const { status, data, error } = useQuery({
   queryKey: ["asset-types"],
   queryFn: () => trpc.assetType.list.query(),
 })
+const { data: metadataFields } = useQuery({
+  queryKey: ["metadata-fields"],
+  queryFn: () => trpc.metadataField.list.query(),
+})
 const { data: recordAttributes } = useQuery({
   queryKey: ["records", "attributes"],
   queryFn: () => trpc.recordAttribute.list.query(),
@@ -98,6 +102,12 @@ const listItems = computed(() => [
     .map((item) => ({
       name: item.displayName || item.name,
       value: `record_attribute.${item.id}`,
+    })),
+  ...(metadataFields.value ?? [])
+    .filter((field) => field.viewable)
+    .map((field) => ({
+      name: `${field.displayName || field.name} (from the file)`,
+      value: `metadata_field.${field.id}`,
     })),
 ])
 const allListItems = computed(() =>

@@ -15,6 +15,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import type { LocationQuery, LocationQueryValue } from 'vue-router'
 
 const attributeKey = /^attributes\[(.+)]$/
+const metadataKey = /^metadata\[(.+)]$/
+const metadataRangeKey = /^metadata_(from|to)\[(.+)]$/
 
 export const SEARCH_SORTS = ['relevance', 'name', 'newest'] as const
 export type SearchSort = typeof SEARCH_SORTS[number]
@@ -93,6 +95,18 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: Searc
       })
       .filter((value): value is [string, string[]] => value !== null)
   )
+  // Text fields list their values; date fields carry a from/to range, days in the URL.
+  const metadata: Record<string, string[] | { from?: string, to?: string }> = {}
+  for (const [key, value] of Object.entries(query)) {
+    const values = attributeKey.test(key) ? null : metadataKey.exec(key)
+    if (values) metadata[values[1]] = queryValueToArray(value)
+    const range = metadataRangeKey.exec(key)
+    const day = queryValueToString(value)
+    if (range && day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      const current = metadata[range[2]]
+      metadata[range[2]] = { ...(Array.isArray(current) ? {} : current), [range[1]]: day }
+    }
+  }
   const sort = SEARCH_SORTS.find((value) => value === query.sort)
 
   return {
@@ -108,6 +122,7 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: Searc
     searchScope: toSearchScope(queryValueToString(query.search_scope)) ?? defaultSearchScope,
     exactMatch: query.exact_match === "true",
     attributes,
+    metadata,
     sort,
   }
 }
@@ -139,14 +154,19 @@ export function toggleQueryValue(query: LocationQuery, key: string, value: strin
 export function clearFilterQuery(query: LocationQuery): LocationQuery {
   const patch: QueryPatch = {}
   for (const key of Object.keys(query)) {
-    if ((FILTER_KEYS as readonly string[]).includes(key) || attributeKey.test(key)) {
+    if ((FILTER_KEYS as readonly string[]).includes(key) || attributeKey.test(key) || metadataKey.test(key) || metadataRangeKey.test(key)) {
       patch[key] = undefined
     }
   }
   return patchSearchQuery(query, patch)
 }
 
-export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'record_views' | 'file_types' | 'extensions' | 'size' | 'attribute', attributeId?: string }
+export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'record_views' | 'file_types' | 'extensions' | 'size' | 'attribute' | 'metadata' | 'metadata_range', attributeId?: string }
+
+export function formatDateRange(range: { from?: string, to?: string }): string {
+  if (range.from && range.to) return `${range.from} to ${range.to}`
+  return range.from ? `From ${range.from}` : `Until ${range.to}`
+}
 
 export function activeFilters(form: SearchForm): ActiveFilter[] {
   return [
@@ -159,6 +179,10 @@ export function activeFilters(form: SearchForm): ActiveFilter[] {
       : []),
     ...Object.entries(form.attributes).flatMap(([attributeId, values]) =>
       values.map((value) => ({ key: `attributes[${attributeId}]`, value, group: 'attribute' as const, attributeId }))
+    ),
+    ...Object.entries(form.metadata).flatMap(([fieldId, value]): ActiveFilter[] => Array.isArray(value)
+      ? value.map((entry) => ({ key: `metadata[${fieldId}]`, value: entry, group: 'metadata' as const, attributeId: fieldId }))
+      : [{ key: `metadata_range[${fieldId}]`, value: formatDateRange(value), group: 'metadata_range' as const, attributeId: fieldId }]
     ),
   ]
 }

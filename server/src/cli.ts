@@ -4,7 +4,7 @@ import * as systemService from "./services/system";
 import { listAssetSourceKeys, removeAssetSource, renameAssetSource, summarizeAssetSources } from "./services/asset"
 import { assetUpdaters } from "./env"
 import { SOURCE_KEY_PATTERN } from "./asset-updater/sources"
-import {boss} from "./worker";
+import {assetExtractMetadataQueue, boss} from "./worker";
 
 async function run() {
 	await dataSource.initialize()
@@ -75,6 +75,21 @@ async function run() {
 		process.exit(0)
 	})
 
+	const metadataBackfillCmd = new Command('metadata:backfill')
+		.description('Queue the reading of EXIF and IPTC metadata for every processed image that has none yet, from the copy already in the assets bucket')
+	metadataBackfillCmd.action(async () => {
+		const files: { id: string }[] = await dataSource.query(`
+			SELECT a.id FROM asset_files a
+			WHERE a.status = 'up_to_date' AND a.mime_type LIKE 'image/%'
+				AND NOT EXISTS (SELECT 1 FROM asset_file_metadata_values v WHERE v.asset_file_id = a.id)
+		`)
+		for (let index = 0; index < files.length; index += 1000) {
+			await assetExtractMetadataQueue.bulkPush(files.slice(index, index + 1000).map((file) => ({ data: { assetFileId: file.id } })))
+		}
+		console.log(`Queued ${files.length} image(s) for metadata reading`)
+		process.exit(0)
+	})
+
 	program
 		.version("1.0.0")
 		.description("Damvia CLI")
@@ -82,6 +97,7 @@ async function run() {
 		.addCommand(listSourcesCmd)
 		.addCommand(renameSourceCmd)
 		.addCommand(removeSourceCmd)
+		.addCommand(metadataBackfillCmd)
 		.parse(process.argv);
 }
 

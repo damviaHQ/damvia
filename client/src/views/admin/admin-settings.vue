@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 const queryClient = useQueryClient()
 const { data: logo, status: logoStatus, refetch: refetchLogo } = useQuery({ queryKey: ['client-logo'], queryFn: () => trpc.settings.getClientLogo.query() })
@@ -66,7 +66,12 @@ async function removeLogo() {
 const toast = useGlobalToast()
 const store = useGlobalStore()
 const { data: enrichment, status: enrichmentStatus, refetch: refetchEnrichment } = useQuery({ queryKey: ['enrichment-settings'], queryFn: () => trpc.settings.getEnrichment.query() })
-const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '' })
+const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '', viewsEnabled: true, viewSeparator: '.', viewDigits: 2, thumbnailView: '00' })
+const viewExample = computed(() => {
+  const separator = recordLabel.value.viewSeparator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return `(key)(?:${separator}(\\d{${recordLabel.value.viewDigits}}))?`
+})
+const fileExample = computed(() => `ABC123-001${recordLabel.value.viewSeparator}${'0'.repeat(Math.max(0, recordLabel.value.viewDigits - 1))}2.jpg`)
 const recordLabelErrors = ref<Record<string, string>>({})
 const isSavingRecordLabel = ref(false)
 watch(enrichment, () => { if (enrichment.value) recordLabel.value = { ...enrichment.value } }, { immediate: true })
@@ -78,7 +83,7 @@ async function saveRecordLabel() {
     await trpc.settings.updateEnrichment.mutate(recordLabel.value)
     await queryClient.invalidateQueries({ queryKey: ['enrichment-settings'] })
     await store.fetchEnv()
-    toast.success('Record label saved')
+    toast.success('Settings saved')
   } catch (error) {
     const result = extractErrors(error as Error)
     recordLabelErrors.value = result.fieldErrors
@@ -207,6 +212,34 @@ const removeBackgroundImage = async () => {
           </div>
         </form>
       </section>
+      <section v-if="enrichmentStatus === 'success'" class="dv-panel branding-settings" aria-labelledby="views-heading">
+        <h2 id="views-heading">Views</h2>
+        <p>A view is the angle or version a file shows of a {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }}, written after the key in the file name, such as the <code>02</code> of <code>{{ fileExample }}</code>. Matching steps then only need the key part.</p>
+        <form class="record-label-form" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
+          <label class="views-switch"><input v-model="recordLabel.viewsEnabled" type="checkbox" /> Files can carry a view number after the key</label>
+          <div class="record-label-fields">
+            <div class="record-label-field">
+              <Label for="viewSeparator">Separator</Label>
+              <Input id="viewSeparator" v-model="recordLabel.viewSeparator" maxlength="1" placeholder="." :disabled="!recordLabel.viewsEnabled" :aria-invalid="!!recordLabelErrors.viewSeparator" />
+              <p v-if="recordLabelErrors.viewSeparator" class="admin-form-error">{{ recordLabelErrors.viewSeparator }}</p>
+            </div>
+            <div class="record-label-field">
+              <Label for="viewDigits">Digits</Label>
+              <Input id="viewDigits" v-model.number="recordLabel.viewDigits" type="number" min="1" max="4" :disabled="!recordLabel.viewsEnabled" :aria-invalid="!!recordLabelErrors.viewDigits" />
+              <p v-if="recordLabelErrors.viewDigits" class="admin-form-error">{{ recordLabelErrors.viewDigits }}</p>
+            </div>
+            <div class="record-label-field">
+              <Label for="thumbnailView">Thumbnail view</Label>
+              <Input id="thumbnailView" v-model="recordLabel.thumbnailView" placeholder="00" :aria-invalid="!!recordLabelErrors.thumbnailView" />
+              <p class="admin-text-secondary">The view used as the picture of a {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }} in the admin list.</p>
+            </div>
+          </div>
+          <p v-if="recordLabel.viewsEnabled" class="branding-note">Added after the key of every file name step: <code>{{ viewExample }}</code>. Turning views off hides the view filter from search; existing view values are kept until the next pass.</p>
+          <div class="flex flex-wrap gap-3">
+            <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || recordLabel.viewSeparator.length !== 1">{{ isSavingRecordLabel ? 'Saving…' : 'Save views' }}</Button>
+          </div>
+        </form>
+      </section>
     </div>
   </div>
 </template>
@@ -221,7 +254,9 @@ const removeBackgroundImage = async () => {
 .logo-preview img { max-width:260px; max-height:80px; object-fit:contain; }
 .branding-background-preview { border-radius:var(--dv-radius-graphic); }
 .branding-settings .branding-note { margin-bottom:20px; }
-.record-label-fields { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:20px; }
+.record-label-fields { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-top:20px; }
+.views-switch { display:flex; align-items:center; gap:10px; margin-top:16px; }
+.branding-settings code { font-size:var(--dv-size-caption); }
 .record-label-field { display:grid; gap:8px; align-content:start; }
 .branding-settings .record-label-field p { margin-top:0; }
 .branding-settings :deep(.dv-button) { height:auto; padding:9px 14px; box-shadow:none; border-radius:0; }

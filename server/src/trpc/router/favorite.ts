@@ -20,6 +20,7 @@ import { RecordAttribute } from "../../entity/record-attribute"
 import { UserCollectionFavorite } from "../../entity/user-collection-favorite"
 import { UserFavorite } from "../../entity/user-favorite"
 import { dataSource } from "../../env"
+import { loadViewableMetadata } from "../../services/file-metadata"
 import { authMiddleware, publicProcedure, router, userApproved, userMember } from "../index"
 import { formatCollectionFile, formatCollection } from "./collection"
 
@@ -63,10 +64,12 @@ export default router({
 				.innerJoin(UserFavorite, 'favorite', 'favorite.collection_file_id = collection_file.id AND favorite.user_id = :favoriteUserId', { favoriteUserId: ctx.user.id })
 				.getMany()
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
+			const metadata = await loadViewableMetadata(files.map((file) => file.assetFileId))
 
 			return Promise.all(files.map((file) => formatCollectionFile({
 				file,
 				recordAttributes,
+				metadata,
 			})))
 		}),
 	add: publicProcedure

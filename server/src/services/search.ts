@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Brackets, In, SelectQueryBuilder } from "typeorm"
 import { CollectionFile } from "../entity/collection-file"
+import { MetadataField } from "../entity/metadata-field"
 import { RecordAttribute } from "../entity/record-attribute"
 import { User } from "../entity/user"
 import { dataSource } from "../env"
@@ -36,15 +37,19 @@ export type SearchInput = {
 	searchScope?: string | null
 	exactMatch?: boolean | null
 	attributes?: Record<string, string[] | null> | null
+	metadata?: Record<string, string[] | { from?: string | null, to?: string | null } | null> | null
 }
 
 // A facet dimension left out of the predicate set so its counts show what selecting it would add.
-export type SearchDimension = 'assetTypes' | 'fileTypes' | 'extensions' | 'recordViews' | `attribute:${string}`
+export type SearchDimension = 'assetTypes' | 'fileTypes' | 'extensions' | 'recordViews' | `attribute:${string}` | `metadata:${string}`
 
 export type SearchContext = {
 	searchableAttributes: RecordAttribute[]
 	filterAttributes: RecordAttribute[]
 	facetableAttributes: RecordAttribute[]
+	searchableMetadata: boolean
+	filterMetadata: MetadataField[]
+	facetableMetadata: MetadataField[]
 }
 
 export const FACET_VALUES_LIMIT = 200
@@ -85,15 +90,28 @@ export function activeAttributeIds(input: SearchInput): string[] {
 	return Object.keys(attributes).filter((key) => isUuid(key) && (attributes[key]?.length ?? 0) > 0)
 }
 
+export function activeMetadataIds(input: SearchInput): string[] {
+	const metadata = input.metadata ?? {}
+	return Object.keys(metadata).filter((key) => {
+		const value = metadata[key]
+		return isUuid(key) && (Array.isArray(value) ? value.length > 0 : !!(value?.from || value?.to))
+	})
+}
+
 export async function loadSearchContext(input: SearchInput): Promise<SearchContext> {
 	const repository = dataSource.getRepository(RecordAttribute)
+	const fields = dataSource.getRepository(MetadataField)
 	const ids = activeAttributeIds(input)
-	const [searchableAttributes, filterAttributes, facetableAttributes] = await Promise.all([
+	const metadataIds = activeMetadataIds(input)
+	const [searchableAttributes, filterAttributes, facetableAttributes, searchableMetadata, filterMetadata, facetableMetadata] = await Promise.all([
 		repository.findBy({ searchable: true }),
 		ids.length ? repository.findBy({ id: In(ids) }) : Promise.resolve([]),
 		repository.findBy({ facetable: true }),
+		fields.existsBy({ searchable: true }),
+		metadataIds.length ? fields.findBy({ id: In(metadataIds), facetable: true }) : Promise.resolve([]),
+		fields.findBy({ facetable: true }),
 	])
-	return { searchableAttributes, filterAttributes, facetableAttributes }
+	return { searchableAttributes, filterAttributes, facetableAttributes, searchableMetadata, filterMetadata, facetableMetadata }
 }
 
 // One token matches when the file name or any searchable attribute contains it.
@@ -101,6 +119,7 @@ function tokenMatch(context: SearchContext, parameter: string): string {
 	const parts = [
 		`asset_file.name ILIKE :${parameter}`,
 		...context.searchableAttributes.map((_, index) => `(record.meta_data -> :attribute${index}) ILIKE :${parameter}`),
+		...(context.searchableMetadata ? [`EXISTS (SELECT 1 FROM asset_file_metadata_values search_value INNER JOIN metadata_fields search_field ON search_field.id = search_value.metadata_field_id WHERE search_value.asset_file_id = asset_file.id AND search_field.searchable AND search_value.value_text ILIKE :${parameter})`] : []),
 	]
 	return `(${parts.join(' OR ')})`
 }
@@ -150,6 +169,25 @@ export function buildSearchQuery(
 				[`attributekey${index}`]: attribute.name,
 				[`attributevalue${index}`]: inputAttributes[attribute.id],
 			})
+		})
+
+	// Metadata belongs to the file, so these filters also work on files no
+	// record is linked to. A date field takes a from/to range, inclusive.
+	const inputMetadata = input.metadata ?? {}
+	context.filterMetadata
+		.filter((field) => exclude !== `metadata:${field.id}`)
+		.forEach((field, index) => {
+			const value = inputMetadata[field.id]
+			const exists = `EXISTS (SELECT 1 FROM asset_file_metadata_values filter_value${index} WHERE filter_value${index}.asset_file_id = asset_file.id AND filter_value${index}.metadata_field_id = :metadataField${index}`
+			query.setParameter(`metadataField${index}`, field.id)
+			if (Array.isArray(value)) {
+				query.andWhere(`${exists} AND filter_value${index}.value_text IN (:...metadataValues${index}))`, { [`metadataValues${index}`]: value })
+			} else if (value) {
+				const bounds: string[] = []
+				if (value.from) bounds.push(`filter_value${index}.value_date >= :metadataFrom${index}`)
+				if (value.to) bounds.push(`filter_value${index}.value_date < CAST(:metadataTo${index} AS date) + 1`)
+				query.andWhere(`${exists} AND ${bounds.join(' AND ')})`, { [`metadataFrom${index}`]: value.from, [`metadataTo${index}`]: value.to })
+			}
 		})
 
 	if (exclude !== 'extensions' && input.extensions?.length) {
@@ -247,6 +285,8 @@ export type SearchFacets = {
 	extensions: Record<string, number>
 	recordViews: Record<string, number>
 	attributes: Record<string, Record<string, number>>
+	metadata: Record<string, Record<string, number>>
+	metadataRanges: Record<string, { min: Date | null, max: Date | null }>
 }
 
 type CountRow = { key: string | null, count: string }
@@ -268,6 +308,24 @@ async function countBy(query: SelectQueryBuilder<CollectionFile>, expression: st
 
 // Counts run over the whole result set, each dimension with its own filter left out.
 export async function searchFacets(user: User, input: SearchInput, context: SearchContext): Promise<SearchFacets> {
+	const textFields = context.facetableMetadata.filter((field) => field.valueType !== 'date')
+	const dateFields = context.facetableMetadata.filter((field) => field.valueType === 'date')
+	const [metadata, metadataRanges] = await Promise.all([
+		Promise.all(textFields.map((field) =>
+			countBy(
+				buildSearchQuery(user, input, context, `metadata:${field.id}`)
+					.innerJoin('asset_file_metadata_values', 'facet_value', 'facet_value.asset_file_id = asset_file.id AND facet_value.metadata_field_id = :facetField', { facetField: field.id }),
+				'facet_value.value_text',
+			).then((counts) => [field.id, counts] as const)
+		)),
+		Promise.all(dateFields.map((field) =>
+			buildSearchQuery(user, input, context, `metadata:${field.id}`)
+				.innerJoin('asset_file_metadata_values', 'facet_value', 'facet_value.asset_file_id = asset_file.id AND facet_value.metadata_field_id = :facetField', { facetField: field.id })
+				.select('min(facet_value.value_date)', 'min').addSelect('max(facet_value.value_date)', 'max')
+				.getRawOne<{ min: Date | null, max: Date | null }>()
+				.then((bounds) => [field.id, { min: bounds?.min ?? null, max: bounds?.max ?? null }] as const)
+		)),
+	])
 	const [assetTypes, fileTypes, extensions, recordViews, ...attributes] = await Promise.all([
 		countBy(buildSearchQuery(user, input, context, 'assetTypes'), 'asset_file.asset_type_id'),
 		countBy(buildSearchQuery(user, input, context, 'fileTypes'), fileTypeExpression),
@@ -280,5 +338,5 @@ export async function searchFacets(user: User, input: SearchInput, context: Sear
 			).then((counts) => [attribute.id, counts] as const)
 		),
 	])
-	return { assetTypes, fileTypes, extensions, recordViews, attributes: Object.fromEntries(attributes) }
+	return { assetTypes, fileTypes, extensions, recordViews, attributes: Object.fromEntries(attributes), metadata: Object.fromEntries(metadata), metadataRanges: Object.fromEntries(metadataRanges) }
 }

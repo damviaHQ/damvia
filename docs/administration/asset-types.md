@@ -19,7 +19,7 @@ Open `/admin/asset-types` and provide:
 | Related to records | Allows record-view filtering for files of this type. The checkbox shows the record label chosen in the Data enrichment settings, for example "Related to products". |
 | Search by default | Includes the type in a reader's initial search selection. |
 | Default display | Chooses grid or list when a reader has no saved preference. |
-| List-view items | Chooses and orders size, licence, format, dimensions, updated date and viewable record attributes. |
+| List-view items | Chooses and orders size, licence, format, dimensions, updated date, viewable record attributes and visible file metadata fields (marked "from the file"). |
 
 Only admins can create, edit or remove a type. Approved users can read the type list because the library needs it for display and search.
 
