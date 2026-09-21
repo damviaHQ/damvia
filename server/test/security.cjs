@@ -293,15 +293,36 @@ test('search treats imported attribute names as data', async () => {
 
 test('failed HTTP requests do not log submitted credentials or database error details', async () => {
     const logs = []
-    const previous = env.logger.error
+    const previous = { error: env.logger.error, warn: env.logger.warn }
     env.logger.error = (...args) => logs.push(args)
+    env.logger.warn = (...args) => logs.push(args)
     try {
         const response = await server.inject({ method: 'POST', url: '/trpc/user.login', payload: { email: 'absent@example.test', password: 'distinctive-secret-not-for-logs' } })
         assert(response.statusCode >= 400)
         assert(logs.length > 0)
         assert(!JSON.stringify(logs).includes('distinctive-secret-not-for-logs'))
         assert(!JSON.stringify(logs).includes('input'))
-    } finally { env.logger.error = previous }
+    } finally { Object.assign(env.logger, previous) }
+})
+
+test('logged errors keep the database message and code, nested included', () => {
+    const driverError = Object.assign(new Error('deadlock detected'), { code: '40P01', detail: 'Process 1 waits for ShareLock' })
+    const queryError = Object.assign(new Error('deadlock detected'), { name: 'QueryFailedError', code: '40P01', query: 'UPDATE "asset_files" SET 1', driverError })
+    const at = new Date('2026-09-21T12:00:00Z')
+    const lines = []
+    const transport = new (require('winston').transports.Stream)({ stream: new (require('node:stream').Writable)({ write(chunk, _, done) { lines.push(chunk.toString()); done() } }) })
+    env.logger.add(transport)
+    try {
+        env.logger.error('failed to update assets', { source: 'dropbox', error: queryError, at, list: [driverError] })
+    } finally { env.logger.remove(transport) }
+    const logged = JSON.parse(lines[0].slice(lines[0].indexOf('{')))
+    assert.equal(logged.source, 'dropbox')
+    assert.equal(logged.error.name, 'QueryFailedError')
+    assert.equal(logged.error.message, 'deadlock detected')
+    assert.equal(logged.error.code, '40P01')
+    assert.equal(logged.error.query, 'UPDATE "asset_files" SET 1')
+    assert.equal(logged.at, '2026-09-21T12:00:00.000Z')
+    assert.equal(logged.list[0].detail, 'Process 1 waits for ShareLock')
 })
 
 // Keep both transactions open deliberately: restrictions must survive either lock order.

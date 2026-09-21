@@ -63,10 +63,43 @@ export async function diskUsage(): Promise<{ totalBytes: number, freeBytes: numb
   return { totalBytes: disk.blocks * disk.bsize, freeBytes: disk.bavail * disk.bsize }
 }
 
+export function serializeErrors(value: unknown, depth = 0): unknown {
+  if (depth > 4 || value === null || typeof value !== 'object') {
+    return value
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => serializeErrors(item, depth + 1))
+  }
+  if (value instanceof Error) {
+    const error = value as Error & { code?: unknown, detail?: unknown, query?: unknown, cause?: unknown }
+    return {
+      name: error.name,
+      message: error.message,
+      ...(error.code !== undefined && { code: error.code }),
+      ...(error.detail !== undefined && { detail: error.detail }),
+      ...(error.query !== undefined && { query: error.query }),
+      ...(error.cause !== undefined && { cause: serializeErrors(error.cause, depth + 1) }),
+    }
+  }
+  const prototype = Object.getPrototypeOf(value)
+  if (prototype !== Object.prototype && prototype !== null) {
+    return value
+  }
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serializeErrors(item, depth + 1)]))
+}
+
+const errorDetails = format((info) => {
+  for (const key of Object.keys(info)) {
+    info[key] = serializeErrors(info[key])
+  }
+  return info
+})
+
 export const logger = createLogger({
   format: format.combine(
     format.timestamp(),
     format.splat(),
+    errorDetails(),
     format.simple(),
   ),
   transports: [new transports.Console()]

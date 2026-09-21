@@ -3,7 +3,7 @@ title: Architecture
 description: The single server process, the path of a request from the Vue client to a TypeORM entity, the folder map of both packages, and where a new feature goes.
 sidebar:
   order: 2
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-21
 ---
 
 This page gives a developer the shape of the code: what runs, how a request travels, what each folder holds, and where to add something. The meaning of the objects (collections, pages, products) is in [Core concepts](../introduction/concepts.md).
@@ -21,7 +21,7 @@ Any failure in steps 2 to 4 logs the error and exits with code 1. Sync initialis
 
 ## Fastify exposes tRPC and one REST route
 
-`server/src/server.ts` builds Fastify with `maxParamLength: 5000` (path parameters, not the tRPC input query string) and `bodyLimit: 5242880`, registers `@fastify/cors` with defaults, and mounts `fastifyTRPCPlugin` under the prefix `/trpc` with `appRouter` and `createContext`. Its `onError` hook logs every procedure error as `http.request` with the procedure `path`, error `code`, `requestId` and `userId`. It excludes request bodies and raw error objects.
+`server/src/server.ts` builds Fastify with `maxParamLength: 5000` (path parameters, not the tRPC input query string) and `bodyLimit: 5242880`, registers `@fastify/cors` with defaults, and mounts `fastifyTRPCPlugin` under the prefix `/trpc` with `appRouter` and `createContext`. Its `onError` hook logs every procedure error as `http.request` with the procedure `path`, error `code`, `requestId` and `userId`: at `warn` level for client errors (`UNAUTHORIZED`, `NOT_FOUND`, `BAD_REQUEST` and the other 4xx codes), at `error` level for `INTERNAL_SERVER_ERROR`, which also carries the `name`, `code` and `message` of its cause. It excludes request bodies, query parameters and raw error objects.
 
 The only non-tRPC route is `GET /v1/downloads/:downloadId`: it loads the `Download`, redirects to `APP_URL/link-expired` when the row is missing or `expiresAt` is past, and otherwise redirects to a presigned URL of `downloads/{id}` in the assets bucket.
 
@@ -44,7 +44,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 |---|---|
 | `index.ts` | Process startup described above |
 | `server.ts` | Fastify instance, CORS, tRPC plugin, `/v1/downloads/:downloadId` |
-| `env.ts` | `logger` (winston, console transport, `timestamp` + `splat` + `simple` format), `dataSource`, S3 clients, mail transporter, `assetUpdater()` selection, `mailConfig()` |
+| `env.ts` | `logger` (winston, console transport, `timestamp` + `splat` + error details + `simple` format), `dataSource`, S3 clients, mail transporter, `assetUpdater()` selection, `mailConfig()` |
 | `worker.ts` | pg-boss instance, `createQueue` helper, every queue definition |
 | `cli.ts` | `commander` program with the `check-integrity` command |
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
@@ -77,7 +77,7 @@ Lists and detail data are fetched with TanStack Vue Query (`useQuery` around `tr
 
 ## Logging goes through winston
 
-Everything is logged with `logger` from `server/src/env.ts`: `logger.info('server listening', { addr })`, `logger.error('failed to update assets', { error })`, and the worker's `job` failure entries. There is no request logging (`logger: false` on Fastify); only procedure errors are logged, by the `onError` hook.
+Everything is logged with `logger` from `server/src/env.ts`: `logger.info('server listening', { addr })`, `logger.error('failed to update assets', { error })`, and the worker's `job` failure entries. An `Error` anywhere in the metadata, nested ones included, is written as its `name`, `message`, `code`, `detail`, `query` and `cause`; a TypeORM `QueryFailedError` therefore shows the Postgres message and SQLSTATE but not its bound parameters. There is no request logging (`logger: false` on Fastify); only procedure errors are logged, by the `onError` hook.
 
 ## Where to add X
 

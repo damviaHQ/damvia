@@ -29,7 +29,15 @@ server.register(fastifyTRPCPlugin, {
 		createContext,
 		onError(opts) {
 			const { error, path, ctx, req } = opts
-			logger.error('http.request', { code: error.code, path, userId: ctx?.user?.id, requestId: req.id })
+			if (error.code !== 'INTERNAL_SERVER_ERROR') {
+				logger.warn('http.request', { code: error.code, path, userId: ctx?.user?.id, requestId: req.id })
+				return
+			}
+			const cause = error.cause as (Error & { code?: unknown }) | undefined
+			logger.error('http.request', {
+				code: error.code, path, userId: ctx?.user?.id, requestId: req.id,
+				cause: cause && { name: cause.name, code: cause.code, message: cause.message },
+			})
 		},
 	},
 })
