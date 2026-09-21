@@ -60,7 +60,7 @@ The old job that applied the regex every 5 minutes still runs, but only on files
 
 The ↗ button next to a key, or Enter on the key, opens the record as a card on the right. Its address carries `?record=`, so a link to it can be shared with another admin.
 
-- **Fields** lists every field with an input of its type; a value is saved when you leave the field or pick an option.
+- **Fields** lists every field with an input of its type; a value is saved when you leave the field or pick an option. The pencil next to a field's name edits the field itself (display name, type, options, switches), and **Add a field** at the bottom adds one to every record.
 - **Files** shows the files linked to the record with their thumbnail, the primary one marked, and what linked each of them: a matching step and its pattern, a folder, a file set by hand, the CSV mapping or the file metadata. Files linked to a range the record belongs to follow under **Covering the range**. Files are attached from [Unmatched](#fix-what-matching-could-not), not from the card.
 - **History** lists who created, changed or deleted the record, when, where (grid, card, bulk edit, CSV import, Unmatched, removal of a field) and each value before and after. A record deleted and created again under the same key shows its earlier life. History started with this version; earlier changes are not listed, and it is never pruned.
 
@@ -84,7 +84,7 @@ An empty value is valid for every type. A value its type refuses is not saved an
 
 A field turned into a select without options takes its options from the values records already hold. An option cannot contain `|`. Readers see the options of a multiple select as a list, and search filters and counts treat each option on its own.
 
-Add a field from the ⋮ menu, from **Columns**, or on **Fields**. Its name is the CSV column name and cannot change afterwards; its display name can. Edit or remove a field from its column menu or on **Fields**. Removing a field removes its value from every record, and each record keeps the lost value in its history.
+Add a field from the ⋮ menu, from **Columns**, from a record's card, or on **Fields**. Its name is the CSV column name and cannot change afterwards; its display name can. Edit or remove a field from its column menu or on **Fields**. Removing a field removes its value from every record, and each record keeps the lost value in its history.
 
 ## Prepare the CSV
 

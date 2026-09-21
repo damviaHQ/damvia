@@ -235,10 +235,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .record-panel-header { display:flex; align-items:center; gap:16px; padding:24px 56px 16px 24px; border-bottom:1px solid var(--dv-color-line); }
 .dv-admin .record-placeholder { padding:12%; fill:var(--dv-text-secondary); opacity:.55; }
 .dv-admin .record-panel-picture { width:72px; height:72px; flex-shrink:0; object-fit:contain; border-radius:var(--dv-radius-graphic); background:var(--dv-surface-canvas); }
-.dv-admin .record-panel-tabs { display:flex; flex-direction:column; flex:1; min-height:0; padding:12px 24px 0; }
-.dv-admin .record-panel-body { flex:1; min-height:0; overflow:auto; padding:16px 0 24px; display:flex; flex-direction:column; gap:16px; }
+.dv-admin .record-panel-tabs { display:flex; flex-direction:column; flex:1; min-height:0; padding:0 24px; }
+.dv-admin .record-panel-tablist { display:flex; justify-content:flex-start; gap:24px; height:auto; padding:0; border-bottom:1px solid var(--dv-color-line); background:transparent; border-radius:0; }
+.dv-admin .record-panel-tab { flex:none; gap:6px; padding:14px 0 12px; margin-bottom:-1px; border-bottom:2px solid transparent; color:var(--dv-text-secondary); font-size:var(--dv-size-body); font-weight:500; background:transparent; }
+.dv-admin .record-panel-tab:hover { color:var(--dv-text-primary); }
+.dv-admin .record-panel-tab[data-state=active] { color:var(--dv-text-primary); border-bottom-color:var(--dv-action-primary); background:transparent; }
+.dv-admin .record-panel-tab:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; box-shadow:none; }
+.dv-admin .record-panel-count { margin-left:6px; padding:0 7px; border-radius:999px; background:var(--dv-surface-canvas); font-size:var(--dv-size-caption); line-height:18px; }
+.dv-admin .record-panel-field-label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.dv-admin .record-panel-field-label label { font-size:var(--dv-size-caption); font-weight:600; color:var(--dv-text-secondary); }
+.dv-admin .record-panel-field-edit { display:grid; place-items:center; width:24px; height:24px; color:var(--dv-text-secondary); opacity:.6; }
+.dv-admin .record-panel-field:hover .record-panel-field-edit, .dv-admin .record-panel-field-edit:focus-visible { opacity:1; }
+.dv-admin .record-panel-field-edit:hover { color:var(--dv-action-primary); background:var(--dv-action-soft); }
+.dv-admin .record-panel-body { flex:1; min-height:0; overflow:auto; padding:16px 4px 24px; margin:0 -4px; display:flex; flex-direction:column; gap:16px; }
+.dv-admin .record-panel-body:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; box-shadow:none; }
+.dv-admin.admin-sheet [data-dialog-close] { top:16px; right:16px; width:32px; height:32px; }
+.dv-admin.admin-sheet [data-dialog-close]:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; }
+.dv-admin .records-grid button:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; }
 .dv-admin .record-panel-field { display:grid; gap:6px; }
-.dv-admin .record-panel-field > label { font-size:var(--dv-size-caption); font-weight:600; color:var(--dv-text-secondary); }
 .dv-admin .record-panel-subheading { font-size:var(--dv-size-body); font-weight:600; margin-top:8px; }
 .dv-admin .record-panel-files { display:grid; gap:10px; }
 .dv-admin .record-panel-files li { display:grid; grid-template-columns:64px 1fr; gap:12px; align-items:center; font-size:var(--dv-size-caption); }

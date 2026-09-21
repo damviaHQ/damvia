@@ -93,7 +93,7 @@ onBeforeUnmount(() => labelResizeObserver?.disconnect())
 
 <template>
   <Breadcrumb class="dv-breadcrumb min-w-0" :data-tone="tone">
-    <BreadcrumbList class="dv-breadcrumb__list m-0 flex-nowrap gap-2 p-0 text-body leading-5 sm:gap-2">
+    <BreadcrumbList class="dv-breadcrumb__list -m-1.5 flex-nowrap gap-2 p-1.5 text-body leading-5 sm:gap-2">
       <template v-for="(item, index) in collapsed.visibleItems" :key="item.id">
         <BreadcrumbItem class="dv-breadcrumb__item min-w-0 gap-0">
           <template v-if="isEllipsis(item)">

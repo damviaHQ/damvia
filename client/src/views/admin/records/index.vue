@@ -397,7 +397,7 @@ watch(() => data.value?.total, (count) => {
 
     <RecordPanel :record-id="panelId" :tab="panelTab" :fields="fields" :record-label="recordLabel.lower.value"
       :save="savePanelField" :add-option="addOption" :remove="(id) => removeRecords([id])"
-      @close="closeRecord" @update:tab="(tab) => openRecord(panelId!, tab)" />
+      @close="closeRecord" @update:tab="(tab) => openRecord(panelId!, tab)" @edit-field="editField" @add-field="editField(null)" />
 
     <FieldEditorDialog v-model:open="fieldDialog.open" :field="fieldDialog.field" :suggestions="(undeclared ?? []).filter((name) => name !== keyLabel && !fields.some((field) => field.name === name))" />
 

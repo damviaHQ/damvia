@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { trpc, type RouterOutput } from "@/services/server"
 import { fieldLabel, formatRecordValue } from "@/utils/recordValues"
 import { useQuery } from "@tanstack/vue-query"
-import { Trash2 } from "@lucide/vue"
+import { PencilLine, Plus, Trash2 } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 import RecordFieldInput from "./RecordFieldInput.vue"
 import type { GridField } from "./RecordsGrid.vue"
@@ -41,7 +41,7 @@ const props = defineProps<{
   addOption: (field: GridField, option: string) => Promise<void>
   remove: (recordId: string) => Promise<void>
 }>()
-const emit = defineEmits<{ close: [], "update:tab": [tab: PanelTab] }>()
+const emit = defineEmits<{ close: [], "update:tab": [tab: PanelTab], editField: [field: GridField], addField: [] }>()
 
 const { data: record, status, error } = useQuery({
   queryKey: computed(() => ["records", "get", props.recordId]),
@@ -135,17 +135,25 @@ function when(value: string | Date) {
           </div>
         </header>
         <Tabs :model-value="tab" class="record-panel-tabs" @update:model-value="(value) => emit('update:tab', value as PanelTab)">
-          <TabsList>
-            <TabsTrigger value="fields">Fields</TabsTrigger>
-            <TabsTrigger value="files">Files ({{ record.fileCount }})</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
+          <TabsList class="record-panel-tablist">
+            <TabsTrigger value="fields" class="record-panel-tab">Fields</TabsTrigger>
+            <TabsTrigger value="files" class="record-panel-tab">Files<span class="record-panel-count">{{ record.fileCount }}</span></TabsTrigger>
+            <TabsTrigger value="history" class="record-panel-tab">History</TabsTrigger>
           </TabsList>
           <TabsContent value="fields" class="record-panel-body">
-            <p v-if="!fields.length" class="admin-text-secondary">No field yet. Add one from the columns menu or the Fields screen.</p>
+            <p v-if="!fields.length" class="admin-text-secondary">No field yet.</p>
             <div v-for="field in fields" :key="field.id" class="record-panel-field">
-              <label :for="`panel-${field.id}`">{{ fieldLabel(field) }}</label>
+              <div class="record-panel-field-label">
+                <label :for="`panel-${field.id}`">{{ fieldLabel(field) }}</label>
+                <button type="button" class="record-panel-field-edit" :aria-label="`Edit the field ${fieldLabel(field)}`" :title="`Edit the field: name, type, options`" @click="emit('editField', field)">
+                  <PencilLine class="size-3.5" />
+                </button>
+              </div>
               <RecordFieldInput :id="`panel-${field.id}`" :field="field" :model-value="record.metaData[field.name] ?? ''"
                 :save="(value) => save(record!.id, field, value)" :add-option="(option) => addOption(field, option)" />
+            </div>
+            <div>
+              <Button type="button" variant="outline" size="sm" @click="emit('addField')"><Plus class="size-4" />Add a field</Button>
             </div>
           </TabsContent>
           <TabsContent value="files" class="record-panel-body">
