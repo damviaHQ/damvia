@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import CollectionDisplayGrid from "@/components/collection/CollectionDisplayGrid.vue"
 import CollectionDisplayListCollection from "@/components/collection/CollectionDisplayListCollection.vue"
 import { RouterOutput } from "@/services/server.ts"
+import { registerPageListing } from "@/composables/usePageListings"
+import { usePageFilter } from "@/composables/usePageFilter"
 import { useGlobalStore } from "@/stores/globalStore"
 import { computed } from "vue"
 import { RouteLocationRaw } from "vue-router"
@@ -32,6 +34,17 @@ const props = defineProps<{
 }>()
 const globalStore = useGlobalStore()
 
+// Chosen collections are not the sub-collections of the page's own collection,
+// so the page says which cards it draws rather than letting anyone assume. The
+// whole list, so the filter bar counts against the page, not against itself.
+registerPageListing(computed(() => ({ collections: props.collections })))
+
+// Narrowing happens here, above the choice between cards and rows, so both obey
+// the same filter without knowing it exists.
+const pageFilter = usePageFilter()
+const visibleCollections = computed(() => pageFilter.filterCollections(props.collections))
+const hiddenByFilter = computed(() => pageFilter.isActive.value && !visibleCollections.value.length)
+
 // Collections are cards or rows; masonry only ever applies to files.
 const folderDisplayPreference = computed<"list" | "grid">(() =>
   (props.forceView || globalStore.displayPreferences["asset_folder"]) === "list" ? "list" : "grid"
@@ -39,8 +52,10 @@ const folderDisplayPreference = computed<"list" | "grid">(() =>
 </script>
 
 <template>
-  <CollectionDisplayListCollection v-if="folderDisplayPreference === 'list'" :collections="collections"
-    :generate-route="generateRoute" :placeholder="placeholder" />
-  <CollectionDisplayGrid v-else :collections="collections" :generate-route="generateRoute" :placeholder="placeholder"
-    :get-path="getPath" />
+  <template v-if="!hiddenByFilter">
+    <CollectionDisplayListCollection v-if="folderDisplayPreference === 'list'" :collections="visibleCollections"
+      :generate-route="generateRoute" :placeholder="placeholder" />
+    <CollectionDisplayGrid v-else :collections="visibleCollections" :generate-route="generateRoute" :placeholder="placeholder"
+      :get-path="getPath" />
+  </template>
 </template>

@@ -165,6 +165,32 @@ for (const width of [1440, 390]) test(`collection properties stay independent of
   await expect(collections).toHaveCount(0)
 })
 
+test('a page listing chosen collections offers their display preferences', async ({ page }) => {
+  // The reported case: the page shows collections picked by hand, so the
+  // collection's own children are empty and the popover used to see nothing.
+  const source = responses['collection.findById'] as any
+  const chosen = { id: 'chosen', name: 'SKYRNR Trail', description: 'Trail campaign', numberOfFiles: 12, files: [], children: [] }
+  await page.route('**/trpc/**', async route => {
+    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
+    const data = name === 'collection.findById'
+      ? {
+        ...source, files: [], children: [],
+        page: { id: 'page-1', blocks: [{ id: 'block-1', type: 'collections', size: 'full', data: { title: 'Test', collectionsId: ['chosen'] } }], assets: { collections: { chosen } } },
+      }
+      : responses[name] ?? []
+    await route.fulfill({ json: { result: { data } } })
+  })
+  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: new URL(test.info().project.use.baseURL!).hostname, path: '/' }])
+  await page.goto('/collections/campaign')
+  await expect(page.getByRole('link', { name: 'SKYRNR Trail' }).first()).toBeVisible()
+
+  await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
+  const menu = page.getByRole('dialog', { name: 'Display preferences' })
+  await expect(menu.getByText('Collections', { exact: true })).toBeVisible()
+  await menu.getByRole('tab', { name: 'List', exact: true }).click()
+  await expect(page.locator('.collection-list-collections_table')).toBeVisible()
+})
+
 test('mixed files offer product columns and malformed saved details recover', async ({ page }) => {
   await fixture(page, true)
   await page.addInitScript(() => localStorage.setItem('dam_display_details', '{broken'))

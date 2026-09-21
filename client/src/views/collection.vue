@@ -22,7 +22,11 @@ import Loader from "@/components/Loader.vue"
 import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Button } from "@/components/ui/button"
 import DisplayPreferences from "@/components/DisplayPreferences.vue"
+import PageFilterBar from "@/components/PageFilterBar.vue"
+import PageFilterToggle from "@/components/PageFilterToggle.vue"
 import { trpc } from "@/services/server.ts"
+import { providePageFilter } from "@/composables/usePageFilter"
+import { providePageListings } from "@/composables/usePageListings"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
@@ -34,7 +38,7 @@ import {
   Trash2,
 } from "@lucide/vue"
 import { storeToRefs } from "pinia"
-import { computed, ref } from "vue"
+import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 const router = useRouter()
@@ -92,6 +96,17 @@ const selection = computed(() => {
       (item.type === "collection" && collectionIds.includes(item.id))
   )
 })
+
+// What the page draws, announced by the renderers themselves: a block may list
+// collections chosen by hand, or the files of another collection entirely.
+const { files: shownFiles, collections: shownCollections } = providePageListings()
+
+// The reader narrows what is on this page. The bar is switched on for good, the
+// values are not: they describe the collection being read, so they start empty
+// on the next one. The view is reused from one collection to the next, so the
+// reset has to be asked for.
+const pageFilter = providePageFilter()
+watch(() => route.params.id, () => pageFilter.clear())
 
 // A page block can fix its own layout, which quietly wins over the reader's
 // choice; saying so beats a toggle that looks broken.
@@ -231,7 +246,8 @@ function removeSelectedFiles() {
             <Search class="text-neutral-500 hover:text-neutral-800" />
           </router-link>
         </Button>
-        <DisplayPreferences :files="collection.files" :collections="collection.children" :layout-locked="layoutLocked" />
+        <PageFilterToggle />
+        <DisplayPreferences :files="shownFiles" :collections="shownCollections" :layout-locked="layoutLocked" />
         <Button aria-label="Share collection" title="Share collection" v-if="collection.canEdit" @click="isShareModalOpen = true" type="button" variant="ghost"
           size="icon-sm">
           <Link class="text-neutral-500 hover:text-neutral-800" />
@@ -240,6 +256,7 @@ function removeSelectedFiles() {
           :collection="collection" />
       </div>
     </div>
+    <PageFilterBar v-if="globalStore.filtersVisible" :files="shownFiles" :collections="shownCollections" />
     <CollectionRenderLayout :key="collection.id" :collection="collection"
       :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
     <CollectionDialogEdit v-model="isEditCollectionModalOpen" :collection="collection" />

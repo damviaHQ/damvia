@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import CollectionDisplayGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
 import CollectionDisplayListFiles from "@/components/collection/CollectionDisplayListFiles.vue"
 import { RouterOutput } from "@/services/server.ts"
+import { registerPageListing } from "@/composables/usePageListings"
+import { usePageFilter } from "@/composables/usePageFilter"
 import { useGlobalStore } from "@/stores/globalStore"
 import type { DisplayView } from "@/utils/displayPreferences"
 import { computed } from "vue"
@@ -36,8 +38,21 @@ const props = defineProps<{
 }>()
 const globalStore = useGlobalStore()
 
+const rawFiles = computed<CollectionFile[]>(() => props.files ?? props.collection?.files ?? [])
+
+// Tell the collection page which files it is actually showing, so its display
+// preferences offer the asset types on screen. The whole list, not the narrowed
+// one: the facets and the preferences must not move while the reader filters.
+registerPageListing(computed(() => ({ files: rawFiles.value })))
+
+// Narrowing happens here, above the choice between grid, masonry and list, so
+// the three views obey the same filter without knowing it exists.
+const pageFilter = usePageFilter()
+const visibleFiles = computed(() => pageFilter.filterFiles(rawFiles.value))
+const hiddenByFilter = computed(() => pageFilter.isActive.value && !visibleFiles.value.length)
+
 const fileDisplayPreference = computed<DisplayView>(() => {
-  const files = props.files || props.collection.files
+  const files = rawFiles.value
   const assetType = files?.[0]?.assetType
   if (props.forceView) {
     return props.forceView
@@ -51,9 +66,11 @@ const fileDisplayPreference = computed<DisplayView>(() => {
 </script>
 
 <template>
-  <CollectionDisplayListFiles v-if="fileDisplayPreference === 'list'" :collection="collection" :files="files"
-    :placeholder="placeholder" />
-  <CollectionDisplayGridFiles v-else :collection="collection" :files="files" :placeholder="placeholder"
-    :get-path="getPath" :uniform="forceView === 'grid'" :masonry="forceView === 'masonry'"
-    :masonry-size="forceMasonrySize ?? null" />
+  <template v-if="!hiddenByFilter">
+    <CollectionDisplayListFiles v-if="fileDisplayPreference === 'list'" :collection="collection" :files="visibleFiles"
+      :placeholder="placeholder" />
+    <CollectionDisplayGridFiles v-else :collection="collection" :files="visibleFiles" :placeholder="placeholder"
+      :get-path="getPath" :uniform="forceView === 'grid'" :masonry="forceView === 'masonry'"
+      :masonry-size="forceMasonrySize ?? null" />
+  </template>
 </template>
