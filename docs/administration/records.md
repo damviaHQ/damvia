@@ -58,7 +58,7 @@ The old job that applied the regex every 5 minutes still runs, but only on files
 | To | Do |
 |---|---|
 | Add a record | Type its key in the last row and press Enter, or use **Add product** at the top. The record opens as a card to fill in. A key already taken is refused in the row. |
-| Edit a value | Click a cell to select it, then click again, double-click, press Enter or start typing. Enter saves and moves down, Tab saves and moves right, Esc cancels. A select opens its list of options; type to narrow it and add a missing option from there. |
+| Edit a value | Click a cell to select it, then click again, double-click, press Enter or Space to continue the value, or start typing to replace it. Enter saves and moves down, Tab saves and moves right, Esc cancels. A select opens its list of options; type to narrow it and add a missing option from there. |
 | Select several cells | Drag across them, Shift+click the far corner, or hold Shift with the arrow keys. Ctrl+A or ⌘+A selects every cell of the page, Esc goes back to one cell. |
 | Copy and paste | Ctrl+C or ⌘+C copies the selected cells as tab-separated rows, the form Sheets and Excel use, so a block goes both ways. Ctrl+V or ⌘+V pastes: one value fills every selected cell, a block the selection holds a whole number of times is repeated across it, and any other block is laid from the top-left cell. |
 | Duplicate values down | Drag the small square at the corner of the selection up or down: the selected rows repeat over the rows you cover. Double-click the square to fill to the last row of the page, or press Ctrl+D or ⌘+D to copy the first row of the selection into the rows below it. |

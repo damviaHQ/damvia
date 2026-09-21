@@ -55,7 +55,7 @@ describe('RecordsGrid', () => {
     wrapper.unmount()
   })
 
-  test('typing on a cell replaces its value, Escape leaves it untouched', async () => {
+  test('typing on a cell replaces its value, Escape leaves it untouched, Space continues it', async () => {
     const { wrapper, commit } = setup()
     await cell(wrapper, 0, 2).trigger('click')
     await cell(wrapper, 0, 2).trigger('keydown', { key: 'G' })
@@ -63,6 +63,9 @@ describe('RecordsGrid', () => {
     await wrapper.get('input.record-cell-input').trigger('keydown', { key: 'Escape' })
     expect(wrapper.find('input.record-cell-input').exists()).toBe(false)
     expect(commit).not.toHaveBeenCalled()
+    await cell(wrapper, 0, 2).trigger('keydown', { key: ' ' })
+    const input = wrapper.get('input.record-cell-input').element as HTMLInputElement
+    expect([input.value, input.selectionStart]).toEqual(['Blue', 4])
     wrapper.unmount()
   })
 

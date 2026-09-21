@@ -175,6 +175,8 @@ function onKeydown(event: KeyboardEvent) {
     const writes = fillDownPlan(range.value, valueAt)
     if (writes.length) writeCells(writes)
   }
+  // Space opens the value to continue it; any other key replaces it.
+  else if (event.key === " " && !shortcut && shape.value.editable(position.column)) { head.value = null; startEdit(position) }
   else if (startsTyping(event) && shape.value.editable(position.column)) { head.value = null; startEdit(position, event.key) }
   else return
   event.preventDefault()
