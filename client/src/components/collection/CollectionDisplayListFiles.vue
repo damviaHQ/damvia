@@ -19,6 +19,7 @@ import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import TableSortHeader from "@/components/TableSortHeader.vue"
 import CollectionModalGallery from "@/components/collection/CollectionModalDownloadUnique.vue"
+import CollectionVariantGroupPanel from "@/components/collection/CollectionVariantGroupPanel.vue"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -62,6 +63,7 @@ const toast = useGlobalToast()
 const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
 const currentCollectionFileId = ref<string | null>(null)
+const openGroupId = ref<string | null>(null)
 const hoveredRowId = ref<string | null>(null)
 const copiedCellId = ref<string | null>(null)
 
@@ -334,6 +336,7 @@ const table = useTable<typeof features, File>({
                         >
                           {{ cell.row.original.name }}
                         </button>
+                        <button v-if="cell.row.original.variantGroup" type="button" class="ml-2 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-800 hover:bg-neutral-300" :aria-label="`Show the ${cell.row.original.variantGroup.memberCount} variants of ${cell.row.original.variantGroup.displayName}`" @click.stop="openGroupId = cell.row.original.variantGroup.id">{{ cell.row.original.variantGroup.memberCount }} variants</button>
                         <div v-if="copiedCellId === `${cell.row.id}-filename`"
                              class="absolute -top-8 left-0 text-xs text-neutral-500 bg-white px-2 py-1 rounded shadow-xs border border-neutral-200 z-20 copied-indicator animate-in fade-in-0 duration-150">
                           copied
@@ -409,4 +412,5 @@ const table = useTable<typeof features, File>({
     <span class="sr-only" role="status" aria-live="polite">{{ copiedCellId ? 'Copied to clipboard' : '' }}</span>
   </div>
   <CollectionModalGallery v-model="currentCollectionFileId" :collection="collection" :files="$props.files" />
+  <CollectionVariantGroupPanel v-model="openGroupId" />
 </template>

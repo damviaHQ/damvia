@@ -17,11 +17,13 @@ import { dataSource, logger } from "../env"
 import { applyFolderAssetTypes, ENRICHMENT_LOCK, refreshFolderPaths, resolveAllFolders } from "./asset-type-rules"
 import { EntityStageResult, runEntityStage } from "./entity-resolution"
 import { refreshMetadataFieldCounts } from "./file-metadata"
+import { runVariantStage, VariantStageResult } from "./variant-grouping"
 
 export type EnrichmentPassResult = {
 	assetTypes: { paths: number, folders: number, files: number }
 	entities: EntityStageResult
 	metadata: { fields: number }
+	variants: VariantStageResult
 }
 
 // Runs after every sync, before the next one. One pass at a time: the session
@@ -53,11 +55,21 @@ export async function runEnrichmentPass(): Promise<EnrichmentPassResult> {
 		})
 		const entities = await stage('entities', (em) => runEntityStage(em))
 		const metadata = await stage('metadata', (em) => refreshMetadataFieldCounts(em))
-		return { assetTypes, entities, metadata }
+		const variants = await stage('variants', (em) => runVariantStage(em))
+		return { assetTypes, entities, metadata, variants }
 	} finally {
 		await runner.query('SELECT pg_advisory_unlock($1)', [ENRICHMENT_LOCK]).catch(() => {})
 		await runner.release()
 	}
+}
+
+// A grouping change (asset type switch, override, setting) re-runs the
+// variant stage on its own.
+export async function rerunVariantStage(): Promise<VariantStageResult> {
+	return dataSource.transaction(async (em) => {
+		await em.query('SELECT pg_advisory_xact_lock($1)', [ENRICHMENT_LOCK])
+		return runVariantStage(em)
+	})
 }
 
 // An admin change (attach, detach, steps saved) re-runs the entity stage

@@ -33,6 +33,8 @@ After the last source of the cycle, the enrichment pass runs once (`services/enr
 
 1. `enrichment.asset-types`: refreshes the stored path of every folder, applies the [folder rules](../administration/asset-types.md#assign-it-by-a-rule-on-the-folder-path) and writes the resulting asset type to the changed folders and their files.
 2. `enrichment.entities`: runs the [matching steps](../administration/records.md#set-the-matching-steps) and the links set by hand, and writes the record links, the unmatched queue and each file's primary record.
+3. `enrichment.metadata`: refreshes how many files carry each metadata field.
+4. `enrichment.variants`: groups the [variants](../administration/variants.md) of the asset types that ask for it, keeping group ids stable.
 
 One pass runs at a time, through a Postgres advisory lock; a save, attach or re-apply from the admin waits for a running pass. Every stage writes only what changed, so a pass on unchanged data writes nothing. The pass reads the database only and never calls a provider.
 

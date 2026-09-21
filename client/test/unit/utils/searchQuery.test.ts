@@ -25,12 +25,12 @@ describe('search query parsing', () => {
 
   test('route query maps onto the search input with defaults', () => {
     expect(parseSearchQuery({}, 'all')).toEqual({
-      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], recordViews: [], fileTypes: [], extensions: [], minSize: undefined, maxSize: undefined, searchScope: 'all', exactMatch: false, attributes: {}, metadata: {}, sort: undefined,
+      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], recordViews: [], fileTypes: [], extensions: [], minSize: undefined, maxSize: undefined, searchScope: 'all', exactMatch: false, attributes: {}, metadata: {}, variantAxes: {}, sort: undefined,
     })
     expect(parseSearchQuery({
       q: 'red hat', page: '2', from_collection: 'c1', asset_types: 't1', record_views: ['front', 'back'], file_types: 'image', search_scope: 'current', exact_match: 'true', sort: 'newest', extensions: 'jpg', size_min: '2', size_max: '50',
     }, 'all')).toEqual({
-      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], recordViews: ['front', 'back'], fileTypes: ['image'], extensions: ['jpg'], minSize: 2097152, maxSize: 52428800, searchScope: 'current', exactMatch: true, attributes: {}, metadata: {}, sort: 'newest',
+      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], recordViews: ['front', 'back'], fileTypes: ['image'], extensions: ['jpg'], minSize: 2097152, maxSize: 52428800, searchScope: 'current', exactMatch: true, attributes: {}, metadata: {}, variantAxes: {}, sort: 'newest',
     })
     expect(parseSearchQuery({ sort: 'random' }, 'all').sort).toBeUndefined()
     expect(parseSearchQuery({ size_min: 'abc', size_max: '-3' }, 'all')).toMatchObject({ minSize: undefined, maxSize: undefined })
@@ -47,6 +47,10 @@ describe('search query parsing', () => {
       { key: 'metadata_range[f2]', value: '2026-05-01 to 2026-05-21', group: 'metadata_range', attributeId: 'f2' },
     ])
     expect(clearFilterQuery({ q: 'a', 'metadata[f1]': 'x', 'metadata_from[f2]': '2026-01-01' })).toEqual({ q: 'a' })
+    const axes = parseSearchQuery({ 'axes[a1]': ['en', 'fr'] }, 'all')
+    expect(axes.variantAxes).toEqual({ a1: ['en', 'fr'] })
+    expect(activeFilters(axes)).toEqual([{ key: 'axes[a1]', value: 'en', group: 'axis', attributeId: 'a1' }, { key: 'axes[a1]', value: 'fr', group: 'axis', attributeId: 'a1' }])
+    expect(clearFilterQuery({ q: 'a', 'axes[a1]': 'en' })).toEqual({ q: 'a' })
   })
 
   test('repeated scalar params keep their first value and the page is a positive integer', () => {

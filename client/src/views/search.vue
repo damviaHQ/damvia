@@ -44,6 +44,7 @@ const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, 
 const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
 const { data: recordFacets } = useQuery({ queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
 const { data: metadataFacets } = useQuery({ queryKey: ["metadata-fields", "facets"], queryFn: () => trpc.metadataField.listFacets.query() })
+const { data: axisFacets } = useQuery({ queryKey: ["variant-axes", "facets"], queryFn: () => trpc.variantAxis.listFacets.query() })
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
@@ -51,7 +52,7 @@ const { data: collection } = useQuery({
 })
 const { status, data: search, error, isPlaceholderData } = useQuery({
   queryKey: computed(() => ["search", form.value]),
-  queryFn: () => trpc.collection.search.query(form.value),
+  queryFn: () => trpc.collection.search.query({ ...form.value, collapseVariants: true }),
   // Changing a filter refines the current results instead of blanking the page.
   placeholderData: keepPreviousData,
 })
@@ -85,7 +86,7 @@ const { data: rangeAll, isFetching: rangeLoading } = useQuery({
 })
 const rangeFiles = computed<any[]>(() => rangePage.value > 0 && rangeAll.value ? rangeAll.value.results : rangeResults.value)
 
-const emptyFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {}, metadata: {}, metadataRanges: {} }
+const emptyFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {}, metadata: {}, metadataRanges: {}, variantAxes: {} }
 const facets = computed(() => search.value?.facets ?? emptyFacets)
 const results = computed<any[]>(() => search.value?.results ?? [])
 const total = computed(() => search.value?.total ?? results.value.length)
@@ -130,6 +131,9 @@ const chips = computed<FilterChip[]>(() =>
       return { key: filter.key, value: filter.value, label: `Format: ${filter.value.toUpperCase()}`, category: "Format", displayValue: filter.value.toUpperCase() }
     } else if (filter.group === "record_views") {
       return { key: filter.key, value: filter.value, label: `View: ${filter.value}`, category: "View", displayValue: filter.value }
+    } else if (filter.group === "axis") {
+      const name = axisFacets.value?.find((entry) => entry.id === filter.attributeId)?.label ?? "Variant"
+      return { key: filter.key, value: filter.value, label: `${name}: ${filter.value}`, category: name, displayValue: filter.value }
     } else if (filter.group === "metadata" || filter.group === "metadata_range") {
       const field = metadataFacets.value?.find((entry) => entry.id === filter.attributeId)
       const name = field?.displayName || field?.name || "File metadata"

@@ -39,6 +39,7 @@ const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () =
 const { data: recordViews } = useQuery({ queryKey: ["record-views"], queryFn: () => trpc.asset.listRecordViews.query() })
 const { data: recordFacets } = useQuery({ queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
 const { data: metadataFacets } = useQuery({ queryKey: ["metadata-fields", "facets"], queryFn: () => trpc.metadataField.listFacets.query() })
+const { data: axisFacets } = useQuery({ queryKey: ["variant-axes", "facets"], queryFn: () => trpc.variantAxis.listFacets.query() })
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
@@ -47,7 +48,7 @@ const { data: collection } = useQuery({
 // Same key as the results view, so the counts come from the one request.
 const { data: search } = useQuery({
   queryKey: computed(() => ["search", form.value]),
-  queryFn: () => trpc.collection.search.query(form.value),
+  queryFn: () => trpc.collection.search.query({ ...form.value, collapseVariants: true }),
   // Keep the previous counts while the next results load, so the rows do not disappear.
   placeholderData: keepPreviousData,
 })
@@ -68,7 +69,7 @@ const { data: notFound } = useQuery({
 const missing = computed(() => (form.value.exactMatch ? [] : notFound.value ?? []))
 
 type SearchFacets = RouterOutput["collection"]["search"]["facets"]
-const emptyFacets: SearchFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {}, metadata: {}, metadataRanges: {} }
+const emptyFacets: SearchFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {}, metadata: {}, metadataRanges: {}, variantAxes: {} }
 const facets = computed<SearchFacets>(() => search.value?.facets ?? emptyFacets)
 const collectionName = computed(() => collection.value?.name ?? "this collection")
 
@@ -110,6 +111,19 @@ const metadataGroups = computed(() =>
       options: Array.from(values).map((value) => ({ id: value, label: value, count: counts[value] ?? 0 })).sort((a, b) => a.label.localeCompare(b.label)),
     }
   })
+)
+// What differs between variants (format, language, duration) filters too;
+// an axis only shows when the results hold some of its values.
+const axisGroups = computed(() =>
+  (axisFacets.value ?? []).map((axis) => {
+    const counts = facets.value.variantAxes[axis.id] ?? {}
+    const selected = form.value.variantAxes[axis.id] ?? []
+    return {
+      id: axis.id,
+      title: axis.label,
+      options: [...new Set([...Object.keys(counts), ...selected])].map((value) => ({ id: value, label: value, count: counts[value] ?? 0 })).sort((a, b) => a.label.localeCompare(b.label)),
+    }
+  }).filter((group) => group.options.length > 0)
 )
 const day = (value: string | Date | null | undefined) => (value ? new Date(value).toISOString().slice(0, 10) : "")
 const dateGroups = computed(() =>
@@ -218,6 +232,7 @@ function removeMissing() {
     <SearchFacetGroup id="search-asset-types" title="Asset type" :options="assetTypeOptions" :selected="form.assetTypes" @toggle="toggleValue('asset_types', $event)" />
     <SearchFacetGroup v-if="viewsEnabled && recordViewOptions.length" id="search-record-views" :title="`${recordLabel.singular.value} view`" :options="recordViewOptions" :selected="form.recordViews" :open="form.recordViews.length > 0" @toggle="toggleValue('record_views', $event)" />
     <SearchFacetGroup v-for="group in attributeGroups" :id="`search-facet-${group.id}`" :key="group.id" :title="group.title" :options="group.options" :selected="form.attributes[group.id] ?? []" :open="(form.attributes[group.id]?.length ?? 0) > 0 || attributeGroups.length <= 3" @toggle="toggleValue(`attributes[${group.id}]`, $event)" />
+    <SearchFacetGroup v-for="group in axisGroups" :id="`search-axis-${group.id}`" :key="group.id" :title="group.title" :options="group.options" :selected="form.variantAxes[group.id] ?? []" :open="(form.variantAxes[group.id]?.length ?? 0) > 0" @toggle="toggleValue(`axes[${group.id}]`, $event)" />
     <SearchFacetGroup v-for="group in metadataGroups" :id="`search-metadata-${group.id}`" :key="group.id" :title="group.truncated ? `${group.title} (first 200)` : group.title" :options="group.options" :selected="Array.isArray(form.metadata[group.id]) ? form.metadata[group.id] as string[] : []" :open="Array.isArray(form.metadata[group.id])" @toggle="toggleValue(`metadata[${group.id}]`, $event)" />
     <section v-for="group in dateGroups" :key="group.id" :aria-labelledby="`search-date-${group.id}`" class="flex min-w-0 flex-col gap-1 border-t border-neutral-200 pt-1 pb-2">
       <h2 :id="`search-date-${group.id}`" :class="sidebarSectionTitleClasses" class="flex h-8 items-center">{{ group.title }}</h2>

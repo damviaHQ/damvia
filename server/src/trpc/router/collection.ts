@@ -31,6 +31,7 @@ import {
 	userCollectionsQuery
 } from "../../services/collection"
 import { loadViewableMetadata, ViewableMetadata } from "../../services/file-metadata"
+import { loadVariantGroups, VariantGroupSummary } from "../../services/variant-grouping"
 import { applySearchOrder, buildRangeQuery, buildSearchQuery, loadSearchContext, onePerFile, searchFacets } from "../../services/search"
 import { collectionSynchronizationQueue } from "../../worker"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
@@ -134,9 +135,10 @@ export type FormatCollectionFileOptions = {
 	file: CollectionFile,
 	recordAttributes?: RecordAttribute[],
 	metadata?: Map<string, ViewableMetadata[]>,
+	variantGroups?: Map<string, VariantGroupSummary>,
 }
 
-export async function formatCollectionFile({ file, recordAttributes, metadata }: FormatCollectionFileOptions) {
+export async function formatCollectionFile({ file, recordAttributes, metadata, variantGroups }: FormatCollectionFileOptions) {
 	const attributes = recordAttributes
 		? Object
 			.entries(file.assetFile.record?.metaData ?? {})
@@ -170,6 +172,7 @@ export async function formatCollectionFile({ file, recordAttributes, metadata }:
 		} : null,
 		recordView: file.assetFile.recordView,
 		metadata: metadata ? metadata.get(file.assetFile.id) ?? [] : null,
+		variantGroup: variantGroups?.get(file.assetFile.id) ?? null,
 		size: parseInt(file.assetFile.size, 10),
 		collectionId: file.collectionId,
 		updatedAt: file.assetFile.updatedAt,
@@ -234,13 +237,15 @@ export default router({
 			exactMatch: z.boolean().optional().nullable(),
 			attributes: z.record(z.string(), z.string().array().nullable()).nullable().optional(),
 			metadata: metadataInput,
+			variantAxes: z.record(z.string(), z.string().max(200).array().max(100).nullable()).nullable().optional(),
 			sort: z.enum(['relevance', 'name', 'newest']).optional().nullable(),
+			collapseVariants: z.boolean().optional(),
 			// Picking an image inside the page editor is not a library search.
 			silent: z.boolean().optional(),
 		}))
 		.query(async ({ input, ctx }) => {
 			const context = await loadSearchContext(input)
-			const query = applySearchOrder(onePerFile(buildSearchQuery(ctx.user, input, context), buildSearchQuery(ctx.user, input, context)), input, context, input.sort)
+			const query = applySearchOrder(onePerFile(buildSearchQuery(ctx.user, input, context), buildSearchQuery(ctx.user, input, context), !!input.collapseVariants), input, context, input.sort)
 			const range = input.page === 1 ? buildRangeQuery(ctx.user, input, context) : null
 
 			const perPage = 300
@@ -263,6 +268,7 @@ export default router({
 			}
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 			const metadata = await loadViewableMetadata([...results, ...rangeResults].map((file) => file.assetFileId))
+			const variantGroups = input.collapseVariants ? await loadVariantGroups(ctx.user, results.map((file) => file.assetFileId)) : undefined
 
 			return {
 				total,
@@ -271,7 +277,7 @@ export default router({
 				previousPage: input.page > 1 ? input.page - 1 : null,
 				nextPage: totalPages > input.page ? input.page + 1 : null,
 				facets,
-				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes, metadata }))),
+				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes, metadata, variantGroups }))),
 				rangeResults: await Promise.all(rangeResults.map(file => formatCollectionFile({ file, recordAttributes, metadata }))),
 				rangeTotal,
 			}
@@ -291,6 +297,7 @@ export default router({
 			exactMatch: z.boolean().optional().nullable(),
 			attributes: z.record(z.string(), z.string().array().nullable()).nullable().optional(),
 			metadata: metadataInput,
+			variantAxes: z.record(z.string(), z.string().max(200).array().max(100).nullable()).nullable().optional(),
 		}))
 		.query(async ({ input, ctx }) => {
 			const context = await loadSearchContext(input)

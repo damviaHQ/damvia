@@ -18,6 +18,7 @@ Open `/admin/asset-types` and provide:
 | Description | Explains when the type should be used. Maximum 255 characters. |
 | Related to records | Allows record-view filtering for files of this type. The checkbox shows the record label chosen in the Data enrichment settings, for example "Related to products". |
 | Search by default | Includes the type in a reader's initial search selection. |
+| Group variants | Shows files of this type that differ only by format, language or duration as one card in search. See [Variants](./variants.md). |
 | Default display | Chooses grid or list when a reader has no saved preference. |
 | List-view items | Chooses and orders size, licence, format, dimensions, updated date, viewable record attributes and visible file metadata fields (marked "from the file"). |
 

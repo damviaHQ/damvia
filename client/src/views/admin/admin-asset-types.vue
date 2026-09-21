@@ -65,6 +65,7 @@ const form = ref<{
   name: string
   description: string
   isRelatedToRecords: boolean
+  groupVariants: boolean
   includeInSearchByDefault: boolean
   defaultDisplay: "grid" | "list"
   listDisplayItems: string[]
@@ -72,6 +73,7 @@ const form = ref<{
   name: "",
   description: '',
   isRelatedToRecords: false,
+  groupVariants: false,
   includeInSearchByDefault: false,
   defaultDisplay: "grid",
   listDisplayItems: [],
@@ -122,6 +124,7 @@ function openCreateModal() {
     name: "",
     description: "",
     isRelatedToRecords: false,
+    groupVariants: false,
     includeInSearchByDefault: false,
     defaultDisplay: "grid",
     listDisplayItems: [],
@@ -135,6 +138,7 @@ function openEditModal(assetType: RouterOutput["assetType"]["list"][number]) {
     name: assetType.name,
     description: assetType.description ?? '',
     isRelatedToRecords: assetType.isRelatedToRecords,
+    groupVariants: assetType.groupVariants,
     includeInSearchByDefault: assetType.includeInSearchByDefault,
     defaultDisplay: assetType.defaultDisplay,
     listDisplayItems: [...assetType.listDisplayItems],
@@ -155,6 +159,7 @@ async function submitChanges(event: Event) {
       ...(form.value.isRelatedToRecords !== undefined && {
         isRelatedToRecords: form.value.isRelatedToRecords,
       }),
+      groupVariants: form.value.groupVariants,
       ...(form.value.includeInSearchByDefault !== undefined && {
         includeInSearchByDefault: form.value.includeInSearchByDefault,
       }),
@@ -244,6 +249,7 @@ async function onModalSubmit(event: Event) {
           <TableHead>Description</TableHead>
           <TableHead>Related to {{ recordLabel.lowerPlural.value }}</TableHead>
           <TableHead>Include in search by default</TableHead>
+          <TableHead>Group variants</TableHead>
           <TableHead></TableHead>
         </TableRow>
       </TableHeader>
@@ -253,6 +259,7 @@ async function onModalSubmit(event: Event) {
           <TableCell>{{ assetType.description }}</TableCell>
           <TableCell>{{ assetType.isRelatedToRecords ? "Yes" : "No" }}</TableCell>
           <TableCell>{{ assetType.includeInSearchByDefault ? "Yes" : "No" }}</TableCell>
+          <TableCell>{{ assetType.groupVariants ? "Yes" : "No" }}</TableCell>
           <TableCell>
             <div class="flex space-x-2">
               <Button variant="ghost" size="sm" @click="openEditModal(assetType)">
@@ -305,6 +312,12 @@ async function onModalSubmit(event: Event) {
               <Checkbox id="isRelatedToRecords" v-model="form.isRelatedToRecords" />
               <Label for="isRelatedToRecords">Related to {{ recordLabel.lowerPlural.value }}</Label>
             </div>
+            <p class="text-body admin-text-secondary -mt-3">Files of this type can be linked to a {{ recordLabel.lower.value }}. Matching rules are set on the Matching screen.</p>
+            <div class="flex items-center space-x-2">
+              <Checkbox id="groupVariants" v-model="form.groupVariants" />
+              <Label for="groupVariants">Group variants</Label>
+            </div>
+            <p class="text-body admin-text-secondary -mt-3">Files of this type that share the same name and differ only by format, language or duration are shown as one card. Never enable it for packshots.</p>
             <div class="flex items-center space-x-2">
               <Checkbox id="includeInSearchByDefault" v-model="form.includeInSearchByDefault" />
               <Label for="includeInSearchByDefault">Search by default</Label>

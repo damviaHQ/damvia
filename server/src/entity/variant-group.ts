@@ -12,34 +12,40 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { Column, CreateDateColumn, Entity, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryColumn, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from "typeorm"
+import { AssetFolder } from "./asset-folder"
+import { AssetType } from "./asset-type"
 
-@Entity('asset_types')
-export class AssetType {
+@Entity('variant_groups')
+@Unique(['assetFolderId', 'assetTypeId', 'prefixKey'])
+export class VariantGroup {
 	@PrimaryColumn()
 	@PrimaryGeneratedColumn("uuid")
 	id: string
 
 	@Column()
-	name: string
+	assetFolderId: string
+
+	@ManyToOne(() => AssetFolder, { onDelete: 'CASCADE' })
+	assetFolder: AssetFolder
+
+	@Column()
+	assetTypeId: string
+
+	@ManyToOne(() => AssetType, { onDelete: 'CASCADE' })
+	assetType: AssetType
+
+	@Column('text')
+	prefixKey: string
+
+	@Column('text')
+	displayName: string
 
 	@Column({ type: 'varchar', nullable: true })
-	description: string | null
+	coverAssetFileId: string | null
 
-	@Column({ default: false })
-	isRelatedToRecords: boolean
-
-	@Column({ default: false })
-	includeInSearchByDefault: boolean
-
-	@Column({ default: 'grid' })
-	defaultDisplay: 'grid' | 'list'
-
-	@Column({ type: 'text', default: [], array: true })
-	listDisplayItems: string[]
-
-	@Column({ default: false })
-	groupVariants: boolean
+	@Column({ type: 'int' })
+	memberCount: number
 
 	@CreateDateColumn()
 	createdAt: Date

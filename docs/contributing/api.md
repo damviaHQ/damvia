@@ -107,6 +107,8 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `search` | query | `userApproved` | Files matching text, asset types, file formats, record facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored. Values of one attribute are alternatives, different attributes narrow each other. `sort` is `relevance` (default with a query: files matching more words first, then names starting with a word), `name` or `newest`; the order is stable across pages. `extensions` keeps only files whose name ends in one of the given extensions, compared in lower case and with a leading dot ignored. `minSize` and `maxSize` bound the file size in bytes and either may be omitted. The response carries `facets`: counts per asset type, file type (`image`, `video`, `document`, `other`), file extension, product view and facetable attribute value, computed over the whole result set with the dimension's own filter left out. Each asset file appears once even when it sits in several visible collections (the first visible `collection_files` row stands for it) and facet counts count files. With a query, the first page also returns `rangeResults` (at most 60) and `rangeTotal`: files linked through an attribute value (a range) shared by the records whose key or searchable attribute matches the query, under the same visibility and filters, never one of the exact results |
 | `rangeSearch` | query | `userApproved` | The range results of a query, 300 per `page`, with `total`, `totalPages` and `nextPage` |
 
+`search` takes `collapseVariants`: each variant group is then one result, its cover when the caller can see it, and every result carries `variantGroup` (`id`, `displayName`, `memberCount` and `status` over the members the caller can see, `coverFileId`) or `null`; without it the output is unchanged. `search` and `rangeSearch` take `variantAxes`, a map from an axis id to values, and `facets.variantAxes` counts the values of each axis over the results. `assetType.create` and `update` take `groupVariants`; changing it re-runs the variant stage.
+
 `search` and `rangeSearch` also take `metadata`: a map from a metadata field id to a list of values (text fields) or `{ from, to }` days (`YYYY-MM-DD`, inclusive, date fields); only facetable fields apply, different fields narrow each other. `facets.metadata` counts the values of each facetable text field and `facets.metadataRanges` gives the `min` and `max` of each date field over the results, each with its own filter left out. Searchable metadata fields join the text match. Every file returned by `search`, `rangeSearch`, `findById`, `lastAddedFiles` and `favorite.list` carries `metadata`: the values of its visible fields, joined by commas.
 | `searchNotFound` | query | `userApproved` | Returns the search terms found neither in a visible file name nor in a searchable attribute, within the same scope, asset type, record view, file type and extension filters |
 | `findById` | query | `userApproved` | One collection with files, children, invitations |
@@ -186,6 +188,23 @@ Records were called products until the 2026-09-21 rename; the tables, columns, p
 | `entityCsv.clear` | mutation | `userAdmin` | Removes the mapping and re-runs the entity stage |
 
 `resolverStep.save` also takes `metadata` steps (`config.metadataFieldId`), refused unless the field can link; `resolverStep.list` returns the fields that can link as `trustedFields`. `entityResolution.unmatchedFiles` returns, per file, a `suggestion`: the value of a field that can link as a record key, when a record has that key. `settings.getEnrichment` and `updateEnrichment` also carry `viewsEnabled`, `viewSeparator` (one character), `viewDigits` (1 to 4) and `thumbnailView`; changing the first three re-runs the entity stage. `env` returns `viewsEnabled`.
+
+### `variantGroup` and `variantAxis`
+
+| Procedure | Kind | Auth | Purpose |
+|---|---|---|---|
+| `variantGroup.findById` | query | `userApproved` | One group with the members the caller can see (each a collection file plus `assetFileId`, `status` and `axisValues`), its axes with their labels, its worst status and, for admins, the overrides that shaped it. `NOT_FOUND` when no member is visible |
+| `variantGroup.setCover` | mutation | `userAdmin` | Pins a member as the cover, replacing an earlier cover override of the group |
+| `variantGroup.forceGroup` | mutation | `userAdmin` | Two to 500 files of one folder and asset type form a group of their own (`BAD_REQUEST` across folders) |
+| `variantGroup.exclude` | mutation | `userAdmin` | Files that are never grouped |
+| `variantGroup.listOverrides`, `undoOverride` | query, mutation | `userAdmin` | The overrides with their file names and author; removing one re-runs grouping |
+| `variantAxis.list` | query | `userAdmin` | Every axis with its label (`Variant n` when unnamed), values, recognizer, `ignored`, examples and group count |
+| `variantAxis.rename`, `ignore` | mutation | `userAdmin` | Names an axis, or hides it from the search filters while keeping it |
+| `variantAxis.merge` | mutation | `userAdmin` | Moves the groups of `fromId` to `intoId`, which takes the union of the values, and deletes `fromId` |
+| `variantAxis.listFacets` | query | `userApproved` | The axes shown as search filters: not ignored and used by a group |
+| `variantAxis.settings`, `updateSettings` | query, mutation | `userAdmin` | `minPrefixLength` (1 to 40) and `blockedTokens` (lower case, no space, dot, dash or underscore); saving re-runs grouping |
+
+Every write re-runs the variant stage of the enrichment pass under its advisory lock and returns its counts.
 
 ### `resolverStep` and `entityResolution`
 

@@ -38,6 +38,8 @@ import regionRouter from "./region"
 import resolverStepRouter from "./resolver-step"
 import settingsRouter from "./settings"
 import userRouter from "./user"
+import variantAxisRouter from "./variant-axis"
+import variantGroupRouter from "./variant-group"
 
 const appRouter = router({
 	user: userRouter,
@@ -53,6 +55,8 @@ const appRouter = router({
 	entityResolution: entityResolutionRouter,
 	entityCsv: entityCsvRouter,
 	metadataField: metadataFieldRouter,
+	variantGroup: variantGroupRouter,
+	variantAxis: variantAxisRouter,
 	favorite: favoriteRouter,
 	license: licenseRouter,
 	download: downloadRouter,

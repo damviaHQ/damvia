@@ -18,6 +18,7 @@ import { AssetFile } from "../../entity/asset-file"
 import { AssetFolder } from "../../entity/asset-folder"
 import { AssetType } from "../../entity/asset-type"
 import { dataSource } from "../../env"
+import { rerunVariantStage } from "../../services/enrichment"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
 export function formatAssetType(type: AssetType) {
@@ -26,6 +27,7 @@ export function formatAssetType(type: AssetType) {
 		name: type.name,
 		description: type.description,
 		isRelatedToRecords: type.isRelatedToRecords,
+		groupVariants: type.groupVariants,
 		includeInSearchByDefault: type.includeInSearchByDefault,
 		defaultDisplay: type.defaultDisplay,
 		listDisplayItems: type.listDisplayItems,
@@ -46,6 +48,7 @@ export default router({
 				name: z.string().min(1).max(30),
 				description: z.string().max(255).optional(),
 				isRelatedToRecords: z.boolean().optional(),
+				groupVariants: z.boolean().optional(),
 				includeInSearchByDefault: z.boolean().optional(),
 				defaultDisplay: z.union([z.literal('list'), z.literal('grid')]),
 				listDisplayItems: z.string().array(),
@@ -56,10 +59,12 @@ export default router({
 			assetType.name = input.name
 			assetType.description = input.description ?? null
 			assetType.isRelatedToRecords = input.isRelatedToRecords ?? false
+			assetType.groupVariants = input.groupVariants ?? false
 			assetType.includeInSearchByDefault = input.includeInSearchByDefault ?? false
 			assetType.defaultDisplay = input.defaultDisplay
 			assetType.listDisplayItems = input.listDisplayItems
 			await dataSource.getRepository(AssetType).save(assetType)
+			if (assetType.groupVariants) await rerunVariantStage()
 			return formatAssetType(assetType)
 		}),
 	update: publicProcedure
@@ -70,6 +75,7 @@ export default router({
 				name: z.string().min(1).max(30),
 				description: z.string().max(255).optional(),
 				isRelatedToRecords: z.boolean().optional(),
+				groupVariants: z.boolean().optional(),
 				includeInSearchByDefault: z.boolean().optional(),
 				defaultDisplay: z.union([z.literal('list'), z.literal('grid')]),
 				listDisplayItems: z.string().array(),
@@ -84,10 +90,13 @@ export default router({
 			assetType.name = input.name
 			assetType.description = input.description ?? null
 			assetType.isRelatedToRecords = input.isRelatedToRecords ?? assetType.isRelatedToRecords
+			const groupingChanged = input.groupVariants !== undefined && input.groupVariants !== assetType.groupVariants
+			assetType.groupVariants = input.groupVariants ?? assetType.groupVariants
 			assetType.includeInSearchByDefault = input.includeInSearchByDefault ?? assetType.includeInSearchByDefault
 			assetType.defaultDisplay = input.defaultDisplay
 			assetType.listDisplayItems = input.listDisplayItems
 			await dataSource.getRepository(AssetType).save(assetType)
+			if (groupingChanged) await rerunVariantStage()
 			return formatAssetType(assetType)
 		}),
 	remove: publicProcedure

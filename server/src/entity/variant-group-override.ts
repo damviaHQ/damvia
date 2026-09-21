@@ -12,38 +12,25 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { Column, CreateDateColumn, Entity, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
+import { Column, CreateDateColumn, Entity, PrimaryColumn, PrimaryGeneratedColumn } from "typeorm"
 
-@Entity('asset_types')
-export class AssetType {
+export type VariantOverrideKind = 'force_group' | 'exclude' | 'cover'
+
+@Entity('variant_group_overrides')
+export class VariantGroupOverride {
 	@PrimaryColumn()
 	@PrimaryGeneratedColumn("uuid")
 	id: string
 
-	@Column()
-	name: string
+	@Column({ type: 'varchar' })
+	kind: VariantOverrideKind
+
+	@Column({ type: 'uuid', array: true })
+	assetFileIds: string[]
 
 	@Column({ type: 'varchar', nullable: true })
-	description: string | null
-
-	@Column({ default: false })
-	isRelatedToRecords: boolean
-
-	@Column({ default: false })
-	includeInSearchByDefault: boolean
-
-	@Column({ default: 'grid' })
-	defaultDisplay: 'grid' | 'list'
-
-	@Column({ type: 'text', default: [], array: true })
-	listDisplayItems: string[]
-
-	@Column({ default: false })
-	groupVariants: boolean
+	createdById: string | null
 
 	@CreateDateColumn()
 	createdAt: Date
-
-	@UpdateDateColumn()
-	updatedAt: Date
 }

@@ -14,32 +14,28 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Column, CreateDateColumn, Entity, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
 
-@Entity('asset_types')
-export class AssetType {
+export type AxisRecognizer = 'dimension' | 'ratio' | 'duration' | 'language'
+
+@Entity('variant_axes')
+export class VariantAxis {
 	@PrimaryColumn()
 	@PrimaryGeneratedColumn("uuid")
 	id: string
 
-	@Column()
-	name: string
+	@Column({ type: 'text', nullable: true })
+	name: string | null
+
+	@Column({ type: 'text', array: true })
+	values: string[]
 
 	@Column({ type: 'varchar', nullable: true })
-	description: string | null
+	recognizer: AxisRecognizer | null
 
 	@Column({ default: false })
-	isRelatedToRecords: boolean
+	ignored: boolean
 
-	@Column({ default: false })
-	includeInSearchByDefault: boolean
-
-	@Column({ default: 'grid' })
-	defaultDisplay: 'grid' | 'list'
-
-	@Column({ type: 'text', default: [], array: true })
-	listDisplayItems: string[]
-
-	@Column({ default: false })
-	groupVariants: boolean
+	@Column({ type: 'text', array: true, default: [] })
+	exampleFileNames: string[]
 
 	@CreateDateColumn()
 	createdAt: Date

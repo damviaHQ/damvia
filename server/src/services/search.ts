@@ -38,10 +38,11 @@ export type SearchInput = {
 	exactMatch?: boolean | null
 	attributes?: Record<string, string[] | null> | null
 	metadata?: Record<string, string[] | { from?: string | null, to?: string | null } | null> | null
+	variantAxes?: Record<string, string[] | null> | null
 }
 
 // A facet dimension left out of the predicate set so its counts show what selecting it would add.
-export type SearchDimension = 'assetTypes' | 'fileTypes' | 'extensions' | 'recordViews' | `attribute:${string}` | `metadata:${string}`
+export type SearchDimension = 'assetTypes' | 'fileTypes' | 'extensions' | 'recordViews' | `attribute:${string}` | `metadata:${string}` | `axis:${string}`
 
 export type SearchContext = {
 	searchableAttributes: RecordAttribute[]
@@ -50,6 +51,7 @@ export type SearchContext = {
 	searchableMetadata: boolean
 	filterMetadata: MetadataField[]
 	facetableMetadata: MetadataField[]
+	facetableAxes: string[]
 }
 
 export const FACET_VALUES_LIMIT = 200
@@ -103,6 +105,7 @@ export async function loadSearchContext(input: SearchInput): Promise<SearchConte
 	const fields = dataSource.getRepository(MetadataField)
 	const ids = activeAttributeIds(input)
 	const metadataIds = activeMetadataIds(input)
+	const axes: { id: string }[] = await dataSource.query('SELECT a.id FROM variant_axes a WHERE NOT a.ignored AND EXISTS (SELECT 1 FROM variant_group_axes ga WHERE ga.variant_axis_id = a.id) ORDER BY a.created_at, a.id')
 	const [searchableAttributes, filterAttributes, facetableAttributes, searchableMetadata, filterMetadata, facetableMetadata] = await Promise.all([
 		repository.findBy({ searchable: true }),
 		ids.length ? repository.findBy({ id: In(ids) }) : Promise.resolve([]),
@@ -111,7 +114,7 @@ export async function loadSearchContext(input: SearchInput): Promise<SearchConte
 		metadataIds.length ? fields.findBy({ id: In(metadataIds), facetable: true }) : Promise.resolve([]),
 		fields.findBy({ facetable: true }),
 	])
-	return { searchableAttributes, filterAttributes, facetableAttributes, searchableMetadata, filterMetadata, facetableMetadata }
+	return { searchableAttributes, filterAttributes, facetableAttributes, searchableMetadata, filterMetadata, facetableMetadata, facetableAxes: axes.map((axis) => axis.id) }
 }
 
 // One token matches when the file name or any searchable attribute contains it.
@@ -190,6 +193,17 @@ export function buildSearchQuery(
 			}
 		})
 
+	// A value of a variant axis: the file is a member of a group using that
+	// axis and holds that value at the axis position.
+	const inputAxes = input.variantAxes ?? {}
+	Object.keys(inputAxes).filter((axisId) => isUuid(axisId) && (inputAxes[axisId]?.length ?? 0) > 0 && exclude !== `axis:${axisId}`).forEach((axisId, index) => {
+		query.andWhere(`EXISTS (
+			SELECT 1 FROM variant_group_members axis_member${index}
+			INNER JOIN variant_group_axes axis_position${index} ON axis_position${index}.variant_group_id = axis_member${index}.variant_group_id AND axis_position${index}.variant_axis_id = :axis${index}
+			WHERE axis_member${index}.asset_file_id = asset_file.id AND axis_member${index}.axis_values[axis_position${index}.position + 1] IN (:...axisValues${index})
+		)`, { [`axis${index}`]: axisId, [`axisValues${index}`]: inputAxes[axisId] })
+	})
+
 	if (exclude !== 'extensions' && input.extensions?.length) {
 		query.andWhere(`${fileExtensionExpression} IN (:...extensions)`, {
 			extensions: input.extensions.map(normalizeExtension).filter((value) => value),
@@ -216,8 +230,19 @@ export function buildSearchQuery(
 
 // A file shared by several visible collections is one result: its first
 // visible collection file stands for it, whatever the order asked for.
-export function onePerFile(query: SelectQueryBuilder<CollectionFile>, candidates: SelectQueryBuilder<CollectionFile>) {
-	const first = candidates.select('collection_file.id').distinctOn(['asset_file.id']).orderBy('asset_file.id').addOrderBy('collection_file.id')
+export function onePerFile(query: SelectQueryBuilder<CollectionFile>, candidates: SelectQueryBuilder<CollectionFile>, collapseVariants = false) {
+	let first = candidates.select('collection_file.id')
+	if (collapseVariants) {
+		// A group of variants is one result too, shown by its cover when the
+		// reader can see it, else by its first visible member.
+		const key = 'coalesce(CAST(collapse_member.variant_group_id AS text), CAST(asset_file.id AS text))'
+		first = first
+			.leftJoin('variant_group_members', 'collapse_member', 'collapse_member.asset_file_id = asset_file.id')
+			.leftJoin('variant_groups', 'collapse_group', 'collapse_group.id = collapse_member.variant_group_id')
+			.distinctOn([key]).orderBy(key).addOrderBy('CASE WHEN collapse_group.cover_asset_file_id = asset_file.id THEN 0 ELSE 1 END').addOrderBy('collection_file.id')
+	} else {
+		first = first.distinctOn(['asset_file.id']).orderBy('asset_file.id').addOrderBy('collection_file.id')
+	}
 	return query.andWhere(`collection_file.id IN (${first.getQuery()})`).setParameters(first.getParameters())
 }
 
@@ -287,6 +312,7 @@ export type SearchFacets = {
 	attributes: Record<string, Record<string, number>>
 	metadata: Record<string, Record<string, number>>
 	metadataRanges: Record<string, { min: Date | null, max: Date | null }>
+	variantAxes: Record<string, Record<string, number>>
 }
 
 type CountRow = { key: string | null, count: string }
@@ -326,6 +352,14 @@ export async function searchFacets(user: User, input: SearchInput, context: Sear
 				.then((bounds) => [field.id, { min: bounds?.min ?? null, max: bounds?.max ?? null }] as const)
 		)),
 	])
+	const variantAxes = await Promise.all(context.facetableAxes.map((axisId) =>
+		countBy(
+			buildSearchQuery(user, input, context, `axis:${axisId}`)
+				.innerJoin('variant_group_members', 'facet_member', 'facet_member.asset_file_id = asset_file.id')
+				.innerJoin('variant_group_axes', 'facet_axis', 'facet_axis.variant_group_id = facet_member.variant_group_id AND facet_axis.variant_axis_id = :facetAxis', { facetAxis: axisId }),
+			'facet_member.axis_values[facet_axis.position + 1]',
+		).then((counts) => [axisId, counts] as const)
+	))
 	const [assetTypes, fileTypes, extensions, recordViews, ...attributes] = await Promise.all([
 		countBy(buildSearchQuery(user, input, context, 'assetTypes'), 'asset_file.asset_type_id'),
 		countBy(buildSearchQuery(user, input, context, 'fileTypes'), fileTypeExpression),
@@ -338,5 +372,5 @@ export async function searchFacets(user: User, input: SearchInput, context: Sear
 			).then((counts) => [attribute.id, counts] as const)
 		),
 	])
-	return { assetTypes, fileTypes, extensions, recordViews, attributes: Object.fromEntries(attributes), metadata: Object.fromEntries(metadata), metadataRanges: Object.fromEntries(metadataRanges) }
+	return { assetTypes, fileTypes, extensions, recordViews, attributes: Object.fromEntries(attributes), metadata: Object.fromEntries(metadata), metadataRanges: Object.fromEntries(metadataRanges), variantAxes: Object.fromEntries(variantAxes.filter(([, counts]) => Object.keys(counts).length > 0)) }
 }

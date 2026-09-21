@@ -12,37 +12,18 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { Column, CreateDateColumn, Entity, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
+import { Column, Entity, PrimaryColumn, UpdateDateColumn } from "typeorm"
 
-@Entity('asset_types')
-export class AssetType {
-	@PrimaryColumn()
-	@PrimaryGeneratedColumn("uuid")
-	id: string
+@Entity('variant_grouping_settings')
+export class VariantGroupingSettings {
+	@PrimaryColumn({ type: 'int' })
+	id: number
 
-	@Column()
-	name: string
+	@Column({ type: 'int', default: 4 })
+	minPrefixLength: number
 
-	@Column({ type: 'varchar', nullable: true })
-	description: string | null
-
-	@Column({ default: false })
-	isRelatedToRecords: boolean
-
-	@Column({ default: false })
-	includeInSearchByDefault: boolean
-
-	@Column({ default: 'grid' })
-	defaultDisplay: 'grid' | 'list'
-
-	@Column({ type: 'text', default: [], array: true })
-	listDisplayItems: string[]
-
-	@Column({ default: false })
-	groupVariants: boolean
-
-	@CreateDateColumn()
-	createdAt: Date
+	@Column({ type: 'text', array: true })
+	blockedTokens: string[]
 
 	@UpdateDateColumn()
 	updatedAt: Date

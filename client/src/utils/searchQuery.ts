@@ -17,6 +17,7 @@ import type { LocationQuery, LocationQueryValue } from 'vue-router'
 const attributeKey = /^attributes\[(.+)]$/
 const metadataKey = /^metadata\[(.+)]$/
 const metadataRangeKey = /^metadata_(from|to)\[(.+)]$/
+const axisKey = /^axes\[(.+)]$/
 
 export const SEARCH_SORTS = ['relevance', 'name', 'newest'] as const
 export type SearchSort = typeof SEARCH_SORTS[number]
@@ -107,6 +108,14 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: Searc
       metadata[range[2]] = { ...(Array.isArray(current) ? {} : current), [range[1]]: day }
     }
   }
+  const variantAxes = Object.fromEntries(
+    Object.entries(query)
+      .map(([key, value]) => {
+        const match = axisKey.exec(key)
+        return match ? [match[1], queryValueToArray(value)] : null
+      })
+      .filter((value): value is [string, string[]] => value !== null)
+  )
   const sort = SEARCH_SORTS.find((value) => value === query.sort)
 
   return {
@@ -123,6 +132,7 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: Searc
     exactMatch: query.exact_match === "true",
     attributes,
     metadata,
+    variantAxes,
     sort,
   }
 }
@@ -154,14 +164,14 @@ export function toggleQueryValue(query: LocationQuery, key: string, value: strin
 export function clearFilterQuery(query: LocationQuery): LocationQuery {
   const patch: QueryPatch = {}
   for (const key of Object.keys(query)) {
-    if ((FILTER_KEYS as readonly string[]).includes(key) || attributeKey.test(key) || metadataKey.test(key) || metadataRangeKey.test(key)) {
+    if ((FILTER_KEYS as readonly string[]).includes(key) || attributeKey.test(key) || metadataKey.test(key) || metadataRangeKey.test(key) || axisKey.test(key)) {
       patch[key] = undefined
     }
   }
   return patchSearchQuery(query, patch)
 }
 
-export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'record_views' | 'file_types' | 'extensions' | 'size' | 'attribute' | 'metadata' | 'metadata_range', attributeId?: string }
+export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'record_views' | 'file_types' | 'extensions' | 'size' | 'attribute' | 'metadata' | 'metadata_range' | 'axis', attributeId?: string }
 
 export function formatDateRange(range: { from?: string, to?: string }): string {
   if (range.from && range.to) return `${range.from} to ${range.to}`
@@ -183,6 +193,9 @@ export function activeFilters(form: SearchForm): ActiveFilter[] {
     ...Object.entries(form.metadata).flatMap(([fieldId, value]): ActiveFilter[] => Array.isArray(value)
       ? value.map((entry) => ({ key: `metadata[${fieldId}]`, value: entry, group: 'metadata' as const, attributeId: fieldId }))
       : [{ key: `metadata_range[${fieldId}]`, value: formatDateRange(value), group: 'metadata_range' as const, attributeId: fieldId }]
+    ),
+    ...Object.entries(form.variantAxes).flatMap(([axisId, values]) =>
+      values.map((value) => ({ key: `axes[${axisId}]`, value, group: 'axis' as const, attributeId: axisId }))
     ),
   ]
 }

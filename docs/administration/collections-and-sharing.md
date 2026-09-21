@@ -124,6 +124,10 @@ In list view, the column headers sort the rows. Clicking a header sorts ascendin
 
 This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, use the magnifier in the same action bar, which opens the search scoped to that collection. The search has its own facets, counted across the whole library — see [Products and PIM](./records.md#configure-record-attributes).
 
+## Variants show as one card in search
+
+When an asset type groups its variants, search shows the formats, languages and durations of one creative as a single stacked card that opens on every version, with **Download all**. Collections and pages keep listing every file. See [Variants](./variants.md).
+
 ## Known operational limits
 
 - Removing a collection link removes favourites attached to that file-in-collection pair.

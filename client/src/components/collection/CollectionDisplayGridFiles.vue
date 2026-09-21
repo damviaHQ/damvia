@@ -19,6 +19,7 @@ import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import CollectionPathTooltip from "@/components/collection/CollectionPathTooltip.vue"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionModalGallery from "@/components/collection/CollectionModalDownloadUnique.vue"
+import CollectionVariantGroupPanel from "@/components/collection/CollectionVariantGroupPanel.vue"
 import { useFileFavorites } from "@/composables/useFileFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
@@ -46,6 +47,7 @@ const props = defineProps<{
 const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
 const currentCollectionFileId = ref<string | null>(null)
+const openGroupId = ref<string | null>(null)
 const {
   canFavorite: haveAccessToFavorites,
   isFavorite,
@@ -145,7 +147,7 @@ async function remove(file: File) {
   <div ref="container" :class="isMasonry ? 'p-0.5' : gridClasses" :style="gridStyle">
     <article v-for="file in files" :key="file.id" :class="isMasonry ? masonryCardClasses : gridCardClasses"
       :style="tileStyle(file)">
-      <div :class="[isMasonry ? masonryPreviewClasses : gridPreviewClasses, isFileSelected(file) && 'outline-2 outline-neutral-500']">
+      <div :class="[isMasonry ? masonryPreviewClasses : gridPreviewClasses, isFileSelected(file) && 'outline-2 outline-neutral-500', file.variantGroup && 'variant-stack']">
         <CollectionPathTooltip :path="getPath?.(file)">
           <button type="button" class="absolute inset-0 flex size-full items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-800" :class="!isMasonry && 'p-2'" :aria-label="`Preview ${file.name}`" @click="currentCollectionFileId = file.id">
             <img v-if="file.thumbnailURL" :src="file.thumbnailURL" :alt="file.name" loading="lazy" decoding="async" class="size-full" :class="isMasonry ? 'object-cover' : 'object-contain'" @load="measure(file, $event)" />
@@ -160,6 +162,7 @@ async function remove(file: File) {
             <StarOff v-if="isFavorite(file)" aria-hidden="true" class="absolute inset-0 size-6 stroke-[2] fill-none text-neutral-500 opacity-0 group-hover/favorite:opacity-100 group-focus-visible/favorite:opacity-100" />
           </span></button>
         </div>
+        <button v-if="file.variantGroup" type="button" class="absolute bottom-3 left-3 z-10 rounded-full bg-neutral-900/80 px-2.5 py-1 text-xs font-medium text-white hover:bg-neutral-900" :aria-label="`Show the ${file.variantGroup.memberCount} variants of ${file.variantGroup.displayName}`" @click="openGroupId = file.variantGroup.id">{{ file.variantGroup.memberCount }} variants</button>
         <!-- Masonry drops the caption under the tile, so the details live over
              the image; pointer-events stay off to keep the whole tile clickable. -->
         <div v-if="isMasonry" class="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/75 to-transparent p-3 pt-8 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 group-has-[:focus-visible]:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
@@ -175,4 +178,10 @@ async function remove(file: File) {
     <p v-if="!files?.length && placeholder" class="col-span-full py-12 text-center text-sm text-neutral-500">{{ placeholder }}</p>
   </div>
   <CollectionModalGallery v-model="currentCollectionFileId" :collection="collection" :files="$props.files" />
+  <CollectionVariantGroupPanel v-model="openGroupId" />
 </template>
+
+<style scoped>
+/* A group of variants reads as a small stack of cards. */
+.variant-stack { box-shadow: 4px 4px 0 -1px var(--dv-surface, #fff), 4px 4px 0 0 var(--dv-color-line, #d4d4d4), 8px 8px 0 -1px var(--dv-surface, #fff), 8px 8px 0 0 var(--dv-color-line, #d4d4d4); }
+</style>
