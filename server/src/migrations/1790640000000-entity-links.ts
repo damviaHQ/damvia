@@ -82,13 +82,16 @@ export class EntityLinks1790640000000 implements MigrationInterface {
             CREATE INDEX idx_folder_attachments_folder ON asset_folder_entity_attachments (asset_folder_id);
 
             ALTER TABLE enrichment_settings
-                ADD COLUMN views_enabled boolean NOT NULL DEFAULT true,
+                ADD COLUMN views_enabled boolean NOT NULL DEFAULT false,
                 ADD COLUMN view_separator varchar NOT NULL DEFAULT '.',
                 ADD COLUMN view_digits int NOT NULL DEFAULT 2,
                 ADD COLUMN thumbnail_view varchar NOT NULL DEFAULT '00';
         `)
         if (process.env.PIM_PRODUCT_VIEW) {
             await queryRunner.query('UPDATE enrichment_settings SET thumbnail_view = $1', [process.env.PIM_PRODUCT_VIEW])
+        }
+        if (process.env.PIM_PRODUCT_VIEW || process.env.PRODUCT_MATCHING_REGEX) {
+            await queryRunner.query('UPDATE enrichment_settings SET views_enabled = true')
         }
         // The links the old cron made on files of record-related types become
         // filename links, so the first pass finds them in place. Files of other

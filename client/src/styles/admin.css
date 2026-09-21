@@ -77,7 +77,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-back-link { display:inline-block; margin-bottom:12px; font-size:var(--dv-size-body); color:var(--dv-text-secondary); }
 .dv-admin .asset__folder > a { border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-control); background:white; }
 .dv-admin .asset__folder > a svg { width:40px; height:40px; fill:none; stroke:var(--dv-color-blue); }
-.dv-admin button { border-radius:0; }
+.dv-admin button:not(:where([role=switch])) { border-radius:0; }
 .dv-admin [data-admin-button=confirmation] { color:white; }
 /* Search inputs inside multi-selects use the outer control's border. */
 .dv-admin .vue-treeselect__input { border:0; min-height:0; background:transparent; box-shadow:none; }

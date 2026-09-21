@@ -17,6 +17,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
@@ -66,12 +67,13 @@ async function removeLogo() {
 const toast = useGlobalToast()
 const store = useGlobalStore()
 const { data: enrichment, status: enrichmentStatus, refetch: refetchEnrichment } = useQuery({ queryKey: ['enrichment-settings'], queryFn: () => trpc.settings.getEnrichment.query() })
-const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '', viewsEnabled: true, viewSeparator: '.', viewDigits: 2, thumbnailView: '00' })
+const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '', viewsEnabled: false, viewSeparator: '.', viewDigits: 2, thumbnailView: '00' })
 const viewExample = computed(() => {
   const separator = recordLabel.value.viewSeparator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return `(key)(?:${separator}(\\d{${recordLabel.value.viewDigits}}))?`
 })
-const fileExample = computed(() => `ABC123-001${recordLabel.value.viewSeparator}${'0'.repeat(Math.max(0, recordLabel.value.viewDigits - 1))}2.jpg`)
+const viewNumber = (view: number) => String(view).padStart(Math.max(1, recordLabel.value.viewDigits), '0')
+const viewFile = (view: number) => `ABC123-001${recordLabel.value.viewSeparator}${viewNumber(view)}.jpg`
 const recordLabelErrors = ref<Record<string, string>>({})
 const isSavingRecordLabel = ref(false)
 watch(enrichment, () => { if (enrichment.value) recordLabel.value = { ...enrichment.value } }, { immediate: true })
@@ -211,34 +213,43 @@ const removeBackgroundImage = async () => {
             <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || !recordLabel.recordLabelSingular.trim() || !recordLabel.recordLabelPlural.trim()">{{ isSavingRecordLabel ? 'Saving…' : 'Save label' }}</Button>
           </div>
         </form>
-      </section>
-      <section v-if="enrichmentStatus === 'success'" class="dv-panel branding-settings" aria-labelledby="views-heading">
-        <h2 id="views-heading">Views</h2>
-        <p>A view is the angle or version a file shows of a {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }}, written after the key in the file name, such as the <code>02</code> of <code>{{ fileExample }}</code>. Matching steps then only need the key part.</p>
-        <form class="record-label-form" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
-          <label class="views-switch"><input v-model="recordLabel.viewsEnabled" type="checkbox" /> Files can carry a view number after the key</label>
-          <div class="record-label-fields">
-            <div class="record-label-field">
-              <Label for="viewSeparator">Separator</Label>
-              <Input id="viewSeparator" v-model="recordLabel.viewSeparator" maxlength="1" placeholder="." :disabled="!recordLabel.viewsEnabled" :aria-invalid="!!recordLabelErrors.viewSeparator" />
-              <p v-if="recordLabelErrors.viewSeparator" class="admin-form-error">{{ recordLabelErrors.viewSeparator }}</p>
+        <template v-if="enrichmentStatus === 'success'">
+          <h3 id="views-heading" class="views-heading">Views</h3>
+          <p>For brands that sell products. A product is usually shot several times: front, back, side, close-up, in use. Each of these pictures is a view, and a number after the product key in the file name tells them apart:</p>
+          <ul class="views-example">
+            <li><code>{{ viewFile(1) }}</code> product <code>ABC123-001</code>, view <code>{{ viewNumber(1) }}</code>, the front for example</li>
+            <li><code>{{ viewFile(2) }}</code> same product, view <code>{{ viewNumber(2) }}</code>, the back</li>
+            <li><code>{{ viewFile(3) }}</code> same product, view <code>{{ viewNumber(3) }}</code>, the side</li>
+          </ul>
+          <p>With views on, all these files are linked to the same {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }}, search can be filtered by view (only the fronts, for example), and one view is used as the {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }}'s picture. Leave views off if each file shows its record once, as for events or venues.</p>
+          <form class="record-label-form" aria-labelledby="views-heading" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
+            <label class="views-switch"><Switch v-model="recordLabel.viewsEnabled" />Files show several views of each {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }}</label>
+            <template v-if="recordLabel.viewsEnabled">
+              <div class="record-label-fields">
+                <div class="record-label-field">
+                  <Label for="viewSeparator">Separator</Label>
+                  <Input id="viewSeparator" v-model="recordLabel.viewSeparator" maxlength="1" placeholder="." :aria-invalid="!!recordLabelErrors.viewSeparator" />
+                  <p v-if="recordLabelErrors.viewSeparator" class="admin-form-error">{{ recordLabelErrors.viewSeparator }}</p>
+                </div>
+                <div class="record-label-field">
+                  <Label for="viewDigits">Digits</Label>
+                  <Input id="viewDigits" v-model.number="recordLabel.viewDigits" type="number" min="1" max="4" :aria-invalid="!!recordLabelErrors.viewDigits" />
+                  <p v-if="recordLabelErrors.viewDigits" class="admin-form-error">{{ recordLabelErrors.viewDigits }}</p>
+                </div>
+                <div class="record-label-field">
+                  <Label for="thumbnailView">Thumbnail view</Label>
+                  <Input id="thumbnailView" v-model="recordLabel.thumbnailView" placeholder="00" :aria-invalid="!!recordLabelErrors.thumbnailView" />
+                  <p class="admin-text-secondary">The view used as the picture of a {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }} in the admin list.</p>
+                </div>
+              </div>
+              <p class="branding-note">Added after the key of every file name step: <code>{{ viewExample }}</code>. Turning views off hides the view filter from search; existing view values are kept until the next pass.</p>
+            </template>
+            <p v-else class="branding-note">Views are off: file names are read as the key only and the view filter is hidden from search.</p>
+            <div class="flex flex-wrap gap-3">
+              <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || (recordLabel.viewsEnabled && recordLabel.viewSeparator.length !== 1)">{{ isSavingRecordLabel ? 'Saving…' : 'Save views' }}</Button>
             </div>
-            <div class="record-label-field">
-              <Label for="viewDigits">Digits</Label>
-              <Input id="viewDigits" v-model.number="recordLabel.viewDigits" type="number" min="1" max="4" :disabled="!recordLabel.viewsEnabled" :aria-invalid="!!recordLabelErrors.viewDigits" />
-              <p v-if="recordLabelErrors.viewDigits" class="admin-form-error">{{ recordLabelErrors.viewDigits }}</p>
-            </div>
-            <div class="record-label-field">
-              <Label for="thumbnailView">Thumbnail view</Label>
-              <Input id="thumbnailView" v-model="recordLabel.thumbnailView" placeholder="00" :aria-invalid="!!recordLabelErrors.thumbnailView" />
-              <p class="admin-text-secondary">The view used as the picture of a {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }} in the admin list.</p>
-            </div>
-          </div>
-          <p v-if="recordLabel.viewsEnabled" class="branding-note">Added after the key of every file name step: <code>{{ viewExample }}</code>. Turning views off hides the view filter from search; existing view values are kept until the next pass.</p>
-          <div class="flex flex-wrap gap-3">
-            <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || recordLabel.viewSeparator.length !== 1">{{ isSavingRecordLabel ? 'Saving…' : 'Save views' }}</Button>
-          </div>
-        </form>
+          </form>
+        </template>
       </section>
     </div>
   </div>
@@ -255,6 +266,8 @@ const removeBackgroundImage = async () => {
 .branding-background-preview { border-radius:var(--dv-radius-graphic); }
 .branding-settings .branding-note { margin-bottom:20px; }
 .record-label-fields { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-top:20px; }
+.branding-settings .views-heading { font-size:var(--dv-size-body); font-weight:600; margin-top:28px; padding-top:24px; border-top:1px solid var(--dv-color-line); }
+.views-example { display:grid; gap:6px; margin-top:12px; padding-left:0; list-style:none; color:var(--dv-text-secondary); font-size:var(--dv-size-body); }
 .views-switch { display:flex; align-items:center; gap:10px; margin-top:16px; }
 .branding-settings code { font-size:var(--dv-size-caption); }
 .record-label-field { display:grid; gap:8px; align-content:start; }

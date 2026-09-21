@@ -25,7 +25,7 @@ export class EnrichmentSettings {
 	@Column({ default: 'Products' })
 	recordLabelPlural: string
 
-	@Column({ default: true })
+	@Column({ default: false })
 	viewsEnabled: boolean
 
 	@Column({ default: '.' })

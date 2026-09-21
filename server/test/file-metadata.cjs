@@ -203,6 +203,8 @@ test('with views enabled a file name step without a view group reads the view af
     const folder = await typedFolder('Views', type)
     const front = await makeFile(folder, { name: 'VW-100.02.jpg', assetTypeId: type.id })
     const side = await makeFile(folder, { name: 'VW-100_03.jpg', assetTypeId: type.id })
+    const original = await admin.settings.getEnrichment()
+    await admin.settings.updateEnrichment({ ...original, viewsEnabled: true })
     await admin.resolverStep.save({ assetTypeId: type.id, steps: [{ strategy: 'filename_regex', enabled: true, config: { pattern: '^(VW-\\d+)', keyGroup: 1 } }] })
     assert.deepEqual([(await fileRow(front.id)).recordView, (await fileRow(side.id)).recordView], ['02', null])
     const settings = await admin.settings.getEnrichment()
@@ -214,7 +216,7 @@ test('with views enabled a file name step without a view group reads the view af
     await admin.settings.updateEnrichment({ ...settings, viewsEnabled: false })
     assert.deepEqual([(await fileRow(front.id)).recordView, (await fileRow(side.id)).recordView, (await fileRow(side.id)).recordId], [null, null, record.id])
     assert.equal((await caller(fixtures.member).env()).viewsEnabled, false)
-    await admin.settings.updateEnrichment(settings)
+    await admin.settings.updateEnrichment(original)
 })
 
 test('fields, CSV mappings and the metadata facets have their guards', async () => {
