@@ -88,6 +88,28 @@ const { data: assetTypes } = useQuery({
 const typeName = (id: string) => assetTypes.value?.find((type) => type.id === id)?.name ?? "Removed type"
 const patternOf = (id: string) => data.value?.rules.find((rule) => rule.id === id)?.pattern ?? id
 const notScanned = computed(() => status.value === "success" && data.value?.folderCount === 0)
+const root = computed(() => data.value?.roots[0] ?? "/Dropbox")
+const symbols = [
+  { symbol: "/", meaning: "Separates folders in the path. Put it before a name to say the name starts there, not in the middle of another word." },
+  { symbol: "^", meaning: "The path starts here. Paths always start with the top folder of the source, so a pattern with ^ must name it." },
+  { symbol: "$", meaning: "The path ends here: the pattern matches that folder itself, not a folder whose name only begins the same way." },
+  { symbol: ".*", meaning: "Any text, including other folders. Use it to skip levels you do not want to name." },
+  { symbol: "[^/]*", meaning: "Any text inside one folder name only, never across a /. Use it for a word that sits anywhere in a folder name." },
+  { symbol: "(A|B)", meaning: "Either A or B." },
+  { symbol: "\\", meaning: "Put it before . ( ) [ ] + ? * | ^ $ when the folder name really contains that character, for example \\(2024\\)." },
+]
+const recipes = computed(() => [
+  { label: "Every folder named PACKSHOTS, wherever it is", pattern: "/PACKSHOTS$" },
+  { label: "Every folder whose name contains the word packshots", pattern: "/[^/]*packshots[^/]*$" },
+  { label: `Only ${root.value}/PACKSHOTS`, pattern: `^${root.value}/PACKSHOTS$` },
+  { label: `Every folder inside ${root.value}/EVENTS`, pattern: `^${root.value}/EVENTS/` },
+  { label: `PACKSHOTS folders at any depth inside ${root.value}/EVENTS`, pattern: `^${root.value}/EVENTS/.*/PACKSHOTS$` },
+  { label: "Every folder named PACKSHOTS or STILLS", pattern: "/(PACKSHOTS|STILLS)$" },
+])
+function useRecipe(pattern: string) {
+  form.value.pattern = pattern
+  document.getElementById("pattern")?.focus()
+}
 
 const preview = ref<Preview | null>(null)
 const previewError = ref("")
@@ -109,6 +131,8 @@ watch(() => [form.value.pattern, form.value.assetTypeId, form.value.enabled, mod
     }
   }, 400)
 })
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`
 
 function describeGroup(group: Preview["changes"]["groups"][number]) {
   const type = group.assetTypeName ?? "no type"
@@ -207,7 +231,7 @@ async function remove(id: string) {
           <TableHead>Pattern</TableHead>
           <TableHead>Asset type</TableHead>
           <TableHead>Enabled</TableHead>
-          <TableHead>Folders</TableHead>
+          <TableHead>Folders typed</TableHead>
           <TableHead>Examples</TableHead>
           <TableHead>Overlaps with</TableHead>
           <TableHead></TableHead>
@@ -221,7 +245,10 @@ async function remove(id: string) {
           </TableCell>
           <TableCell>{{ typeName(rule.assetTypeId) }}</TableCell>
           <TableCell>{{ rule.enabled ? "Yes" : "No" }}</TableCell>
-          <TableCell>{{ notScanned ? "–" : rule.folders }}</TableCell>
+          <TableCell>
+            {{ notScanned ? "–" : rule.folders }}
+            <p v-if="rule.keptByHand" class="admin-text-secondary folder-rule-examples">+ {{ rule.keptByHand }} kept by hand</p>
+          </TableCell>
           <TableCell>
             <TooltipProvider v-if="rule.examples.length">
               <Tooltip>
@@ -293,17 +320,18 @@ async function remove(id: string) {
     </AdminList>
   </div>
   <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && !saving && (modalState = 'closed')">
-    <DialogContent class="flex flex-col">
+    <DialogContent class="admin-dialog--wide flex flex-col">
       <form :aria-busy="saving" @submit.prevent="onModalSubmit" class="admin-form">
         <DialogHeader>
           <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} folder rule</DialogTitle>
           <DialogDescription>Saving applies the rule right away. Nothing is written to Dropbox, OneDrive or Google Drive.</DialogDescription>
         </DialogHeader>
+        <div class="modal-editor-grid">
         <div class="flex flex-col gap-5 min-w-0">
           <FieldGroup>
             <Label for="pattern">Pattern *</Label>
-            <Input id="pattern" v-model="form.pattern" placeholder="^/DIGITAL PACK/.*/PACKSHOTS" :aria-invalid="!!errors.pattern" aria-describedby="pattern-help pattern-error" />
-            <p id="pattern-help" class="text-body admin-text-secondary">A regular expression tested against the folder path, for example <code>^/DIGITAL PACK/.*/PACKSHOTS</code>. Case does not matter.</p>
+            <Input id="pattern" v-model="form.pattern" placeholder="/PACKSHOTS$" :aria-invalid="!!errors.pattern" aria-describedby="pattern-help pattern-error" />
+            <p id="pattern-help" class="text-body admin-text-secondary">Tested against the full path of each folder, such as <code>{{ root }}/EVENTS/2026/PACKSHOTS</code>. Every path starts with <code>{{ root }}</code>. Upper and lower case do not matter.</p>
             <p v-if="errors.pattern" id="pattern-error" class="admin-form-error">{{ errors.pattern }}</p>
           </FieldGroup>
           <FieldGroup>
@@ -328,13 +356,43 @@ async function remove(id: string) {
             <template v-if="previewing">Checking the folders…</template>
             <template v-else-if="previewError">{{ previewError }}</template>
             <template v-else-if="preview">
-              <p>Matches {{ preview.matches }} {{ preview.matches === 1 ? "folder" : "folders" }}<template v-if="preview.examples.length">: {{ preview.examples.slice(0, 3).join(", ") }}</template></p>
+              <p v-if="preview.matches === 0">No folder matches.<template v-if="form.pattern.startsWith('^')"> A pattern starting with <code>^</code> must continue with <code>{{ root }}</code>.</template></p>
+              <template v-else>
+                <p>Matches {{ plural(preview.matches, "folder") }}: {{ preview.examples.slice(0, 3).join(", ") }}<template v-if="preview.matches > 3">, …</template></p>
+                <ul class="folder-rule-outcome">
+                  <li>{{ preview.applied ? plural(preview.applied, "folder") : "No folder" }} will take this type.</li>
+                  <li v-if="preview.keptByHand">{{ plural(preview.keptByHand, "folder") }} {{ preview.keptByHand === 1 ? "keeps" : "keep" }} the type set by hand. Clear it in Assets to let the rule apply.</li>
+                  <li v-for="lost in preview.lostTo" :key="lost.rulePattern ?? ''">{{ plural(lost.count, "folder") }} {{ lost.count === 1 ? "keeps" : "keep" }} the type of the rule <code>{{ lost.rulePattern }}</code>, which starts deeper, or at the same level and is older.</li>
+                </ul>
+              </template>
               <ul v-if="preview.changes.groups.length" class="folder-rule-examples">
                 <li v-for="group in preview.changes.groups" :key="describeGroup(group)">{{ describeGroup(group) }}</li>
               </ul>
             </template>
             <template v-else>Enter a pattern and pick a type to see what would change.</template>
           </div>
+        </div>
+        <aside class="pattern-guide" aria-labelledby="pattern-guide-heading">
+          <h3 id="pattern-guide-heading">How to write a pattern</h3>
+          <p class="admin-text-secondary">Letters, digits and spaces match themselves. These characters have a meaning:</p>
+          <dl class="pattern-guide__symbols">
+            <template v-for="entry in symbols" :key="entry.symbol">
+              <dt><code>{{ entry.symbol }}</code></dt>
+              <dd>{{ entry.meaning }}</dd>
+            </template>
+          </dl>
+          <h3>Examples</h3>
+          <ul class="pattern-guide__recipes">
+            <li v-for="recipe in recipes" :key="recipe.pattern">
+              <div>
+                <span>{{ recipe.label }}</span>
+                <code>{{ recipe.pattern }}</code>
+              </div>
+              <Button type="button" variant="outline" size="sm" :aria-label="`Use the pattern ${recipe.pattern}`" @click="useRecipe(recipe.pattern)">Use</Button>
+            </li>
+          </ul>
+          <p class="admin-text-secondary">A folder matched by a rule gives its type to its subfolders, so a rule does not need to match them.</p>
+        </aside>
         </div>
         <DialogFooter class="items-center">
           <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
@@ -350,4 +408,15 @@ async function remove(id: string) {
 
 <style scoped>
 .folder-rule-examples { display:grid; gap:2px; font-size:var(--dv-size-caption); }
+.folder-rule-outcome { display:grid; gap:2px; margin:6px 0; padding-left:18px; list-style:disc; }
+.pattern-guide { display:grid; gap:12px; align-content:start; padding:20px; background:var(--dv-surface-canvas); border-radius:var(--dv-radius-data); font-size:var(--dv-size-caption); line-height:1.5; }
+.pattern-guide h3 { font-size:var(--dv-size-body); font-weight:600; }
+.pattern-guide h3 + p, .pattern-guide h3 + ul { margin-top:-4px; }
+.pattern-guide__symbols { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:8px 14px; }
+.pattern-guide__symbols dt { white-space:nowrap; }
+.pattern-guide__recipes { display:grid; gap:8px; }
+.pattern-guide__recipes li { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.pattern-guide__recipes li > div { display:grid; gap:2px; min-width:0; }
+.pattern-guide__recipes code { overflow-wrap:anywhere; }
+.pattern-guide code, .admin-form code { font-family:var(--dv-font-mono, ui-monospace, monospace); background:var(--dv-surface-raised, rgba(0,0,0,.05)); padding:1px 5px; border-radius:4px; }
 </style>

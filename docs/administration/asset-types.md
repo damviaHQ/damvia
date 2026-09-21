@@ -41,6 +41,29 @@ Open `/admin/folder-rules` to give a type to every folder whose path matches a r
 
 Rules are applied by the enrichment pass that runs after every sync, and immediately when a rule is saved or re-applied. The dialog shows, before saving, how many folders match with three examples, and what those folders currently hold ("12 folders currently Packshot (rule `…`)", "3 folders currently Shooting (set by hand, not changed)"). Saving writes the type to the matched folders and their files. Nothing is ever written to the cloud storage.
 
+### Writing a pattern
+
+Every path starts with the top folder of the source, for example `/Dropbox/EVENTS/2026/PACKSHOTS`. Letters, digits and spaces match themselves; these characters have a meaning:
+
+| Character | Meaning |
+|---|---|
+| `/` | Separates folders. Put it before a name so the name starts there, not in the middle of another word. |
+| `^` | The path starts here. A pattern starting with `^` must continue with the top folder, such as `^/Dropbox/`. `^/PACKSHOTS` matches nothing. |
+| `$` | The path ends here: the folder itself, not a longer name that begins the same way. |
+| `.*` | Any text, across folders. Skips levels you do not want to name. |
+| `[^/]*` | Any text inside one folder name only. |
+| `(A\|B)` | Either A or B. |
+| `\` | Before `. ( ) [ ] + ? * \| ^ $` when the folder name really contains that character. |
+
+| Goal | Pattern |
+|---|---|
+| Every folder named PACKSHOTS, wherever it is | `/PACKSHOTS$` |
+| Every folder whose name contains the word packshots | `/[^/]*packshots[^/]*$` |
+| Only one folder | `^/Dropbox/PACKSHOTS$` |
+| PACKSHOTS folders at any depth inside one folder | `^/Dropbox/EVENTS/.*/PACKSHOTS$` |
+
+The dialog shows this guide with a **Use** button per example. Its preview says how many folders the pattern matches, how many will take the type, how many keep a type set by hand and how many stay with another rule, naming it. The rules table counts, under **Folders typed**, only the folders a rule actually types, and adds the folders it matches but that keep a hand-set type.
+
 How the type of a folder is decided:
 
 - A type set by hand on the folder wins, always.

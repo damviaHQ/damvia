@@ -64,9 +64,8 @@ async function assertAssetType(id: string) {
 
 // What the folders currently hold where the resolution would change, grouped
 // by type and origin, so the admin sees "12 folders currently Packshot (rule
-// X)" before anything is written. Manual folders the rule matches are listed
-// too, as not changed.
-async function summarizeChanges(folders: FolderRow[], changes: FolderResolution[], manualMatched: FolderRow[]) {
+// X)" before anything is written.
+async function summarizeChanges(folders: FolderRow[], changes: FolderResolution[]) {
 	const byId = new Map(folders.map((folder) => [folder.id, folder]))
 	const groups = new Map<string, { assetTypeId: string | null, source: string | null, ruleId: string | null, count: number }>()
 	const add = (folder: FolderRow) => {
@@ -76,7 +75,6 @@ async function summarizeChanges(folders: FolderRow[], changes: FolderResolution[
 		groups.set(key, group)
 	}
 	for (const change of changes) add(byId.get(change.id)!)
-	for (const folder of manualMatched) add(folder)
 	const types = await dataSource.getRepository(AssetType).find()
 	const rules = await dataSource.getRepository(AssetTypeRule).find()
 	const files = changes.length ? await dataSource.query('SELECT count(*)::int AS count FROM asset_files WHERE folder_id = ANY($1)', [changes.map((change) => change.id)]) : [{ count: 0 }]
@@ -100,13 +98,16 @@ export default router({
 			const folders = await loadFolders(dataSource.manager)
 			const compiled = await loadCompiledRules(dataSource.manager)
 			const { wins, overlaps } = resolveFolderAssetTypes(folders, compiled)
-			const paths = new Map(folders.map((folder) => [folder.id, folder.path]))
+			const byId = new Map(folders.map((folder) => [folder.id, folder]))
+			const applied = (ruleId: string) => (wins.get(ruleId) ?? []).filter((id) => byId.get(id)!.assetTypeSource !== 'manual')
 			return {
 				folderCount: folders.length,
+				roots: folders.filter((folder) => !folder.parentId).map((folder) => folder.path),
 				rules: rules.map((rule) => ({
 					...formatAssetTypeRule(rule),
-					folders: wins.get(rule.id)?.length ?? 0,
-					examples: (wins.get(rule.id) ?? []).slice(0, EXAMPLES).map((id) => paths.get(id)!),
+					folders: applied(rule.id).length,
+					keptByHand: (wins.get(rule.id)?.length ?? 0) - applied(rule.id).length,
+					examples: applied(rule.id).slice(0, EXAMPLES).map((id) => byId.get(id)!.path),
 					overlaps: [...new Set(overlaps.filter((overlap) => overlap.ruleId === rule.id || overlap.otherRuleId === rule.id).map((overlap) => overlap.ruleId === rule.id ? overlap.otherRuleId : overlap.ruleId))],
 				})),
 			}
@@ -121,13 +122,23 @@ export default router({
 			const rules = input.enabled === false ? others : [...others, candidate].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id))
 			const folders = await loadFolders(dataSource.manager)
 			const { wins, changes } = resolveFolderAssetTypes(folders, rules)
-			const byId = new Map(folders.map((folder) => [folder.id, folder]))
-			const won = wins.get(candidate.id) ?? []
-			const manualMatched = won.map((id) => byId.get(id)!).filter((folder) => folder.assetTypeSource === 'manual')
+			const winnerOf = new Map<string, string>()
+			for (const [ruleId, folderIds] of wins) for (const folderId of folderIds) winnerOf.set(folderId, ruleId)
+			const patterns = new Map((await dataSource.getRepository(AssetTypeRule).find()).map((rule) => [rule.id, rule.pattern]))
+			const matched = folders.filter((folder) => candidate.regex.test(folder.path))
+			const keptByHand = matched.filter((folder) => folder.assetTypeSource === 'manual')
+			const lostTo = new Map<string, number>()
+			for (const folder of matched) {
+				const winner = winnerOf.get(folder.id)
+				if (folder.assetTypeSource !== 'manual' && winner && winner !== candidate.id) lostTo.set(winner, (lostTo.get(winner) ?? 0) + 1)
+			}
 			return {
-				matches: won.length,
-				examples: won.slice(0, EXAMPLES).map((id) => byId.get(id)!.path),
-				changes: await summarizeChanges(folders, changes, manualMatched),
+				matches: matched.length,
+				examples: matched.slice(0, EXAMPLES).map((folder) => folder.path),
+				applied: (wins.get(candidate.id) ?? []).filter((id) => !keptByHand.some((folder) => folder.id === id)).length,
+				keptByHand: keptByHand.length,
+				lostTo: [...lostTo].map(([ruleId, count]) => ({ rulePattern: patterns.get(ruleId) ?? null, count })),
+				changes: await summarizeChanges(folders, changes),
 			}
 		}),
 	create: publicProcedure

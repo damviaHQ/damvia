@@ -122,7 +122,7 @@ The chosen filters stay across navigation and reloads until they are unticked; t
 
 In list view, the column headers sort the rows. Clicking a header sorts ascending, clicking it again descending. **Size** sorts by the real byte count and **Updated at** by the real date, not by the text in the cell. Sorting lasts as long as the view; it is not saved.
 
-This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, use the magnifier in the same action bar, which opens the search scoped to that collection. The search has its own facets, counted across the whole library — see [Products and PIM](./products-and-pim.md#configure-product-attributes).
+This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, use the magnifier in the same action bar, which opens the search scoped to that collection. The search has its own facets, counted across the whole library — see [Products and PIM](./records.md#configure-record-attributes).
 
 ## Known operational limits
 
