@@ -151,31 +151,27 @@ function openDialog(type: "add" | "edit") {
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem v-if="item.type === 'collection'" @select="openDialog('add')">
-            <div class="flex items-center">
-              <Plus class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
-              <span>Add Item to Collection</span>
-            </div>
+            <Plus />
+            <span>Add Item to Collection</span>
           </DropdownMenuItem>
           <DropdownMenuItem @select="openDialog('edit')">
-            <div class="flex items-center">
-              <Settings class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
-              <span>Edit Item</span>
-            </div>
+            <Settings />
+            <span>Edit Item</span>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="index > 0" @select="moveItem(-1)">
-            <ArrowUp class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
+            <ArrowUp />
             <span>Move up</span>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="index < count - 1" @select="moveItem(1)">
-            <ArrowDown class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
+            <ArrowDown />
             <span>Move down</span>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="['collection', 'page'].includes(item.type)" @click="setHome(item)">
-            <Home class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
+            <Home />
             <span>Set as Home</span>
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleRemove(item)">
-            <Trash class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)] mr-2" />
+          <DropdownMenuItem variant="destructive" @click="handleRemove(item)">
+            <Trash />
             <span>Remove from menu</span>
           </DropdownMenuItem>
         </DropdownMenuContent>

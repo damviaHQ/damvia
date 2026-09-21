@@ -98,28 +98,28 @@ const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDi
             showMemberDialog = true
           memberDialogInitialTab = 'profile';
           ">
-            <User class="size-4 shrink-0" />
+            <User />
             <span>Profile</span>
           </DropdownMenuItem>
           <DropdownMenuItem class="cursor-pointer" @click="
             showMemberDialog = true
           memberDialogInitialTab = 'downloads';
           ">
-            <Download class="size-4 shrink-0" />
+            <Download />
             <span>My Downloads</span>
           </DropdownMenuItem>
           <DropdownMenuItem class="cursor-pointer" @click="
             showMemberDialog = true
           memberDialogInitialTab = 'links';
           ">
-            <Link class="size-4 shrink-0" />
+            <Link />
             <span>My Links</span>
           </DropdownMenuItem>
           <DropdownMenuItem class="cursor-pointer" @click="
             showMemberDialog = true
           memberDialogInitialTab = 'display-preferences';
           ">
-            <LayoutDashboard class="size-4 shrink-0" />
+            <LayoutDashboard />
             <span>Display Preferences</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -131,20 +131,20 @@ const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDi
           </DropdownMenuLabel>
           <DropdownMenuItem v-if="['admin'].includes(globalStore.user?.role ?? '')">
             <router-link :to="{ name: 'admin-dashboard' }" class="flex w-full items-center gap-2">
-              <Settings class="size-4 shrink-0" />
+              <Settings />
               <span>Administration</span>
             </router-link>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')">
             <router-link :to="{ name: 'admin-users' }" class="flex w-full items-center gap-2">
-              <Users class="size-4 shrink-0" />
+              <Users />
               <span>Manage Users</span>
             </router-link>
           </DropdownMenuItem>
           <DropdownMenuSeparator v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')"
             class="my-1" />
           <DropdownMenuItem @click="globalStore.logout()" class="cursor-pointer">
-            <LogOut class="size-4 shrink-0" />
+            <LogOut />
             <span>Log out</span>
           </DropdownMenuItem>
         </DropdownMenuContent>

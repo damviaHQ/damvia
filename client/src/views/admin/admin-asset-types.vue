@@ -245,7 +245,6 @@ async function onModalSubmit(event: Event) {
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
     <AdminPageHeader :description="`Say what kind of file each folder holds: packshot, event photo, banner. The next steps are set per type: how its files find their ${recordLabel.lower.value} and whether its variants are grouped.`">
-      <template #lead><span class="admin-step">Setup · step 1 of 4</span></template>
     </AdminPageHeader>
     <Tabs :model-value="tab" @update:model-value="onTab">
       <TabsList>

@@ -45,19 +45,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-badge--danger { color: var(--dv-color-danger); background: var(--dv-color-danger-soft); }
 .dv-badge--blue { color: var(--dv-action-primary); background: var(--dv-action-soft); }
 .dv-panel { background: var(--dv-surface-panel); border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-surface); }
-.dv-toast { display: flex; align-items: center; gap: var(--dv-space-3); min-height: 58px; max-width: min(380px, calc(100vw - 32px)); padding: 13px 16px; border: 1px solid rgb(255 255 255 / .14); border-radius: var(--dv-radius-data); background: var(--dv-color-midnight); color: var(--dv-text-on-dark); box-shadow: 0 16px 42px rgb(0 5 47 / .22); }
+.dv-toast { display: flex; align-items: flex-start; gap: 10px; max-width: min(360px, calc(100vw - 32px)); padding: 14px 16px; border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-surface); background: var(--dv-surface-panel); color: var(--dv-text-primary); box-shadow: 0 1px 2px rgb(15 23 42 / .04), 0 10px 28px -8px rgb(15 23 42 / .16); }
 /* Compact status icons sit directly on the toast surface. */
-.dv-toast .dv-toast__icon { width:18px; height:18px; padding:0; color:var(--dv-action-primary); }
+.dv-toast .dv-toast__icon { width:18px; height:18px; margin-top:1px; flex-shrink:0; padding:0; color:var(--dv-action-primary); }
 .dv-toast--success .dv-toast__icon { color:var(--dv-color-success); }
 .dv-toast--danger .dv-toast__icon { color:var(--dv-color-danger); }
 .dv-toast--warning .dv-toast__icon { color:var(--dv-color-warning); }
-.dv-toast__title { color: var(--dv-text-on-dark); font-size:var(--dv-size-body); font-weight: 600; line-height: 1.4; letter-spacing: -.01em; }
-.dv-toast__description { color: var(--dv-text-on-dark-secondary); font-size:var(--dv-size-caption); line-height: 1.5; }
-.dv-toast__action, .dv-toast__cancel { min-height: 32px; margin-left: auto; border: 1px solid rgb(255 255 255 / .24); border-radius: var(--dv-radius-button); padding: 0 11px; font-size:var(--dv-size-caption); font-weight: 550; }
-.dv-theme .dv-toast__action { display:inline-flex; align-items:center; justify-content:center; background:var(--dv-action-primary); color:var(--dv-text-on-dark); border:1px solid var(--dv-action-primary); font-family:var(--dv-font-body); font-size:var(--dv-size-caption); font-weight:550; line-height:1.5; padding:5px 10px; }
+.dv-toast__title { color: var(--dv-text-primary); font-size:var(--dv-size-body); font-weight: 600; line-height: 20px; }
+.dv-toast__description { color: var(--dv-text-secondary); font-size:13px; line-height: 18px; }
+.dv-toast__action, .dv-toast__cancel { align-self: center; min-height: 30px; margin-left: auto; border: 1px solid var(--dv-color-line); border-radius: var(--dv-radius-button); padding: 0 12px; font-size:var(--dv-size-caption); font-weight: 550; }
+.dv-theme .dv-toast__action { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; background:var(--dv-action-primary); color:var(--dv-text-on-dark); border-color:var(--dv-action-primary); font-family:var(--dv-font-body); }
 .dv-theme .dv-toast__action:hover { background:var(--dv-action-hover); border-color:var(--dv-action-hover); }
-.dv-toast__cancel { background: transparent; color: var(--dv-text-on-dark-secondary); }
-.dv-toast__close { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; margin-left: auto; padding: 0; border: 0; border-radius: var(--dv-radius-button); background: transparent; color: var(--dv-text-on-dark-secondary); }
+.dv-toast__cancel { background: transparent; color: var(--dv-text-secondary); }
+.dv-toast__close { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; margin-left: auto; padding: 0; border: 0; border-radius: var(--dv-radius-sm); background: transparent; color: var(--dv-text-secondary); }
+.dv-toast__close:hover { background: var(--dv-surface-canvas); color: var(--dv-text-primary); }
 .dv-table-wrap { position: relative; overflow-x: auto; }
 .dv-table { width: 100%; border-collapse: collapse; text-align: left; font-size:var(--dv-size-body); }
 .dv-table th { background: var(--dv-surface-canvas); color: var(--dv-text-secondary); font-weight: 500; font-size:var(--dv-size-caption); padding: 11px 20px; white-space: nowrap; }

@@ -8,6 +8,8 @@ lastUpdated: 2026-09-21
 
 The administration area controls who can enter the library, how source files are classified, what readers see, and whether the instance is healthy. These guides describe administrative decisions and their consequences. Everyday reader workflows belong in the separate website knowledge base and onboarding.
 
+The icon next to the logo hides the administration menu so a screen can use the full width. The icon at the left of the top bar brings the menu back. Each browser remembers the choice.
+
 ## Start with access and a healthy source
 
 After creating the [first admin](../getting-started/first-admin.md):

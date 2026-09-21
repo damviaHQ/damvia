@@ -60,7 +60,7 @@ Vue and Astro use identical class and variable names. Typography is optional: im
 | `dv-select` | Native select; always provide a label |
 | `dv-badge` | Square data label; `--success`, `--warning`, `--danger`, `--blue`; include text |
 | `dv-panel` | Rounded passive layout surface; semantic section/heading remains consumer-owned |
-| `dv-toast` | Square midnight notification surface; status modifiers `--success`, `--danger`, `--warning`, `--info` tint the labelled icon; square action and close controls |
+| `dv-toast` | Panel notification surface (white, line border, 12 px radius); status modifiers `--success`, `--danger`, `--warning`, `--info` tint the labelled icon; square action button |
 | `dv-breadcrumb` | Square navigation path with linked ancestors, a plain-text current page, truncated-label tooltips and an ellipsis menu for hidden ancestors |
 | `dv-table` | Wrap in `dv-table-wrap`; use caption, headings and sort semantics |
 

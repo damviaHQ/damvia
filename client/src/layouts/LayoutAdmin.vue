@@ -35,6 +35,8 @@ import {
   LayoutDashboard,
   Menu,
   Package,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   SquareChevronLeft,
   Unlink,
@@ -51,6 +53,10 @@ const recordLabel = useRecordLabel()
 const router = useRouter()
 const mobileOpen = ref(false)
 watch(() => route.fullPath, () => { mobileOpen.value = false })
+const SIDEBAR_HIDDEN_KEY = 'damvia-admin-sidebar-hidden'
+const readSidebarHidden = () => { try { return localStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1' } catch { return false } }
+const sidebarHidden = ref(readSidebarHidden())
+watch(sidebarHidden, (hidden) => { try { localStorage.setItem(SIDEBAR_HIDDEN_KEY, hidden ? '1' : '0') } catch {} })
 // Child routes highlight no sidebar entry, so the breadcrumb is their only locator.
 const adminParents: Record<string, string> = {
   'admin-record-import': 'admin-records',
@@ -103,8 +109,11 @@ const storageLevel = computed(() => {
   <div class="dv-theme dv-admin admin-shell">
     <a href="#admin-content" class="skip-link">Skip to content</a>
     <button class="mobile-nav-toggle" :aria-expanded="mobileOpen" aria-controls="admin-navigation" @click="mobileOpen = !mobileOpen"><Menu />{{ mobileOpen ? 'Close navigation' : 'Open navigation' }}</button>
-    <aside id="admin-navigation" class="admin-sidebar" :class="{ 'is-open': mobileOpen }">
-      <router-link :to="{ name: 'home' }" class="admin-brand" aria-label="Back to the DAM" title="Back to the DAM" @click="mobileOpen = false"><ClientLogo admin /><span>ADMIN</span></router-link>
+    <aside id="admin-navigation" class="admin-sidebar" :class="{ 'is-open': mobileOpen, 'is-hidden': sidebarHidden }">
+      <div class="admin-brand-row">
+        <router-link :to="{ name: 'home' }" class="admin-brand" aria-label="Back to the DAM" title="Back to the DAM" @click="mobileOpen = false"><ClientLogo admin /></router-link>
+        <button type="button" class="sidebar-toggle" aria-label="Hide menu" title="Hide menu" aria-controls="admin-navigation" :aria-expanded="!sidebarHidden" @click="sidebarHidden = true"><PanelLeftClose /></button>
+      </div>
       <div v-if="storage" class="sidebar-storage" :class="`sidebar-storage--${storageLevel}`">
         <div class="sidebar-storage-head">
           <span class="sidebar-storage-label">{{ storageLevel === 'ok' ? 'Storage used' : storage.quotaReachedAt ? 'Storage full' : storageLevel === 'full' ? 'Storage almost full' : 'Storage running low' }}</span>
@@ -230,7 +239,7 @@ const storageLevel = computed(() => {
       </div>
     </aside>
     <div class="admin-workspace">
-      <header class="admin-topbar"><PathBreadcrumb :items="adminBreadcrumbItems" /><router-link :to="{ name: 'home' }" class="dv-button">Open your DAM <SquareChevronLeft /></router-link></header>
+      <header class="admin-topbar"><button v-if="sidebarHidden" type="button" class="sidebar-toggle sidebar-toggle--topbar" aria-label="Show menu" title="Show menu" aria-controls="admin-navigation" aria-expanded="false" @click="sidebarHidden = false"><PanelLeftOpen /></button><PathBreadcrumb :items="adminBreadcrumbItems" /><router-link :to="{ name: 'home' }" class="dv-button">Open your DAM <SquareChevronLeft /></router-link></header>
       <div v-if="showStorageBanner && storage" role="status" class="storage-banner flex items-center gap-2 px-8 py-2 text-body"
         :class="storagePercent >= 90 ? 'storage-banner--danger' : 'storage-banner--warning'">
         <HardDrive class="w-4 h-4" />
@@ -249,13 +258,20 @@ const storageLevel = computed(() => {
 <style scoped>
 .admin-shell { --nav-hover:#172049; --nav-active:#193674; --nav-line:#46527c; --nav-track:#28315a; --nav-accent:#85aaff; display:flex; height:100dvh; overflow:hidden; background:var(--dv-surface-canvas); }
 .admin-sidebar { width:228px; flex-shrink:0; background:var(--dv-surface-nav); color:var(--dv-text-on-dark-secondary); padding:22px 4px 16px 18px; display:flex; flex-direction:column; overflow:hidden; }
-.admin-brand { display:flex; align-items:center; gap:16px; padding:0 10px 18px; }
+.admin-brand-row { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; padding-right:10px; }
+.admin-brand { display:flex; align-items:center; min-width:0; padding:0 10px 18px; }
 .admin-brand :deep(.client-logo--default) { width:108px; filter:brightness(0) invert(1); }
 .admin-brand :deep(.client-logo--uploaded) { filter:none; background:white; padding:8px; border-radius:var(--dv-radius-graphic); width:128px; height:56px; object-fit:contain; }
-.admin-brand span { font-size:var(--dv-size-caption); letter-spacing:.1em; border:1px solid var(--nav-line); padding:3px 5px; border-radius:var(--dv-radius-data); }
+.sidebar-toggle { display:flex; flex:none; align-items:center; justify-content:center; width:28px; height:28px; color:var(--dv-text-on-dark-muted); border-radius:var(--dv-radius-data); }
+.sidebar-toggle:hover { background:var(--nav-hover); color:white; }
+.sidebar-toggle > svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
+.sidebar-toggle--topbar { color:var(--dv-text-secondary); }
+.sidebar-toggle--topbar:hover { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
+.sidebar-toggle--topbar:focus-visible { outline:2px solid var(--dv-color-line); outline-offset:-2px; }
+@media(min-width:761px) { .admin-sidebar.is-hidden { display:none; } }
 .admin-nav { flex:1; min-height:0; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--nav-line) transparent; }
 .admin-nav::-webkit-scrollbar { width:5px; }
-.admin-nav :focus-visible, .admin-brand:focus-visible, .sidebar-credit a:focus-visible, .mobile-nav-toggle:focus-visible { outline:2px solid var(--nav-accent); outline-offset:-2px; }
+.admin-nav :focus-visible, .admin-brand:focus-visible, .sidebar-toggle:focus-visible, .sidebar-credit a:focus-visible, .mobile-nav-toggle:focus-visible { outline:2px solid var(--nav-accent); outline-offset:-2px; }
 .admin-nav::-webkit-scrollbar-thumb { background:var(--nav-line); }
 .menu-section { margin-bottom:8px; }
 .menu-section-title { color:var(--dv-text-on-dark-muted); font-size:var(--dv-size-caption); padding:8px 12px 4px; }
@@ -292,6 +308,7 @@ const storageLevel = computed(() => {
  .admin-shell { height:auto; min-height:100dvh; display:block; overflow:visible; }
  .mobile-nav-toggle { display:flex; align-items:center; gap:10px; background:var(--dv-surface-nav); color:white; width:100%; padding:16px; font-size:var(--dv-size-body); }
  .mobile-nav-toggle svg { width:var(--dv-icon-default); }
+ .sidebar-toggle { display:none; }
  .admin-sidebar { display:none; width:100%; }
  .admin-sidebar.is-open { display:flex; }
  .admin-nav { overflow:visible; }

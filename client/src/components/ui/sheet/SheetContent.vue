@@ -28,10 +28,10 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
 <template>
   <DialogPortal>
-    <DialogOverlay class="fixed inset-0 z-50 bg-black/30" />
+    <DialogOverlay class="fixed inset-0 z-40 bg-black/30" />
     <DialogContent
       v-bind="{ ...forwarded, ...$attrs }"
-      :class="cn('fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-lg', adminTheme ? 'dv-theme dv-admin admin-sheet' : '', props.class)"
+      :class="cn('fixed inset-y-0 right-0 z-40 flex h-full w-full flex-col border-l bg-background shadow-lg', adminTheme ? 'dv-theme dv-admin admin-sheet' : '', props.class)"
     >
       <slot />
       <DialogClose data-dialog-close

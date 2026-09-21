@@ -83,18 +83,18 @@ async function openDialog(action: 'edit' | 'share') {
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" side="bottom" :side-offset="4" :collision-padding="12" class="min-w-52"
       @pointer-down-outside="dismissedByOutsidePointer = true" @close-auto-focus="handleCloseAutoFocus">
-      <DropdownMenuItem v-if="canRename" class="gap-2" @select="renameModalOpen = true">
-        <Pencil aria-hidden="true" class="size-4 shrink-0" /> Rename collection
+      <DropdownMenuItem v-if="canRename" @select="renameModalOpen = true">
+        <Pencil aria-hidden="true" />Rename collection
       </DropdownMenuItem>
-      <DropdownMenuItem v-if="collection.canEdit" class="gap-2" @select="openDialog('share')">
-        <Link aria-hidden="true" class="size-4 shrink-0" /> Share collection
+      <DropdownMenuItem v-if="collection.canEdit" @select="openDialog('share')">
+        <Link aria-hidden="true" />Share collection
       </DropdownMenuItem>
-      <DropdownMenuItem v-if="collection.canEdit" class="gap-2" @select="openDialog('edit')">
-        <Settings aria-hidden="true" class="size-4 shrink-0" /> Edit collection
+      <DropdownMenuItem v-if="collection.canEdit" @select="openDialog('edit')">
+        <Settings aria-hidden="true" />Edit collection
       </DropdownMenuItem>
       <DropdownMenuSeparator v-if="canDelete" />
-      <DropdownMenuItem v-if="canDelete" class="gap-2 text-destructive data-[highlighted]:text-destructive" @select="deleteModalOpen = true">
-        <Trash aria-hidden="true" class="size-4 shrink-0" /> Delete collection
+      <DropdownMenuItem v-if="canDelete" variant="destructive" @select="deleteModalOpen = true">
+        <Trash aria-hidden="true" />Delete collection
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
