@@ -90,7 +90,6 @@ export default router({
 		}))
 		.mutation(async ({ input }) => {
 			const menuItem = new MenuItem()
-			const menuItems = [menuItem]
 			menuItem.type = input.type
 			if (input.parentId) {
 				const parent = await dataSource.getRepository(MenuItem).findOneBy({ id: input.parentId })
@@ -102,6 +101,7 @@ export default router({
 			}
 			menuItem.position = await dataSource.getRepository(MenuItem).countBy({ parentId: menuItem.parentId ?? IsNull() })
 
+			let syncTree: Collection | null = null
 			if (input.type === MenuItemType.COLLECTION) {
 				const collection = input.collectionId ? await dataSource.getRepository(Collection).findOneBy({ id: input.collectionId }) : null
 				if (!collection) {
@@ -109,21 +109,9 @@ export default router({
 				}
 				menuItem.collectionId = collection.id
 				menuItem.collection = collection
+				menuItem.data = input.data
 				if (input.data?.sync) {
-					const tree = await dataSource.getTreeRepository(Collection).findDescendantsTree(collection)
-					const addChildren = (menuItem: MenuItem, collection: Collection) =>
-						menuItem.children = collection.children.map((collection, index) => {
-							const newItem = new MenuItem()
-							newItem.type = MenuItemType.COLLECTION
-							newItem.position = index
-							newItem.data = { sync: true }
-							newItem.parentId = menuItem.id
-							newItem.collectionId = collection.id
-							menuItems.push(newItem)
-							addChildren(newItem, collection)
-							return newItem
-						})
-					addChildren(menuItem, tree)
+					syncTree = await dataSource.getTreeRepository(Collection).findDescendantsTree(collection)
 				}
 			} else if (input.type === MenuItemType.PAGE) {
 				const page = input.pageId ? await dataSource.getRepository(Page).findOneBy({ id: input.pageId }) : null
@@ -137,7 +125,27 @@ export default router({
 				menuItem.collectionId = null
 			}
 
-			await dataSource.getRepository(MenuItem).save(menuItems)
+			await dataSource.transaction(async (em) => {
+				await em.getRepository(MenuItem).save(menuItem)
+				// Items are stored one at a time: the path of an item is derived
+				// from a parent that is already in the database.
+				const addChildren = async (parent: MenuItem, collection: Collection) => {
+					for (const [index, child] of collection.children.entries()) {
+						const newItem = new MenuItem()
+						newItem.type = MenuItemType.COLLECTION
+						newItem.position = index
+						newItem.data = { sync: true }
+						newItem.parentId = parent.id
+						newItem.parent = parent
+						newItem.collectionId = child.id
+						await em.getRepository(MenuItem).save(newItem)
+						await addChildren(newItem, child)
+					}
+				}
+				if (syncTree) {
+					await addChildren(menuItem, syncTree)
+				}
+			})
 			return formatMenuItem(menuItem)
 		}),
 	update: publicProcedure

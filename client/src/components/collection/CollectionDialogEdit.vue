@@ -22,10 +22,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
-import { useQueryClient } from "@tanstack/vue-query"
+import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { ImageMinus, ImageUp, Trash } from "@lucide/vue"
-import { ref, toRefs, watch } from "vue"
+import { computed, ref, toRefs, watch } from "vue"
 import { useRouter } from "vue-router"
+import Treeselect from "vue3-treeselect-ts"
 import SelectGroupInput from "@/components/SelectGroupInput.vue";
 
 const props = defineProps<{
@@ -48,6 +49,7 @@ const form = ref<{
   thumbnailFile?: File;
   thumbnailURL?: string | null;
   limitedToGroupIds?: string[];
+  parentId?: string | null;
 }>({})
 function updateForm() {
   form.value = {
@@ -56,8 +58,33 @@ function updateForm() {
     draft: collection.value.draft,
     thumbnailURL: collection.value.thumbnailURL,
     limitedToGroupIds: collection.value.limitedToGroupIds,
+    parentId: collection.value.parentId,
   }
 }
+
+// The synchronization owns where its own sub-collections sit, so only a custom
+// collection and a collection linked to a folder by hand can be moved.
+const canMove = computed(() => !(collection.value.synchronized && collection.value.parent?.synchronized))
+const { data: collections } = useQuery({
+  queryKey: ["collection", "tree"],
+  queryFn: () => trpc.collection.tree.query(),
+  enabled: canMove,
+})
+// A collection cannot receive itself, and dropping it drops its descendants
+// with it. Only collections of the same visibility can receive it.
+const parentOptions = computed(() => {
+  function format(items: RouterOutput["collection"]["tree"]): any {
+    const options = items
+      .filter((item: RouterOutput["collection"]["tree"][number]) => item.id !== collection.value.id && item.public === collection.value.public)
+      .map((item: RouterOutput["collection"]["tree"][number]) => ({
+        id: item.id,
+        label: item.name,
+        children: item.children ? format(item.children) : undefined,
+      }))
+    return options.length ? options : undefined
+  }
+  return format(collections.value ?? []) ?? []
+})
 
 watch(collection, () => {
   updateForm()
@@ -124,6 +151,9 @@ async function onSubmit() {
       updateData.name = form.value.name
     }
     const collection = await trpc.collection.update.mutate(updateData)
+    if (canMove.value && (form.value.parentId ?? null) !== (props.collection.parentId ?? null)) {
+      await trpc.collection.move.mutate({ id: props.collection.id, parentId: form.value.parentId ?? null })
+    }
 
     queryClient.invalidateQueries({ queryKey: ["collection-favorites"] })
     queryClient.invalidateQueries({ queryKey: ["collection"] })
@@ -157,6 +187,15 @@ async function onSubmit() {
           <Label for="collection-description">Description</Label>
           <Input id="collection-description" v-model="form.description" placeholder="Describe this collection" aria-describedby="collection-description-help" />
           <FieldDescription id="collection-description-help">Shown in list view.</FieldDescription>
+        </FieldGroup>
+      </section>
+
+      <section v-if="canMove" class="grid gap-4" aria-labelledby="collection-place-heading">
+        <h3 id="collection-place-heading" class="text-sm font-semibold">Place</h3>
+        <FieldGroup role="group" aria-labelledby="collection-parent">
+          <Label id="collection-parent">Parent collection</Label>
+          <Treeselect v-model="form.parentId" placeholder="Top level" :options="parentOptions" :clearable="true" />
+          <FieldDescription>Everything inside this collection moves with it. Access given on the collection it leaves is lost, and access given on the one it joins applies.</FieldDescription>
         </FieldGroup>
       </section>
 
@@ -194,7 +233,7 @@ async function onSubmit() {
       </section>
 
       <DialogFooter>
-        <Button v-if="!collection.parent?.synchronized" type="button" variant="ghost" class="mr-auto text-destructive hover:text-destructive" @click="deleteCollection"><Trash class="size-5" />Delete collection</Button>
+        <Button v-if="!(collection.synchronized && collection.parent?.synchronized) || collection.orphanedAt" type="button" variant="ghost" class="mr-auto text-destructive hover:text-destructive" @click="deleteCollection"><Trash class="size-5" />Delete collection</Button>
         <Button type="button" variant="outline" @click="emit('update:modelValue', false)">Cancel</Button>
         <Button type="button" @click="onSubmit">Save changes</Button>
       </DialogFooter>

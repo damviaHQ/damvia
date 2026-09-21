@@ -1,6 +1,7 @@
 import {AssetFile, AssetFileStatus } from "../entity/asset-file";
 import {assetsS3, assetsS3Bucket, dataSource} from "../env";
 import {assetUpdateContentQueue} from "../worker";
+import {recomputeCollectionRollups} from "./collection";
 import {removeOrphanObjects} from "./storage";
 
 export async function integrityCheck() {
@@ -34,22 +35,8 @@ export async function integrityCheck() {
 	}
 	console.log('Successfully updated assets files')
 
-	console.log('Syncing folder thumbnails')
-	await dataSource.query(`
-      UPDATE collections
-      SET sample_file_ids = coalesce((
-				SELECT ARRAY_AGG(subquery.id)
-				FROM (
-					SELECT collection_files.id
-					FROM collection_files
-					INNER JOIN collections collection_file_collection ON collection_files.collection_id = collection_file_collection.id
-					INNER JOIN asset_files ON collection_files.asset_file_id = asset_files.id AND asset_files.has_thumbnail
-					WHERE collections.id::text = ANY(string_to_array(collection_file_collection.mpath, '.'))
-					ORDER BY array_position(string_to_array(collections.mpath, '.'), collection_files.collection_id::text) NULLS LAST, collection_files.created_at
-					LIMIT 4
-				) AS subquery
-	 		), ARRAY[]::uuid[])
-		`)
+	console.log('Syncing folder counts and thumbnails')
+	await recomputeCollectionRollups(dataSource.manager)
 
 	await removeOrphanObjects()
 }

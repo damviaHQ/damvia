@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
-import { Brackets, ILike, In } from "typeorm"
+import { Brackets, ILike, In, IsNull, Not } from "typeorm"
 import { z } from "zod"
 import { AssetFolder } from "../../entity/asset-folder"
 import { Collection } from "../../entity/collection"
@@ -24,7 +24,8 @@ import { assetsS3, assetsS3Bucket, dataSource, mainS3, mainS3Bucket } from "../.
 import {
 	duplicateCollection,
 	duplicateFiles,
-	removeCollection,
+	moveCollection,
+	removeCollections,
 	syncCollectionMenuItems,
 	userCollectionFilesQuery,
 	userCollectionsQuery
@@ -84,6 +85,19 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 			: null,
 		limitedToGroupIds: collection.limitedToGroupIds,
 		canEditLimitedToGroupIds: collection.canEditLimitedToGroupIds,
+		orphanedAt: collection.orphanedAt,
+		orphanedReason: collection.orphanedReason,
+		orphanedFromName: collection.orphanedFromName,
+	}
+}
+
+// Names were unique per parent in the database until synchronized siblings were
+// allowed to share one with a custom collection; manual actions keep the rule.
+async function assertNameFree(parentId: string | null | undefined, name: string, exceptId?: string) {
+	if (!parentId) return
+	const taken = await dataSource.getRepository(Collection).existsBy({ parentId, name, ...(exceptId ? { id: Not(exceptId) } : {}) })
+	if (taken) {
+		throw new TRPCError({ code: 'BAD_REQUEST', message: 'A collection with this name already exists here.' })
 	}
 }
 
@@ -298,7 +312,7 @@ export default router({
 
 			const userVisibleCollections = await userCollectionsQuery(ctx.user).getMany()
 			await dataSource.getTreeRepository(Collection).findAncestorsTree(collection)
-			collection.children = await userCollectionsQuery(ctx.user).andWhere({ parentId: collection.id }).getMany()
+			collection.children = await userCollectionsQuery(ctx.user).leftJoinAndSelect('collection.page', 'page').andWhere({ parentId: collection.id }).getMany()
 			collection.files = await userCollectionFilesQuery(ctx.user).andWhere({ collectionId: collection.id }).getMany()
 
 			const sampleFileIds = collection.children.flatMap(child => child.sampleFileIds)
@@ -364,6 +378,7 @@ export default router({
 				collection.draft = false
 			}
 			collection.owner = collection.public ? null : ctx.user
+			await assertNameFree(collection.parent?.id, collection.name)
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
 				await syncCollectionMenuItems(em, collection)
@@ -395,6 +410,9 @@ export default router({
 				collection.parent = await dataSource.getRepository(Collection).findOneBy(
 					ctx.user.role !== UserRole.ADMIN ? { id: input.parentId, ownerId: ctx.user.id } : { id: input.parentId },
 				)
+				if (collection.parent?.synchronized) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'The subfolders of a synchronized collection are linked by the synchronization.' })
+				}
 			}
 			collection.public = collection.parent?.public ?? input.public ?? false
 			collection.draft = collection.parent?.draft ?? input.draft ?? false
@@ -454,6 +472,7 @@ export default router({
 			if (collection.synchronized) {
 				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Rename synchronized collections in your cloud storage.' })
 			}
+			await assertNameFree(collection.parentId, input.name, collection.id)
 			await dataSource.getRepository(Collection).update(collection.id, { name: input.name })
 			collection.name = input.name
 			return formatCollection({ collection, user: ctx.user })
@@ -481,6 +500,9 @@ export default router({
 
 			if (input.public !== undefined && input.public !== collection.public) {
 				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cannot change the public status of a collection.' })
+			}
+			if (!collection.synchronized) {
+				await assertNameFree(collection.parentId, input.name, collection.id)
 			}
 
 			collection.name = input.name
@@ -553,13 +575,69 @@ export default router({
 				.getOne()
 			if (!collection) {
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
-			} else if (collection.parent?.synchronized) {
+			} else if (collection.synchronized && collection.parent?.synchronized && !collection.orphanedAt) {
 				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Synchronized collections cannot be deleted.' })
 			} else if (!collection.canEdit(ctx.user)) {
 				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
 			}
 
-			await dataSource.transaction((em) => removeCollection(em, collection.id))
+			const cleanup = await dataSource.transaction((em) => removeCollections(em, [collection.id]))
+			await cleanup()
+		}),
+	move: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({ id: z.uuid(), parentId: z.uuid().nullable() }))
+		.mutation(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user)
+				.andWhere('collection.id = :id', { id: input.id })
+				.leftJoinAndMapOne('collection.parent', 'collection.parent', 'parent', 'parent.id = collection.parent_id')
+				.getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			} else if (collection.synchronized && collection.parent?.synchronized) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Move the folder in your cloud storage to move this collection.' })
+			}
+
+			const parent = input.parentId
+				? await dataSource.getRepository(Collection).findOneBy(
+					ctx.user.role !== UserRole.ADMIN ? { id: input.parentId, ownerId: ctx.user.id } : { id: input.parentId },
+				)
+				: null
+			if (input.parentId && !parent) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Destination collection not found.' })
+			} else if (parent && parent.public !== collection.public) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'A collection cannot move between the catalogue and private collections.' })
+			} else if (parent?.path?.startsWith(collection.path ?? '')) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'A collection cannot be moved inside itself.' })
+			}
+			if (parent?.id !== collection.parentId) {
+				await assertNameFree(parent?.id, collection.name, collection.id)
+				await dataSource.transaction((em) => moveCollection(em, collection, parent))
+			}
+			return formatCollection({ collection, user: ctx.user })
+		}),
+	listOrphaned: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.query(async ({ ctx }) => {
+			const collections = await dataSource.getRepository(Collection).find({
+				where: { orphanedAt: Not(IsNull()) },
+				order: { orphanedAt: 'DESC' },
+			})
+			return Promise.all(collections.map((collection) => formatCollection({ collection, user: ctx.user })))
+		}),
+	dismissOrphan: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(z.uuid())
+		.mutation(async ({ input }) => {
+			const collection = await dataSource.getRepository(Collection).findOneBy({ id: input })
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (collection.synchronized) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Delete this collection, or move its folder back where it is mirrored.' })
+			}
+			await dataSource.getRepository(Collection).update(collection.id, { orphanedAt: null, orphanedReason: null, orphanedFromName: null })
 		}),
 	getFiles: publicProcedure
 		.use(authMiddleware(userApproved))
@@ -633,6 +711,7 @@ export default router({
 			collection.public = false
 			collection.draft = false
 			collection.owner = ctx.user
+			await assertNameFree(collection.parent?.id, collection.name)
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
 				await syncCollectionMenuItems(em, collection)

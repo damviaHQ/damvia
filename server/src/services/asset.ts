@@ -20,14 +20,15 @@ import {tmpdir} from "node:os"
 import {join} from "node:path"
 import sharp from "sharp"
 import { randomUUID } from 'node:crypto'
+import {In} from "typeorm"
 import {AssetFile, AssetFileStatus} from "../entity/asset-file"
 import {AssetFolder, AssetFolderStatus} from "../entity/asset-folder"
 import {AssetSource} from "../entity/asset-source"
-import {Collection} from "../entity/collection"
 import {CollectionFile} from "../entity/collection-file"
 import {Product} from "../entity/product"
 import {assetsS3, assetsS3Bucket, assetUpdaterFor, dataSource, logger} from "../env"
 import {assetUpdateContentQueue, collectionSynchronizationQueue} from "../worker"
+import {destroySynchronizedCollections, moveSynchronizedCollections, reparentSubtree} from "./collection"
 import {commitStorage, releaseStorage, reserveStorage, StorageQuotaExceededError} from "./storage"
 import {
 	convertOfficeToPng,
@@ -424,65 +425,88 @@ export type UpsertFolderOptions = {
 
 export async function upsertFolder(opts: UpsertFolderOptions): Promise<AssetFolder> {
 	const sourceKey = opts.sourceKey ?? ''
-	let folder = await dataSource.getRepository(AssetFolder).findOne({
-		where: { sourceKey, externalId: opts.externalId },
-		relations: { parent: { collections: true }, collections: true },
-	})
-	const alreadyExists = !!folder
-	if (!folder) {
-		folder = new AssetFolder()
-		folder.externalId = opts.externalId
-		folder.sourceKey = sourceKey
-		folder.status = AssetFolderStatus.UP_TO_DATE
-	}
-
-	const folderNameChanged = folder.name !== opts.name
-	folder.name = opts.name
-	const previousParent = folder.parent
-	if (folder.parent?.externalId !== opts.parentExternalId) {
-		folder.parent = await dataSource.getRepository(AssetFolder).findOne({
-			where: { sourceKey, externalId: opts.parentExternalId },
-			relations: { collections: true },
+	const { folder, jobs } = await dataSource.transaction(async (em) => {
+		let folder = await em.getRepository(AssetFolder).findOne({
+			where: { sourceKey, externalId: opts.externalId },
+			relations: { parent: { collections: true }, collections: true },
 		})
-	}
-	const parentChanged = previousParent?.id !== folder.parent?.id
+		const alreadyExists = !!folder
+		if (!folder) {
+			folder = new AssetFolder()
+			folder.externalId = opts.externalId
+			folder.sourceKey = sourceKey
+			folder.status = AssetFolderStatus.UP_TO_DATE
+		}
 
-	if (!alreadyExists || parentChanged) {
-		folder.licenseId = folder.parent?.licenseId ?? null
-		folder.assetTypeId = folder.parent?.assetTypeId ?? null
-	}
+		const folderNameChanged = folder.name !== opts.name
+		folder.name = opts.name
+		const previousParent = folder.parent
+		let parent = folder.parent
+		if (folder.parent?.externalId !== opts.parentExternalId) {
+			parent = await em.getRepository(AssetFolder).findOne({
+				where: { sourceKey, externalId: opts.parentExternalId },
+				relations: { collections: true },
+			})
+			// A child listed before its parent must not land at the root; the
+			// next pass finds the parent.
+			if (!parent && opts.parentExternalId !== '' && alreadyExists) {
+				parent = previousParent
+			}
+		}
+		const parentChanged = previousParent?.id !== parent?.id
 
-	await dataSource.getRepository(AssetFolder).save(folder)
-	if (folderNameChanged || parentChanged || !alreadyExists) {
-		const jobs = [
+		if (!alreadyExists || parentChanged) {
+			folder.licenseId = parent?.licenseId ?? null
+			folder.assetTypeId = parent?.assetTypeId ?? null
+		}
+		if (!alreadyExists) {
+			folder.parent = parent
+		}
+
+		await em.getRepository(AssetFolder).save(folder)
+		if (alreadyExists && parentChanged) {
+			await reparentSubtree(em, { table: 'asset_folders', nodeId: folder.id, newParentId: parent?.id ?? null })
+			folder.parent = parent
+			folder.parentId = parent?.id ?? null
+			await moveSynchronizedCollections(em, { folderId: folder.id, newParentFolderId: parent?.id ?? null })
+		}
+		const jobs = folderNameChanged || parentChanged || !alreadyExists ? [
 			...(folder.collections?.map((c) => ({ data: { collectionId: c.id } })) ?? []),
-			...(folder.parent?.collections?.map((c) => ({ data: { collectionId: c.id } })) ?? []),
+			...(parent?.collections?.map((c) => ({ data: { collectionId: c.id } })) ?? []),
 			...(parentChanged && previousParent
 				? previousParent.collections?.map((c) => ({ data: { collectionId: c.id } }))
 				: []
 			),
-		]
-		if (jobs.length > 0) {
-			await collectionSynchronizationQueue.bulkPush(jobs)
-		}
+		] : []
+		return { folder, jobs }
+	})
+	if (jobs.length > 0) {
+		await collectionSynchronizationQueue.bulkPush(jobs)
 	}
 	return folder
 }
 
 export async function deleteFolder(folderId: string): Promise<void> {
-	const folder = await dataSource.getRepository(AssetFolder).findOne({
-		where: { id: folderId },
-		relations: { children: true, files: true },
-	})
-	if (!folder) return
-	for (const child of folder.children) {
-		await deleteFolder(child.id)
-	}
-	for (const file of folder.files) {
+	const folders: { id: string }[] = await dataSource.query(`
+		WITH RECURSIVE tree AS (
+			SELECT id FROM asset_folders WHERE id = $1
+			UNION ALL
+			SELECT asset_folders.id FROM asset_folders INNER JOIN tree ON asset_folders.parent_id = tree.id
+		)
+		SELECT id FROM tree
+	`, [folderId])
+	if (folders.length === 0) return
+	const folderIds = folders.map((current) => current.id)
+	const files = await dataSource.getRepository(AssetFile).findBy({ folderId: In(folderIds) })
+	for (const file of files) {
 		await deleteFile(file.id)
 	}
-	await dataSource.getRepository(Collection).delete({ assetFolderId: folder.id })
-	await dataSource.getRepository(AssetFolder).remove(folder)
+	const cleanup = await dataSource.transaction(async (em) => {
+		const cleanup = await destroySynchronizedCollections(em, folderIds)
+		await em.getRepository(AssetFolder).delete({ id: In(folderIds) })
+		return cleanup
+	})
+	await cleanup()
 }
 
 export type UpsertFileOptions = {

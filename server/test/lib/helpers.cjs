@@ -28,8 +28,8 @@ process.env.APP_SECRET = 'security-tests-only-random-fixture-secret-20260916'
 process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../../dist/env')
 const { dataSource: db } = env
-const LATEST_MIGRATION = 'PageBlockLayout1790208000000'
-const UPGRADE_MIGRATIONS = 9
+const LATEST_MIGRATION = 'CollectionNesting1790294400000'
+const UPGRADE_MIGRATIONS = 10
 const state = {
     disk: { totalBytes: 10000, freeBytes: 9000 },
     bucketObjects: [],
@@ -126,8 +126,10 @@ async function setup() {
     fixtures.legacyGuestId = randomUUID()
     await db.query(`INSERT INTO users(id,name,company,email,role,region_id,reset_password_token) VALUES($1,'Guest','Test',$2,'guest',$3,'old-reset')`, [fixtures.legacyGuestId, `${fixtures.legacyGuestId}@example.test`, fixtures.region.id])
     await save(UserGroup, { userId: fixtures.legacyGuestId, groupId: fixtures.group.id })
-    const parent = await makeCollection({ limitedToGroupIds: [fixtures.group.id] })
-    fixtures.legacyChild = await makeCollection({ parent })
+    const [legacyParent] = await db.query(`INSERT INTO collections(name, public, draft, limited_to_group_ids) VALUES ($1, true, false, $2) RETURNING id`, [randomUUID(), [fixtures.group.id]])
+    await db.query(`UPDATE collections SET mpath = id::text || '.' WHERE id = $1::uuid`, [legacyParent.id])
+    ;[fixtures.legacyChild] = await db.query(`INSERT INTO collections(name, public, draft, parent_id) VALUES ($1, true, false, $2::uuid) RETURNING id`, [randomUUID(), legacyParent.id])
+    await db.query(`UPDATE collections SET mpath = $2::text || '.' || id::text || '.' WHERE id = $1::uuid`, [fixtures.legacyChild.id, legacyParent.id])
     await db.runMigrations()
     fixtures.admin = await makeUser('admin')
     fixtures.manager = await makeUser('manager')

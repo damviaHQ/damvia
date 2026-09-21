@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ChevronDown, ChevronRight, CirclePlus, ExternalLink, EyeOff, FilePenLine, Folder, Image, Settings, Trash2 } from "@lucide/vue"
+import { ChevronDown, ChevronRight, CirclePlus, ExternalLink, EyeOff, FilePenLine, Folder, Image, Settings, Trash2, Unlink } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 
 const { status, data: collections, error } = useQuery({
@@ -104,6 +104,26 @@ function stopPropagation(event: Event) {
   event.stopPropagation()
 }
 
+const orphanReasons: Record<string, string> = {
+  folder_deleted: 'its folder was deleted',
+  parent_unmirrored: 'its folder moved out of the mirrored tree',
+  ambiguous_move: 'its folder moved where several collections could receive it',
+  duplicate_mirror: 'the upgrade merged two collections of one folder',
+}
+function orphanTitle(item: RouterOutput["collection"]["treeAdmin"][number]) {
+  return `Was in "${item.orphanedFromName}", ${orphanReasons[item.orphanedReason ?? ''] ?? item.orphanedReason}`
+}
+
+async function dismissOrphan(item: RouterOutput["collection"]["treeAdmin"][number]) {
+  try {
+    await trpc.collection.dismissOrphan.mutate(item.id)
+    queryClient.invalidateQueries({ queryKey: ['collection'] })
+    toast.success('Collection kept')
+  } catch (error) {
+    toast.error('Failed to update collection')
+  }
+}
+
 async function confirmDeleteCollection() {
   if (collectionToDelete.value) {
     try {
@@ -155,6 +175,10 @@ async function confirmDeleteCollection() {
             <FilePenLine class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
             page
           </Badge>
+          <Badge v-if="item.orphanedAt" variant="outline" class="flex items-center gap-1" :title="orphanTitle(item)">
+            <Unlink class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
+            orphaned
+          </Badge>
           <Badge v-if="item.draft" variant="outline" class="flex items-center gap-1">
             <EyeOff class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
             draft
@@ -166,6 +190,10 @@ async function confirmDeleteCollection() {
         </div>
 
         <div class="flex items-center gap-2 ml-5" @click="stopPropagation">
+          <Button v-if="item.orphanedAt && !item.synchronized" variant="link" @click="dismissOrphan(item)" :aria-label="`Keep ${item.name} where it is`"
+            class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
+            <Unlink class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /> Keep
+          </Button>
           <Button variant="link" as-child :aria-label="`Open ${item.name}`"
             class="flex items-center gap-2 admin-text-secondary admin-text-primary-hover">
             <!-- The reader's own view of the collection, left in its own tab so

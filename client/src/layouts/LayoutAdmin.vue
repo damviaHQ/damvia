@@ -72,6 +72,11 @@ const { data: summary } = useQuery({
   refetchInterval: 5 * 60 * 1000,
 })
 const storage = computed(() => summary.value?.storage)
+const { data: orphans } = useQuery({
+  queryKey: ['collection', 'orphaned'],
+  queryFn: () => trpc.collection.listOrphaned.query(),
+  enabled: isAdmin,
+})
 const storagePercent = computed(() => Math.round(storage.value?.percent ?? 0))
 const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent != null && storage.value.percent >= 80)
 const storageLevel = computed(() => {
@@ -125,6 +130,7 @@ const storageLevel = computed(() => {
             <router-link :to="{ name: 'admin-collections' }" class="menu-item">
               <FilePenLine class="w-4 h-4 mr-2" />
               Collections
+              <span v-if="orphans?.length" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums" :title="`${orphans.length} orphaned collection${orphans.length === 1 ? '' : 's'}`">{{ orphans.length }}</span>
             </router-link>
             <router-link :to="{ name: 'admin-pages' }" class="menu-item">
               <FilePenLine class="w-4 h-4 mr-2" />

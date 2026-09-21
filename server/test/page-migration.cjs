@@ -29,7 +29,7 @@ const legacyBlock = (pageId, type, row, column, data) => db.query(
 // Existing installations must come through the rewrite with their pages intact:
 // reading order is preserved and the old grid becomes block widths.
 test('the layout migration converts existing pages without losing content', async () => {
-    await db.undoLastMigration()
+    while ((await db.query("SELECT 1 FROM migrations WHERE name = 'PageBlockLayout1790208000000'")).length) await db.undoLastMigration()
 
     const pageId = randomUUID()
     await db.query(`INSERT INTO pages (id, name) VALUES ($1, 'Legacy')`, [pageId])
@@ -90,7 +90,7 @@ test('the migration can be undone and replayed, as an upgrade that is rolled bac
         [randomUUID(), pageId, JSON.stringify({ html: '<p>Keep me</p>' })]
     )
 
-    await db.undoLastMigration()
+    while ((await db.query("SELECT 1 FROM migrations WHERE name = 'PageBlockLayout1790208000000'")).length) await db.undoLastMigration()
     const legacy = await db.query('SELECT type, row, "column", width, data FROM page_blocks WHERE page_id = $1', [pageId])
     assert.equal(legacy.length, 1)
     assert.equal(legacy[0].row, 0)

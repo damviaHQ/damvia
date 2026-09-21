@@ -75,20 +75,19 @@ const collectionOptions = computed(() => {
     return []
   }
 
+  // A custom collection can live anywhere, inside a synchronized tree too; a
+  // folder is linked at the root or under a custom collection only.
   function formatCollectionArray(collections: RouterOutput["collection"]["tree"]): any {
-    if (!collections.some((c: RouterOutput["collection"]["tree"][number]) => !c.synchronized)) {
-      return undefined
-    }
-
-    return collections
-      .filter((c: RouterOutput["collection"]["tree"][number]) => !c.synchronized)
+    const options = collections
+      .filter((c: RouterOutput["collection"]["tree"][number]) => !form.value.synchronized || !c.synchronized)
       .map((c: RouterOutput["collection"]["tree"][number]) => ({
         id: c.id,
         label: c.name,
         children: c.children ? formatCollectionArray(c.children) : undefined,
       }))
+    return options.length ? options : undefined
   }
-  return formatCollectionArray(collections.value)
+  return formatCollectionArray(collections.value) ?? []
 })
 
 async function onSubmit() {

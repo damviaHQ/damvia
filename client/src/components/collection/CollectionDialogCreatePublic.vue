@@ -89,17 +89,13 @@ const collectionOptions = computed(() => {
   }
 
   function formatCollectionArray(collections: RouterOutput["collection"]["tree"]): any {
-    if (!collections.some((c: RouterOutput["collection"]["tree"][number]) => !c.synchronized)) {
-      return undefined
-    }
-
-    return collections
-        .filter((c: RouterOutput["collection"]["tree"][number]) => !c.synchronized)
+    const options = collections
         .map((c: RouterOutput["collection"]["tree"][number]) => ({
           id: c.id,
           label: c.name,
           children: c.children ? formatCollectionArray(c.children) : undefined,
         }))
+    return options.length ? options : undefined
   }
   return formatCollectionArray(collections.value) ?? []
 })

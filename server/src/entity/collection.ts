@@ -25,7 +25,6 @@ import {
 	Tree,
 	TreeChildren,
 	TreeParent,
-	Unique,
 	UpdateDateColumn
 } from "typeorm"
 import { AssetFolder } from "./asset-folder"
@@ -36,7 +35,7 @@ import { User, UserRole } from "./user"
 
 @Entity('collections')
 @Tree('materialized-path')
-@Unique('idx_parent_id_name', ['parentId', 'name'])
+@Index('idx_collections_parent_asset_folder', ['parentId', 'assetFolderId'], { unique: true, where: 'asset_folder_id IS NOT NULL' })
 export class Collection {
 	@PrimaryColumn()
 	@PrimaryGeneratedColumn("uuid")
@@ -107,6 +106,15 @@ export class Collection {
 
 	@OneToOne(() => Page, (page) => page.collection)
 	page?: Page | null
+
+	@Column({ type: 'timestamp', nullable: true })
+	orphanedAt: Date | null
+
+	@Column({ type: 'varchar', nullable: true })
+	orphanedFromName: string | null
+
+	@Column({ type: 'varchar', nullable: true })
+	orphanedReason: string | null
 
 	@CreateDateColumn()
 	createdAt: Date
