@@ -35,6 +35,19 @@ An axis is shared by every group whose values it already holds, so naming it onc
 
 Search shows one card per group, with its cover, a stacked outline and a **n variants** button; collections and pages keep showing every file. The button opens the group: each member with its preview, its value on each axis, its type, its status and a download link, and **Download all**, which opens the usual download dialog with the group as the selection. Members a reader cannot see, because of a collection, group or licence rule, are neither listed, counted nor downloaded.
 
+## Name the axes and set the rules
+
+Open **Data enrichment → Variants** (`/admin/data-enrichment/variants`). The menu badge counts the axes waiting for a name.
+
+| Tab | What it does |
+|---|---|
+| Axes | Axes waiting for a name first, then named ones, each with its values, the number of groups using it and two example file names. Type a name to rename it everywhere. **Ignore** hides an axis from the search filters; its values stay stored and it does not come back. **Merge into** another axis takes the union of the values and moves the groups. |
+| Changes by hand | Every split, exclusion and cover chosen by hand, with the files, who and when, and **Undo**. |
+| Blocked words | Add or remove the words that keep a file out of every group. |
+| Settings | The minimum shared length, 4 by default, with a live example. |
+
+Every change regroups straight away. Nothing is written to the cloud storage.
+
 ## Correct a group by hand
 
 Admins see **Edit group** in the group panel. Select members, then:

@@ -189,6 +189,14 @@ Records were called products until the 2026-09-21 rename; the tables, columns, p
 
 `resolverStep.save` also takes `metadata` steps (`config.metadataFieldId`), refused unless the field can link; `resolverStep.list` returns the fields that can link as `trustedFields`. `entityResolution.unmatchedFiles` returns, per file, a `suggestion`: the value of a field that can link as a record key, when a record has that key. `settings.getEnrichment` and `updateEnrichment` also carry `viewsEnabled`, `viewSeparator` (one character), `viewDigits` (1 to 4) and `thumbnailView`; changing the first three re-runs the entity stage. `env` returns `viewsEnabled`.
 
+### `enrichment`
+
+| Procedure | Kind | Auth | Purpose |
+|---|---|---|---|
+| `enrichment.overview` | query | `userAdmin` | `synced`, folder counts by origin of their type, file counts by resolution status, `variantGroups`, `unnamedAxes`, `running` (the pass holding the lock, with its start and trigger) and `lastRun` (finished, with duration, per-stage `stats` or `error`) |
+| `enrichment.run` | mutation | `userAdmin` | Starts a pass without waiting for it; `queued: true` when one is running, in which case it runs next |
+| `enrichment.badges` | query | `userAdmin` | `unmatched` (unmatched and conflicts) and `unnamedAxes` used by a group, for the menu |
+
 ### `variantGroup` and `variantAxis`
 
 | Procedure | Kind | Auth | Purpose |

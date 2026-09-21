@@ -85,6 +85,7 @@ async function save(field: Field, patch: Partial<Field>) {
     })
     await queryClient.invalidateQueries({ queryKey: ["metadata-fields"] })
     await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+    await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
   } catch (err) {
     toast.error(extractErrors(err as Error).message)
   } finally {

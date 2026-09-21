@@ -169,6 +169,7 @@ async function applyCsv() {
     csvComparison.value = null
     await queryClient.invalidateQueries({ queryKey: ["entity-csv"] })
     await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+    await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
   } catch (err) {
     toast.error(extractErrors(err as Error).message)
   } finally {
@@ -181,6 +182,7 @@ async function clearCsv() {
     toast.success("Mapping removed")
     await queryClient.invalidateQueries({ queryKey: ["entity-csv"] })
     await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+    await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
   } catch (err) {
     toast.error(extractErrors(err as Error).message)
   }
@@ -217,6 +219,7 @@ async function save() {
     const result = await trpc.resolverStep.save.mutate({ assetTypeId: selectedType.value.id, steps: payload() })
     await queryClient.invalidateQueries({ queryKey: ["resolver-steps"] })
     await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+    await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
     toast.success(`Steps saved: ${result.applied.matched} files matched, ${result.applied.unmatched} unmatched, ${result.applied.conflicts} in conflict`)
   } catch (err) {
     toast.error(extractErrors(err as Error).message)

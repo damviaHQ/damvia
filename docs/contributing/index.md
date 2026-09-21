@@ -79,6 +79,7 @@ Run the same commands before opening a pull request. There is no ESLint or Prett
 | `entity-resolution.cjs` | Matching: the file name step against the old job, folder steps, attachments, the merge rules (agreement, conflict, range, primary order, dangling), the pass (idempotence, re-attach after import, moves), the matching and unmatched routers, search deduplication and range results, the upgrade seed, admin-only access |
 | `file-metadata.cjs` | IPTC and EXIF parsing, a real JPEG, fields created switched off, trusted metadata linking, metadata search, facets and date ranges, the CSV mapping compare and replace, the views setting, admin-only access |
 | `variant-grouping.cjs` | The tokenizer, grouping (banners and teasers, SKUs apart, short prefixes, the pinned short-prefix collision, grids of formats), covers, overrides, 5,000 names within a second, recognizers and axis reuse, the pass (stable ids, nothing written twice, dissolved groups, orphan axes), collapsed search and axis filters with visibility, the admin actions and access |
+| `enrichment-overview.cjs` | The record of each pass, its error and the 50 kept, the overview counts, Run now queued behind a running pass, the menu badges, admin-only access |
 | `search.cjs` | Token and exact search, attribute, scope, file type and asset type filters, pagination, search activity events, `searchNotFound` |
 | `download.cjs` | Single-file and archive downloads, entry names, access refusals |
 | `users.cjs` | Sign-up approval and default groups, password-less mode, session tokens |

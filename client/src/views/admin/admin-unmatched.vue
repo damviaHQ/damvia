@@ -81,6 +81,7 @@ function attachFiles(ids: string[], name: string) {
 
 async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+    await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
 }
 
 async function confirm(target: RecordTarget) {

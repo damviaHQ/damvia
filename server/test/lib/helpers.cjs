@@ -28,8 +28,8 @@ process.env.APP_SECRET = 'security-tests-only-random-fixture-secret-20260916'
 process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../../dist/env')
 const { dataSource: db } = env
-const LATEST_MIGRATION = 'VariantGroups1790812800000'
-const UPGRADE_MIGRATIONS = 16
+const LATEST_MIGRATION = 'EnrichmentRuns1790899200000'
+const UPGRADE_MIGRATIONS = 17
 const state = {
     disk: { totalBytes: 10000, freeBytes: 9000 },
     bucketObjects: [],

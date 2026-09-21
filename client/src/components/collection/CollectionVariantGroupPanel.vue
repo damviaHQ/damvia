@@ -108,7 +108,7 @@ function downloadAll() {
 
 <template>
   <Dialog :open="!!modelValue" @update:open="(open) => !open && emit('update:modelValue', null)">
-    <DialogContent class="admin-dialog--wide flex max-h-[90vh] flex-col overflow-hidden">
+    <DialogContent class="flex max-h-[90vh] w-[calc(100vw-2rem)] flex-col overflow-hidden sm:max-w-[960px]">
       <Loader v-if="status === 'pending'" />
       <template v-else-if="group">
         <DialogHeader>
@@ -152,7 +152,7 @@ function downloadAll() {
             <TableBody>
               <TableRow v-for="member in group.members" :key="member.id">
                 <TableCell v-if="editing"><Checkbox :model-value="selected.includes(member.assetFileId)" :aria-label="`Select ${member.name}`" @update:model-value="(checked) => selected = checked === true ? [...selected, member.assetFileId] : selected.filter((id) => id !== member.assetFileId)" /></TableCell>
-                <TableCell><img v-if="member.thumbnailURL" :src="member.thumbnailURL" alt="" loading="lazy" class="size-12 object-contain" /><thumbnailPlaceholder v-else class="size-12 fill-neutral-400" aria-hidden="true" /></TableCell>
+                <TableCell><img v-if="member.thumbnailURL" :src="member.thumbnailURL" alt="" class="size-12 object-contain" /><thumbnailPlaceholder v-else class="size-12 fill-neutral-400" aria-hidden="true" /></TableCell>
                 <TableCell>{{ member.name }}<span v-if="member.assetFileId === group.coverFileId" class="admin-text-secondary"> · cover</span></TableCell>
                 <TableCell v-for="(axis, index) in group.axes" :key="axis.id">{{ member.axisValues[index] || "—" }}</TableCell>
                 <TableCell class="uppercase">{{ getFileExtension(member.name) }}</TableCell>

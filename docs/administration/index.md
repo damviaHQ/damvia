@@ -66,5 +66,6 @@ Collections organise references to assets. Copying a file into another collectio
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
 | Records, fields and metadata | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/fields` | admin |
 | Matching and unmatched files | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
+| Data enrichment overview and variants | `/admin/data-enrichment`, `/admin/data-enrichment/variants` | admin |
 
 The labels and exact layout may evolve; the permission and data consequences documented on each linked page are the durable contract.

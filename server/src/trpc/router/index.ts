@@ -24,6 +24,7 @@ import authorizedDomainRouter from "./authorized-domain"
 import collectionRouter from "./collection"
 import dashboardRouter from "./dashboard"
 import downloadRouter from "./download"
+import enrichmentRouter from "./enrichment"
 import entityCsvRouter from "./entity-csv"
 import entityResolutionRouter from "./entity-resolution"
 import favoriteRouter from "./favorite"
@@ -57,6 +58,7 @@ const appRouter = router({
 	metadataField: metadataFieldRouter,
 	variantGroup: variantGroupRouter,
 	variantAxis: variantAxisRouter,
+	enrichment: enrichmentRouter,
 	favorite: favoriteRouter,
 	license: licenseRouter,
 	download: downloadRouter,

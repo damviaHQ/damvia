@@ -30,11 +30,14 @@ export type EnrichmentPassResult = {
 // lock makes a second caller wait, and the admin actions take the same lock
 // inside their own transaction. Each stage commits on its own and is
 // idempotent, so a crash is repaired by the next pass.
-export async function runEnrichmentPass(): Promise<EnrichmentPassResult> {
+export async function runEnrichmentPass(trigger: 'sync' | 'admin' = 'sync', startedById: string | null = null): Promise<EnrichmentPassResult> {
 	const runner = dataSource.createQueryRunner()
 	await runner.connect()
+	let runId: string | null = null
 	try {
 		await runner.query('SELECT pg_advisory_lock($1)', [ENRICHMENT_LOCK])
+		const [run] = await runner.query('INSERT INTO enrichment_runs (trigger, started_by_id) VALUES ($1, $2) RETURNING id', [trigger, startedById])
+		runId = run.id
 		const stage = async <T>(name: string, work: (em: EntityManager) => Promise<T>): Promise<T> => {
 			const started = Date.now()
 			await runner.startTransaction()
@@ -56,9 +59,29 @@ export async function runEnrichmentPass(): Promise<EnrichmentPassResult> {
 		const entities = await stage('entities', (em) => runEntityStage(em))
 		const metadata = await stage('metadata', (em) => refreshMetadataFieldCounts(em))
 		const variants = await stage('variants', (em) => runVariantStage(em))
-		return { assetTypes, entities, metadata, variants }
+		const result = { assetTypes, entities, metadata, variants }
+		await runner.query('UPDATE enrichment_runs SET finished_at = now(), stats = $2 WHERE id = $1', [runId, JSON.stringify(result)])
+		await runner.query('DELETE FROM enrichment_runs WHERE id NOT IN (SELECT id FROM enrichment_runs ORDER BY started_at DESC LIMIT 50)')
+		return result
+	} catch (error) {
+		if (runId) await runner.query('UPDATE enrichment_runs SET finished_at = now(), error = $2 WHERE id = $1', [runId, String(error?.message ?? error).slice(0, 2000)]).catch(() => {})
+		throw error
 	} finally {
 		await runner.query('SELECT pg_advisory_unlock($1)', [ENRICHMENT_LOCK]).catch(() => {})
+		await runner.release()
+	}
+}
+
+// A pass holds the lock for its whole length; trying it tells whether one is
+// running without waiting for it.
+export async function isEnrichmentRunning(): Promise<boolean> {
+	const runner = dataSource.createQueryRunner()
+	await runner.connect()
+	try {
+		const [{ free }] = await runner.query('SELECT pg_try_advisory_lock($1) AS free', [ENRICHMENT_LOCK])
+		if (free) await runner.query('SELECT pg_advisory_unlock($1)', [ENRICHMENT_LOCK])
+		return !free
+	} finally {
 		await runner.release()
 	}
 }

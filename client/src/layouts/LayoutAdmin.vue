@@ -27,9 +27,11 @@ import {
   FileCog,
   FilePenLine,
   FolderCog,
+  Gauge,
   Folders,
   HardDrive,
   KeyRound,
+  Layers,
   Link2,
   LayoutDashboard,
   Menu,
@@ -81,13 +83,13 @@ const { data: orphans } = useQuery({
   queryFn: () => trpc.collection.listOrphaned.query(),
   enabled: isAdmin,
 })
-const { data: resolutionCounts } = useQuery({
-  queryKey: ['entity-resolution', 'counts'],
-  queryFn: () => trpc.entityResolution.counts.query(),
+const { data: badges } = useQuery({
+  queryKey: ['enrichment', 'badges'],
+  queryFn: () => trpc.enrichment.badges.query(),
   enabled: isAdmin,
   staleTime: 60 * 1000,
 })
-const unmatchedBadge = computed(() => (resolutionCounts.value?.unmatched ?? 0) + (resolutionCounts.value?.conflicts ?? 0))
+const unmatchedBadge = computed(() => badges.value?.unmatched ?? 0)
 const storagePercent = computed(() => Math.round(storage.value?.percent ?? 0))
 const showStorageBanner = computed(() => isAdmin.value && storage.value?.percent != null && storage.value.percent >= 80)
 const storageLevel = computed(() => {
@@ -185,6 +187,10 @@ const storageLevel = computed(() => {
           <!-- Data enrichment -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
             <div class="menu-section-title">Data Enrichment</div>
+            <router-link :to="{ name: 'admin-enrichment-overview' }" class="menu-item" active-class="" exact-active-class="router-link-active">
+              <Gauge class="w-4 h-4 mr-2" />
+              Overview
+            </router-link>
             <router-link :to="{ name: 'admin-records' }" class="menu-item">
               <Package class="w-4 h-4 mr-2" />
               {{ recordLabel.plural.value }}
@@ -205,6 +211,11 @@ const storageLevel = computed(() => {
               <Unlink class="w-4 h-4 mr-2" />
               Unmatched
               <span v-if="unmatchedBadge" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${unmatchedBadge} files unmatched or in conflict`">{{ unmatchedBadge }}</span>
+            </router-link>
+            <router-link :to="{ name: 'admin-variants' }" class="menu-item">
+              <Layers class="w-4 h-4 mr-2" />
+              Variants
+              <span v-if="badges?.unnamedAxes" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${badges.unnamedAxes} axes waiting for a name`">{{ badges.unnamedAxes }}</span>
             </router-link>
           </div>
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">

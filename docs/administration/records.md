@@ -10,6 +10,10 @@ The Data enrichment area adds context to mirrored assets. Damvia imports a flat 
 
 A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), section **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
 
+## See where enrichment stands
+
+**Data enrichment → Overview** (`/admin/data-enrichment`) counts the folders typed by a rule, by hand, inherited or untyped; the files matched, unmatched or in conflict; the variant groups and the axes waiting for a name. It shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
+
 ## Two questions, two tools
 
 - **Folder rules** answer "what kind of file is this?": they give an [asset type](./asset-types.md) from the folder path (packshot, video, logo).

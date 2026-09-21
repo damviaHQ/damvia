@@ -153,6 +153,7 @@ async function attachFolder(target: RecordTarget) {
     toast.success(`${result.files} ${result.files === 1 ? "file" : "files"} linked`)
     pickerOpen.value = false
     await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+    await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
   } catch (error) {
     toast.error((error as Error).message)
   } finally {
@@ -164,6 +165,7 @@ async function detachFolder(attachmentId: string) {
     await trpc.entityResolution.detach.mutate({ attachmentId })
     toast.success("Link removed")
     await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
+    await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
   } catch (error) {
     toast.error((error as Error).message)
   }
