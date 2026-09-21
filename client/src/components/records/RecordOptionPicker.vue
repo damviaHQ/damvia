@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { joinMulti, splitMulti } from "@/utils/recordValues"
-import { Check, Plus } from "@lucide/vue"
+import { Check, Plus, X } from "@lucide/vue"
 import { computed, nextTick, onMounted, ref } from "vue"
 
 // The list behind a select field: type to narrow it, arrows to move, Enter to
@@ -46,7 +46,14 @@ const creatable = computed(() => {
   const value = search.value.trim()
   return !!props.canCreate && !!value && !value.includes("|") && !props.options.some((option) => option.toLocaleLowerCase() === value.toLocaleLowerCase())
 })
-const entries = computed(() => [...visible.value.map((option) => ({ kind: "option" as const, option })), ...(creatable.value ? [{ kind: "create" as const, option: search.value.trim() }] : [])])
+// A value kept from before the field had these options: listed first so it
+// can be removed, since it would otherwise be refused on every save.
+const unknown = computed(() => selected.value.filter((value) => !props.options.includes(value)))
+const entries = computed(() => [
+  ...unknown.value.map((option) => ({ kind: "unknown" as const, option })),
+  ...visible.value.map((option) => ({ kind: "option" as const, option })),
+  ...(creatable.value ? [{ kind: "create" as const, option: search.value.trim() }] : []),
+])
 const listId = `options-${Math.random().toString(36).slice(2)}`
 
 onMounted(() => nextTick(() => input.value?.focus()))
@@ -63,6 +70,10 @@ function pick(index: number) {
   if (entry.kind === "create") {
     emit("create", entry.option)
     search.value = ""
+    return
+  }
+  if (entry.kind === "unknown" && !props.multiple) {
+    emit("commit", "")
     return
   }
   const value = valueWith(entry.option)
@@ -91,11 +102,16 @@ function onKeydown(event: KeyboardEvent) {
       placeholder="Find an option" @input="highlighted = 0" />
     <ul :id="listId" role="listbox" :aria-label="label" :aria-multiselectable="multiple || undefined" class="record-option-list">
       <li v-for="(entry, index) in entries" :id="`${listId}-${index}`" :key="entry.kind + entry.option" role="option"
-        :aria-selected="entry.kind === 'option' && selected.includes(entry.option)"
+        :aria-selected="entry.kind !== 'create' && selected.includes(entry.option)"
         :class="{ 'is-highlighted': index === highlighted }" @mousedown.prevent @click="pick(index)" @mousemove="highlighted = index">
         <template v-if="entry.kind === 'option'">
           <span class="record-option-check"><Check v-if="selected.includes(entry.option)" class="size-3.5" /></span>
           <span class="record-chip">{{ entry.option }}</span>
+        </template>
+        <template v-else-if="entry.kind === 'unknown'">
+          <span class="record-option-check"><X class="size-3.5" /></span>
+          <span class="record-chip is-invalid">{{ entry.option }}</span>
+          <span class="record-option-hint">not an option, click to remove</span>
         </template>
         <template v-else><Plus class="size-3.5" /> Add option "{{ entry.option }}"</template>
       </li>

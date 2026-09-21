@@ -270,3 +270,5 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .records-bulk-bar button { background:transparent; color:#fff; border-color:rgb(255 255 255 / .4); }
 .dv-admin .records-bulk-bar button:hover { background:rgb(255 255 255 / .12); color:#fff; }
 @media(max-width:760px) { .dv-admin .records-grid .is-sticky-key, .dv-admin .records-grid .is-thumbnail { position:static; } .dv-admin .records-grid-wrap { max-height:none; } }
+.dv-admin .record-chip.is-invalid { background:var(--dv-color-danger-soft); color:var(--dv-color-danger); }
+.dv-admin .record-option-hint { margin-left:auto; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
