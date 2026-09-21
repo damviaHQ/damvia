@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -132,10 +132,15 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 |---|---|---|---|
 | `asset.tree` | query | `userAdmin` | Asset folder tree |
 | `asset.findById` | query | `userAdmin` | One folder with children, files and ancestors |
-| `asset.update` | mutation | `userAdmin` | Sets `assetTypeId` and `licenseId` on a folder, its descendants and their files |
+| `asset.update` | mutation | `userAdmin` | Sets `assetTypeId` and `licenseId` on a folder, its descendants and their files. When `assetTypeId` is given, also records `assetTypeSource` (`manual` on the folder, `inherited` on the descendants, `null` when the type is cleared) and clears `assetTypeRuleId` |
 | `asset.listProductViews` | query | `userApproved` | Distinct `productView` values |
 | `assetType.list` | query | `userApproved` | Asset types |
-| `assetType.create`, `update`, `remove` | mutation | `userAdmin` | CRUD |
+| `assetType.create`, `update`, `remove` | mutation | `userAdmin` | CRUD; removing a type deletes its folder rules |
+| `assetTypeRule.list` | query | `userAdmin` | Every rule with its asset type, `enabled`, `lastError`, `createdById`, the number of folders it types, up to 10 example paths and the ids of the rules it overlaps with, plus `folderCount` (folders with a stored path) |
+| `assetTypeRule.preview` | query | `userAdmin` | `pattern`, `assetTypeId`, `enabled`, optional `id`: resolves every folder as if the rule were saved and returns `matches`, `examples` and `changes` (`folders`, `files`, and `groups` of what the changed folders currently hold, by type name, `source` and `rulePattern`; manual folders the rule matches are listed with `source: 'manual'` and not counted as changes) |
+| `assetTypeRule.create`, `update` | mutation | `userAdmin` | Validates the pattern as a field error (compiles, at most 500 characters, under 50 ms on a sample path), refuses a duplicate pattern (`BAD_REQUEST`) and an unknown type (`NOT_FOUND`), saves, then re-applies the rule and returns `{ rule, applied: { folders, files } }` |
+| `assetTypeRule.remove` | mutation | `userAdmin` | Deletes the rule; folders keep their type until the next pass |
+| `assetTypeRule.reresolve` | mutation | `userAdmin` | Re-applies one rule: its folders, the folders it used to type and their inherited descendants; returns `{ folders, files }` |
 | `license.list` | query | `userAdmin` | Licenses |
 | `license.create`, `update`, `remove` | mutation | `userAdmin` | CRUD |
 | `favorite.list` | query | `userApproved`, `userMember` | The caller's favourite collection files |

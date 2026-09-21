@@ -18,6 +18,7 @@ import { publicProcedure, router } from "../index"
 import analyticsRouter from "./analytics"
 import assetRouter from "./asset"
 import assetTypeRouter from "./asset-type"
+import assetTypeRuleRouter from "./asset-type-rule"
 import authorizedDomainRouter from "./authorized-domain"
 import collectionRouter from "./collection"
 import dashboardRouter from "./dashboard"
@@ -42,6 +43,7 @@ const appRouter = router({
 	collection: collectionRouter,
 	asset: assetRouter,
 	assetType: assetTypeRouter,
+	assetTypeRule: assetTypeRuleRouter,
 	favorite: favoriteRouter,
 	license: licenseRouter,
 	download: downloadRouter,

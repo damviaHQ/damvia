@@ -135,6 +135,16 @@ const openAssets = computed(() => {
   return assetPaths.value.find((item) => item[item.length - 1] === route.params.id)
 })
 const rootAssets = computed(() => assets.value?.filter((asset) => !asset.parentId) ?? [])
+const { data: folderRules } = useQuery({
+  queryKey: ["asset-type-rules"],
+  queryFn: () => trpc.assetTypeRule.list.query(),
+})
+const assetTypeOrigin = computed(() => {
+  if (asset.value?.assetTypeSource === "manual") return "set by hand"
+  if (asset.value?.assetTypeSource === "rule") return `set by the rule ${folderRules.value?.rules.find((rule) => rule.id === asset.value?.assetTypeRuleId)?.pattern ?? "(removed)"}`
+  if (asset.value?.assetTypeSource === "inherited") return "inherited from a parent folder"
+  return "not applied yet, waiting for the next sync"
+})
 const childFolders = computed(() => asset.value?.children ?? [])
 const assetFiles = computed(() => asset.value?.files ?? [])
 const breadcrumbItems = computed<PathBreadcrumbItem[]>(() => [
@@ -229,6 +239,7 @@ function getFileExtension(filename: string): string {
               <div>
                 <h2 id="asset-settings-heading">Folder defaults</h2>
                 <p>Apply an asset type and license to this folder.</p>
+                <p v-if="asset.assetTypeId">Asset type {{ assetTypeOrigin }}.</p>
               </div>
             </div>
             <div class="asset-settings__fields">

@@ -3,7 +3,7 @@ title: Administration
 description: Choose the administrative guide for access, assets, collections, pages, products or workspace health.
 sidebar:
   order: 1
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
 The administration area controls who can enter the library, how source files are classified, what readers see, and whether the instance is healthy. These guides describe administrative decisions and their consequences. Everyday reader workflows belong in the separate website knowledge base and onboarding.
@@ -32,7 +32,7 @@ Managers only receive the Users area and can act only on users in their own regi
 ## Assets and rights
 
 - [Assets tree](./assets-tree.md): inspect each source and assign a type and licence to folders.
-- [Asset types](./asset-types.md): control default display, product linkage and search defaults.
+- [Asset types](./asset-types.md): control default display, product linkage and search defaults, and type folders by rules on their path.
 - [Licences](./licenses.md): restrict files by region and date and understand why a licence follows a file into every collection.
 
 Source files are managed in the connected cloud storage. Damvia's asset tree is for inspection and classification; it does not upload or reorganise those files.
@@ -60,6 +60,7 @@ Collections organise references to assets. Copying a file into another collectio
 | Branding | `/admin/settings` | admin |
 | Menu, collections and pages | `/admin/menu-items`, `/admin/collections`, `/admin/pages` | admin |
 | Assets, types and licences | `/admin/assets`, `/admin/asset-types`, `/admin/licenses` | admin |
+| Folder rules | `/admin/folder-rules` | admin |
 | Users | `/admin/users` | admin or manager for their region |
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
 | Products and attributes | `/admin/products`, `/admin/products/import`, `/admin/products/attributes` | admin |

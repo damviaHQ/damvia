@@ -3,7 +3,7 @@ title: Architecture
 description: The single server process, the path of a request from the Vue client to a TypeORM entity, the folder map of both packages, and where a new feature goes.
 sidebar:
   order: 2
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-21
 ---
 
 This page gives a developer the shape of the code: what runs, how a request travels, what each folder holds, and where to add something. The meaning of the objects (collections, pages, products) is in [Core concepts](../introduction/concepts.md).
@@ -48,11 +48,11 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `worker.ts` | pg-boss instance, `createQueue` helper, every queue definition |
 | `cli.ts` | `commander` program with the `check-integrity` command |
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
-| `entity/` | 19 TypeORM entities and their enums |
+| `entity/` | 24 TypeORM entities and their enums |
 | `migrations/` | Hand-written SQL migrations, run at startup |
-| `services/` | `asset.ts` (upsert, deletion, thumbnails, product matching), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation), `search-insights.ts` (search demand, daily spikes and contactable search audiences) |
+| `services/` | `asset.ts` (upsert, deletion, thumbnails, product matching), `asset-type-rules.ts` (folder rule compilation, the pure resolution of folder asset types, the set-based write), `enrichment.ts` (`runEnrichmentPass()`, the post-sync pass under an advisory lock), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation), `search-insights.ts` (search demand, daily spikes and contactable search audiences) |
 | `trpc/index.ts` | tRPC init, context, `authMiddleware` and the four predicates |
-| `trpc/router/` | 15 domain routers plus `collection/invitation.ts`, merged in `index.ts` with the public `env` query |
+| `trpc/router/` | 18 domain routers plus `collection/invitation.ts`, merged in `index.ts` with the public `env` query |
 | `util/array.ts` | `compact()` |
 
 ## Folder map of `client/src`

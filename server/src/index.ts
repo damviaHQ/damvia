@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { assetUpdaters, dataSource, logger } from "./env"
 import { adoptUnassignedAssets, recordAssetSourceRun, registerAssetSources, staleAssetSourceKeys } from "./services/asset"
+import { runEnrichmentPass } from "./services/enrichment"
 import { cleanStaleTempDirectories } from "./services/storage"
 import { startQueues } from "./worker"
 import server from "./server"
@@ -43,6 +44,7 @@ async function startAssetUpdater() {
 			INNER JOIN collections ON collections.asset_folder_id = asset_files.folder_id
 			ON CONFLICT DO NOTHING
 		`).catch((error) => logger.error('failed to link files to collections', { error }))
+		await runEnrichmentPass().catch((error) => logger.error('failed to run enrichment pass', { error }))
 		setTimeout(fetchUpdates, 5 * 60 * 1000)
 	}
 	fetchUpdates()

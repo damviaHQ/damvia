@@ -457,7 +457,9 @@ export async function upsertFolder(opts: UpsertFolderOptions): Promise<AssetFold
 
 		if (!alreadyExists || parentChanged) {
 			folder.licenseId = parent?.licenseId ?? null
-			folder.assetTypeId = parent?.assetTypeId ?? null
+			if (folder.assetTypeSource !== 'manual') {
+				folder.assetTypeId = parent?.assetTypeId ?? null
+			}
 		}
 		if (!alreadyExists) {
 			folder.parent = parent

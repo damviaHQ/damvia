@@ -19,6 +19,7 @@ import { AssetFile } from "../../entity/asset-file"
 import { AssetFolder } from "../../entity/asset-folder"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { assetSourceStatuses } from "../../services/asset"
+import { ENRICHMENT_LOCK } from "../../services/asset-type-rules"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
 export async function formatAssetFolder(assetFolder: AssetFolder) {
@@ -26,6 +27,9 @@ export async function formatAssetFolder(assetFolder: AssetFolder) {
 		id: assetFolder.id,
 		name: assetFolder.name,
 		assetTypeId: assetFolder.assetTypeId,
+		assetTypeSource: assetFolder.assetTypeSource,
+		assetTypeRuleId: assetFolder.assetTypeRuleId,
+		path: assetFolder.path,
 		licenseId: assetFolder.licenseId,
 		children: assetFolder.children?.length ? await Promise.all(assetFolder.children.map(formatAssetFolder)) : undefined,
 		files: assetFolder.files?.length ? await Promise.all(assetFolder.files.map(formatAssetFile)) : undefined,
@@ -104,10 +108,15 @@ export default router({
 			const descendants = await dataSource.getTreeRepository(AssetFolder).findDescendants(assetFolder)
 			const folderIdsToUpdate = [assetFolder.id, ...descendants.map((descendant) => descendant.id)]
 			await dataSource.transaction(async (em) => {
+				await em.query('SELECT pg_advisory_xact_lock($1)', [ENRICHMENT_LOCK])
 				await em.getRepository(AssetFolder).update(
 					{ id: In(folderIdsToUpdate) },
 					{ assetTypeId: input.assetTypeId, licenseId: input.licenseId },
 				)
+				if (input.assetTypeId !== undefined) {
+					await em.getRepository(AssetFolder).update({ id: assetFolder.id }, { assetTypeSource: input.assetTypeId ? 'manual' : null, assetTypeRuleId: null })
+					await em.getRepository(AssetFolder).update({ id: In(descendants.map((descendant) => descendant.id).filter((id) => id !== assetFolder.id)) }, { assetTypeSource: input.assetTypeId ? 'inherited' : null, assetTypeRuleId: null })
+				}
 				await em.getRepository(AssetFile).update(
 					{ folderId: In(folderIdsToUpdate) },
 					{ assetTypeId: input.assetTypeId, licenseId: input.licenseId },

@@ -3,7 +3,7 @@ title: Assets tree
 description: Inspect mirrored cloud folders, assign asset types and licences, and diagnose files that have not finished processing.
 sidebar:
   order: 7
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
 The Assets area is Damvia's mirror of the configured cloud sources. Administrators inspect it and classify folders; source files are added, moved, renamed and removed in Dropbox, OneDrive or Google Drive.
@@ -16,6 +16,8 @@ Open `/admin/assets`. Each configured source appears at the root with its latest
 - **Licence** controls where and when non-admin users may see the files.
 
 Choose values and press **Save** to apply them to that folder, all descendant folders and all files below it. New folders inherit from their parent; every source run refreshes each file from its current folder.
+
+Under the folder defaults, the screen says where the asset type came from: set by hand, set by a named [folder rule](./asset-types.md#assign-it-by-a-rule-on-the-folder-path), inherited from a parent, or not applied yet (a folder created by the last sync, typed by the enrichment pass that follows it). A folder typed by hand keeps that type when it is moved in the cloud storage; every other folder takes the type of its new place. Each folder also stores its path (`/Source/Season/Packshots`), refreshed after every sync, which is what the rules match.
 
 The type and licence then belong to the file. They follow it into every collection, page block and search result. A collection never replaces them. Moving the file to a different cloud folder gives it the new folder's values on the next run. See [Asset types](./asset-types.md) and [Licences](./licenses.md).
 

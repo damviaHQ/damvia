@@ -3,7 +3,7 @@ title: Upgrading
 description: Pull, build, restart; migrations run on their own at startup.
 sidebar:
   order: 6
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
 To upgrade an instance, rebuild the server image and client files, then deploy them together. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
@@ -84,6 +84,12 @@ Before restarting, set a randomly generated `APP_SECRET` of at least 32 bytes. T
 
 Back up first and apply the migration with application writers stopped. Validate a restricted collection, an invited guest and an administrator before reopening access.
 
+## Folder rules in this upgrade
+
+- The migration stores the path of every folder and marks every typed folder as set by hand when its type differs from its parent's. Nothing is re-typed: the first enrichment pass after the restart writes only the `inherited` mark on the other folders, which is why it can report thousands of folders updated on a large library while no file changes type.
+- Rules start empty. Until an administrator adds one on `/admin/folder-rules`, typing by hand and inheritance behave as before, with one change: a folder typed by hand now keeps its type when it is moved in the cloud storage.
+- The pass runs after each sync in the API process and holds an advisory lock for its duration; on a library of 100,000 folders it takes a few seconds.
+
 ## Collection nesting in this upgrade
 
 - Synchronized collections are now identified by the folder they mirror (`asset_folder_id`), no longer by their name. The unique `(parent_id, name)` constraint is dropped; the migration first retires rows that mirrored the same folder twice under one parent (an artefact of the old rename race), keeping the oldest and moving custom collections found under the others to it (those that were more than one level down are flagged `duplicate_mirror` so an admin can put them back where they belong), then adds a unique index on `(parent_id, asset_folder_id)`.
@@ -113,6 +119,8 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1790035200000-collection-favorites` | `user_collection_favorites` table (each user's starred collections) with its index on `collection_id`; starts empty |
 | `1790208000000-page-block-layout` | Rewrites `page_blocks` for the new page editor: adds `position` and `size`, converts `data` from text to `jsonb` with one shape per block type, and drops `row`, `column` and `width`. Reading order is preserved; a row that held two blocks becomes two `half` blocks, three becomes `third`, anything else becomes `full`. Text alignment chosen in the old editor is dropped, since the new editor has no alignment control. Rolling this migration back puts every block on a row of its own and deletes `hero` blocks, which the old schema cannot represent |
 | `1790121600000-asset-sources` | `source_key` on `asset_folders` and `asset_files` (empty for existing rows, adopted at the next start), unique index on (`source_key`, `external_id`) replacing the unique `external_id`, and the `asset_sources` table holding each configured source's last run |
+| `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |
+| `1790467200000-asset-type-rules` | `asset_type_rules` table; `asset_type_source` and `asset_type_rule_id` on `asset_folders`. Existing typed folders whose type differs from their parent's, and typed roots, are marked `manual`; the others `inherited`. Rolling back drops the table and the three columns and loses nothing the previous version reads |
 | `1790294400000-collection-nesting` | `orphaned_at`, `orphaned_from_name` and `orphaned_reason` on `collections`; retires duplicate mirrors of one folder under one parent; rebuilds `mpath` of `collections` and `menu_items` from `parent_id`; recounts `number_of_files`; drops the unique `(parent_id, name)` constraint and adds the partial unique index `idx_collections_parent_asset_folder` on `(parent_id, asset_folder_id)` plus `text_pattern_ops` indexes on the `mpath` of `collections`, `menu_items` and `asset_folders` |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.

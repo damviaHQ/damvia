@@ -36,6 +36,8 @@ export enum AssetFolderStatus {
 	PENDING_DELETION = 'pending_deletion',
 }
 
+export type AssetTypeSource = 'manual' | 'rule' | 'inherited'
+
 @Entity('asset_folders')
 @Index(['sourceKey', 'externalId'], { unique: true })
 @Tree('materialized-path')
@@ -67,6 +69,15 @@ export class AssetFolder {
 
 	@ManyToOne(() => AssetType)
 	assetType: AssetType | null
+
+	@Column({ type: 'varchar', nullable: true })
+	assetTypeSource: AssetTypeSource | null
+
+	@Column({ type: 'varchar', nullable: true })
+	assetTypeRuleId: string | null
+
+	@Column({ type: 'text', nullable: true })
+	path: string | null
 
 	@Column({ type: 'varchar', nullable: true })
 	licenseId: string | null

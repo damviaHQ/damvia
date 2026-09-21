@@ -25,6 +25,7 @@ import {
   Copyright,
   FileCog,
   FilePenLine,
+  FolderCog,
   Folders,
   HardDrive,
   KeyRound,
@@ -185,6 +186,10 @@ const storageLevel = computed(() => {
             <router-link :to="{ name: 'admin-product-attributes' }" class="menu-item">
               <Blocks class="w-4 h-4 mr-2" />
               Attributes
+            </router-link>
+            <router-link :to="{ name: 'admin-folder-rules' }" class="menu-item">
+              <FolderCog class="w-4 h-4 mr-2" />
+              Folder rules
             </router-link>
           </div>
         </div>

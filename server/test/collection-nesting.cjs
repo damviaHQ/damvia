@@ -348,7 +348,7 @@ test('the upgrade merges duplicate mirrors of one folder and keeps every custom 
     const root = await makeFolder({ name: 'Root' })
     const twin = await makeFolder({ name: 'Twin', parent: root })
     const deeper = await makeFolder({ name: 'Deeper', parent: twin })
-    await db.undoLastMigration()
+    while ((await db.query("SELECT 1 FROM migrations WHERE name = 'CollectionNesting1790294400000'")).length) await db.undoLastMigration()
     const insert = async (name, assetFolderId, parentId) => (await db.query(
         `INSERT INTO collections(name, public, draft, asset_folder_id, parent_id) VALUES ($1, true, false, $2, $3) RETURNING id`, [name, assetFolderId, parentId]
     ))[0]

@@ -28,8 +28,8 @@ process.env.APP_SECRET = 'security-tests-only-random-fixture-secret-20260916'
 process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../../dist/env')
 const { dataSource: db } = env
-const LATEST_MIGRATION = 'CollectionNesting1790294400000'
-const UPGRADE_MIGRATIONS = 10
+const LATEST_MIGRATION = 'AssetTypeRules1790467200000'
+const UPGRADE_MIGRATIONS = 12
 const state = {
     disk: { totalBytes: 10000, freeBytes: 9000 },
     bucketObjects: [],
@@ -74,6 +74,7 @@ const entities = {
     AssetFolder: require('../../dist/entity/asset-folder').AssetFolder,
     AssetFile: require('../../dist/entity/asset-file').AssetFile,
     AssetType: require('../../dist/entity/asset-type').AssetType,
+    AssetTypeRule: require('../../dist/entity/asset-type-rule').AssetTypeRule,
     AuthorizedDomain: require('../../dist/entity/authorized-domain').AuthorizedDomain,
     License: require('../../dist/entity/license').License,
     Product: require('../../dist/entity/product').Product,
@@ -85,6 +86,8 @@ const services = {
     users: require('../../dist/services/user'),
     collections: require('../../dist/services/collection'),
     assets: require('../../dist/services/asset'),
+    assetTypeRules: require('../../dist/services/asset-type-rules'),
+    enrichment: require('../../dist/services/enrichment'),
     download: require('../../dist/services/download'),
 }
 const { appRouter } = require('../../dist/trpc')

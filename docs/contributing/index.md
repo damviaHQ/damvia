@@ -3,7 +3,7 @@ title: Contributing
 description: Set up a development environment, know the scripts and checks that exist, and submit a change with its license header and its documentation.
 sidebar:
   order: 1
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-21
 ---
 
 This page is the entry point for developers who want to change or extend Damvia. It covers the application packages, their scripts and checks, and what a pull request must contain. The other pages of this group describe the code itself: [Architecture](./architecture.md), [Data model](./data-model.md), [tRPC API](./api.md), [Writing a background job](./background-jobs.md) [Storage drivers](./storage-drivers.md) and the proposed [Design system](./design-system.md).
@@ -58,7 +58,7 @@ Run the same commands before opening a pull request. There is no ESLint or Prett
 
 ### Server suites
 
-`server/test/*.cjs` are `node:test` files that require the compiled `dist/` output, so every run starts with a build. `server/test/lib/helpers.cjs` holds the shared setup: it refuses any `SECURITY_TEST_DATABASE_URL` whose database name does not end in `_test`, never loads `server/.env`, replaces the S3 clients, the cloud driver, the mail transport and the pg-boss queues with in-memory stubs, and exposes `setup()` and `teardown()` for each suite's `before` and `after` hooks. `setup()` asserts the newest migration name, undoes the last upgrade migrations, seeds legacy rows, re-runs the migrations and creates the fixture users; when you add a migration, update `LATEST_MIGRATION` and `UPGRADE_MIGRATIONS` in the helper. All suites share one database, which is why `npm test` passes `--test-concurrency=1`.
+`server/test/*.cjs` are `node:test` files that require the compiled `dist/` output, so every run starts with a build. `server/test/lib/helpers.cjs` holds the shared setup: it refuses any `SECURITY_TEST_DATABASE_URL` whose database name does not end in `_test`, never loads `server/.env`, replaces the S3 clients, the cloud driver, the mail transport and the pg-boss queues with in-memory stubs, and exposes `setup()` and `teardown()` for each suite's `before` and `after` hooks. `setup()` asserts the newest migration name, undoes the last upgrade migrations, seeds legacy rows, re-runs the migrations and creates the fixture users; when you add a migration, update `LATEST_MIGRATION` and `UPGRADE_MIGRATIONS` in the helper. All suites share one database, which is why `npm test` passes `--test-concurrency=1`. Because every suite undoes and re-applies the upgrade migrations, the columns they add and drop pile up in the PostgreSQL catalogue; when a run fails with `tables can have at most 1600 columns`, drop and recreate the `_test` database.
 
 | File | Covers |
 |---|---|
@@ -74,6 +74,8 @@ Run the same commands before opening a pull request. There is no ESLint or Prett
 | `asset-sources.cjs` | Several sources in one library, and the per-source status the dashboard shows (`asset_sources`): a source's sweep never touches another's rows, provider ids scoped per source, labels and same-name refusal, adoption of rows from before sources existed, the stale keys that stop the server, `list-sources`, `rename-source`, `remove-source`. Same change policy as the driver suites |
 | `onedrive.cjs` | The OneDrive listing to upsert plan: root kept as the top folder, parent ids preserved, `eTag` checksum, skipped item kinds, parents-first order; needs no database |
 | `onedrive-sync.cjs` | A production-shaped OneDrive library run through one sync with a stubbed Graph client: nothing re-parented, re-downloaded or deleted; guards for empty listings, failed items, startup and download errors. These two suites lock the guarantees in [OneDrive](../integrations/onedrive.md); change them only for a confirmed critical bug or a security hazard |
+| `matching.cjs` | The product matching cron as it behaves today: capture groups for key and view, files without a match left alone, an unknown key erasing an earlier link, no-op without the regex |
+| `asset-type-rules.cjs` | Folder rules: pattern guard, the pure resolution (deepest start wins, ties, hand-set anchors), the post-sync pass (paths, moves, idempotence, invalid rules skipped, scoped re-apply), the router and its admin-only access |
 | `search.cjs` | Token and exact search, attribute, scope, file type and asset type filters, pagination, search activity events, `searchNotFound` |
 | `download.cjs` | Single-file and archive downloads, entry names, access refusals |
 | `users.cjs` | Sign-up approval and default groups, password-less mode, session tokens |

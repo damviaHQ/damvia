@@ -41,6 +41,7 @@ const router = createRouter({
 		{ name: 'admin-settings', path: '/admin/settings', component: () => import('@/views/admin/admin-settings.vue'), meta: { layout: 'admin', title: 'Settings' } },
 		{ name: 'admin-assets', path: '/admin/assets/:id?', component: () => import('@/views/admin/admin-assets.vue'), meta: { layout: 'admin', title: 'Assets' } },
 		{ name: 'admin-asset-types', path: '/admin/asset-types', component: () => import('@/views/admin/admin-asset-types.vue'), meta: { layout: 'admin', title: 'Asset types' } },
+		{ name: 'admin-folder-rules', path: '/admin/folder-rules', component: () => import('@/views/admin/admin-folder-rules.vue'), meta: { layout: 'admin', title: 'Folder rules' } },
 		{ name: 'admin-licenses', path: '/admin/licenses', component: () => import('@/views/admin/admin-licenses.vue'), meta: { layout: 'admin', title: 'Licenses' } },
 		{ name: 'admin-products', path: '/admin/products', component: () => import('@/views/admin/products/index.vue'), meta: { layout: 'admin', title: 'Records' } },
 		{ name: 'admin-product-import', path: '/admin/products/import', component: () => import('@/views/admin/products/admin-product-import.vue'), meta: { layout: 'admin', title: 'Import records' } },

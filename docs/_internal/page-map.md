@@ -25,6 +25,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/trpc/router/region.ts`, `group.ts`, `entity/region.ts`, `entity/group.ts` | `administration/groups-and-regions.md` |
 | `server/src/trpc/router/license.ts`, `entity/license.ts` | `administration/licenses.md` |
 | `server/src/trpc/router/asset-type.ts`, `entity/asset-type.ts` | `administration/asset-types.md` |
+| `server/src/trpc/router/asset-type-rule.ts`, `services/asset-type-rules.ts`, `services/enrichment.ts`, `entity/asset-type-rule.ts`, `client/src/views/admin/admin-folder-rules.vue` | `administration/asset-types.md`, `administration/assets-tree.md`, `integrations/index.md`, `contributing/api.md` |
 | `server/src/trpc/router/asset.ts`, `entity/asset-file.ts`, `entity/asset-folder.ts` | `administration/assets-tree.md` |
 | `server/src/trpc/router/menu-item.ts`, `page.ts`, `services/page.ts`, `services/page-storage.ts`, `page-blocks/schema.ts`, `page-blocks/sanitize.ts`, `entity/menu-item.ts`, `page.ts`, `page-block.ts`, `client/src/components/page-renderer/`, `client/src/components/page-editor/` | `administration/menu-and-pages.md` |
 | `server/src/trpc/router/pim.ts`, `product-attributes.ts`, `entity/product.ts`, `product-attribute.ts` | `administration/products-and-pim.md` |
