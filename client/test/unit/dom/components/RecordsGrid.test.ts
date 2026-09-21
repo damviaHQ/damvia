@@ -104,4 +104,25 @@ describe('RecordsGrid', () => {
     expect((input.element as HTMLInputElement).value).toBe('')
     wrapper.unmount()
   })
+
+  test('ticking an option shows in the cell at once and saves when the list closes', async () => {
+    const tags: GridField = { id: 'f3', name: 'Tags', displayName: null, valueType: 'multi_select', options: ['Eco', 'Sale'] }
+    const commit = vi.fn().mockResolvedValue(undefined)
+    const wrapper = mount(RecordsGrid, {
+      attachTo: document.body,
+      props: { rows: [{ ...rows[0], metaData: { Tags: 'Eco' } }], columns: [...columns.slice(0, 2), { id: 'field:Tags', kind: 'field', label: 'Tags', width: 200, field: tags }], fieldCount: 1, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, addOption: vi.fn(), create: vi.fn() },
+    })
+    await cell(wrapper, 0, 2).trigger('click')
+    await cell(wrapper, 0, 2).trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    const sale = [...document.body.querySelectorAll('[role=option]')].find((option) => option.textContent?.includes('Sale')) as HTMLElement
+    sale.click()
+    await flushPromises()
+    expect(cell(wrapper, 0, 2).text()).toContain('Sale')
+    expect(commit).not.toHaveBeenCalled()
+    ;(document.body.querySelector('.record-option-done') as HTMLElement).click()
+    await flushPromises()
+    expect(commit).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), tags, 'Eco|Sale')
+    wrapper.unmount()
+  })
 })

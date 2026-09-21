@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import { Popover, PopoverContent } from "@/components/ui/popover"
 import { fieldLabel, joinMulti, splitMulti, type ValueField } from "@/utils/recordValues"
 import { PopoverAnchor } from "reka-ui"
-import { computed, nextTick, onMounted, ref } from "vue"
+import { computed, nextTick, onMounted, ref, watch } from "vue"
 import RecordOptionPicker from "./RecordOptionPicker.vue"
 
 export type EditorMove = "down" | "up" | "next" | "previous"
@@ -29,13 +29,15 @@ const props = defineProps<{
   typed?: string
   addOption: (option: string) => Promise<void>
 }>()
-const emit = defineEmits<{ commit: [value: string, move?: EditorMove], cancel: [] }>()
+const emit = defineEmits<{ commit: [value: string, move?: EditorMove], cancel: [], draft: [value: string] }>()
 
 const isSelect = computed(() => props.field.valueType === "single_select" || props.field.valueType === "multi_select")
 const acceptsTyping = ["text", "long_text", "number", "url"].includes(props.field.valueType)
 const value = ref(props.typed !== undefined && acceptsTyping ? props.typed : props.initial)
 const input = ref<HTMLInputElement | HTMLTextAreaElement | null>(null)
 let done = false
+// The cell shows the options as they are ticked, before the list closes and saves.
+watch(value, (next) => emit("draft", next))
 
 const inputType = computed(() => ({ number: "text", date: "date", url: "url" } as Record<string, string>)[props.field.valueType] ?? "text")
 

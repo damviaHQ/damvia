@@ -54,7 +54,7 @@ const emit = defineEmits<{
 const root = ref<HTMLElement | null>(null)
 const newKeyInput = ref<HTMLInputElement | null>(null)
 const focused = ref<GridPosition>({ row: 0, column: 0 })
-const editing = ref<{ row: number, column: number, initial: string, typed?: string } | null>(null)
+const editing = ref<{ row: number, column: number, initial: string, typed?: string, draft?: string } | null>(null)
 const newKey = ref("")
 const newKeyError = ref("")
 const creating = ref(false)
@@ -301,8 +301,8 @@ defineExpose({
             </div>
             <template v-else-if="column.kind === 'field' && column.field">
               <RecordCellEditor v-if="editing?.row === r && editing?.column === c" :field="column.field" :initial="editing.initial" :typed="editing.typed"
-                :add-option="(option) => addOption(column.field!, option)" @commit="onCommit" @cancel="onCancel" />
-              <RecordCellValue :class="{ 'is-hidden-behind-editor': editing?.row === r && editing?.column === c && column.field.valueType !== 'single_select' && column.field.valueType !== 'multi_select' && column.field.valueType !== 'long_text' }" :field="column.field" :value="row.metaData[column.field.name]" />
+                :add-option="(option) => addOption(column.field!, option)" @commit="onCommit" @cancel="onCancel" @draft="(value) => editing && (editing.draft = value)" />
+              <RecordCellValue :class="{ 'is-hidden-behind-editor': editing?.row === r && editing?.column === c && column.field.valueType !== 'single_select' && column.field.valueType !== 'multi_select' && column.field.valueType !== 'long_text' }" :field="column.field" :value="isEditing({ row: r, column: c }) && editing?.draft !== undefined ? editing.draft : row.metaData[column.field.name]" />
             </template>
             <button v-else-if="column.kind === 'files'" type="button" tabindex="-1" class="records-grid-count" @click.stop="emit('open', row, 'files')">
               {{ row.fileCount }}<span class="sr-only"> files</span>
