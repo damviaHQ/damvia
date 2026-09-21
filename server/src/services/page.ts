@@ -241,6 +241,7 @@ export type PageAssetCollection = {
 	canEdit: boolean
 	thumbnailURL: string | null
 	sampleFiles: { id: string, name: string, thumbnailURL: string | null }[]
+	page: { id: string } | null
 }
 
 export type PageAssets = {
@@ -311,6 +312,7 @@ export async function resolveCollectionAssets(user: User, ids: string[]): Promis
 	}
 
 	const collections = await userCollectionsQuery(user)
+		.leftJoinAndSelect('collection.page', 'page')
 		.andWhere('collection.id IN (:...ids)', { ids })
 		.getMany()
 	// A collection card previews its content, so the sample files a card falls
@@ -339,6 +341,7 @@ export async function resolveCollectionAssets(user: User, ids: string[]): Promis
 						? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey)
 						: null,
 				}))),
+			page: collection.page ? { id: collection.page.id } : null,
 		}
 	}))
 	return cards

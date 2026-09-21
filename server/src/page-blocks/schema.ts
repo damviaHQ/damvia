@@ -107,7 +107,7 @@ export const blockDataSchemas = {
 		link: linkSchema.nullish().default(null),
 	}),
 	video: z.object({ media: videoRefSchema.nullish().default(null) }),
-	collections: z.object({ title, layout, collectionsId: z.uuid().array().max(200).nullish() }),
+	collections: z.object({ title, layout, collectionsId: z.uuid().array().max(200).nullish(), layoutFilter: z.enum(['with_layout', 'without_layout']).nullish() }),
 	files: z.object({ title, layout: fileLayout, masonrySize, collectionId: z.uuid().nullish() }),
 	last_files: z.object({ title, layout: fileLayout, masonrySize }),
 } satisfies Record<BlockType, z.ZodType>

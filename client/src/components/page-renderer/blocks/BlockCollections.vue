@@ -15,6 +15,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRender from "@/components/collection/CollectionRender.vue"
 import { trpc } from "@/services/server.ts"
+import { usePageFilter } from "@/composables/usePageFilter"
+import { matchesCollection } from "@/utils/pageFilter"
 import { useQuery } from "@tanstack/vue-query"
 import { LayoutGrid } from "@lucide/vue"
 import { computed } from "vue"
@@ -50,18 +52,26 @@ const { data: resolved } = useQuery({
 })
 
 const collections = computed(() => {
-  if (chosen.value.length) {
-    return chosen.value
+  const listed = chosen.value.length
+    ? chosen.value
       .map((id: string) => props.assets?.collections?.[id] ?? (resolved.value as any)?.[id])
       .filter((collection: unknown) => !!collection)
-  }
-  return props.collection?.children ?? []
+    : props.collection?.children ?? []
+  if (!props.data?.layoutFilter) return listed
+  return listed.filter((collection: any) => !!collection.page === (props.data.layoutFilter === "with_layout"))
 })
 const forceView = computed(() => (["list", "grid"].includes(props.data?.layout) ? props.data.layout : null))
+
+// The renderer below narrows the cards; the block asks the same question so its
+// title goes away with it rather than standing over nothing. Never while
+// editing, where the author is looking at the block itself.
+const pageFilter = usePageFilter()
+const hiddenByFilter = computed(() => !props.editing && pageFilter.isActive.value &&
+  !collections.value.some((collection: any) => matchesCollection(collection, pageFilter.state.value)))
 </script>
 
 <template>
-  <div v-if="editing || collections.length">
+  <div v-if="(editing || collections.length) && !hiddenByFilter">
     <div v-if="data.title" class="mb-0.5 text-sm font-medium text-muted-foreground">{{ data.title }}</div>
     <BlockPlaceholder v-if="editing && !collections.length" :icon="LayoutGrid" title="Collections"
       explanation="Every collection listed here appears as a card, for readers to open."

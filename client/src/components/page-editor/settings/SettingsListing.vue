@@ -107,6 +107,18 @@ function patch(values: Record<string, unknown>) {
         <RotateCcw class="size-4" />Show the sub-collections instead
       </Button>
     </FieldGroup>
+    <FieldGroup v-if="type === 'collections'">
+      <Label :for="`${fieldId}-layout-filter`">Which collections</Label>
+      <Select :model-value="data.layoutFilter ?? 'all'"
+        @update:model-value="patch({ layoutFilter: $event === 'all' ? null : $event })">
+        <SelectTrigger :id="`${fieldId}-layout-filter`"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All of them</SelectItem>
+          <SelectItem value="with_layout">Only those with a custom layout</SelectItem>
+          <SelectItem value="without_layout">Only those without a custom layout</SelectItem>
+        </SelectContent>
+      </Select>
+    </FieldGroup>
     <FieldGroup v-else-if="type === 'files'">
       <Label :id="`${fieldId}-collection`">Collection (optional)</Label>
       <Treeselect :model-value="data.collectionId ?? null" :options="collectionOptions" :clearable="true" :flat="true"
