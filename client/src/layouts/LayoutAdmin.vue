@@ -186,6 +186,10 @@ const storageLevel = computed(() => {
               <Package class="w-4 h-4 mr-2" />
               {{ recordLabel.plural.value }}
             </router-link>
+            <router-link :to="{ name: 'admin-file-metadata' }" class="menu-item">
+              <Blocks class="w-4 h-4 mr-2" />
+              File metadata
+            </router-link>
             <router-link :to="{ name: 'admin-unmatched' }" class="menu-item">
               <Unlink class="w-4 h-4 mr-2" />
               To review
@@ -205,10 +209,6 @@ const storageLevel = computed(() => {
             <router-link :to="{ name: 'admin-matching' }" class="menu-item">
               <Link2 class="w-4 h-4 mr-2" />
               Link to {{ recordLabel.lowerPlural.value }}
-            </router-link>
-            <router-link :to="{ name: 'admin-fields' }" class="menu-item">
-              <Blocks class="w-4 h-4 mr-2" />
-              Fields
             </router-link>
             <router-link :to="{ name: 'admin-variants' }" class="menu-item">
               <Layers class="w-4 h-4 mr-2" />

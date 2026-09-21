@@ -49,8 +49,10 @@ const router = createRouter({
 		{ name: 'admin-licenses', path: '/admin/licenses', component: () => import('@/views/admin/admin-licenses.vue'), meta: { layout: 'admin', title: 'Licenses' } },
 		{ name: 'admin-records', path: '/admin/data-enrichment/records', component: () => import('@/views/admin/records/index.vue'), meta: { layout: 'admin', title: 'Records' } },
 		{ name: 'admin-record-import', path: '/admin/data-enrichment/records/import', component: () => import('@/views/admin/records/admin-record-import.vue'), meta: { layout: 'admin', title: 'Import records' } },
-		{ name: 'admin-fields', path: '/admin/data-enrichment/fields', component: () => import('@/views/admin/admin-fields.vue'), meta: { layout: 'admin', title: 'Fields' } },
-		{ name: 'admin-record-attributes', path: '/admin/data-enrichment/records/attributes', redirect: { name: 'admin-fields' } },
+		{ name: 'admin-file-metadata', path: '/admin/data-enrichment/file-metadata', component: () => import('@/views/admin/admin-file-metadata.vue'), meta: { layout: 'admin', title: 'File metadata' } },
+		// Record fields are set from the records page, file metadata on its own page.
+		{ path: '/admin/data-enrichment/fields', redirect: (to) => to.query.tab === 'metadata' ? { name: 'admin-file-metadata', query: {} } : { name: 'admin-records', query: { fields: '1' } } },
+		{ path: '/admin/data-enrichment/records/attributes', redirect: { name: 'admin-records', query: { fields: '1' } } },
 		{ path: '/admin/data-enrichment/settings', redirect: '/admin/settings' },
 		{ path: '/admin/products', redirect: '/admin/data-enrichment/records' },
 		{ path: '/admin/products/import', redirect: '/admin/data-enrichment/records/import' },

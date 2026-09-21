@@ -92,7 +92,7 @@ Back up first and apply the migration with application writers stopped. Validate
 ## File metadata in this upgrade
 
 - Images are read for EXIF and IPTC metadata as they are downloaded. For the images already in the library, run `npm run cli -- metadata:backfill` once after the restart, off-peak on a large library: it queues one `asset/extract-metadata` job per image, which reads the copy in the assets bucket without asking the cloud source.
-- Fields appear switched off on **Data enrichment → Fields**, tab **File metadata**; nothing changes for readers until an admin switches one on. The Attributes screen moved to the first tab of Fields; its old address redirects.
+- Fields appear switched off on **Data enrichment → File metadata**; nothing changes for readers until an admin switches one on. Record fields are managed from the records page (⋮ → **Manage fields**); the old Attributes and Fields addresses redirect.
 - The server has a new dependency, `exif-reader`, installed by `npm ci`; no system package is added.
 
 ## Matching in this upgrade

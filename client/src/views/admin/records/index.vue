@@ -17,6 +17,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import Loader from "@/components/Loader.vue"
 import FieldEditorDialog from "@/components/records/FieldEditorDialog.vue"
 import RecordColumns from "@/components/records/RecordColumns.vue"
+import RecordFieldsSheet from "@/components/records/RecordFieldsSheet.vue"
 import RecordFilters from "@/components/records/RecordFilters.vue"
 import RecordPanel, { type PanelTab } from "@/components/records/RecordPanel.vue"
 import RecordsBulkBar from "@/components/records/RecordsBulkBar.vue"
@@ -282,6 +283,15 @@ function closeRecord() {
   router.replace({ query: rest })
 }
 
+// The fields panel keeps ?fields=1 so the old Fields page can land on it.
+const fieldsOpen = computed({
+  get: () => route.query.fields === "1",
+  set: (open: boolean) => {
+    const { fields: _, ...rest } = route.query
+    router.replace({ query: open ? { ...rest, fields: "1" } : rest })
+  },
+})
+
 function filterBy(column: GridColumn) {
   const name = column.kind === "key" ? "recordKey" : column.field!.name
   const type = column.kind === "key" ? "key" : column.field!.valueType
@@ -356,7 +366,7 @@ watch(() => data.value?.total, (count) => {
         <DropdownMenuContent align="end">
           <DropdownMenuItem :disabled="exporting || !total" @select="exportCsv"><Download class="size-4" />Export {{ narrowed ? "matching" : "all" }} {{ recordLabel.lowerPlural.value }} (CSV)</DropdownMenuItem>
           <DropdownMenuItem @select="editField(null)"><Plus class="size-4" />Add a field</DropdownMenuItem>
-          <DropdownMenuItem as-child><router-link :to="{ name: 'admin-fields' }"><Blocks class="size-4" />Manage fields</router-link></DropdownMenuItem>
+          <DropdownMenuItem @select="fieldsOpen = true"><Blocks class="size-4" />Manage fields</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem :disabled="!total && !narrowed" class="text-destructive" @select="showRemoveAll = true"><PackageX class="size-4" />Remove all {{ recordLabel.lowerPlural.value }}</DropdownMenuItem>
         </DropdownMenuContent>
@@ -446,6 +456,8 @@ watch(() => data.value?.total, (count) => {
       :save="savePanelField" :add-option="addOption" :remove="(id) => removeRecords([id])"
       @close="closeRecord" @update:tab="(tab) => openRecord(panelId!, tab)" @edit-field="editField" @add-field="editField(null)" />
 
+    <RecordFieldsSheet v-model:open="fieldsOpen" :fields="attributes ?? []" :record-label="recordLabel.singular.value"
+      @add="editField(null)" @edit="editField" @remove="askRemoveField" />
     <FieldEditorDialog v-model:open="fieldDialog.open" :field="fieldDialog.field" :suggestions="(undeclared ?? []).filter((name) => name !== keyLabel && !fields.some((field) => field.name === name))" />
 
     <AlertDialog :open="!!fieldToRemove" @update:open="(open) => { if (!open && !removingField) fieldToRemove = null }">

@@ -64,7 +64,7 @@ Collections organise references to assets. Copying a file into another collectio
 | Folder rules, a tab of Asset types | `/admin/asset-types?tab=folder-rules`; `/admin/folder-rules` redirects | admin |
 | Users | `/admin/users` | admin or manager for their region |
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
-| Records, fields and metadata | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/fields` | admin |
+| Records and their fields, file metadata | `/admin/data-enrichment/records` (fields under ⋮ → Manage fields, `?fields=1`), `/admin/data-enrichment/records/import`, `/admin/data-enrichment/file-metadata`; `/admin/data-enrichment/fields` redirects | admin |
 | Link to records and To review | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
 | Setup guide and variants | `/admin/data-enrichment`, `/admin/data-enrichment/variants` | admin |
 

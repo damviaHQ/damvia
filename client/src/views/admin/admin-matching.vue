@@ -297,7 +297,7 @@ async function save() {
                     <SelectTrigger :id="`field-${step.key}`"><SelectValue placeholder="Choose a trusted field" /></SelectTrigger>
                     <SelectContent><SelectItem v-for="field in data.trustedFields" :key="field.id" :value="field.id">{{ field.displayName || field.name }}</SelectItem></SelectContent>
                   </Select>
-                  <p v-if="!data.trustedFields.length" class="admin-text-secondary">No field can link yet: tick “Can link” on a field in <router-link :to="{ name: 'admin-fields', query: { tab: 'metadata' } }" class="underline">Fields</router-link> first.</p>
+                  <p v-if="!data.trustedFields.length" class="admin-text-secondary">No field can link yet: tick “Can link” on a field in <router-link :to="{ name: 'admin-file-metadata' }" class="underline">File metadata</router-link> first.</p>
                   <p v-else class="admin-text-secondary">{{ fieldMeaning(step.config.metadataFieldId) }}</p>
                 </div>
                 <div v-else class="matching-step__field matching-step__field--wide">

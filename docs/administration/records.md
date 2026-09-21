@@ -12,13 +12,13 @@ A record is whatever the files are about: a product for a brand, an event for a 
 
 ## Daily work and setup
 
-The menu splits data enrichment in two. **Data Enrichment** holds the screens used every day: **Products** (your record label), the catalogue that some teams run as their PIM, and **To review**, where the files no step could link arrive after each sync. **Enrichment Setup** holds four settings, made once in order and adjusted when the folders or the catalogue change. Each setup screen names its step at the top.
+The menu splits data enrichment in two. **Data Enrichment** holds the screens used every day: **Products** (your record label), the catalogue that some teams run as their PIM, with its fields; **File metadata**, the fields read from the files themselves; and **To review**, where the files no step could link arrive after each sync. **Enrichment Setup** holds four settings, made once in order and adjusted when the folders or the catalogue change. Each setup screen names its step at the top.
 
 | Step | Screen | Question it answers |
 |---|---|---|
 | 1 | **Asset types**, with the **Folder rules** tab | What kind of file is this? The other settings are made per type. |
 | 2 | **Link to products** | How does a file of each type find its record? Needs records to link to. |
-| 3 | **Fields**, optional | What do readers see and search: record columns and photo metadata? |
+| 3 | **File metadata**, optional, under Data Enrichment | Which metadata read from photos do readers see and search? Record fields are set from the records page. |
 | 4 | **Variants**, optional | Which files are versions of one creative? |
 
 **Enrichment Setup → Setup guide** (`/admin/data-enrichment`) lists the four steps with where each stands: types defined and folders still without one, types with matching steps (or that no record exists yet), photo metadata fields shown, types grouping variants and axes waiting for a name. A step is ticked when it is done, and its button opens its screen. It also shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
@@ -98,7 +98,7 @@ An empty value is valid for every type. A value its type refuses is not saved an
 
 A field turned into a select without options takes its options from the values records already hold. An option cannot contain `|`. Readers see the options of a multiple select as a list, and search filters and counts treat each option on its own.
 
-Add a field from the ⋮ menu, from **Columns**, from a record's card, or on **Fields**. Its name is the CSV column name and cannot change afterwards; its display name can. Edit or remove a field from its column menu or on **Fields**. Removing a field removes its value from every record, and each record keeps the lost value in its history.
+Add a field from the ⋮ menu, from **Columns**, from a record's card, or in **Manage fields**. Its name is the CSV column name and cannot change afterwards; its display name can. Edit or remove a field from its column menu or in **Manage fields**. Removing a field removes its value from every record, and each record keeps the lost value in its history.
 
 ## Prepare the CSV
 
@@ -158,7 +158,7 @@ The attach dialog searches records by key and by searchable attribute, or picks 
 
 ## Use the metadata written inside the files
 
-Damvia reads the EXIF (camera, lens, date taken, GPS) and IPTC (title, caption, keywords, credit, city, copyright) metadata of every image it processes. Each tag becomes a field on the **File metadata** tab of **Fields**, created switched off the first time a file carries it, so nothing shows to readers until an admin decides. Formats that carry no readable metadata, such as PSD files, are skipped without an error. Images processed before this feature have none until `npm run cli -- metadata:backfill` is run once on the server.
+Damvia reads the EXIF (camera, lens, date taken, GPS) and IPTC (title, caption, keywords, credit, city, copyright) metadata of every image it processes. Each tag becomes a field on **Data enrichment → File metadata** (`/admin/data-enrichment/file-metadata`), created switched off the first time a file carries it, so nothing shows to readers until an admin decides. Formats that carry no readable metadata, such as PSD files, are skipped without an error. Images processed before this feature have none until `npm run cli -- metadata:backfill` is run once on the server.
 
 | Switch | Effect |
 |---|---|
@@ -194,15 +194,15 @@ A search now lists each file once, even when it sits in several collections the 
 
 ## Configure record fields
 
-Open **Data enrichment → Fields** (`/admin/data-enrichment/fields`), tab **Product attributes**. Drag the fields, or use the arrows, to set the order of the grid and the card; each admin can still rearrange the grid for themselves. Declare how each field behaves:
+On the records page, open ⋮ → **Manage fields**. The panel lists every field with its type. Drag the fields, or use the arrows, to set the order of the grid and the card for everyone; each admin can still rearrange the grid for themselves with **Columns**. Tick what each field does for readers, and use the pencil for its display name, type and options, or the bin to remove it. The old **Fields** address opens this panel, and `?tab=metadata` opens File metadata.
 
 | Setting | Effect |
 |---|---|
-| Display name | Label shown to admins and readers instead of the name. |
-| Type and options | How values are entered and checked; see [Give each field a type](#give-each-field-a-type). |
-| Searchable | Free-text search checks this field. |
-| Filter in search | The field becomes a faceted filter. Enabling it also makes it visible. |
-| Visible on files | The value can appear in file details and configured list views. |
+| Display name | Label shown to admins and readers instead of the name. Set with the pencil. |
+| Type and options | How values are entered and checked; see [Give each field a type](#give-each-field-a-type). Set with the pencil. |
+| Filter | The field becomes a faceted filter in the DAM search. Ticking it also ticks Show. |
+| Show | The value can appear in file details and configured list views. |
+| Search | Free-text search checks this field. |
 
 Choose facetable columns with a manageable set of values such as category, colour family or season. Very high-cardinality values produce unwieldy filters even though the interface hides options that would yield no result.
 

@@ -79,13 +79,13 @@ const steps = computed(() => {
       action: overview.records ? "Set the steps" : `Import ${plural}`,
     },
     {
-      title: "Fields",
-      what: `What readers see and can search: ${label.lower.value} columns and the metadata read from photos.`,
+      title: "File metadata",
+      what: `What readers see and can search of the metadata read from photos. ${label.singular.value} fields are set from Manage fields on the ${plural} page.`,
       status: `${overview.metadataFields.shown} of ${overview.metadataFields.total} photo metadata fields shown`,
       done: overview.metadataFields.shown > 0,
       optional: true,
-      to: { name: "admin-fields" },
-      action: "Open fields",
+      to: { name: "admin-file-metadata" },
+      action: "Open file metadata",
     },
     {
       title: "Variants",

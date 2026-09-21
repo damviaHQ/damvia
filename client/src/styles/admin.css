@@ -376,3 +376,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .records-grid.is-wrapped .record-value:not(.record-chips):not(.is-number):not(.record-url) { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; line-clamp:4; height:auto; min-height:20px; margin:8px 10px; padding:0; line-height:20px; white-space:pre-wrap; overflow-wrap:anywhere; }
 .dv-admin .records-grid.is-wrapped .record-chips { flex-wrap:wrap; height:auto; min-height:36px; padding-top:7px; padding-bottom:7px; }
 .dv-admin .records-grid.is-wrapped .records-grid-key, .dv-admin .records-grid.is-wrapped .records-grid-filled, .dv-admin .records-grid.is-wrapped .records-grid-count { height:36px; }
+
+/* Records: fields panel */
+.dv-admin.records-fields-sheet { width:min(720px, 100vw); display:flex; flex-direction:column; }
+.dv-admin .records-fields-header { display:grid; gap:6px; padding:20px 60px 16px 24px; border-bottom:1px solid var(--dv-color-line); }
+.dv-admin .records-fields-header h2 { font-size:var(--dv-size-section-title, 18px); font-weight:600; }
+.dv-admin .records-fields-header p { color:var(--dv-text-secondary); font-size:var(--dv-size-body); }
+.dv-admin .records-fields-body { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:16px; padding:16px 24px 24px; }
+.dv-admin .records-fields-table { width:100%; border-collapse:collapse; font-size:var(--dv-size-body); }
+.dv-admin .records-fields-table th { padding:8px 6px; border-bottom:1px solid var(--dv-color-line); text-align:left; font-size:var(--dv-size-caption); font-weight:500; color:var(--dv-text-secondary); }
+.dv-admin .records-fields-table td { padding:8px 6px; border-bottom:1px solid var(--dv-color-line); vertical-align:middle; }
+.dv-admin .records-fields-table .is-setting { width:64px; text-align:center; }
+.dv-admin .records-fields-table td strong { display:block; font-weight:500; }
+.dv-admin .records-fields-meta { font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
+.dv-admin .records-fields-order { width:76px; white-space:nowrap; color:var(--dv-text-secondary); }
+.dv-admin .records-fields-order > * { display:inline-block; vertical-align:middle; }
+.dv-admin .records-fields-order button { padding:4px; }
+.dv-admin .records-fields-order button:disabled { opacity:.3; }
+.dv-admin .records-fields-handle { cursor:grab; }
+.dv-admin .records-fields-actions { width:84px; white-space:nowrap; text-align:right; }
+.dv-admin .records-fields-note { font-size:var(--dv-size-caption); }
+.dv-admin .records-fields-note a { color:var(--dv-action-primary); text-decoration:underline; }

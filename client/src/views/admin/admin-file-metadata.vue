@@ -43,28 +43,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { extractErrors, RouterOutput, trpc } from "@/services/server.ts"
-import AdminRecordAttributes from "@/views/admin/records/admin-record-attributes.vue"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import type { AcceptableValue } from "reka-ui"
 import { ref } from "vue"
-import { useRoute, useRouter } from "vue-router"
 
 type Field = RouterOutput["metadataField"]["list"][number]
 
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
 const label = useRecordLabel()
-const route = useRoute()
-const router = useRouter()
-const tab = ref(route.query.tab === "metadata" ? "metadata" : "attributes")
-function onTab(value: string | number) {
-  tab.value = String(value)
-  router.replace({ query: { ...route.query, tab: value === "metadata" ? "metadata" : undefined } })
-}
 
 const { data: fields, status, error } = useQuery({ queryKey: ["metadata-fields"], queryFn: () => trpc.metadataField.list.query() })
 const { data: attributeNames } = useQuery({ queryKey: ["records", "available-attributes"], queryFn: () => trpc.recordAttribute.listAvailable.query() })
@@ -113,57 +103,44 @@ const linkMeaning = (field: Field) => !field.canLink ? "—" : field.linkTarget 
 
 <template>
   <div class="admin-page admin-resource-page">
-    <AdminPageHeader :description="`Choose what readers see and can search: the columns of your ${label.lowerPlural.value}, and the metadata read from the photos themselves (camera, date, keywords).`">
-      <template #lead><span class="admin-step">Setup · step 3 of 4</span></template>
-    </AdminPageHeader>
-    <Tabs :model-value="tab" @update:model-value="onTab">
-      <TabsList>
-        <TabsTrigger value="attributes">{{ label.singular.value }} attributes</TabsTrigger>
-        <TabsTrigger value="metadata">File metadata</TabsTrigger>
-      </TabsList>
-      <TabsContent value="attributes" class="mt-4">
-        <AdminRecordAttributes />
-      </TabsContent>
-      <TabsContent value="metadata" class="mt-4">
-        <p class="admin-form-note mb-4">Cameras write some fields (date, GPS, camera). People write others (title, keywords, category), and they can be wrong or outdated. Only tick “Can link” for a field your team fills reliably.</p>
-        <div v-if="status === 'pending'"><Loader :text="true" /></div>
-        <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
-        <div v-else-if="!fields?.length" class="admin-empty dv-panel">
-          <h2>No metadata found yet.</h2>
-          <p>Metadata is read when files are processed after the next sync. For files processed earlier, run <code>npm run cli -- metadata:backfill</code> on the server.</p>
-        </div>
-        <AdminList v-else :items="fields" :fields="['name', 'displayName']" label="Metadata fields" v-slot="{ items }">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Field</TableHead>
-                <TableHead>Display name</TableHead>
-                <TableHead>Files</TableHead>
-                <TableHead>Examples</TableHead>
-                <TableHead>Searchable</TableHead>
-                <TableHead>Filter</TableHead>
-                <TableHead>Visible</TableHead>
-                <TableHead>Can link</TableHead>
-                <TableHead>Link meaning</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-for="field in items" :key="field.id" :aria-busy="saving === field.id">
-                <TableCell><code>{{ field.name }}</code><p class="admin-text-secondary">{{ field.valueType }}</p></TableCell>
-                <TableCell><Input :model-value="field.displayName ?? ''" :aria-label="`Display name of ${field.name}`" placeholder="Shown to readers" @change="(event: Event) => save(field, { displayName: (event.target as HTMLInputElement).value || null })" /></TableCell>
-                <TableCell>{{ field.fileCount }}</TableCell>
-                <TableCell class="admin-text-secondary">{{ field.examples.join(", ") }}</TableCell>
-                <TableCell><Checkbox :model-value="field.searchable" :aria-label="`${field.name} searchable`" @update:model-value="(checked) => save(field, { searchable: checked === true })" /></TableCell>
-                <TableCell><Checkbox :model-value="field.facetable" :disabled="field.valueType === 'gps'" :aria-label="`${field.name} filter in search`" @update:model-value="(checked) => save(field, { facetable: checked === true })" /></TableCell>
-                <TableCell><Checkbox :model-value="field.viewable" :aria-label="`${field.name} visible`" @update:model-value="(checked) => save(field, { viewable: checked === true })" /></TableCell>
-                <TableCell><Checkbox :model-value="field.canLink" :aria-label="`${field.name} can link files`" @update:model-value="(checked) => askTrust(field, checked)" /></TableCell>
-                <TableCell>{{ linkMeaning(field) }}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </AdminList>
-      </TabsContent>
-    </Tabs>
+    <AdminPageHeader :description="`The metadata read from the files themselves (camera, date, keywords, title): what readers see and can search, and which fields may link a file to its ${label.lower.value}.`" />
+    <p class="admin-form-note mb-4">Cameras write some fields (date, GPS, camera). People write others (title, keywords, category), and they can be wrong or outdated. Only tick “Can link” for a field your team fills reliably.</p>
+    <div v-if="status === 'pending'"><Loader :text="true" /></div>
+    <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
+    <div v-else-if="!fields?.length" class="admin-empty dv-panel">
+      <h2>No metadata found yet.</h2>
+      <p>Metadata is read when files are processed after the next sync. For files processed earlier, run <code>npm run cli -- metadata:backfill</code> on the server.</p>
+    </div>
+    <AdminList v-else :items="fields" :fields="['name', 'displayName']" label="Metadata fields" v-slot="{ items }">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Field</TableHead>
+            <TableHead>Display name</TableHead>
+            <TableHead>Files</TableHead>
+            <TableHead>Examples</TableHead>
+            <TableHead>Searchable</TableHead>
+            <TableHead>Filter</TableHead>
+            <TableHead>Visible</TableHead>
+            <TableHead>Can link</TableHead>
+            <TableHead>Link meaning</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow v-for="field in items" :key="field.id" :aria-busy="saving === field.id">
+            <TableCell><code>{{ field.name }}</code><p class="admin-text-secondary">{{ field.valueType }}</p></TableCell>
+            <TableCell><Input :model-value="field.displayName ?? ''" :aria-label="`Display name of ${field.name}`" placeholder="Shown to readers" @change="(event: Event) => save(field, { displayName: (event.target as HTMLInputElement).value || null })" /></TableCell>
+            <TableCell>{{ field.fileCount }}</TableCell>
+            <TableCell class="admin-text-secondary">{{ field.examples.join(", ") }}</TableCell>
+            <TableCell><Checkbox :model-value="field.searchable" :aria-label="`${field.name} searchable`" @update:model-value="(checked) => save(field, { searchable: checked === true })" /></TableCell>
+            <TableCell><Checkbox :model-value="field.facetable" :disabled="field.valueType === 'gps'" :aria-label="`${field.name} filter in search`" @update:model-value="(checked) => save(field, { facetable: checked === true })" /></TableCell>
+            <TableCell><Checkbox :model-value="field.viewable" :aria-label="`${field.name} visible`" @update:model-value="(checked) => save(field, { viewable: checked === true })" /></TableCell>
+            <TableCell><Checkbox :model-value="field.canLink" :aria-label="`${field.name} can link files`" @update:model-value="(checked) => askTrust(field, checked)" /></TableCell>
+            <TableCell>{{ linkMeaning(field) }}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </AdminList>
     <AlertDialog :open="!!trusting" @update:open="(open) => !open && (trusting = null)">
       <AlertDialogContent v-if="trusting">
         <AlertDialogHeader>

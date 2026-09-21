@@ -52,6 +52,9 @@ test('no focus outline of the records screen is cut by its container', async ({ 
   await page.getByRole('button', { name: 'Edit the field Colour' }).click()
   await page.getByRole('dialog', { name: /Edit Colour/ }).waitFor()
   expect(await page.evaluate(AUDIT), 'field dialog').toEqual([])
+  await page.goto('/admin/data-enrichment/records?fields=1')
+  await page.getByRole('dialog', { name: 'Product fields' }).getByRole('button', { name: 'Add a field' }).waitFor()
+  expect(await page.evaluate(AUDIT), 'fields panel').toEqual([])
 })
 
 test('no focus outline of the CSV import is cut by its container', async ({ page }) => {

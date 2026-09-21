@@ -260,7 +260,7 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
       <ul v-if="comparison.newColumns.length || Object.keys(comparison.newOptions).length" class="import-notes">
         <li v-if="comparison.newColumns.length">
           <strong>{{ plural(comparison.newColumns.length, "new field", "new fields") }}</strong>, created as text: {{ comparison.newColumns.join(", ") }}. Change their type afterwards on
-          <router-link :to="{ name: 'admin-fields' }">Fields</router-link>.
+          <router-link :to="{ name: 'admin-records', query: { fields: '1' } }">Manage fields</router-link> on the {{ recordLabel.lowerPlural.value }} page.
         </li>
         <li v-for="(options, name) in comparison.newOptions" :key="name">
           <strong>{{ labels[name] ?? name }}</strong> gains {{ plural(options.length, "option", "options") }}: {{ options.join(", ") }}.
