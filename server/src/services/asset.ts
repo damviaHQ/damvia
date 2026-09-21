@@ -302,7 +302,13 @@ export async function upsertFolder(opts: UpsertFolderOptions): Promise<AssetFold
 		folder.assetTypeId = folder.parent?.assetTypeId
 	}
 
-	await dataSource.getRepository(AssetFolder).save(folder)
+	// save() on a tree entity without a parent rewrites the mpath of its whole
+	// subtree, so an unchanged root would lock every folder on each pass.
+	if (!alreadyExists || parentChanged) {
+		await dataSource.getRepository(AssetFolder).save(folder)
+	} else if (folderNameChanged) {
+		await dataSource.getRepository(AssetFolder).update({ id: folder.id }, { name: folder.name })
+	}
 	if (folderNameChanged || parentChanged || !alreadyExists) {
 		const jobs = [
 			...(folder.collections?.map((c) => ({ data: { collectionId: c.id } })) ?? []),

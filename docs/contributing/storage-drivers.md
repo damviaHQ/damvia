@@ -3,7 +3,7 @@ title: Storage drivers
 description: "Add a cloud storage provider: the AssetUpdater base class, the upsertFolder and upsertFile contract, the deletion sweep, and the checklist for a new driver."
 sidebar:
   order: 6
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-21
 ---
 
 This page describes what a storage driver must do so that a third provider can be added next to Dropbox and OneDrive. How the two existing drivers are configured is in [Dropbox](../integrations/dropbox.md) and [OneDrive](../integrations/onedrive.md); what happens to a file once it is known is in [Assets tree](../administration/assets-tree.md).
@@ -29,7 +29,7 @@ The base class also provides five protected helpers for the deletion sweep: `get
 - Creates it with `status = up_to_date` when unknown.
 - Sets `name`, and looks the parent up by `parentExternalId` when it differs from the current parent. A `parentExternalId` that matches no row yields a root folder (`parent` is `null`).
 - On creation or when the parent changed, copies `licenseId` and `assetTypeId` from the new parent.
-- Saves, then, when the folder is new, renamed or moved, `bulkPush`es one `collection/synchronization` job for each collection bound to the folder, to its new parent and to its previous parent.
+- Saves with `save()` only when the folder is new or moved, since `save()` on a tree entity without a parent rewrites the `mpath` of its whole subtree; a rename is a plain `update` of `name`, and an unchanged folder writes nothing. Then, when the folder is new, renamed or moved, it `bulkPush`es one `collection/synchronization` job for each collection bound to the folder, to its new parent and to its previous parent.
 
 It returns the saved `AssetFolder`; collect `folder.id` for the sweep. Upsert parents before children, since the parent lookup is by `externalId` at call time: OneDrive relies on delta order, Dropbox sorts folders by path depth and creates `generated_`-prefixed placeholders for parents the listing did not return.
 

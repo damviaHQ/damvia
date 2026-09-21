@@ -848,3 +848,26 @@ test('an alert that could not be sent is sent again at the next measurement', as
         disk = { totalBytes: 10000, freeBytes: 9000 }
     }
 })
+
+test('re-syncing an unchanged root folder leaves its subtree alone', async () => {
+    const rootId = randomUUID()
+    const root = await assets.upsertFolder({ externalId: rootId, parentExternalId: '', name: 'Synced root' })
+    const child = await assets.upsertFolder({ externalId: randomUUID(), parentExternalId: rootId, name: 'Synced child' })
+    const childRow = async () => (await db.query('SELECT mpath, updated_at FROM asset_folders WHERE id = $1', [child.id]))[0]
+    const before = await childRow()
+    const updates = []
+    const createQueryRunner = db.createQueryRunner.bind(db)
+    db.createQueryRunner = (...args) => {
+        const runner = createQueryRunner(...args)
+        const query = runner.query.bind(runner)
+        runner.query = (sql, ...rest) => { if (/^UPDATE "asset_folders"/.test(sql)) updates.push(sql); return query(sql, ...rest) }
+        return runner
+    }
+    try {
+        await assets.upsertFolder({ externalId: rootId, parentExternalId: '', name: 'Synced root' })
+        assert.deepEqual(updates, [])
+        await assets.upsertFolder({ externalId: rootId, parentExternalId: '', name: 'Renamed root' })
+    } finally { db.createQueryRunner = createQueryRunner }
+    assert.equal((await db.getRepository(AssetFolder).findOneByOrFail({ id: root.id })).name, 'Renamed root')
+    assert.deepEqual(await childRow(), before)
+})
