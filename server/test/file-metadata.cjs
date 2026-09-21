@@ -54,9 +54,9 @@ test('IPTC keywords, caption and credit are read, repeated keywords give several
     ])
 })
 
-test('EXIF scalars become typed fields, GPS one position, buffers and arrays are left out and repeats are dropped', () => {
+test('EXIF scalars become typed fields, GPS one position, buffers, arrays and section pointers are left out and repeats are dropped', () => {
     const exif = {
-        Image: { Make: 'Canon ', Model: 'EOS R5', Orientation: 1, XResolution: 72, StripOffsets: [1, 2], PrintIM: Buffer.from('x') },
+        Image: { Make: 'Canon ', Model: 'EOS R5', Orientation: 1, XResolution: 72, ExifTag: 210, GPSTag: 430, StripOffsets: [1, 2], PrintIM: Buffer.from('x') },
         Photo: { DateTimeOriginal: new Date('2026-05-21T14:02:03Z'), ISOSpeedRatings: 400, UserComment: '\u0000\u0000' },
         GPSInfo: { GPSLatitude: [23, 33, 0], GPSLatitudeRef: 'S', GPSLongitude: [46, 38, 0], GPSLongitudeRef: 'W' },
     }
@@ -89,6 +89,17 @@ test('a real JPEG gives its EXIF, a JPEG without EXIF gives nothing, and a file 
         await rm(withExif, { force: true })
         await rm(without, { force: true })
     }
+})
+
+test('a format sharp cannot read has no metadata and is not an error, a missing file still fails', async () => {
+    const unreadable = join(tmpdir(), `metadata-${randomUUID()}.psd`)
+    await writeFile(unreadable, Buffer.from('8BPS not an image sharp reads'))
+    try {
+        assert.deepEqual(await metadata.readFileMetadata(unreadable), [])
+    } finally {
+        await rm(unreadable, { force: true })
+    }
+    await assert.rejects(metadata.readFileMetadata(join(tmpdir(), `metadata-${randomUUID()}.jpg`)))
 })
 
 test('a field whose value equals a record key links nothing until an admin trusts it and a step names it', async () => {

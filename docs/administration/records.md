@@ -99,7 +99,7 @@ The attach dialog searches records by key and by searchable attribute, or picks 
 
 ## Use the metadata written inside the files
 
-Damvia reads the EXIF (camera, lens, date taken, GPS) and IPTC (title, caption, keywords, credit, city, copyright) metadata of every image it processes. Each tag becomes a field on the **File metadata** tab of **Fields**, created switched off the first time a file carries it, so nothing shows to readers until an admin decides. Images processed before this feature have none until `npm run cli -- metadata:backfill` is run once on the server.
+Damvia reads the EXIF (camera, lens, date taken, GPS) and IPTC (title, caption, keywords, credit, city, copyright) metadata of every image it processes. Each tag becomes a field on the **File metadata** tab of **Fields**, created switched off the first time a file carries it, so nothing shows to readers until an admin decides. Formats that carry no readable metadata, such as PSD files, are skipped without an error. Images processed before this feature have none until `npm run cli -- metadata:backfill` is run once on the server.
 
 | Switch | Effect |
 |---|---|

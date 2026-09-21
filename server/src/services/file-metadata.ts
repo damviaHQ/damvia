@@ -69,6 +69,9 @@ export function parseIptc(buffer: Buffer): { name: string, value: string }[] {
 	return values
 }
 
+// Offsets to the other sections of the block, meaningless as values.
+const POINTER_TAGS = new Set(['ExifTag', 'GPSTag', 'InteroperabilityTag'])
+
 const toDegrees = (value: unknown, reference: unknown) => {
 	if (!Array.isArray(value) || value.length !== 3) return null
 	const [degrees, minutes, seconds] = value.map(Number)
@@ -83,6 +86,7 @@ export function flattenMetadata(exif: ReturnType<typeof exifReader> | null, iptc
 	const values: ExtractedValue[] = []
 	for (const section of [exif?.Image, exif?.Photo]) {
 		for (const [tag, raw] of Object.entries(section ?? {})) {
+			if (POINTER_TAGS.has(tag)) continue
 			const field = `exif.${tag}`
 			if (raw instanceof Date) {
 				if (!Number.isNaN(raw.getTime())) values.push({ field, type: 'date', text: raw.toISOString().slice(0, 19).replace('T', ' '), date: raw, number: null })
@@ -113,7 +117,11 @@ export function flattenMetadata(exif: ReturnType<typeof exifReader> | null, iptc
 }
 
 export async function readFileMetadata(contentPath: string): Promise<ExtractedValue[]> {
-	const meta = await sharp(contentPath, { limitInputPixels: 0, pages: 1 }).metadata()
+	const meta = await sharp(contentPath, { limitInputPixels: 0, pages: 1 }).metadata().catch((error: Error) => {
+		if (/unsupported image format/.test(error.message)) return null
+		throw error
+	})
+	if (!meta) return []
 	let exif: ReturnType<typeof exifReader> | null = null
 	if (meta.exif) {
 		try {

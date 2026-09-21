@@ -24,6 +24,8 @@ The `--` separates npm's arguments from the command's. In a production container
 docker exec -it <container> npm run cli -- check-integrity
 ```
 
+A hosting panel that offers a terminal on the application container, such as the Terminal tab of Coolify, runs the same command without SSH.
+
 ## Commands
 
 | Command | What it does |
