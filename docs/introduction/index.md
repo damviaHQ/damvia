@@ -1,77 +1,58 @@
 ---
 title: What is Damvia
-description: Damvia is a self-hosted Digital Asset Management layer that sits on top of your Dropbox or OneDrive and adds access control, collections, pages and product search.
+description: Damvia adds controlled discovery, presentation and sharing to assets that remain in your cloud storage.
 sidebar:
   order: 1
 lastUpdated: 2026-09-20
 ---
 
-This page explains what Damvia does, who it is built for, what it deliberately does not do, and what it is made of. Read it before [Getting started](../getting-started/index.md) to decide whether it fits your setup.
+Damvia is a self-hosted Digital Asset Management application for organisations that already keep their files in Dropbox, OneDrive or Google Drive. It mirrors selected cloud folders, adds product data and access rules, and presents the result as a searchable library without asking teams to migrate their source files.
 
-## Cloud storage stays the source of truth
+This documentation is for people evaluating, installing, configuring and administering Damvia. Everyday how-to articles and onboarding are maintained separately on the public website.
 
-Damvia is a Digital Asset Management (DAM) application that works on top of a cloud storage you already have. It never becomes the place where files live. The supported backends, selected with `ASSET_UPDATER`, are:
+## Cloud storage remains the source of truth
 
-| Backend | Value | Notes |
-| --- | --- | --- |
-| Dropbox | `dropbox` | Lists the app's root folder recursively. Set `DROPBOX_USE_TEAM_ROOT=true` to sync a Dropbox Business team space instead of the member's home folder. |
-| OneDrive for Business | `onedrive` | Uses the Microsoft Graph delta endpoint for the drive set in `ONEDRIVE_USER` and `ONEDRIVE_DRIVE`. |
-| Google Drive | `googledrive` | Uses a service account to list the folder set in `GOOGLE_DRIVE_FOLDER_ID`, on My Drive or a shared drive. |
+Damvia reads configured folders every five minutes. Adding, renaming, moving or removing a file in the cloud storage changes the corresponding asset in Damvia. Users do not upload source assets through Damvia, and Damvia never writes changes back to a connected source.
 
-Every 5 minutes the server walks the storage and mirrors its folder tree into Postgres as asset folders and asset files. Entries whose name starts with `.`, empty files and empty folders are skipped. A folder or file that disappeared from the listing is marked `pending_deletion` and removed by the `asset/process-deletion` job, which runs every minute.
+An instance can use one source with the simple provider variables, or several sources through `ASSET_SOURCES`. Sources may use different accounts and a mix of Dropbox, OneDrive and Google Drive. Each appears as a top-level folder in the asset tree. See [Integrations](../integrations/index.md) and [Sources](../integrations/sources.md).
 
-For each new file, and each file the daily integrity check re-queues, the `asset/update-content` queue downloads the original into Damvia's own assets bucket and generates a WebP thumbnail. Thumbnails are produced for:
+Damvia keeps a working copy of originals and previews in S3-compatible storage so that the library can search, preview and package files efficiently. The connected source is still authoritative: changing a source file updates the working copy, and removing it eventually removes its mirrored asset.
 
-| Kind | Extensions | Tool |
-| --- | --- | --- |
-| Images | `jpg` `jpeg` `png` `gif` `bmp` `webp` `tiff` `tif` `svg` `psd` `heic` `heif` | sharp, with ImageMagick for the formats sharp cannot read |
-| Videos | `mp4` `mov` `avi` `mkv` `wmv` `flv` `webm` `m4v` | ffmpeg |
-| PDF and vector | `pdf` `eps` `ai` | Ghostscript |
-| Office and text | `doc` `docx` `xls` `xlsx` `ppt` `pptx` `odt` `ods` `odp` `rtf` `pps` `ppsx` `potx` `pot` `html` `htm` `xml` `json` `md` `yaml` `yml` `txt` `css` `js` `ts` `csv` | LibreOffice |
-| Fonts | `ttf` `otf` | ImageMagick sample text |
+## What Damvia adds
 
-Files of other types are still mirrored and downloadable, they simply have no preview.
+- **Search and product data.** Import a CSV catalogue, extract a product reference from filenames and use selected columns as search terms and filters.
+- **Collections.** Mirror a cloud folder as a synchronised collection, or curate a manual collection from files already in the library.
+- **Pages and navigation.** Present collections, files, text, pictures and videos in editorial pages and arrange them in a controlled menu.
+- **Access control.** Approve accounts and combine roles, regions, groups, collection visibility and file licences.
+- **Sharing and downloads.** Invite a guest to a collection and prepare original or converted downloads with expiring links.
 
-## What Damvia adds on top
+[Core concepts](./concepts.md) explains how these parts relate. [Roles and access](./roles-and-access.md) describes the access model.
 
-- Access control: four roles, account approval, regions, groups, licenses and time-limited guest invitations. See [Roles and access](./roles-and-access.md).
-- Collections: a tree of curated sets of files. A collection can be bound to an asset folder so its content follows the storage automatically, or be assembled by hand.
-- Pages: editorial pages built from blocks (collections, files, latest files, text, image, video) and a configurable menu.
-- Search: case-insensitive substring matching (`ILIKE`) on file names and searchable product attributes; words are combined with OR and `exactMatch` matches the complete phrase as a substring, with facets on asset types, product views, file kinds and any attribute flagged as facetable.
-- PIM linking: products are imported from CSV, and `PRODUCT_MATCHING_REGEX` extracts a product key and a product view from each file name so files are linked to products automatically every 5 minutes.
+## What Damvia does not replace
 
-The domain model is described in [Core concepts](./concepts.md).
+Damvia does not replace the connected cloud storage or its backup. It also does not turn a page upload into a managed asset: collection thumbnails, page media, branding and other editorial uploads live only in Damvia's main bucket.
+
+A recoverable installation therefore backs up PostgreSQL, the main bucket, configuration and secrets together. Asset originals and previews in the assets bucket can be rebuilt only while their cloud sources remain available; prepared download archives are not rebuilt. See [Backups](../deployment/backups.md).
 
 ## Who it is for
 
-Damvia is designed for brand and marketing teams that hold product imagery, videos and documents in a shared drive and need to distribute them to internal users, regional teams and partners. Regions and licenses let an administrator decide which markets may use which assets, and invitations let any collection owner share a collection with an outside guest for a limited time without giving that guest access to anything else.
+Damvia fits brand, marketing and product teams that manage a large visual library in shared cloud storage and need controlled access for internal teams, regions and partners. It is especially useful when filenames or catalogue data already identify products and variants.
 
-## What Damvia is not
+Before installing, confirm that you can provide a supported cloud account, PostgreSQL, two S3-compatible buckets, SMTP and one server process with the media tools required for previews. Continue with [Requirements](../getting-started/index.md).
 
-Damvia is not an upload tool. Users do not upload assets in the browser: assets arrive by adding files to the cloud storage, and they disappear by removing them there. The only in-app uploads are the collection thumbnail, images and videos placed in page blocks, and the login background image, all of which go to the main bucket rather than the assets bucket.
+## Deployment shape
 
-Back up the database, main bucket and configuration/secrets together. Asset originals and generated previews can be rebuilt only while their sources remain available in the cloud storage. Download archives are not recreated. See [Backups](../deployment/backups.md).
+A production instance contains:
 
-## Tech stack
+- one Node.js server process for the API, background work and source synchronisation;
+- a static Vue client;
+- PostgreSQL for application data and the job queue;
+- two S3-compatible buckets;
+- an SMTP provider;
+- one or more configured cloud sources.
 
-| Layer | Technology |
-| --- | --- |
-| Client | Vue 3, Vite, Tailwind CSS, tRPC client |
-| Server | Node.js, Fastify 5, tRPC 11 |
-| Database | PostgreSQL 15 with TypeORM |
-| Background jobs | pg-boss (runs in the same process when `ENABLE_WORKER=true`) |
-| Object storage | Two S3-compatible buckets, MinIO by default (`MAIN_S3_URL`, `ASSETS_S3_URL`) |
-| Email | Any SMTP provider via nodemailer (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`) |
-| Media tooling | sharp, ffmpeg, LibreOffice, Ghostscript, ImageMagick |
-
-The `docker-compose.yml` in `server/` starts Postgres, MinIO and MailHog for local development.
+The supported topology and setup order are in [Deployment](../deployment/index.md). Contributors can find the implementation overview in [Architecture](../contributing/architecture.md).
 
 ## License
 
-Damvia is released under the GNU Affero General Public License v3 (see `LICENSE` at the repository root). For a self-hoster this means that if you modify Damvia and let users interact with it over a network, you must make the source code of your modified version available to those users.
-
-:::note
-The statement above describes the network interaction requirement in AGPL section 13 for a modified version. It does not summarise all obligations when conveying copies; consult the repository licence for those conditions.
-:::
-
-Next: [Core concepts](./concepts.md), [Roles and access](./roles-and-access.md), [Getting started](../getting-started/index.md).
+Damvia is released under the GNU Affero General Public License v3. If you modify Damvia and let users interact with that modified version over a network, section 13 requires offering those users the corresponding source. Read the repository `LICENSE` for the complete terms.

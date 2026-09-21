@@ -3,7 +3,7 @@ title: Sources
 description: Sync several folders, from several Dropbox, OneDrive or Google Drive accounts, into one library with ASSET_SOURCES.
 sidebar:
   order: 2
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 A **source** is one cloud folder that Damvia mirrors: one account on one provider, plus the folder inside it that becomes a top-level folder of the library. An instance may have one source, as every instance had before this feature, or several, on any mix of providers and accounts: two folders of one Dropbox account next to one OneDrive folder, for example. Each source is a separate top-level folder in the [assets tree](../administration/assets-tree.md); nothing else in Damvia distinguishes them.
@@ -79,7 +79,7 @@ Each source adds one top-level folder named after its cloud folder. Two sources 
 
 ## How the runs work
 
-The sources run one after another, every 5 minutes, in the order of the list. Each run is the one described in [Integrations](./index.md): list everything, write folders then files, then sweep. The sweep is limited to the rows of that source, so an empty listing, a failed item or a broken token on one source never touches another. A source that fails is logged with its key and retried at the next cycle while the others continue. Provider ids are unique per source, not per instance: the same file reachable through two sources on two accounts gives two independent rows and two copies.
+The sources run one after another, every 5 minutes, in the order of the list. Each run is the one described in [Integrations](./index.md): list everything, write folders then files, then sweep. The sweep is limited to the rows of that source, so an empty listing, a failed item or a broken token on one source never touches another. It is also skipped, with the run marked failed, when more than `ASSET_SYNC_MAX_DELETION_PERCENT` of the source's folders and files are absent from the listing (20 % by default, only above 20 items): a truncated listing is indistinguishable from a mass deletion, so the operator decides. Set the variable to `100` to disable the check, or raise it for the run that should apply an intended clean-up, then put it back. A source that fails is logged with its key and retried at the next cycle while the others continue. Provider ids are unique per source, not per instance: the same file reachable through two sources on two accounts gives two independent rows and two copies.
 
 Memory grows with the largest source, not with their number, because one listing is held at a time. See [Worker and scaling](../deployment/worker-and-scaling.md#memory-and-disk) for the figures.
 

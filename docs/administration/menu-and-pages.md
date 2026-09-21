@@ -1,117 +1,104 @@
 ---
 title: Menu and pages
-description: Build the navigation menu and compose pages out of blocks, for the home screen and for collections.
+description: Arrange the reader navigation and build editorial pages without changing the assets or collections they display.
 sidebar:
   order: 9
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
-The menu is the tree users see in the main layout; pages are block layouts that can be a standalone destination (for example the home page) or the landing view of a collection. Both are administered from the Content Management section.
+The menu controls how readers reach content. Pages combine text and media with live collection or file listings. A page presents existing content; it does not move assets, add files to collections or change their permissions.
 
-## Menu items
+## Build the navigation menu
 
-Rows of `menu_items` form a materialized-path tree with a `position` inside each parent and a `home` flag.
+Open `/admin/menu-items` to add one of four entries:
 
-| Type | Points to | `data` keys |
-| --- | --- | --- |
-| `collection` | `collection_id` | `sync` (boolean) |
-| `page` | `page_id` | none |
-| `text` | nothing | `text`, `url`, `external` |
-| `divider` | nothing | `border`, `spacingTop`, `spacingBottom` |
+| Type | Use it for |
+|---|---|
+| Collection | Open a public collection. It can optionally keep descendant collection entries in sync. |
+| Page | Open a standalone editorial page. |
+| Text/Link | Add a label or link to an internal/external address. |
+| Divider | Separate menu groups with optional spacing and a line. |
 
-Items referencing a collection or a page are deleted with it (`ON DELETE CASCADE`), and children go with their parent.
+Entries may be nested and reordered among their siblings. A hand-placed menu entry cannot be moved to a different parent directly; recreate it under the intended parent. Moving a collection moves its synchronised menu entries. Collection and page entries can be set as Home. Damvia keeps only one Home entry; if none exists, the client falls back to the first accessible collection or its welcome state.
 
-### The screen
+A synchronised collection menu entry can generate and maintain entries for its descendant collections. A reader receives only the collection entries they are allowed to see. A parent menu label may remain visible as a container when one of its children is accessible.
 
-`/admin/menu-items` (admin only) shows the tree and an `Add a new item` action. The dialog (`Add item to menu` / `Edit item`) has a `Type` select with `Collection`, `Text/Link`, `Divider` and `Page`; the type and the target cannot change once the item exists. Per type:
+When a synchronised collection moves with its source folder, its synced menu entries follow. When a deleted synchronised branch contains hand-placed menu items, Damvia moves those items to the nearest surviving menu entry; see [Collections and sharing](./collections-and-sharing.md#custom-collections-survive-inside-a-synchronised-tree).
 
-- **Collection**: choose an existing collection; `Display and synchronize all sub-collections in the menu` sets `data.sync`.
-- **Page**: choose a page from the standalone pages.
-- **Text/Link**: a `Text`, an optional `URL` and, when a URL is set, `Open in new tab`.
-- **Divider**: `Show a divider line`, `Spacing top` and `Spacing bottom` sliders (0 to 100 px in steps of 5).
+## Choose a standalone or collection page
 
-Each item's menu offers `Add Item to Collection` (create a child) and, for collection and page items, `Set as Home`. Items with children expand and collapse from their row. Dragging items, or choosing `Move up` / `Move down` in an item's menu, calls `menuItem.updatePositions` with the new positions of its siblings; a keyboard move announces the new position to screen readers.
+A **standalone page** is created under `/admin/pages` and becomes reachable after it is added to the menu. Use it for a home page, campaign overview or guidance that is not owned by one collection.
 
-### Home, synchronization and visibility
+A **collection page** replaces the default sub-collection/file listing for that collection. Anyone who can edit the collection can edit its page. Until the first save, the editor shows the default arrangement without creating a permanent custom page.
 
-- `menuItem.setHome` clears `home` on every other item and sets it on the chosen one, in one transaction, so that operation selects one home item. A new instance or deletion of that item can leave none; the client then chooses the first accessible collection or its welcome message.
-- Creating a collection item with `sync` also creates one child item per descendant collection, each with `data.sync`. From then on, `syncCollectionMenuItems` in `server/src/services/collection.ts` keeps synced items aligned: a new public sub-collection gets an item under each synced parent item, a root public collection gets a root item if it has none, and a collection that becomes non-public loses its items.
-- `menuItem.list`, used by every approved user, hides collection items whose collection the user cannot see. An item is still returned when one of its children is visible, but flagged `hasAccess: false`.
+Deleting or resetting a collection page returns the collection to its normal listing. Deleting a standalone page removes menu entries that point to it.
 
-## Pages and blocks
+## Compose a page from blocks
 
-A row of `pages` has a `name` and an optional `collection_id`. A unique partial index guarantees at most one page per collection. Blocks are rows of `page_blocks`: a `type`, a `position` in the page and a `size`, plus a `data` payload in `jsonb`.
+Blocks are ordered and use one of three widths: full, half or third. Consecutive narrow blocks share a row when they fit.
 
-Blocks are an ordered list, not a grid. Each one is `full`, `half` or `third` of the page width, and the browser packs consecutive narrow blocks onto the same line: two `half` blocks sit side by side, three `third` blocks make a row of three, and a `full` block always starts a new line. Authors choose nothing else about layout; there is no padding, margin, colour or font setting anywhere in the editor.
+| Block | Displays |
+|---|---|
+| Banner | A focused picture, title, subtitle and optional button. |
+| Text | Rich text with headings, emphasis, lists, quotes and links. |
+| Picture | One uploaded picture or one accessible library image. |
+| Video | An upload, an accessible library video, or a YouTube/Vimeo embed. |
+| Collections | The collection's children or a chosen selection. It can focus on custom page collections or plain sub-collections. |
+| Files | Files from a collection. |
+| Latest files | Recently added files, optionally scoped to a collection. |
 
-A page takes all the width it is given, in the editor and on the live page alike, because a library needs the room to show its pictures. The proportions hold at every width: blocks an author placed side by side stay side by side, and never drop onto a line of their own on a narrower window. What reflows is the content inside each block, since a collection or file listing wraps to the width of its block rather than to the width of the window.
+Drag a block into the page or add it at the end. Each block can be resized, reordered, duplicated, configured or deleted. Text is edited in place. **Save** writes the full page; **Discard** returns to the last saved version. Leaving with unsaved changes asks for confirmation.
 
-Every block keeps its own cell even when it has nothing to show, so a picture that has not been chosen yet, or a listing that is still empty, does not pull the blocks after it out of place. An empty text block keeps the room it took in the editor, which is what makes it usable as deliberate space between two sections.
+A picture block has its own height: drag the handle on the bottom edge of the picture, or focus it and use the arrow keys. That handle, and the button that changes the picture, sit on the picture itself and stay visible while the page is being edited. Height runs from 80 to 2400 pixels and stops where the picture no longer grows in the width it was given. Pages saved before this control keep their previous size (small, medium, large or full size) as the matching height.
 
-| Block type | Editor name | What it shows |
-| --- | --- | --- |
-| `hero` | Banner | A picture with a title, a subtitle and an optional button |
-| `text` | Text | Titles and paragraphs |
-| `image` | Picture | One picture, held to a chosen height, with a description for screen readers, an optional caption and an optional link |
-| `video` | Video | An uploaded video, a library file, or a YouTube or Vimeo address |
-| `collections` | Collections | Sub-collections, or a chosen selection |
-| `files` | Files | Every file of a collection |
-| `last_files` | Latest files | Recently added files |
+A listing block can leave its display to the reader's own preference, or fix it. Collection listings offer grid and list; file listings — Files and Latest files — also offer masonry, with a Picture size slider whose value everyone then sees. A block that fixes its display overrules the reader's choice, and the reader's display menu says so.
 
-Each block type has its own payload, defined once in `server/src/page-blocks/schema.ts` and imported by the client, so the editor and the server agree on what is valid. A picture carries its `height`, and a banner carries the `focus` point that decides which part of it stays in frame; both have defaults, so blocks saved before these existed keep working. Pictures and videos hold a reference rather than an address: either `{ source: 'upload', s3key }` for a file uploaded to the page, or `{ source: 'file', fileId }` for a file already in the library. Videos also accept `{ source: 'embed', provider, videoId }`.
+Readers can narrow a page the way they narrow a collection: the funnel button shows a filter bar that matches names and offers the asset types, file types, formats and product attributes present on the page. It applies to every listing block at once, in grid, masonry and list alike, and a block whose every item is filtered out disappears with its title. The bar never appears while the page is being edited, so an author always sees the blocks as they are. See [Collections and sharing](./collections-and-sharing.md#narrow-what-is-on-screen).
 
-### The editor
+Page layouts do not have a history or draft state. Saving publishes the new layout immediately to everyone who can reach it.
 
-Editing a page is its own screen, at `/collections/:id/edit` for a collection page and `/admin/pages/:id` for a standalone one. The navigation tree and the top bar are replaced, so nothing competes with the page being edited:
+## Uploaded media and library files are different
 
-- The **left sidebar is the block library**. Drag a block onto the page to insert it where you drop it, or click it to add it at the end.
-- The **top bar** names the page, says whether there are unsaved changes, and holds `Discard`, `Save` and `Exit`, plus `Reset to default layout` on a collection page that has one.
-- **Each block carries a toolbar** on hover or keyboard focus: a drag handle, the three width buttons, `Move block up` and `Move block down`, a settings popover for the types that have options, `Duplicate block` and `Delete block`. A keyboard move announces the block's new position to screen readers.
-- **Text is written on the page itself.** Selecting text raises a small toolbar with bold, italic, three heading levels (title, heading, subheading), lists, quote and link.
-- **A custom selection can be handed back.** Once a collections block names collections of its own, `Show the sub-collections instead` returns it to following the sub-collections of its collection.
-- **Pictures and videos open a chooser** with two tabs: upload a file, or pick one from the library, where each picture is shown in its own proportions. The library tab searches the same index as the rest of the application, without recording the search as library activity. It only offers what a page can actually display — JPEG, PNG, WebP, GIF, AVIF and SVG for pictures, MP4, WebM and MOV for videos. The library calls every `image/…` file a picture, so formats no browser draws, such as PSD and TIFF, are left out rather than picked and then shown as a broken image; the chooser says how many were hidden. Video has a third tab for a YouTube or Vimeo address. A chosen picture appears in the block straight away, before the page is saved.
-- **A picture keeps its proportions** and is held to Small, Medium, Large or Full size, chosen in the block settings, so a large original does not take over the page. A banner picture fills its frame instead, and two compact controls on the picture itself let the author change it or drag, or arrow-key, the part that stays in view.
-- **Nothing inside a block responds to a reader's gestures while editing.** Collections and files are shown as they will appear, but they cannot be opened, selected or followed, so a click always acts on the block.
-- **An empty listing says what will fill it.** A collections or files block with nothing to show explains what it is for and why it is empty, rather than reporting that nothing was found.
-- **A block dropped beside a narrower one takes the room that is left**, so dragging something next to a half-width block does not push it onto a line of its own.
+The picture and video blocks offer two ways to supply media, with different security consequences.
 
-Nothing is written until `Save`, which sends the whole page in one call. `Discard` returns the page to its last saved state, and leaving with unsaved changes asks for confirmation.
+### Choose from the library
 
-### Standalone pages
+A library file remains the existing asset. It keeps the type and licence inherited from its source folder, and each reader must still be allowed to see it. If access or licence conditions later hide that file, the page does not receive an unrestricted copy.
 
-`/admin/pages` (admin only) lists pages whose `collection_id` is null, with a `Page Name` column and a creation form. `page.findById` only returns standalone pages, which is what a `page` menu item opens.
+The picker limits choices to formats the browser can display. Choosing a file does not add it to the collection behind the page and does not change any file count.
 
-### Collection pages
+Library originals are often print-resolution files of many megabytes. A picture or banner block displays the preview rendition Damvia generated for that file (WebP, at most 1280 pixels tall) rather than the original, so a page stays light whatever the source weighs. A file with no rendition falls back to its original. Readers download the original only from the file itself, never from the page.
 
-`Edit page` sits in the header of every collection the user can edit, whether or not that collection has a layout of its own yet. A collection without one opens the editor on a draft of the default arrangement — a full-width `collections` block above a full-width `files` block — so the author starts from what readers already see and changes it from there.
+### Upload into the page
 
-The page row is only written when there is something to put in it. `page.createForCollection`, available to whoever can edit the collection, creates it empty and returns the existing one when there already is one, and the editor calls it on the first `Save` — or earlier, if a picture is uploaded and needs somewhere to live. An author who leaves without saving leaves the collection on its default layout: a page created for an upload is deleted again on the way out, with its objects. `Reset to default layout` deletes the page for good and returns the collection to the default listing.
+An uploaded picture or video is editorial media stored in Damvia's main bucket. It is not an asset, has no asset type or licence, and is visible to anyone who can see the page. Uploading a licensed photograph instead of choosing it from the library therefore removes the licence protection from that page copy.
 
-The page is returned inside the collection payload, so the collection view renders it in place of the default listing.
+Use direct uploads for banners, illustrations and logos whose publication rights are managed outside Damvia. Use a library file when its asset licence must remain enforceable.
 
-### Permissions and stored files
-
-`page.save` and the upload procedures resolve the page through `findPage` in `server/src/services/page.ts` and then check `Page.canEdit`: an admin can edit any page; another user can edit only a collection page whose collection they can see and own. A page someone cannot reach is reported as missing rather than forbidden, so the editor never confirms that a page exists to someone who cannot see it.
-
-What a block points at is resolved for whoever is reading it. A page is returned with an `assets` map holding the addresses of its pictures, files, collections and pages, built for that reader: a file they are not allowed to open simply does not appear, and the block renders nothing rather than a broken or leaked link. A collection named by a block arrives with what its card needs to preview its content, its own thumbnail or the sample files it falls back on, so a collection chosen from elsewhere in the library looks the same as a sub-collection. In the editor a collection previews as soon as it is chosen, because the block asks for the cards it does not have yet instead of waiting for the page to be saved and read back. The collection the page belongs to cannot be chosen as one of its own cards, since that card would lead a reader back to the page they are on; it stays in the picker, so its own sub-collections remain reachable, and it is dropped from anything saved before that rule existed.
-
-Pictures and videos live in the **main** bucket under `blocks/{pageId}/`:
-
-- `page.createUpload` returns a ten-minute presigned POST to `blocks/{pageId}/tmp/{uploadId}`, restricted to JPEG, PNG, WebP, GIF and AVIF up to 20 MB, or MP4, WebM and MOV up to 500 MB.
-- `page.finalizeUpload` checks the staged file, re-encodes pictures to WebP no larger than 2400 px, verifies that a video really is one, and moves it to `blocks/{pageId}/{uuid}`. The staged copy is always removed, including when the file is rejected.
-- Saving a page deletes every object under its prefix that no block refers to any more, which also clears uploads that were added and then discarded.
-- Deleting a page, or the collection that owns it, deletes its objects.
-
-Text is sanitised on the way in and on the way out: only paragraphs, headings, basic emphasis, lists, quotes, rules and links survive, links are limited to `http`, `https` and `mailto`, and any style, class or script is dropped.
-
-A `files` block whose collection files share one asset type uses the type's name as its default title; see [Asset types](./asset-types.md). Bucket configuration is described in [Object storage](../integrations/object-storage.md).
-
-:::tip
-To make a custom landing page, create a standalone page, add it to the menu as a `Page` item, then use `Set as Home` on that item.
+:::caution
+A page upload is protected only by access to the page. Damvia cannot infer or preserve the licence of an external file that an editor uploads directly.
 :::
 
-## Admin interface
+## Link blocks only to accessible content
 
-Menu items use square rows and themed action menus, with an empty state and ordering instructions. The Pages list searches names and paginates at 20 rows. Editing a page from the Pages list opens the same editor screen as a collection page, so the admin sidebar gives way to the block library; `Exit` returns to the list.
+Collection and file blocks resolve their content for the current reader. A collection or asset they cannot access is omitted rather than exposed through the page. A page cannot use its own collection as a collection card because that would link back to itself.
 
-The menu-item editor uses the shared shadcn dialog, including a close button, Cancel, loading protection and visible save errors. The page editor has its own full-height layout, with the block library on the left and the page on a white sheet at a readable width.
+Banner buttons can point to a collection, page or web address. Standalone page targets are available to admins. Links in rich text are sanitised and limited to `http`, `https` and `mailto`; scripts, styles and unsupported markup are removed.
+
+## Uploaded-file limits and cleanup
+
+Direct picture uploads accept JPEG, PNG, WebP, GIF and AVIF up to 20 MB. They are converted to static WebP and reduced to at most 2400 pixels, so an animated GIF or AVIF loses its animation. Use a video block for animation.
+
+Direct video uploads accept MP4, WebM and MOV up to 500 MB. Uploaded media is staged before validation. Saving a page removes objects that no saved block references, and deleting the page removes its media. Page media belongs to the main bucket and must be included in backups.
+
+## Publishing checks
+
+Before leaving the editor:
+
+1. Save and reopen the page so that every block resolves from stored data.
+2. Check it with a non-admin account from a representative region/group; admins are exempt from licence restrictions.
+3. Confirm direct uploads are intentional and library files retain the expected licences.
+4. Check narrow layouts: half and third blocks remain side by side, so their internal content must still be readable.
+5. Verify the intended menu entry and Home setting.
+
+For current layout and upload limitations, see [Known limitations](../reference/known-limitations.md). For main-bucket recovery, see [Backups](../deployment/backups.md).

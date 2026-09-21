@@ -108,15 +108,19 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `searchNotFound` | query | `userApproved` | Returns the search terms found neither in a visible file name nor in a searchable attribute, within the same scope, asset type, product view, file type and extension filters |
 | `findById` | query | `userApproved` | One collection with files, children, invitations |
 | `lastAddedFiles` | query | `userApproved` | 10 most recent collection files, optionally under one collection |
-| `create` | mutation | `userApproved` | New collection; `public` is forced to `false` for non-admins, so only admins create public ones |
-| `createFromAsset` | mutation | `userAdmin` | Synchronised collection from an asset folder; pushes `collection/synchronization` |
+| `create` | mutation | `userApproved` | New collection, under any parent including a synchronized one; `public` is forced to `false` for non-admins, so only admins create public ones. `BAD_REQUEST` when a sibling already has that name |
+| `createFromAsset` | mutation | `userAdmin` | Synchronised collection from an asset folder, at the root or under a custom collection (`BAD_REQUEST` under a synchronized parent, whose sub-folders the sync links itself); pushes `collection/synchronization` |
 | `createUserCollection` | mutation | `userApproved` | Private collection owned by the caller |
 | `ListPrivateCollections` | query | `userApproved` | The caller's private collections |
 | `addItems` | mutation | `userApproved` | Duplicates selected files or whole collections into a collection the caller can edit (`duplicateCollection`, `duplicateFiles`) |
-| `update` | mutation | `userApproved` | Name, description, `public`, `draft`, `hasThumbnail`, `limitedToGroupIds` |
+| `rename` | mutation | `userApproved` | Name only, refused on synchronized collections and when a sibling already has that name |
+| `move` | mutation | `userApproved` | Changes the parent, or takes the collection to the top level with `parentId: null`. Refused on a synchronized collection under a synchronized parent, into the collection's own subtree, across the public and private divide, and onto a name a sibling already has. The subtree follows, with `draft`, owner and group restriction re-derived from the new parent |
+| `update` | mutation | `userApproved` | Name, description, `public`, `draft`, `hasThumbnail`, `limitedToGroupIds`; the sibling-name rule applies to custom collections |
 | `presignedThumbnailUploadUrl` | query | `userApproved` | Presigned PUT for `collections/{id}-thumbnail` |
 | `removeFiles` | mutation | `userApproved` | Removes collection files |
-| `remove` | mutation | `userApproved` | Deletes a collection the caller can edit |
+| `remove` | mutation | `userApproved` | Deletes a collection the caller can edit. `BAD_REQUEST` for a synchronized collection under a synchronized parent, unless it is flagged orphaned; custom collections inside a synchronized tree and synchronized roots can be deleted |
+| `listOrphaned` | query | `userAdmin` | Collections flagged `orphanedAt`, newest first, with `orphanedReason` and `orphanedFromName` |
+| `dismissOrphan` | mutation | `userAdmin` | Clears the orphan flag of a custom collection; `BAD_REQUEST` on a synchronized one, which is deleted or healed by moving its folder back |
 | `getFiles` | mutation | `userApproved` | Resolves a selection (files and collections) into files, licenses and `allowDirectDownload` (total at most 2,000,000,000 bytes) |
 | `invitation.create` | mutation | `userApproved` | Invites an email to a collection, creating a guest user when unknown; pushes `mailer/invitation` |
 | `invitation.remove` | mutation | `userApproved` | Revokes an invitation |

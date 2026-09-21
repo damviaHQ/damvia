@@ -1,76 +1,66 @@
 ---
 title: Core concepts
-description: The objects an administrator manipulates in Damvia, where each one comes from, and how they relate.
+description: Understand sources, assets, collections, pages, products and access rules before configuring an instance.
 sidebar:
   order: 2
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
-This page describes the domain model behind the admin screens: what an asset, a collection, a page or a product is, and which of them you control versus which are mirrored. Access rules are in [Roles and access](./roles-and-access.md).
+Damvia separates the files it discovers from the ways those files are organised and presented. That distinction explains most administrative decisions and prevents accidental assumptions about licences, copies and deletion.
 
-## Who owns what
+## Sources bring cloud folders into Damvia
 
-| Object | Where it comes from | Who manages it |
-| --- | --- | --- |
-| Asset folders, asset files | Mirrored from the cloud storage every 5 minutes | Nobody edits them in Damvia; admins assign asset types and licenses |
-| Asset types | Created in the admin | Admin |
-| Licenses | Created in the admin | Admin |
-| Collections | Created by admins (public) or by any approved user (private), or generated from an asset folder | Owner or admin |
-| Collection files | Inserted by synchronisation or by "add to collection" | Owner or admin (only on non-synchronised collections) |
-| Pages and page blocks | Created in the admin | Admin, or the owner of the linked collection |
-| Menu items | Created in the admin, plus one per public root collection automatically | Admin |
-| Products, product attributes | CSV import in the admin; links to files computed by `PRODUCT_MATCHING_REGEX` | Admin |
-| Regions, groups, authorized domains | Created in the admin | Admin |
-| Users, invitations | Sign-up, or automatically by an invitation (there is no admin "create user" action) | Admin, manager (own region), collection owner for invitations |
-| Downloads | Created by users when they download a selection | Expire automatically after 7 days |
+A source is one configured folder in Dropbox, OneDrive or Google Drive. Damvia reads it every five minutes and shows it as a top-level folder in the asset tree. Several sources may coexist in one instance.
 
-## Asset folders and asset files mirror the storage
+The source key is Damvia's permanent identity for that source; its label is the name people see. Changing or removing a key requires a maintenance command because every mirrored folder and file carries it. See [Sources](../integrations/sources.md).
 
-An asset folder or asset file is one entry of the cloud storage, identified by its `externalId` (the Dropbox, OneDrive or Google Drive item id). Folders form a tree using a materialized path.
+## Assets mirror files and folders
 
-File `status` values are `creating` (just discovered, content not fetched yet), `up_to_date`, `outdated` (flagged for re-fetch, today only by the daily integrity check) and `pending_deletion`. Folder `status` values are `up_to_date` and `pending_deletion`. The `asset/process-deletion` job deletes `pending_deletion` rows, their S3 objects and any collection bound to the folder.
+An asset folder and asset file represent entries in a configured source. Admins classify folders with an asset type and a licence; files inherit both from their current source folder.
 
-Both folders and files can carry an asset type (`assetTypeId`) and a license (`licenseId`). A new folder, or a folder that moved, inherits both from its parent; a file inherits both from its folder on every sync. Files also store `hasThumbnail`, `width`, `height`, `mimeType` and `size`, and may link to a product (`productId`) with a `productView`.
+The type and licence belong to the file once assigned. They follow that file wherever Damvia displays it—in synchronised collections, manual collections, search results and page blocks. A collection does not replace them. Moving the source file to another cloud folder changes both values to those of the new folder and currently removes its manual collection links and favourites; see [Known limitations](../reference/known-limitations.md).
 
-## Collections are the unit of publication
+Damvia stores a working copy and, when supported, a preview. Unsupported formats remain downloadable without a preview.
 
-A collection is a named tree node (materialized path, unique `name` under a `parentId`) with:
+## Collections organise assets for readers
 
-- `public`: `true` for the shared catalogue, `false` for a user's own collection. Public collections have no owner; private ones belong to `ownerId`. The flag cannot be changed after creation.
-- `draft`: hides a public collection from members while it is being prepared.
-- `assetFolderId`: when set, the collection is synchronised. Its name follows the folder name, its files are the folder's files, and its children are generated from the sub-folders by the `collection/synchronization` queue. Files cannot be added to or removed from a synchronised collection.
-- `limitedToGroupIds` and `canEditLimitedToGroupIds`: restrict visibility to members of the listed groups; see [Roles and access](./roles-and-access.md).
-- `sampleFileIds`: up to four collection file ids refreshed by database triggers and the integrity check (deletion alone can leave stale ids), used to draw the thumbnail mosaic when no custom thumbnail is uploaded (`hasThumbnail`).
-- `numberOfFiles`: maintained by insert and delete triggers on `collection_files`; the application never writes it.
+A collection is a browsable group of files and child collections.
 
-## Collection files are join rows
+- A **synchronised collection** follows one asset folder. Its files and generated sub-collections follow the source tree; they cannot be edited by hand.
+- A **manual collection** contains references to selected assets. Adding a file does not duplicate the source file or change its type or licence.
+- A **public collection** belongs to the shared catalogue. A **private collection** belongs to one user.
 
-A collection file links one asset file to one collection; the pair is unique. Favorites, downloads and search results all point at collection files, not at asset files, which is why the same asset can appear in several collections and be favourited in each.
+Custom collections may be nested inside synchronised trees. Current movement, deletion, orphan recovery and sharing rules are documented in [Collections and sharing](../administration/collections-and-sharing.md).
 
-## Pages and menu items shape the navigation
+## Groups restrict collections; licences restrict files
 
-A page is an editorial layout attached to at most one collection (`collectionId` is unique). It is made of blocks of type `collections`, `files`, `last_files`, `text`, `image` or `video`, each placed on a grid by `column`, `row` and `width`. Image and video blocks upload their media to the main bucket under `blocks/{pageId}/{uuid}`.
+These two controls operate at different levels:
 
-Menu items build the sidebar. Their `type` is `collection`, `page`, `text` or `divider`; they nest via a materialized path and are ordered by `position`. At most one item is selected as `home` through `menuItem.setHome` and becomes the landing view. A menu entry is created automatically for every public root collection.
+| Control | Attached to | Follows |
+|---|---|---|
+| Group restriction | Collection | The collection tree and its descendants |
+| Licence | Asset file, inherited from its source folder | The file everywhere it appears |
 
-## Products and attributes drive search facets
+Copying a licensed file into another collection does not remove its licence. Copying an unrestricted file into a group-restricted collection limits access through that collection, but the file can remain visible elsewhere. Admins are exempt from licence restrictions, so test licence behaviour with a non-admin account. See [Licenses](../administration/licenses.md) and [Roles and access](./roles-and-access.md).
 
-A product has a unique `productKey`, the name of the column it came from (`primaryKeyName`), and a `metaData` key/value store (Postgres `hstore`) holding every other CSV column. Each column is declared as a product attribute with three flags: `facetable` (shown as a filter), `searchable` (matched by the search bar) and `viewable` (displayed on the file). Every 5 minutes, the `asset/assign-products-to-asset-files` job applies `PRODUCT_MATCHING_REGEX` to every file name; capture group 1 is matched against `productKey` and capture group 2 becomes `productView`.
+## Pages present content without changing it
 
-## Asset types and licenses classify files
+A page arranges banners, text, pictures, videos, collections, files and latest-file listings. It may stand alone in the menu or replace the default layout of a collection.
 
-An asset type (`name`, `description`) says what kind of content a folder holds and how to display it: `isRelatedToProducts` enables product views, `includeInSearchByDefault` preselects it in search, `defaultDisplay` is `grid` or `list`, and `listDisplayItems` lists the fields shown in list view.
+A block that points to a library file displays that asset with its existing access and licence rules. A picture or video uploaded directly into the page is editorial media in Damvia's main bucket; it is not a library asset and has no asset licence. A block never adds a file to the collection behind the page. See [Menu and pages](../administration/menu-and-pages.md).
 
-A license (`name`, `details`) limits usage: `scopes` is any of `print` and `digital`, `usageFrom` and `usageTo` bound the validity period, and `allowedRegionIds` lists the regions that may see licensed files. Both are assigned to asset folders in the admin and inherited by files.
+## Products enrich assets
 
-## Regions, groups, users and invitations
+Products are imported from CSV. Damvia applies `PRODUCT_MATCHING_REGEX` to filenames, links a matching file to its product key and can record an optional view such as front, side or detail.
 
-A user belongs to exactly one region and to any number of groups. Each region names a default group for members who sign up. Guests created by invitations start with no groups. An invitation grants one email address access to one collection until `expiresAt`, creating a guest account if the address is unknown. Details are in [Roles and access](./roles-and-access.md).
+Selected product columns become searchable text, filters or displayed metadata. This enriches the asset; it does not move or rename the source file. See [Products and PIM](../administration/products-and-pim.md).
 
-## Downloads are prepared archives
+## People receive access through several rules
 
-A download records the `collectionFileIds` requested, the chosen `imageFormat` (`original`, `png`, `jpg`, `webp`), `imageResolution`, `videoFormat` (`original`, `mp4`, `webm`) and `videoResolution` (`high`, `medium`, `low`), and a `type` of `direct` or `email`. Its `status` moves from `preparing` to `ready` when the `download/create-archive` job has built the archive, then to `expired` 7 days after creation, when `download/process-expired` deletes the object.
+Accounts have one role and one region, and may belong to several groups. A person can see a collection because it is public, they own it, a group allows it, or they hold an active invitation. File licences add a second check for every non-admin user.
 
-## Two S3 buckets
+Invitations can extend through descendant collections. Moving a collection within a synchronised tree can therefore change which ancestor invitation covers it. [Roles and access](./roles-and-access.md) contains the exact access matrix.
 
-The main bucket (`MAIN_S3_URL`) holds what users upload in the app: collection thumbnails at `collections/{id}-thumbnail`, page block media at `blocks/{pageId}/{uuid}` and the login background at `settings/auth-background.webp`. The assets bucket (`ASSETS_S3_URL`) is a cache of the cloud storage: originals at `asset-file/{id}`, WebP thumbnails at `asset-file/{id}-thumbnail` and download archives at `downloads/{id}`. The worker keeps the total size of both buckets in the single-row `storage_usage` table for the admin [dashboard](../administration/dashboard.md) and the `STORAGE_QUOTA` plan.
+## Downloads create temporary deliverables
+
+A download packages the files the requester can still access, optionally converting supported images or videos. Links expire after seven days. Revoking access prevents a queued archive from being prepared, but does not revoke an already issued signed storage URL immediately. See [Downloads](../administration/downloads.md) and [Accounts and links](../administration/accounts-and-links.md).

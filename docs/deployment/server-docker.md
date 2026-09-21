@@ -54,15 +54,15 @@ docker run -d --name damvia-server \
   damvia-server:latest
 ```
 
-Run one server container with `ENABLE_WORKER=true`: `npm start` does not set it, unlike `npm run dev`. Without it pg-boss is not started in this process, so even publishing jobs can fail. See [Worker and scaling](./worker-and-scaling.md).
+Run one server container with `ENABLE_WORKER=true`: `npm start` does not set it, unlike `npm run dev`. Without it the process can publish jobs but does not process them or register scheduled jobs. See [Worker and scaling](./worker-and-scaling.md).
 
 The complete variable list is in [Environment variables](../reference/environment-variables.md). Inside a Docker network, `DATABASE_URL` and an internal `SMTP_HOST` use service names rather than `localhost`. S3 URLs must use an endpoint reachable both from the container and browsers, see [Reverse proxy](./reverse-proxy.md).
 
 ## Startup sequence and health
 
-The server starts preparing the cloud driver at the same time as it connects to the database. Once the driver is ready, its first sync begins, even if the database or job queues are not ready yet.
+The server first initialises the database and migrations, validates stored source keys, and registers the configured sources. It then starts source initialisation, creates the queues and worker schedules, and opens the HTTP port. Source initialisation is asynchronous, so the first source run can overlap queue startup.
 
-Meanwhile, the main startup function waits for the database and migrations, opens the HTTP port, starts the worker when enabled, then logs `server listening`. Check for startup errors and confirm that a full sync eventually logs `assets updated successfully`.
+Treat `server listening` as an API/database check. Readiness also requires one recent `assets updated successfully` message per source, processing jobs that leave the queue, reachable S3 objects and a controlled email delivery.
 
 There is no dedicated health endpoint. `GET /trpc/env` returns a JSON body with the app name and regions and needs no authentication, which checks API/database access only. It does not certify worker, SMTP, S3 or cloud sync readiness:
 

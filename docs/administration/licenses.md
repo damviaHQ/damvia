@@ -3,7 +3,7 @@ title: Licenses
 description: Define usage licenses, attach them to folders, and understand how access checks and download terms work.
 sidebar:
   order: 5
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-20
 ---
 
 A license describes under which terms, where and for how long a set of files may be used. Licence dates and allowed regions apply to every non-admin user, including owners, group members and invitees. Admins are exempt. The client displays an acceptance checkbox; this is not a server-side record of acceptance.
@@ -32,7 +32,7 @@ The sync process keeps that inheritance alive:
 - A folder that is new or that moved to another parent copies its parent's `license_id` (`upsertFolder` in `server/src/services/asset.ts`).
 - A file always takes its folder's `license_id` each time the asset updater upserts it, so the file level never diverges from the folder level.
 
-There is no per-file license in the UI.
+There is no per-file license in the UI. One consequence is worth planning for: a file moved to another folder in the cloud storage takes the new folder's licence on the next sync pass, so a file can change licence without anyone editing a licence or touching a collection. Everyone who was being shown that file, including through a copy in another collection or a page block, is affected on the next read.
 
 ## How a license hides collections and files
 
@@ -42,7 +42,7 @@ The server checks two things before returning content: the user must have access
 2. Licensed content requires the user’s region in `allowed_region_ids`.
 3. Optional start and end dates are inclusive, using the PostgreSQL session’s current date. A licence ending today remains valid throughout today.
 
-`userCollectionsQuery` checks the linked asset folder’s licence. `userCollectionFilesQuery` checks each file’s licence. Search, favourites, copies and new downloads use these rules. Archive jobs check access again before preparing the files; a revoked or expired selection is not exported.
+Collection listings check the linked asset folder's licence and file listings check each file's licence. Search, favourites, copies and new downloads use the same rules. Archive jobs check access again before preparing files, so a revoked or expired selection is not exported.
 
 Admins retain access to licensed content within the collections they can manage. Guests need an invitation, ownership or an explicitly assigned group, and must meet the same licence conditions as other non-admin users.
 
@@ -50,23 +50,32 @@ Admins retain access to licensed content within the collections they can manage.
 A manual (non-synchronized) collection has no asset folder, so the collection itself always passes the license check. Its files are still filtered one by one through `asset_file.license_id`, which means a collection can be visible while some of the files copied into it are hidden.
 :::
 
+## A licence follows the file, not the collection
+
+A licence is a property of the asset. It is set on a folder of the [Assets tree](./assets-tree.md) and copied down to the files inside it. It is never a property of the collection that happens to show the file. Two consequences matter as soon as a collection mixes content from several folders:
+
+- **Copying a file into another collection does not change its licence.** `collection.addItems` records a reference to the same `asset_files` row, so the file keeps the licence of the folder it actually lives in, wherever it is shown.
+- **A collection does not apply its licence to what is placed inside it.** A synchronized collection whose folder is restricted to one region does not restrict a file copied in from an unrestricted folder. That file stays visible everywhere, inside that collection.
+
+The reverse direction is safe. A file carrying a restrictive licence stays restricted in every collection, page block and search result that shows it, so no copy and no curated selection can widen its reach. The two ways of narrowing access are therefore not interchangeable:
+
+| Restriction | Set on | Applies through |
+| --- | --- | --- |
+| Group restriction | The collection | The collection tree, inherited by child collections |
+| Licence regions and dates | The cloud folder | The file itself, in every collection, page and search result that shows it |
+
+To restrict who may see one file, set a licence on the folder it comes from. To restrict who may open a collection assembled by hand, use groups; see [Groups and regions](./groups-and-regions.md).
+
+:::caution
+An administrator cannot reproduce a licence problem by looking. Admins are exempt from the licence check, so a file hidden from a member by its region or its dates is still perfectly visible to an admin. When someone reports that a file disappeared, compare the licence on that file's origin folder with the region of the person who reported it, rather than opening the collection yourself.
+:::
+
 ## Client acceptance is not server enforcement
 
-Every file returned to the client carries its license as `{ id, name, scopes, details, allowedRegionIds, expired }`. The two download dialogs use it:
+The single-file and multi-file download dialogs show the applicable licence names, scopes and details and require the user to tick an acceptance checkbox before continuing. This is a client-side acknowledgement only: Damvia does not store an acceptance record and the download API does not receive one.
 
-- `CollectionModalDownloadUnique.vue` (one file) shows the license name, its scopes in upper case, and a `Checkbox` labelled `By downloading this asset, I hereby agree to respect the Asset Usage Licensing Agreement.` If `details` is set, clicking the name opens a dialog that renders them.
-- `CollectionModalDownloadMulti.vue` (several files) calls `collection.getFiles`, which returns the distinct licenses across the selection, lists each one, and shows the same checkbox with the plural wording `By downloading these assets, ...`.
-
-In both dialogs the download button stays styled as inactive until the box is checked, and pressing it anyway shows the error `Please accept the terms and conditions to proceed with the download.` The acceptance is enforced in the client only; `download.create` on the server does not receive or check it. What the server does check is visibility: a file the user cannot see because of its license is not returned by `userCollectionFilesQuery`, so it cannot be added to a download.
+The server separately enforces visibility. A file hidden by its licence is not offered to the requester and cannot be added to a new download. A queued archive checks access again before it is built.
 
 ## Regions show how many licenses cover them
 
-`/admin/regions` displays a `Licenses` column computed with `ArrayContains` on `allowed_region_ids`. Use it before removing a region to see how many licenses will lose that region.
-
-## Admin interface
-
-The Licenses screen has name search, a result count and pagination at 20 rows. The editor retains usage dates, scopes and allowed regions; repeated submissions are disabled while saving.
-
-The license form uses a responsive two-column layout with its action footer in normal document flow, so the editor remains usable on narrow screens. Clear-date buttons have accessible names.
-
-The license editor uses the wide modal layout with a separated action footer; mobile layouts stack the form fields and usage details.
+`/admin/regions` displays how many licences include each region. Check that count before removing a region so you know how many licence rules will change.

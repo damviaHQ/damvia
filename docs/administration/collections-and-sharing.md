@@ -1,109 +1,127 @@
 ---
 title: Collections and sharing
-description: How collections are built, synchronized with folders, kept up to date by triggers, and shared with guests.
+description: Choose manual or synchronised collections, control access, and understand what source changes do to their contents.
 sidebar:
   order: 8
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-21
 ---
 
-A collection is the unit users browse: a named node in a tree that holds files and child collections. Public collections make up the catalogue and are managed by admins; private collections belong to one user. Either kind can be synchronized with a folder of the assets tree, or assembled by hand.
+A collection is the unit people browse and share. Public collections make up the common catalogue; private collections belong to one user. A collection can follow a source folder or be assembled from selected files.
 
-## The collection model
+## Choose the right collection type
 
-Collections live in `collections`, a materialized-path tree (`mpath`) with a unique `(parent_id, name)` pair.
+| Type | Use it when | Behaviour |
+|---|---|---|
+| Synchronised | A cloud folder should become part of the catalogue | Its name, files and generated sub-collections follow the source folder. Files cannot be added or removed by hand. |
+| Manual | You need a curated selection from one or more folders | It stores references to existing assets. An owner or admin can add and remove them. |
+| Public | The collection belongs to the shared catalogue | Admins manage it. It may be a draft or restricted to groups. |
+| Private | One person needs their own selection | The owner manages it under My collections. |
 
-| Column | Meaning |
-| --- | --- |
-| `public` | Part of the catalogue; public collections have no owner |
-| `draft` | Visible only to admins and the owner |
-| `owner_id` | The user who owns a private collection; null for public ones |
-| `asset_folder_id` | When set, the collection mirrors that folder and is "synchronized" |
-| `limited_to_group_ids`, `can_edit_limited_to_group_ids` | Group restriction; see [Groups and regions](./groups-and-regions.md) |
-| `sample_file_ids` | Up to 4 file ids used as the folder preview, maintained by triggers |
-| `number_of_files` | Count of files in the collection and its descendants, maintained by triggers |
-| `has_thumbnail` | A custom thumbnail exists under `collections/{id}-thumbnail` in the main bucket |
+An admin can create a manual collection at the root or under another collection, including a synchronised one. A synchronised collection may be created at the root or under a manual collection. Under a synchronised parent, source subfolders create their own synchronised children automatically.
 
-Files are rows of `collection_files` (`collection_id`, `asset_file_id`, unique together).
+Sibling names must be different when a manual collection is created or renamed. Deleting a collection never deletes the corresponding source files.
 
-## The admin screen
+## Synchronised collections follow folders
 
-`/admin/collections` (admin only) shows the public tree returned by `collection.treeAdmin`, with a `page`, `draft` or `thumbnail` badge per node and `Edit` / `Delete` actions. `Add new collection` opens the creation dialog. The delete confirmation explains that no file is removed from cloud storage.
+On each source run, Damvia aligns a synchronised collection with its source folder:
 
-## Create a collection
+- the collection takes the folder's current name;
+- the folder's current files become the collection's files;
+- current subfolders receive matching child collections;
+- manual collections nested inside the tree are left alone;
+- a source folder that disappears is handled by the deletion and rescue rules below.
 
-| Procedure | Who | Result |
-| --- | --- | --- |
-| `collection.create` | approved users | Manual collection. Non-admins always get `public = false`, `draft = false`, owner = themselves. Admins can pass `public`/`draft`; a child inherits both from its parent. |
-| `collection.createFromAsset` | admin | Synchronized collection named after the folder; pushes `collection/synchronization` |
-| `collection.createUserCollection` | approved users | Private collection (owner = the user), optionally under one of their own collections |
-| `collection.addItems` | owner or admin | Copies files or whole collections into a manual collection; refused on synchronized ones (`Synchronized folders cannot be changed.`) |
+Updates for the same synchronised tree are serialised so that two workers do not restructure it at the same time.
 
-## Synchronization mirrors a folder
+### A folder is renamed or moved
 
-The `collection/synchronization` queue (one job at a time) runs `synchronizeCollection` in `server/src/services/collection.ts` inside a transaction:
+Renaming a source folder renames its synchronised collection without changing the collection's identity. Its page, thumbnail, restrictions, invitations and nested content remain attached.
 
-1. Renames the collection to the folder's name and refreshes its menu items.
-2. Upserts one `collection_files` row per file of the folder and deletes rows that no longer match.
-3. Upserts one child collection per subfolder (matching on `parent_id` and `name`), copying `public`, `draft` and `owner_id` from the parent, and deletes children that no longer have a subfolder.
-4. Pushes one synchronization job per child, so the same process copies the folder structure all the way down the tree.
+When a folder moves within a part of the source that is already mirrored, its synchronised collection and descendants move beneath the collection for the new parent folder. The moved branch takes the new parent's public/private ownership rules. A restricted destination applies its group restriction to the whole moved subtree; a destination with no restriction leaves the subtree's existing group settings alone. Synced menu entries follow it, and file counts and preview mosaics are recomputed on the old and new branches.
 
-Jobs are triggered by `createFromAsset` and by the asset updater whenever a folder is created, renamed or moved (`upsertFolder`). Independently, `server/src/index.ts` runs this after every sync pass:
+Moving a branch also changes inherited invitation access: invitations on the old ancestors stop covering it, and invitations on its new ancestors begin to cover it.
 
-```sql
-INSERT INTO collection_files (asset_file_id, collection_id)
-SELECT asset_files.id, collections.id FROM asset_files
-INNER JOIN collections ON collections.asset_folder_id = asset_files.folder_id
-ON CONFLICT DO NOTHING
-```
+If Damvia cannot identify one safe destination—for example the new parent is not mirrored, or several candidates exist—the synchronised collection stays in place and is marked **orphaned** for an administrator to resolve. Moving the folder back can heal it; otherwise remove the duplicate/obsolete collection after checking its content.
 
-It back-fills any file that reached a linked folder between two synchronizations.
+## Custom collections survive inside a synchronised tree
 
-## Triggers keep counts and previews fresh
+A manual collection can live under a synchronised one. Synchronisation ignores it, so it survives refreshes and can have its own page. It inherits the visibility of its parent branch and appears beside the generated sub-collections.
 
-- `number_of_files` is incremented or decremented on every insert or delete in `collection_files`, for the collection and all its ancestors read from `mpath` (initial migration).
-- `sample_file_ids` is recomputed by the function `refresh_collection_sample_files_from_asset_files`, fired after insert and update on `asset_files` (migrations `1751012487660-add-trigger-to-sample-files.ts` and `1751187976556-update-asset-file-trigger.ts`). For the affected collection and its ancestors it selects up to 4 `collection_files` whose asset has a thumbnail, prioritising files in the collection itself, then descendant files by creation date (not every descendant depth). The daily `system/integrity-check` job recomputes the same field for every collection.
+If a synchronised source folder is deleted, Damvia removes the collections generated from that folder but rescues custom descendants:
 
-## Edit and delete
+1. Each custom collection moves, with its descendants, beneath the nearest surviving collection.
+2. If no ancestor survives, it moves to the root as a draft so it cannot appear publicly by accident.
+3. Hand-placed menu items move to the nearest surviving menu entry. Synced entries belonging to the removed branch disappear.
+4. The rescued collection is marked **orphaned** and the admin sidebar shows that attention is required.
 
-`collection.update` requires `canEdit` (admin or owner) and changes `name`, `description`, `draft`, `hasThumbnail` and, when allowed, `limitedToGroupIds`. The public flag cannot change (`Cannot change the public status of a collection.`). Draft, owner and group limits are copied to every descendant, menu items are re-synced, and the thumbnail object is removed when `hasThumbnail` is false. `collection.presignedThumbnailUploadUrl` returns a 24-hour PUT URL for `collections/{id}-thumbnail` in the main bucket.
+The Collections screen explains where an orphan came from. After reviewing its location, use **Keep** to clear the warning. Removing the source branch also removes its generated pages, invitations, thumbnails and page uploads after the database change commits; rescued custom collections keep their own content.
 
-`collection.removeFiles` refuses files of synchronized collections; `collection.remove` refuses a collection whose parent is synchronized (`Synchronized collections cannot be deleted.`). Deleting a collection removes its thumbnail object and cascades to children, files, invitations, menu items and its page.
+## What a file keeps when it is copied into a collection
 
-## Private collections
+Adding a file to a manual collection creates a reference; it copies no bytes. The same asset can therefore appear in several collections.
 
-`collection.ListPrivateCollections` returns the tree of collections where `public` is false and `owner_id` is the caller. This is the "my collections" area where members copy files with `addItems`.
+- **Its asset type and licence stay those of its source folder.** A destination collection never replaces them.
+- **Collection edits do not change the file.** Renaming or restricting a collection leaves the file's type and licence intact.
+- **Moving the file in cloud storage changes them.** On the next source run, the file takes the type and licence of its new folder.
 
-## How collection invitations work
+The displayed file count counts collection links, not distinct assets. If a file is mirrored in a child collection and also added manually to an ancestor, it is counted twice.
 
-The sharing dialog (`CollectionDialogShare.vue`) is available to the collection owner or an admin. It asks for the guest's email address and an expiry date, initially set to 30 days ahead. The date must be in the future. The two buttons create the invitation in different ways:
+:::caution
+A file moved to another cloud folder currently loses **every** collection link first, including links added by hand, before Damvia recreates links for synchronised collections at the new location. A curated collection can therefore lose that file, and every favourite attached to those links is destroyed. Renaming or moving a **folder** does not have this effect; only moving a **file** does. This is a current limitation, not a completed fix. See [Known limitations](../reference/known-limitations.md).
+:::
 
-- `Send Invite` creates the invitation with `sendEmail: true`. A job on `mailer/invitation` sends a link to `/collections/{id}?dam_token=<jwt>`; the client stores that token in the `dam_token` cookie, so the guest is logged in on arrival.
-- `Copy Link` creates the invitation silently and copies a URL carrying `auth_params` (base64 of the email, `magicLink: true` and the collection). Opening it pre-fills the login form and sends a login email.
+## Group restrictions follow the collection tree
 
-On the server, `collection.invitation.create` looks up a user with that email. If none exists, `createGuestUser` creates one with `name` and `company` set to `NA`, role `guest`, `approved` and `emailVerified` true, the inviter's region and no group memberships. The invitation stores `collection_id`, `email`, `user_id`, `invited_by_id` and `expires_at`. The creator is retained for the admin activity feed; deleting that account sets `invited_by_id` to null without revoking the guest's invitation.
+A public collection with no group restriction is available to approved members and managers, subject to drafts and file licences. A group-restricted collection is available to members of the allowed groups; descendants inherit that restriction.
 
-For revocation, `collection.invitation.remove` deletes the row. `collection.invitation.getUserInvitations` feeds the member links dialog with invitations on the caller's collections (and, for admins, on all public ones). Deleting a user deletes the invitations sent to their email.
+Groups restrict the collection path. Licences restrict the individual file everywhere it appears. Copying an unrestricted file into a restricted collection restricts access through that collection, but the same file may remain visible elsewhere. Copying a licensed file never removes its licence. See [Licences](./licenses.md).
 
-## Who can see a collection
+Draft collections are visible only to admins and their owner. Admins are exempt from file-licence restrictions.
 
-`userCollectionsQuery` grants access when any of these holds:
+## Share a collection with a guest
 
-| Rule | Condition |
-| --- | --- |
-| Owner | `owner_id` is the user |
-| Admin | user is `admin` and the collection is public (drafts included) |
-| Public | user is `member` or `manager`, collection is public and not draft, has no group limit, and the folder license allows the user's region today |
-| Group | one of the user's groups is in `limited_to_group_ids` |
-| Invitation | an unexpired invitation for the user exists on the collection or on any ancestor in `mpath` |
+An owner or admin can invite an email address to a collection and choose an expiry date. **Send Invite** emails an access link. **Copy Link** creates the invitation without sending it and produces a link that begins the email-login flow.
 
-Every non-admin user must also meet the licence’s region and date conditions, regardless of which access rule applies. Only admins and owners can see drafts. Files follow the same rules through `userCollectionFilesQuery`, with the licence read from the file. Copying a collection includes only the descendants and files the caller can currently access. See [Licenses](./licenses.md) for the license clause and [Menu and pages](./menu-and-pages.md) for how public collections appear in the navigation.
+If the address has no account, Damvia creates an approved guest in the inviter's region with no groups. The invitation gives access to the selected collection and its descendants until the start of the selected expiry date. It gives read/download access, not edit rights.
 
-## Operational limits
+Removing the invitation ends that access path. It does not remove access gained through ownership, public/group rules or another invitation, and it does not revoke a storage URL that has already been signed. Moving a synchronised collection can change which ancestor invitations cover it.
 
-New children and copies inherit their destination parent’s group restrictions. See [Groups and regions](./groups-and-regions.md). Preview triggers do not cover `collection_files` deletions; the integrity check repairs stale mosaics. Invitation expiry is the start of the selected date in PostgreSQL's session timezone; it does not include the entire day. Already issued storage URLs are independent of invitation revocation.
+## Edit and delete safely
 
-## Admin interface
+An admin can edit any public collection; a private collection's owner can edit their own. Editing can change the name, description, draft state, thumbnail and allowed groups. Public collections cannot be converted to private collections or the reverse.
 
-The Collections screen uses the shared admin controls and a full-width tree with square row backgrounds. An empty library offers an explicit empty state. Editing refreshes the same collection tree query used by this screen.
+On `/admin/collections`, those settings are the row's **Settings** action. The row also carries **Open**, which shows the collection as a reader sees it in a new tab, and **Page**, which opens its page editor directly — see [Menu and pages](./menu-and-pages.md#choose-a-standalone-or-collection-page). Leaving that editor returns to the collection, not to the dashboard.
 
-Collection creation uses keyboard-operable buttons for Custom and Synchronized choices. The collection editor groups its heading, wraps thumbnail controls on small screens and uses the shared action footer.
+The **Place** setting can move an editable collection under another collection or to the top level. Its whole subtree follows. The move is refused when it would put a collection inside itself, cross the public/private boundary, create a duplicate sibling name, or move a generated synchronised child away from its synchronised parent. Non-admins can move only their own collections beneath another collection they own.
+
+The destination re-derives the moved root's draft and ownership rules. A restricted destination applies its group restriction to the whole subtree; an unrestricted destination keeps the subtree's existing group settings. Synced menu entries follow, and invitation coverage changes with the old and new ancestor paths.
+
+Files cannot be removed from a synchronised collection. A generated synchronised child normally cannot be deleted on its own because the next refresh would recreate it; remove or move the source folder instead. An orphaned synchronised collection can be removed after the ambiguity is resolved.
+
+Deleting a collection removes its descendants, links, invitations, menu entries, page and Damvia-hosted thumbnail/page media. It does not delete any connected cloud file. Before deletion, check for custom descendants and active invitations.
+
+## Narrow what is on screen
+
+The funnel button in a collection's action bar, beside the display preferences, shows a filter bar above the content. It narrows what the page already draws; it never fetches anything and never looks into sub-collections.
+
+- **Filter by name** matches part of a name, ignoring case, on the files **and** the sub-collections shown on the page.
+- **Asset type**, **File type**, **Format** and each **product attribute** offer the values present on the page, with a count beside each. Several values inside one list widen the result; values in different lists narrow it together. A count says how many items picking that value would show, so the other values never read zero.
+- A dimension holding a single value is not offered, and the facets only describe files: a chip on **Format** hides no sub-collection.
+- Chips above the content list what is active. Each is removed on its own, and **Clear all** empties the bar.
+
+A section or a page block whose every item is filtered out disappears with its title, so the page does not keep a heading over nothing.
+
+The funnel stays on across navigation and reloads until it is switched off again; it is saved in that browser only, like the display preferences. The filter values themselves are not: they describe the collection being read, so they start empty on the next one.
+
+In list view, the column headers sort the rows. Clicking a header sorts ascending, clicking it again descending. **Size** sorts by the real byte count and **Updated at** by the real date, not by the text in the cell. Sorting lasts as long as the view; it is not saved.
+
+This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, use the magnifier in the same action bar, which opens the search scoped to that collection. The search has its own facets, counted across the whole library — see [Products and PIM](./products-and-pim.md#configure-product-attributes).
+
+## Known operational limits
+
+- Removing a collection link removes favourites attached to that file-in-collection pair.
+- A preview mosaic can remain stale after a file leaves until a move/rescue recalculation or the nightly integrity check refreshes it.
+- Invitation expiry begins at the start of the selected date in the database session timezone.
+- Already issued signed storage URLs have their own lifetime and are not revoked with the invitation.
+
+The complete current list, including file-move data loss, is in [Known limitations](../reference/known-limitations.md).

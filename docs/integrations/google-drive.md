@@ -3,7 +3,7 @@ title: Google Drive
 description: Create a service account, share one folder with it and point Damvia at that folder, on My Drive or a shared drive.
 sidebar:
   order: 5
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 The Google Drive driver (`server/src/asset-updater/google-drive.ts`) lists one Drive folder, folder by folder, every 5 minutes with a service account and downloads file contents on demand. Nothing is written to Drive. It behaves like the [OneDrive](onedrive.md) and [Dropbox](dropbox.md) drivers and gives the same tree: the pointed folder is the single top-level asset folder, the same kinds of items are skipped, the same protections surround deletion.
@@ -44,15 +44,16 @@ Alternatively, with domain-wide delegation granted to the service account's clie
 - MIME type comes from Drive's `mimeType`, falls back to the extension, and is re-detected from the content on download. When the content cannot be identified, the listing type is kept unless a browser would execute it (HTML, SVG, XML, JavaScript), in which case the file is stored as `application/octet-stream`. Drive allows slashes, quotes and control characters in names; they are replaced by `_` in download file names and archive paths.
 - If the listing contains no folder and no file, the run logs `Google Drive listing is empty, skipping sync to avoid deleting all assets` and stops. The usual causes are a folder not shared with the service account, or a wrong id.
 - If any folder or file fails to upsert, the error is logged with the item, the run ends as `failed to update assets` and the deletion pass is skipped.
-- Otherwise anything not returned by the listing is marked `pending_deletion` and removed by the per-minute deletion job.
+- Otherwise anything not returned by the listing is marked `pending_deletion` and removed by the per-minute deletion job, unless the absent items exceed `ASSET_SYNC_MAX_DELETION_PERCENT` of the source (20 % by default, and never fewer than 21 items): then the run ends as failed with the count, nothing is marked, and the next run tries again. Raise the variable when the deletion is intended. See [Sources](./sources.md#how-the-runs-work).
+- A folder that moves keeps its collections: the collection the sync created for it, with its page, thumbnail, permissions, invitations and custom sub-collections, follows the folder to the collection mirroring its new parent. See [Collections and sharing](../administration/collections-and-sharing.md#a-folder-moves-or-is-renamed).
 
 ## Downloading contents
 
 File contents are streamed from `files.get` with `alt=media` into a temporary file, then uploaded to the assets bucket by the `asset/update-content` job. A failed download rejects with the Drive error and leaves no temporary file.
 
-## Guarantees the tests lock
+## Safety and compatibility guarantees
 
-The [OneDrive guarantees](onedrive.md#guarantees-the-tests-lock) apply to Google Drive in the same terms, with `md5Checksum` in place of `eTag`, "Google-native document or shortcut" added to the skipped kinds, and "folder with no non-empty file below it" in place of "size 0". `server/test/google-drive.cjs` (listing to upsert plan) and `server/test/google-drive-sync.cjs` (a library run through one sync with a stubbed client) fail when any of them changes. Change them only for a confirmed critical bug or a security hazard, name it in the commit, and update this section.
+The [OneDrive safety guarantees](onedrive.md#safety-and-compatibility-guarantees) apply to Google Drive in the same terms, with `md5Checksum` in place of `eTag`, "Google-native document or shortcut" added to the skipped kinds, and "folder with no non-empty file below it" in place of "size 0". Existing libraries depend on these rules; treat a change as a storage migration and test it on a restored copy.
 
 ## Checking the setup
 

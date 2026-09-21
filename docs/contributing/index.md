@@ -33,7 +33,7 @@ The two application packages have their own `package.json` and `node_modules`. A
 | `server/` | `npm test` | Builds the server and runs every suite in `server/test/*.cjs` one file at a time against `SECURITY_TEST_DATABASE_URL`, a disposable database whose name ends in `_test` |
 | `server/` | `npm run test:security` | Same build, security suite only |
 | `server/` | `npm start` | `NODE_ENV=production node dist/index.js` |
-| `server/` | `npm run cli -- <command>` | `ts-node src/cli.ts`; the only command is `check-integrity`, see [CLI](../reference/cli.md) |
+| `server/` | `npm run cli -- <command>` | Maintenance CLI; see [CLI](../reference/cli.md) for the current commands and their data effects |
 | `server/` | `npm run typeorm` | `typeorm-ts-node-commonjs`, the TypeORM CLI running on the TypeScript sources |
 | `client/` | `npm run dev` | `vite`, on port 5173 |
 | `client/` | `npm run build` | `vite build` into `client/dist/` |

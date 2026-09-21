@@ -3,7 +3,7 @@ title: OneDrive
 description: Register an Azure application with Microsoft Graph permissions and point Damvia at one user's drive.
 sidebar:
   order: 4
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 The OneDrive driver (`server/src/asset-updater/one-drive.ts`) uses Microsoft Graph with application credentials (client id and secret, no user login) to read the delta feed of one user's OneDrive for Business and download file contents.
@@ -48,7 +48,8 @@ In both cases the first item becomes the single top-level asset folder, with no 
 - MIME type comes from Graph's `file.mimeType` at listing time, falls back to the file extension, and is re-detected from the content on download when the content type can be identified.
 - If the listing contains no folder and no file, the run logs a warning and stops without marking anything for deletion.
 - If any folder or file fails to upsert, the error is logged with the item, the run ends as `failed to update assets` and the deletion pass is skipped, so a transient database error never removes assets.
-- Otherwise anything not returned by the feed is marked `pending_deletion` and removed by the per-minute deletion job.
+- Otherwise anything not returned by the feed is marked `pending_deletion` and removed by the per-minute deletion job, unless the absent items exceed `ASSET_SYNC_MAX_DELETION_PERCENT` of the source (20 % by default, and never fewer than 21 items): then the run ends as failed with the count, nothing is marked, and the next run tries again. Raise the variable when the deletion is intended. See [Sources](./sources.md#how-the-runs-work).
+- A folder that moves keeps its collections: the collection the sync created for it, with its page, thumbnail, permissions, invitations and custom sub-collections, follows the folder to the collection mirroring its new parent. An empty folder is still skipped, so a folder kept only as a container for custom collections must hold at least one file; if it empties, its collection is removed and the custom collections under it are re-homed and flagged, never deleted. See [Collections and sharing](../administration/collections-and-sharing.md#custom-collections-inside-a-synchronized-tree).
 
 The driver always requests the full delta from the start (it does not persist a delta link), so each 5-minute run lists the whole subtree.
 
@@ -60,9 +61,9 @@ File contents are streamed from `/users/{user}/drive/items/{id}/content` into a 
 The empty-listing guard only protects an empty path. If `ONEDRIVE_DRIVE` is changed to a different, non-empty folder, every asset outside it is marked for deletion on the next run. Change the path only when you intend to replace the library.
 :::
 
-## Guarantees the tests lock
+## Safety and compatibility guarantees
 
-Production libraries were built by a driver that wrote the Graph listing down item for item. The behaviours below are what an upgrade must preserve; `server/test/onedrive.cjs` (listing to upsert plan, no database) and `server/test/onedrive-sync.cjs` (a production-shaped library run through one sync) fail when any of them changes. Change them only for a confirmed critical bug or a security hazard, name it in the commit, and update this section.
+Existing libraries depend on the behaviours below. Treat a change to one of them as a storage migration: test it on a restored copy, explain the impact in the release notes and update this page.
 
 | Guarantee | Why it matters |
 |---|---|
@@ -72,6 +73,7 @@ Production libraries were built by a driver that wrote the Graph listing down it
 | All delta pages are read first; folders are upserted parents first (order derived from parent ids, since delta responses carry no `parentReference.path`), then files | A child listed before its parent must not end up top-level or fail with "folder not found" |
 | A listing with no folder and no file ends the run with a warning, before the deletion pass | A permission lapse or a wrong path must never empty the library |
 | Any failed upsert ends the run with an error, before the deletion pass | A transient database error must never turn into deleted files and objects |
+| More absent items than `ASSET_SYNC_MAX_DELETION_PERCENT` allows (above 20 items) ends the run with an error, before the deletion pass | A listing truncated by the provider must never empty the library; the operator raises the limit for an intended mass deletion |
 | The startup drive check logs on failure and never stops the server | A Microsoft outage at boot must not take the API down |
 | A failed download rejects with the Graph error and leaves no temporary file | Otherwise the queue logs a misleading `ENOENT` and the temp directory fills up |
 | A file that Graph lists without a MIME type gets one from its extension; when the content cannot be identified the listing type is kept unless a browser would execute it (HTML, SVG, XML, JavaScript), which falls back to `application/octet-stream` | CSV and text files keep a usable type in the portal and in download names, while a file that only claims to be HTML is never served as such from the assets bucket |

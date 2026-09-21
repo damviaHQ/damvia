@@ -3,7 +3,7 @@ title: Server configuration
 description: What each group of server variables controls, and the values that trip people up.
 sidebar:
   order: 2
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 `server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
@@ -47,6 +47,10 @@ Setting a plan on an instance that already stores files does not delete anything
 
 Leave it empty for no limit: the dashboard still shows the used space, but no alert is sent and nothing is blocked. The value is parsed at startup; `abc` or `0` stops the server with `STORAGE_QUOTA must be a size such as 1500GB or 1.5TB.` The alerts and the recovery steps are described in [Dashboard](../administration/dashboard.md).
 
+## ASSET_SYNC_MAX_DELETION_PERCENT guards against a truncated listing
+
+Every sync pass marks for deletion what the cloud listing no longer contains. A listing cut short by the provider, a token that lost a scope or a root path pointed elsewhere all look like a mass deletion, so the sweep is skipped, and the run logged as failed, when more than this share of the source's folders and files is absent (20 % by default; the check ignores sources with 20 missing items or fewer, so a small library is never stuck). The synchronized collections, custom collections and menu items built on those rows survive until the operator has looked. For an intended clean-up of a large part of the library, raise the value (or set `100`) for one run, then put it back.
+
 ## SERVER_ALERT_EMAILS separates the host from the customer
 
 When one server hosts several Damvia instances, each customer's admins must see their own plan and nothing about the machine. `SERVER_ALERT_EMAILS` names the people who run the server and must hear about a critical server problem. They receive the `disk-alert` emails when the disk itself passes 80, 90, 95 or 100 %, whatever fills it, and they see a "Server disk" block on the dashboard when they log in to an instance with one of these addresses. Nothing about the day-to-day administration of the DAM goes to these addresses. They are, however, shown to the instance's admins as the contact to raise the plan, in the storage warning of the dashboard, so list an address you are happy for customers to write to. Every other admin only sees the plan. The disk is read with `statfs` on `STORAGE_DISK_PATH` (default `/`), so nothing else has to be installed or mounted on a single-disk server.
@@ -63,9 +67,13 @@ Leave `SERVER_ALERT_EMAILS` empty and the server never sends nor shows a disk fi
 
 `MAILCONFIG` holds the templates as base64 JSON. It exists so a container can carry the templates without a mounted file; leaving it empty falls back to `server/mailconfig.json`. See [Email templates](./email-templates.md).
 
-## Exactly one cloud storage
+## Configure one source or several
 
-`ASSET_UPDATER` selects `dropbox` or `onedrive`; the server refuses to start otherwise, because the sync loop is part of startup. Only the variables of the selected provider are read. Switching providers on an existing instance is not a configuration change: external ids differ, so every asset would be marked for deletion and re-imported.
+For a simple installation with one source, `ASSET_UPDATER` selects `dropbox`, `onedrive` or `googledrive`; only that provider's variables are read. The server requires a valid source configuration because synchronisation is part of startup.
+
+For several folders, accounts or providers, set `ASSET_SOURCES` to the raw or base64-encoded JSON described in [Sources](../integrations/sources.md). When it is set, `ASSET_UPDATER` and the individual provider variables are ignored.
+
+A source key becomes part of every mirrored row. Changing a provider, root or key on an existing instance can remove, duplicate or re-import assets if it is treated as an ordinary environment edit. Follow the rename and removal procedures in the Sources guide.
 
 ## PIM matching
 

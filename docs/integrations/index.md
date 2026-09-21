@@ -3,7 +3,7 @@ title: Integrations
 description: "How Damvia talks to the outside world: one or more cloud storage sources, an SMTP server, and two S3 buckets."
 sidebar:
   order: 1
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 Damvia integrates with three kinds of external services. The cloud storage is where your files already live; Damvia only reads it. SMTP carries every account and notification email. S3-compatible storage holds Damvia's own copies, previews and archives.
@@ -26,7 +26,7 @@ One run of one source does the following:
 
 1. Lists the whole tree from the provider (a full recursive listing for Dropbox, the delta feed for OneDrive, a folder-by-folder listing for Google Drive), all pages first, and turns it into folder upserts (parents first) and file upserts. Every driver stores the pointed folder as the single top-level asset folder and skips hidden, empty and undownloadable items in the same way; see each driver's page for the exact rules and the tests that lock them.
 2. Upserts each folder and file by its provider id (`external_id`, unique within the source): new files get status `creating` and an `asset/update-content` job that downloads the content and builds the preview; existing files are updated in place (name, size, folder, inherited asset type and license). A changed listing checksum (`eTag`, `content_hash`, `md5Checksum`) marks the file `outdated` and queues a fresh download; the daily [integrity check](../deployment/integrity-check.md) catches size differences on top.
-3. Marks every folder and file **of this source** that was **not** in the listing as `pending_deletion`, in batches of 1,000. Rows of other sources, and rows of a source key that is no longer configured, are never touched. The `asset/process-deletion` job checks them every minute, including their objects in the assets bucket.
+3. Marks every folder and file **of this source** that was **not** in the listing as `pending_deletion`, in batches of 1,000, unless they exceed `ASSET_SYNC_MAX_DELETION_PERCENT` of the source (see [Sources](./sources.md#how-the-runs-work)). Rows of other sources, and rows of a source key that is no longer configured, are never touched. The `asset/process-deletion` job checks them every minute, including their objects in the assets bucket.
 4. Inserts a `collection_files` row for every asset file whose folder is linked to a collection, so linked collections pick up new files without waiting for the `collection/synchronization` job.
 
 Step 3 is why every driver stops before it on an empty listing, and when any item failed to upsert: either would delete part or all of the library.

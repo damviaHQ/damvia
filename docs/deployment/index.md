@@ -45,4 +45,4 @@ Keep configuration/secrets and application version with the database and main-bu
 
 ## Validate and operate
 
-Use the [acceptance checklist](./acceptance-checklist.md) after setup and the [operations runbook](./operations.md) for monitoring. Review [known limitations](../reference/known-limitations.md) before exposing the API; the current code has access-control defects that documentation alone cannot resolve.
+Use the [acceptance checklist](./acceptance-checklist.md) after setup and the [operations runbook](./operations.md) for monitoring. Review [known limitations](../reference/known-limitations.md) before exposing the API, especially the current file-move loss of manual collection links/favourites, page-upload licence boundary and single-process topology.

@@ -2,11 +2,11 @@
 
 **`docs/` is the source of the public documentation site.** Every Markdown file here, except this one and `_internal/`, is rendered by the Damvia website with [Astro Starlight](https://starlight.astro.build). The website pulls this repository in as a git submodule, so the docs are versioned with the code and edited in the same pull request as the behaviour they describe.
 
-Audience: people who **install, configure, run and administer** a Damvia instance, plus a Contributing group for developers changing the code. End-user instructions belong in a separate guide. Keep this site technical: configuration, API rules, administrative procedures and operating runbooks.
+Audience: people who **evaluate, install, configure, run and administer** a Damvia instance, plus developers changing the code. The public website maintains the end-user how-to knowledge base and onboarding separately. Link to that material when it exists; do not duplicate its step-by-step workflows here.
 
 ## The maintenance rule
 
-**When you change behaviour in `server/` or `client/`, update the page that describes it in the same commit, and set that page's `lastUpdated` to today.** [`_internal/page-map.md`](_internal/page-map.md) says which page covers which part of the code. Typical triggers: a new or renamed environment variable, a new queue or cron, a new admin screen, a change to a sync driver, a mail template, the CLI, the Dockerfile or docker-compose.
+**Update the documentation when a change affects what a reader does, sees, configures, operates or must understand to avoid data loss.** Update the existing explanation in the same commit and set its `lastUpdated` to the date it was checked. An internal refactor, function rename or component change does not need public prose unless it changes one of those reader-facing facts. [`_internal/page-map.md`](_internal/page-map.md) identifies the authoritative page for each durable concern.
 
 A new environment variable is added in three places: the code, `server/.env.template` (or `client/.env.template`), and `reference/environment-variables.md`. `scripts/check-docs.sh` checks both the templates and the reference for dot-notation variables detected in the source.
 
@@ -19,8 +19,8 @@ A new environment variable is added in three places: the code, `server/.env.temp
 | `configuration/` | Configuration | Env walkthrough, email templates, branding |
 | `integrations/` | Integrations | Dropbox, OneDrive, SMTP, object storage |
 | `deployment/` | Deployment | Docker, client build, reverse proxy, worker, upgrades, backups |
-| `administration/` | Administration | Every admin screen and the rules behind it |
-| `reference/` | Reference | Tables: env vars, jobs, CLI, ports, troubleshooting |
+| `administration/` | Administration | Administrative tasks, decisions and consequences |
+| `reference/` | Reference | Exact lookup material: env vars, jobs, CLI, ports, troubleshooting |
 | `contributing/` | Contributing | For developers: architecture, data model, API, jobs, storage drivers |
 | `assets/` | (not a group) | Images referenced relatively from pages |
 | `_internal/` | (excluded) | Repo-only notes, never published |
@@ -52,14 +52,17 @@ Optional: `sidebar.label` (shorter sidebar text), `sidebar.badge: { text: Beta }
 
 ## Writing rules
 
-Write for a person maintaining Damvia. Describe what happens, what they can see and why it matters before naming the supporting function or field. Prefer “the dialog shows the download status” to “the component consumes status”. Keep useful interface descriptions, such as labels, disabled buttons and status changes: they help a maintainer check the behaviour. Step-by-step tutorials for everyday users belong in the separate user guide.
+Write for a person evaluating, installing, configuring or maintaining Damvia. Start with the decision or task, then describe the visible result and the consequences. Name a field, function, table or queue only when the reader must configure it, inspect it during an incident, or preserve its contract while contributing. Everyday-user walkthroughs belong in the website knowledge base and onboarding.
 
-- One topic per page, 300 to 1,200 words.
+- One durable topic per page. Use the length the task needs; there is no minimum word count.
 - Open with one or two sentences that say what the page lets the reader do.
 - Headings state a fact or a task: "Managers only see their own region", not "Managers".
 - Backticks for every env var, path, column, enum value and queue name. Exact numbers ("every 5 minutes", "7 days").
 - Label executable examples and unexecuted operational procedures honestly. A source review or compilation does not prove a live integration; record actual results in `reference/validation-status.md`.
 - Never cite line numbers. Name files and symbols instead: they are greppable and their absence is detectable.
+- Keep one authoritative explanation for each rule and link to it. Do not repeat schemas, procedure inventories, component styling or historical test counts across task pages.
+- Put stable implementation contracts in `contributing/`, exact lookup material in `reference/`, current limitations in `reference/known-limitations.md`, release-specific changes in release notes, and temporary audits in `_internal/`.
+- A task guide states its audience, prerequisites, steps, expected result and material failure or recovery cases. Preserve exact technical detail when the reader must enter it or act on it.
 - Plain Markdown. Starlight asides are fine (`:::note`, `:::tip`, `:::caution`). No custom components, no imports, so the files stay readable on GitHub.
 - Cross-link with relative paths: `[Licenses](../administration/licenses.md)`. The website remark plugin resolves the target against the source file before converting it to an absolute `/docs/...` route; keep the `.md` links readable on GitHub.
 - Images go in `assets/` and are referenced relatively: `![Admin users](../assets/admin-users.png)`.

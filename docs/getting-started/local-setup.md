@@ -56,7 +56,9 @@ Leave `MAILCONFIG` empty: the server then reads `server/mailconfig.json`, whose 
 npm run dev
 ```
 
-`npm run dev` runs `nodemon` with `ts-node` and sets `ENABLE_WORKER=true`. Driver initialisation and the first sync start concurrently with database initialisation. The API listens on `http://localhost:3000` before worker startup finishes. Log ordering is not guaranteed: check for migration errors, `server listening`, and a subsequent `assets updated successfully`. The next sync starts 5 minutes after the previous attempt ends.
+`npm run dev` runs `nodemon` with `ts-node` and sets `ENABLE_WORKER=true`. Startup waits for the database, migrations and source validation, starts source initialisation, creates the job queues, then opens the API on `http://localhost:3000`. The first source run may overlap queue startup, so inspect any early processing error instead of assuming that `server listening` proves the whole stack is ready.
+
+A usable local instance shows `server listening`, then one `assets updated successfully` message per configured source. Confirm that files move from `creating` to `up_to_date`, that a preview opens, and that MailHog receives a controlled email. The next source cycle begins five minutes after the previous cycle completes.
 
 Files appear in the database with status `creating` and are downloaded and thumbnailed by the worker in batches of 10; a large library takes a while to fill in.
 

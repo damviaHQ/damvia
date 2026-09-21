@@ -3,7 +3,7 @@ title: Integrity check
 description: What the daily integrity check compares between the database and the assets bucket, and when to run it by hand.
 sidebar:
   order: 8
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 The integrity check is the repair tool for the assets bucket. It runs every day at 05:00 UTC as the `system/integrity-check` job and on demand with `npm run cli -- check-integrity`. Both call `integrityCheck()` in `server/src/services/system.ts`.
@@ -13,17 +13,17 @@ The integrity check is the repair tool for the assets bucket. It runs every day 
 1. Loads every asset file from the database and lists every object under `asset-file/` in the assets bucket.
 2. Keeps an asset file as healthy only if its object exists, the object's size equals the `size` recorded from the cloud storage listing, **and** the row's status is `up_to_date`.
 3. Sets every other asset file to `outdated`, saves them, and pushes one `asset/update-content` job per file. The worker downloads the content from the cloud storage again, uploads it, rebuilds the WebP thumbnail and sets `up_to_date`.
-4. Recomputes `sample_file_ids` for every collection: the first four collection files with a thumbnail, prioritising files in the collection itself, then descendant files by creation date. These are the four images in a collection's thumbnail mosaic.
+4. Recomputes `number_of_files` and `sample_file_ids` for every collection (`recomputeCollectionRollups`): the count of collection files in the collection and its descendants, and the first four collection files with a thumbnail, prioritising files in the collection itself, then descendant files by creation date. These are the four images in a collection's thumbnail mosaic. The triggers that maintain both columns do not follow tree moves, so this pass is the safety net for counters that drifted.
 5. Lists `asset-file/` and `downloads/` again and deletes orphan objects: an original or thumbnail whose asset file row no longer exists, and an archive whose download row is gone, `expired` or `failed`. Only objects last modified more than 24 hours ago are deleted, so a file whose upload is in progress is never touched. The count and the bytes freed are logged as `storage.orphans-removed` and shown on the [dashboard](../administration/dashboard.md).
 
-The console prints `N assets files found to sync` and `Syncing folder thumbnails`. The CLI exits when the queueing is done, not when the downloads are: watch the worker for the actual work.
+The console prints `N assets files found to sync` and `Syncing folder counts and thumbnails`. The CLI exits when the queueing is done, not when the downloads are: watch the worker for the actual work.
 
 ## When to run it by hand
 
 | Situation | Why it helps |
 |---|---|
 | The assets bucket was lost or restored from an old copy | Every missing object is re-fetched. |
-| A file was replaced in the cloud storage and the change is not visible yet | The sync does not compare checksums, so this is the only automatic refresh, and it needs a size difference. Same-size replacements must be set to `outdated` in SQL. |
+| A source file changed but its working copy is still stale | The normal sync compares the provider checksum when one is available and queues a refresh. Use the integrity check when that job failed, the provider did not expose the change, or the stored object is missing/has the wrong size. Same-size problems with no checksum change require the targeted procedure below. |
 | System packages (ffmpeg, ghostscript, libreoffice) were installed after files had synced | Files that got no preview are re-processed. Note that a file whose object exists with the right size and status `up_to_date` is **not** re-queued even without a thumbnail; select the affected ids and mark those rows `outdated` before running the CLI, as below |
 | Collection mosaics look empty or stale | Step 4 fixes them without touching files. |
 

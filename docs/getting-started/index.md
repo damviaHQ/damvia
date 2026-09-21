@@ -36,7 +36,7 @@ Damvia does not host uploads. It mirrors one of:
 | OneDrive for Business | An Azure app registration with application permissions on Microsoft Graph, and the user whose drive to sync. See [OneDrive](../integrations/onedrive.md). |
 | Google Drive | A service account with the Drive API enabled, and the folder to sync shared with it. See [Google Drive](../integrations/google-drive.md). |
 
-Exactly one provider is active per instance (`ASSET_UPDATER`).
+For one source, select a provider with `ASSET_UPDATER` and set its provider variables. For several folders, accounts or providers, use `ASSET_SOURCES`; see [Sources](../integrations/sources.md). Every configured source needs a stable key and appears as a top-level folder in the library.
 
 ## System packages for previews
 
@@ -63,4 +63,4 @@ Images (`jpg`, `png`, `gif`, `bmp`, `webp`, `tiff`, `svg`) go through `sharp`, w
 
 - The server keeps the full listing of the cloud storage in memory during each 5-minute sync, and downloads each file once to a temp directory before uploading it to S3. Allow for up to ten concurrent asset downloads, archive source files, converted copies and the finished archive at the same time. The API limit bounds source bytes, not conversion output. Dropbox also buffers `fileBinary` in memory. Measure peak disk and memory with representative files; there is no verified minimum sizing.
 - LibreOffice conversions are the heaviest step; a small instance handles them, but expect the first sync of a large library to take hours.
-- One API process is enough for most teams. The documented operating topology is one process with `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md).
+- Run one server process with `ENABLE_WORKER=true`. The current sync loop runs in every server process, so adding API replicas also duplicates provider listings. See [Worker and scaling](../deployment/worker-and-scaling.md).

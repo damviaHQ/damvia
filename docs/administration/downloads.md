@@ -1,87 +1,55 @@
 ---
 title: Downloads
-description: How download requests become files or archives, the formats and limits, and when links expire.
+description: Understand direct and emailed exports, conversion limits, access rechecks and seven-day link expiry.
 sidebar:
   order: 11
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-20
 ---
 
-A download is a request to package one or more visible files, optionally converted, into a single object in the assets bucket. Small requests are built during the request; larger ones are built by the worker and announced by email. Every link expires after 7 days.
+Damvia packages one or more accessible files as a downloadable object in the assets bucket. Small exports can finish in the request; larger exports are prepared by the worker and announced by email. Every prepared object expires after seven days.
 
-## The download record
+## Direct and emailed exports
 
-`downloads` stores who asked, which `collection_files` ids, the chosen conversion options and the progress of the request:
-
-| Field | Values |
-| --- | --- |
-| `status` | `preparing`, `ready`, `failed`, `expired` |
-| `type` | `direct`, `email` |
-| `image_format` | `original`, `png`, `jpg`, `webp` |
-| `image_resolution` | `high`, `medium`, `low` |
-| `video_format` | `original`, `mp4`, `webm` |
-| `video_resolution` | `high`, `medium`, `low` |
-| `expires_at` | Creation time plus 7 days |
-
-The object is stored under `downloads/{id}` in the assets bucket (see [Object storage](../integrations/object-storage.md)).
-
-## Create a download
-
-`download.create` (approved users) first re-reads the requested `collection_files` through the visibility query, so files the user cannot see are silently dropped. If the total size of the remaining files is 10 GB or more, it fails with `You cannot download more than 10GB.` It then saves the record with status `preparing` and:
-
-- for `direct`, builds the archive inside the request and returns the record as `ready`;
-- for `email`, pushes `download/create-archive`; that job builds the archive, then pushes `mailer/download-ready`, which emails a presigned link to the object.
-
-The client applies stricter defaults before the server limit:
-
-| Path | Effective limit |
+| Mode | Behaviour |
 |---|---|
-| Single-file client (`CollectionModalDownloadUnique.vue`) | Direct download through 5,000,000,000 bytes. |
-| Multiple-file client (`CollectionModalDownloadMulti.vue`) | Direct download through 2,000,000,000 bytes via `getFiles.allowDirectDownload`, and at most 300 images. The extra 5 GiB check does not raise this limit. Image conversion is disabled above 300 images. |
-| Server `download.create` | Rejects total source sizes of 10,000,000,000 bytes or more, for either mode. |
+| Direct | Damvia prepares the file or archive while the request is open and returns it when ready. Proxy timeouts must allow long conversions. |
+| Email | A background job prepares the export, then emails a link when it is ready. The worker and SMTP must be healthy. |
 
-License acceptance shown in these dialogs is covered in [Licenses](./licenses.md).
+The client normally offers direct multi-file downloads only up to 2 GB and 300 images. Single-file direct downloads can be offered up to 5 GB. The server rejects any request whose accessible source files total 10 GB or more. These are decimal byte limits.
 
-## What the archive contains
+For several files, Damvia creates an uncompressed zip and preserves the collection path beneath an `export/` folder. A single file is delivered directly. Up to 25 files may be fetched or converted at once, so a large export can require substantial temporary disk and CPU.
 
-`createDownloadArchive` in `server/src/services/download.ts`:
+## Format conversion
 
-- With one file, uploads the (possibly converted) file directly with a `Content-Disposition: attachment; filename="..."` header.
-- With several files, streams a zip with compression level 0 (store only) and places each file at `export/<collection path>/<file name>`, where the path is the chain of collection names from the root. Up to 25 files are fetched and converted in parallel.
+Images can remain original or be converted to PNG, JPEG or WebP. Videos can remain original or be converted to MP4 or WebM. Resolution/quality choices affect only supported image and video files; other file types remain original.
 
-Conversions run only on files whose MIME type starts with `image/` or `video/` and only when the format is not `original`; other files are copied as is. The output extension replaces the original one.
+Video conversion requires ffmpeg. Image conversion uses sharp. Conversion output can be larger than the source, so the request-size checks do not guarantee that temporary disk or the finished archive fits. Monitor representative exports before setting proxy and disk limits.
 
-| Option | Implementation |
-| --- | --- |
-| Image `high` / `medium` / `low` | `sharp` quality 100 / 70 / 40 for `jpg`, `webp` and `png` |
-| Video `mp4` | ffmpeg with `libx264` |
-| Video `webm` | ffmpeg with `libvpx` |
-| Video `high` / `medium` / `low` | Scaled to a width of 7680 / 1920 / 720 pixels, height kept proportional |
+## Access is checked again
 
-The archive worker checks the requester’s current approval, collection access and file licences before preparing the export. If the account or selection no longer allows access, the download becomes `failed`, with no download link or ready email. The worker does not retry that export. Direct downloads return the error to the caller and roll back the new download record.
+When a request is created, files the requester cannot see are excluded. Before a queued email export is prepared, Damvia checks the requester's current approval, collection access and file licences again.
 
-Temporary storage and processing errors still use the queue’s normal retries. Duplicate jobs do not restart downloads that are already ready, failed or expired.
+If access has been revoked or a licence has expired, the export becomes `failed`, no ready email is sent and no link is exposed. Temporary storage or provider failures use the queue's retry policy; exhausted jobs require diagnosis before a new request is submitted.
 
-Temporary files are written under the system temp directory and removed when the job ends. `ffmpeg` must be installed on the host; the `server/Dockerfile` provides it.
+Licence acceptance shown in the browser is an acknowledgement, not a server-side acceptance record. The server enforces visibility and licence conditions independently. See [Licences](./licenses.md).
 
-## Links expire after 7 days
+## Links expire after seven days
 
-The `download/process-expired` job runs every minute (`* * * * *`). It selects downloads whose `expires_at` is in the past and whose status is not `expired`, deletes the object `downloads/{id}` from the bucket, and sets the status to `expired`. Deleting a user removes their downloads and objects immediately.
+A ready download uses `API_URL/v1/downloads/{id}`. That route does not require a session; it redirects to a short-lived signed object URL while the download record is ready and unexpired. Anyone who holds the public link can use it during that period.
 
-`download.list` returns the caller's `ready`, `preparing` and `failed` downloads, plus `expired` ones updated within the last month, so expired entries remain visible for about 30 days. Failed downloads follow the same seven-day expiry and cleanup schedule.
+Every minute, the cleanup job marks overdue downloads expired and deletes their stored objects. Expired entries remain visible in the download history for about a month. Deleting a user removes that user's downloads and stored objects immediately.
 
-## The public download URL
+Removing an invitation or rotating `APP_SECRET` does not revoke an already issued object URL. See [Accounts and links](./accounts-and-links.md).
 
-A `ready` download exposes `url` as `API_URL/v1/downloads/{id}`. The route in `server/src/server.ts`:
+## Diagnose a failed or stuck export
 
-1. Loads the download; if it does not exist, is not `ready`, or `expires_at` has passed, redirects to `APP_URL/link-expired`.
-2. Otherwise generates a presigned GET URL for `downloads/{id}` and redirects to it.
+Check these in order:
 
-The route carries no authentication, which is what makes the `Copy URL` action shareable. Anyone holding the link can fetch the object until expiry.
+1. Confirm one server process runs with `ENABLE_WORKER=true`.
+2. Inspect `download/create-archive` jobs and the corresponding download status.
+3. Check temporary disk, memory and the required conversion tools.
+4. Verify that source objects can be read and the assets bucket can be written.
+5. For an email export, verify the ready-email job and provider delivery log.
+6. Re-check the requester's approval, collection access, region and file licences.
 
-## How download progress appears in the client
-
-`DialogMemberDownloads.vue` shows each download's creation date, expiry date, status and number of files. The `Download` and `Copy URL` buttons are enabled when a download link is available. A green `New` badge highlights email downloads that finished since the dialog was last viewed.
-
-A red `Failed` badge identifies an export that could not proceed because access changed. Its download and copy buttons stay disabled. Failed exports do not keep the progress checks running when no other email export is preparing.
-
-While an email download is still being prepared (`status = preparing`), `client/src/stores/downloadStore.ts` asks `download.list` for updates every 500 ms. This updates the status and badge without reloading the page. The checks stop once no email download is still being prepared. Queue names and schedules are listed in [Background jobs](../reference/background-jobs.md).
+An active job expires after the queue's configured lifetime and has limited retries. A retry may find an object already uploaded or an email already sent, so inspect the existing record before submitting another request. The detailed procedure is in [Operations](../deployment/operations.md#downloads-stuck-in-preparing).

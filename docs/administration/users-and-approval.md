@@ -1,143 +1,79 @@
 ---
 title: Users and approval
-description: How a visitor becomes a user, how approval and roles work, and what managers can and cannot do.
+description: Approve accounts, assign roles, groups and regions, and remove access without confusing verification with approval.
 sidebar:
   order: 3
-lastUpdated: 2026-09-17
+lastUpdated: 2026-09-20
 ---
 
-Users sign up themselves, verify their email address, and then wait for an administrator or a manager of their region to approve them, unless their email domain is on the authorized list. This page follows that path and the rules around roles, magic links, password resets and account removal.
+An account normally needs two independent conditions before it can use the library: its email must be verified and the account must be approved. Roles then decide what the person can administer; regions, groups, collection rules and file licences decide what content they can see.
 
-## A sign-up creates an unapproved member
+## Verification and approval are separate
 
-The sign-up form (`/sign-up`) asks for a name, a company, a region picked from the list of existing regions, an email address and a password of 6 to 100 characters. When `ENABLE_PASSWORD_LESS_AUTH=true` the password is ignored and not stored.
+At sign-up, Damvia creates a member in the selected region and adds the region's default group. It sends a verification email. The new account is approved immediately only when its email domain is in the authorised-domain list; otherwise it waits for an admin or manager.
 
-`createUser` in `server/src/services/user.ts` then:
+After verification, Damvia emails the admins and managers in the same region to request approval. If that region has no admin or manager, no approval request can be delivered. Give every active region at least one responsible approver.
 
-| Step | Detail |
-| --- | --- |
-| Role | Always `member` |
-| Group | The user joins the region's default group (`regions.default_group_id`) |
-| Verification code | 12 random bytes, hex encoded, stored in `email_verification_code` |
-| Approval | `approved` is true only if the part after `@` matches a row in `authorized_domains` |
-| Email | A job is pushed to `mailer/email-verification` |
+The first account cannot approve itself. Promote it through the database as described in [First admin](../getting-started/first-admin.md), then add the organisation's authorised domains and regional approvers.
 
-The API returns a JWT immediately, so the person is logged in, but `client/src/app.vue` shows a waiting screen instead of the app until both `emailVerified` and `approved` are true. A second sign-up with the same email fails with `Email address already taken.`
+## Approve a user
 
-## Verifying the email address triggers the approval request
+Open `/admin/users`. A verified, unapproved account shows an **Approve** action. Approval enables normal access and sends the user-approved email.
 
-The verification email links to `APP_URL` with `?verificationCode=<code>`. `app.vue` watches the route, calls `user.verifyEmail` with the code and refreshes the user. On success the code is cleared and `emailVerified` becomes true.
+Managers see and change users only in their own region. They may approve members and guests, edit their name/company/groups, and remove eligible accounts. They cannot grant `admin` or `manager`, change their own role or region, or change/remove another manager or admin.
 
-If the user is still unapproved at that moment, a job is pushed to `email/request-approval`. `sendRequestApprovalEmail` in `server/src/services/mailer.ts` sends one message to every user whose role is `manager` or `admin` **and** whose `region_id` equals the requester's. If that list is empty, no email is sent.
+Admins can manage every region and assign all roles. Before granting an administrative role, check whether the person also receives sensitive operational data or maintenance email.
 
-A signed-in user can resend their own verification email. `user.resendVerificationEmail` queues the email and returns no login token.
+## Choose the role
 
-## Approve a pending user
+| Role | Administrative scope |
+|---|---|
+| `admin` | All settings, content, assets, products, people, storage and reporting. Admins are exempt from file-licence restrictions. |
+| `manager` | Users in their own region only. Content access is otherwise like a member. |
+| `member` | No admin area; may maintain their private collections and invitations for collections they own. |
+| `guest` | Created for sharing. Reads invited/otherwise permitted collections; the client hides collection editing and favourites. |
 
-On `/admin/users`, a user who has verified their email but is not approved shows an `Approve` action in the table and an `Approve user` action in their details modal. Approval:
+Changing a role does not replace collection, group or licence checks. See [Roles and access](../introduction/roles-and-access.md).
 
-1. Sets `approved` to true.
-2. Pushes a job to `email/user-approved`.
-3. The email contains a link to `/login?token=<jwt>`; opening it logs the user in directly.
+## Assign region and groups
 
-The Last Login column shows when the user last opened the application, to the nearest 30 minutes of inactivity, or `never`. It is the same moment [Insights](./analytics.md) counts as a login, and it starts at the upgrade that added it.
+Every user has one region and may have several groups. The selected region controls which managers can administer the account and which licences permit the user to see a file. Groups grant access to restricted collection branches.
 
-Approving an already approved user fails with `User already approved.` The templates for these emails are described in [Email templates](../configuration/email-templates.md).
+Changing a region does not automatically remove manually assigned groups. Review both when moving someone between markets or business units. Guests created from an invitation start with no groups and use the inviter's region for licence checks.
 
-## Managers only see their own region
+## Authorise a domain
 
-Every procedure in `server/src/trpc/router/user.ts` that lists or changes other users is open to `admin` and `manager`, but a manager's queries are filtered by `regionId = <manager's region>`:
+An authorised email domain makes future sign-ups from that domain approved immediately; users still need to verify their address. Use exact organisational domains and review the list after acquisitions, rebrands or contractor changes.
 
-| Procedure | Admin | Manager |
-| --- | --- | --- |
-| `list` | All users | Users of own region |
-| `findById` | Any user | Users of own region |
-| `approve`, `remove` | Any user | Members and guests of own region |
-| `update` role | Any role | `member` or `guest` only; `admin` or `manager` fails with `Managers cannot set admin or manager roles.` |
-| `update` region and groups | Yes | Members and guests of own region |
-| `update` `maintenanceContact` | Admin profiles only | Ignored |
-| `update` own profile | Name, company, email, region, role, groups | Name, company, email only |
-| Edit or remove an admin or another manager | Yes | Refused by the server |
+Removing a domain affects only future sign-ups. It does not revoke existing accounts.
 
-Changing a user's email through `update` resets `emailVerified` and sends a new verification email. In the Edit User dialog the Role select shows `Guest` and `Member` to everyone, and `Manager` and `Admin` only to admins.
+## Password and passwordless modes
 
-## Designated admins receive the storage and maintenance emails
+With normal authentication, accounts use a password and receive verification/reset emails. Passwords are stored with scrypt and a separate random salt; older supported hashes are upgraded on successful login.
 
-The `storage-alert` email sent when the plan passes 80, 90, 95 or 100 % goes only to admins whose profile has "Receives storage and maintenance emails" ticked (`maintenanceContact` on `users`). Only an admin sees the box, and only on a profile whose role is `admin`; the flag is cleared when the account is demoted, and a manager cannot set it. When no admin is designated, the worker logs `storage.alert-no-recipient`, sends nothing, and the [dashboard](./dashboard.md) shows a warning. The server disk alerts do not use this flag: they go to `SERVER_ALERT_EMAILS`, see [Server configuration](../configuration/server-env.md).
+With `ENABLE_PASSWORD_LESS_AUTH=true`, sign-up has no password and login emails a time-limited link. Existing password hashes are not erased, and changing the flag should be tested with existing accounts before rollout. Invitation links can also trigger the email-login flow regardless of the global mode.
 
-## What each role can do
+Changing `APP_SECRET` invalidates every current session and signed login/invitation JWT. Password resets also invalidate earlier sessions for that account. See [Accounts and links](./accounts-and-links.md).
 
-| Role | Given by | Access |
-| --- | --- | --- |
-| `admin` | Another admin | Every admin screen and every collection that is public, plus own private ones |
-| `manager` | An admin | The Users screen for their region; otherwise a member |
-| `member` | Sign-up default | Browse public collections allowed by groups and licenses, create private collections, download |
-| `guest` | Created by a collection invitation | Only collections they own, are invited to, or that are limited to one of their groups |
+## Maintenance contacts
 
-The predicates `userApproved`, `userAdmin`, `userMember` and `userManagerOrAdmin` in `server/src/trpc/index.ts` implement these checks; nearly every non-admin procedure requires `userApproved`. See [Roles and access](../introduction/roles-and-access.md) for the full matrix.
+An admin can be designated to receive customer-facing storage and maintenance email. This is distinct from `SERVER_ALERT_EMAILS`, which identifies the people operating the host and controls server-disk alerts/visibility.
 
-## Magic links replace passwords when enabled
+Ensure at least one active admin is a maintenance contact when storage alerts are enabled. Removing or demoting the last contact leaves customer-level alerts without a recipient.
 
-With `ENABLE_PASSWORD_LESS_AUTH=true`:
+## Remove an account carefully
 
-- No password is stored at sign-up and the password field is hidden on `/login`.
-- `user.login` looks the user up by email, pushes a job to `mailer/log-in` and returns `null`; the client shows a check-your-inbox message.
-- The email links to `/login?token=<jwt>`; the login view stores the token and redirects home.
-- An unknown email fails with `User not found.`
+Before removal, inspect:
 
-In password mode the same email flow is used when the login request carries `magicLink: true`, which the client sets when it was opened from an invitation link (see [Collections and sharing](./collections-and-sharing.md)).
+- private collections owned by the account;
+- invitations sent to or created by the account;
+- pending downloads;
+- administrative or maintenance-contact responsibilities.
 
-## Password-reset implementation
+Deletion can fail while private collections still reference the owner. Reassign or delete those collections first. Removing a user deletes their invitations and downloads; prepared download objects are also removed. Deleting the invitation creator does not revoke invitations they sent when the invitation remains otherwise valid.
 
-A reset link expires after one hour and works once. Requesting another link replaces the previous one. The email links to `/password-update?email=<email>&token=<token>`.
+## Search and export
 
-The server generates 32 random bytes and stores the token’s SHA-256 hash in `reset_password_token`, with its deadline in `reset_password_expires_at`. The email job carries the original token and sends it only while it is still current. A successful reset stores the new password (6 to 100 characters), clears the reset fields and returns a fresh session. It also invalidates the account’s earlier sessions and login links. Concurrent submissions cannot reuse the same reset link.
+The Users screen supports text search, role/region/status filters and CSV export of the displayed administrative fields. Treat exports as personal data: store them temporarily, restrict access and delete them according to the organisation's retention policy.
 
-The request returns the same empty response for an unknown email address.
-
-## Removing an account
-
-`user.remove` (admin or manager, within the rules above) and `user.removeAccount` (a user deleting their own account) both call `removeUser`, which in one transaction:
-
-1. Deletes every `collection_invitations` row addressed to the user's email.
-2. Sets `owner_id` to null on public collections the user owned, so they survive without an owner.
-3. Deletes the user's downloads, including the archive objects in the assets bucket.
-4. Deletes the user row.
-
-## Authorized domains
-
-`/admin/authorized-domains` (admin only) lists rows of `authorized_domains` with a `Domain` and a `Description`. The dialog `Add new authorized domain` takes a domain such as `company.com` and an optional description. A sign-up whose email ends with a listed domain is approved at creation; it still has to verify its email address. Removing a domain does not change users already approved.
-
-## Password storage and sessions
-
-Passwords use scrypt with a separate random salt for each password. Existing password hashes are upgraded when the user next logs in successfully. See `server/src/services/credentials.ts`.
-
-Sessions are signed with the required `APP_SECRET` and last 180 days. The server also checks the account’s `auth_version`; a password reset increments it and ends earlier sessions. See [Accounts and links](./accounts-and-links.md).
-
-## Account removal
-
-`removeUser` does not remove or reassign private collections. Their owner foreign key can block the final user deletion. Resolve ownership or remove those collections through the application before attempting account removal. Earlier archive-object deletions are external effects and cannot be rolled back with the SQL transaction.
-
-The dashboard’s pending-approval links open this screen with the needs-approval filter selected (`?needsApproval=true`). Clear that filter to see the other users.
-
-## Search, filter and export
-
-The user directory uses mutually exclusive All users, Needs approval, Active and Unverified views. Active means both approved and email-verified. Search matches name, email or company, and additional filters narrow by role, region and group. Managers still receive only their region’s users from the API.
-
-Click User or Joined to change the sort order. The default is newest registrations first. Choose 10, 20 or 50 rows per page. The header checkbox selects the current page; selection can span pages. Changing filters or page size clears selection, and refreshed data removes selections that no longer match.
-
-Export users downloads every matching record, or the selected matching records when a selection exists, across all pages. CSV includes name, email, company, role, region, group names, status and registration date. Fields are quoted and spreadsheet formula prefixes are neutralised. Copy emails uses the same selection/filter scope but includes only verified addresses.
-
-## User details
-
-Click a user’s name to open the keyboard-accessible details modal. It contains profile fields, role, region, group membership and the storage-alert setting when applicable. Managers can inspect elevated accounts but only administrators can edit them. Managers can edit their own name, email and company; their access controls remain managed by an administrator. Self-role changes and self-deletion are unavailable in this directory.
-
-Save failures remain visible in the form. Changing an email explains the re-verification requirement before saving. Deletion requires confirmation, and a failed deletion keeps the confirmation open with its error. Escape dismisses idle dialogs and focus returns to the opening control (or search if that row no longer exists).
-
-## Admin interface
-
-The Authorized domains screen has search by domain or description, a result count, and pagination at 20 rows. Its removal confirmation explains that future accounts need manual approval; existing accounts are unaffected.
-
-User-detail and authorized-domain dialogs inherit the shared modal header, control and footer styling.
-
-Users awaiting approval have an **Approve** button in place of their status badge in the user list. It approves the account immediately without opening a modal, and refreshes the list and counts. It is shown only for verified accounts the current administrator or manager is permitted to approve.
+When diagnosing why someone cannot enter, check in this order: email verification, approval, current session validity, role/region, group membership, collection rule, then file licence. Admin accounts are poor test subjects for the last step because they bypass licence checks.

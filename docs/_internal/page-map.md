@@ -21,6 +21,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/services/user.ts`, `trpc/router/user.ts`, `trpc/router/authorized-domain.ts` | `administration/users-and-approval.md`, `introduction/roles-and-access.md`, `getting-started/first-admin.md` |
 | `server/src/trpc/index.ts` (auth predicates) | `introduction/roles-and-access.md` |
 | `server/src/services/collection.ts`, `trpc/router/collection.ts`, `trpc/router/collection/invitation.ts`, `entity/collection.ts` | `administration/collections-and-sharing.md`, `introduction/roles-and-access.md` |
+| `client/src/utils/pageFilter.ts`, `composables/usePageFilter.ts`, `components/PageFilterBar.vue`, `PageFilterToggle.vue`, `FilterChipList.vue`, `TableSortHeader.vue`, `components/collection/CollectionRender*.vue`, `CollectionDisplayList*.vue` | `administration/collections-and-sharing.md`, `administration/menu-and-pages.md` |
 | `server/src/trpc/router/region.ts`, `group.ts`, `entity/region.ts`, `entity/group.ts` | `administration/groups-and-regions.md` |
 | `server/src/trpc/router/license.ts`, `entity/license.ts` | `administration/licenses.md` |
 | `server/src/trpc/router/asset-type.ts`, `entity/asset-type.ts` | `administration/asset-types.md` |
@@ -34,7 +35,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/services/storage.ts`, `trpc/router/dashboard.ts`, `entity/storage-usage.ts` | `administration/dashboard.md`, `deployment/operations.md`, `configuration/server-env.md`, `deployment/integrity-check.md` |
 | `client/src/views/admin/admin-dashboard.vue`, `client/src/layouts/LayoutAdmin.vue` | `administration/dashboard.md`, `administration/index.md` |
 | `server/src/trpc/router/analytics.ts`, `services/analytics.ts`, `entity/activity-event.ts`, `client/src/views/admin/admin-analytics.vue`, the activity inserts in `trpc/router/user.ts` (`me`), `download.ts`, `collection.ts` (`search`), `collection/invitation.ts`, `favorite.ts`, the view report in `client/src/components/collection/CollectionModalDownloadUnique.vue` | `administration/analytics.md`, `contributing/api.md`, `contributing/data-model.md` |
-| `server/src/entity/*` (all) | `introduction/concepts.md` |
+| Reader-visible meaning or lifecycle of a domain object | `introduction/concepts.md` or the relevant administration page; do not mirror entity fields there |
 | `server/src/migrations/*` | `deployment/upgrading.md` |
 | `server/Dockerfile` | `deployment/server-docker.md`, `getting-started/index.md` |
 | `server/docker-compose.yml` | `getting-started/local-setup.md`, `reference/ports-and-services.md` |
@@ -59,4 +60,8 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | Unresolved implementation defects | `reference/known-limitations.md` (remove or update entries when fixed) |
 | Documentation rendering and validation | `docs/README.md`, `scripts/`, `.github/workflows/docs.yml`; matching renderer and build checks in the website repository |
 
-End-user instructions are intentionally outside this technical documentation.
+End-user instructions are maintained as a separate how-to knowledge base and onboarding on the public website. This repository documents the product model, installation, configuration, administration, operation and contribution contracts. Do not duplicate the website walkthroughs here.
+
+## Relevance test for documentation updates
+
+Update a public page when a code change alters a reader's action, visible result, configuration, supported capability, permission, limit, compatibility, failure mode or recovery procedure. Keep implementation-only changes in code, tests, pull requests or `_internal/` notes. Rewrite the existing explanation instead of appending a chronological account of the change.

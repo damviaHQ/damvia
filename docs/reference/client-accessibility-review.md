@@ -4,6 +4,7 @@ description: Accessibility audit of the client on 2609-v2 with axe-core results,
 sidebar:
   order: 10
 lastUpdated: 2026-09-19
+draft: true
 ---
 
 Reviewed 19 September 2026 on 2609-v2. Read-only audit; no UI changes made.

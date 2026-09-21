@@ -3,7 +3,7 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-20
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
@@ -26,6 +26,7 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). `
 | `ENABLE_WORKER` | unset (worker off) | `true` processes jobs and registers cron schedules inside this process. Without it the process still queues jobs. `npm run dev` sets it. See [Worker and scaling](../deployment/worker-and-scaling.md). |
 | `ENABLE_PASSWORD_LESS_AUTH` | `false` | `true` selects passwordless sign-up/login; it does not erase existing hashes or disable password-reset endpoints. |
 | `STORAGE_QUOTA` | unset (no limit) | Storage plan for the two buckets together, in decimal units: `1500GB`, `1.5TB` or a number of bytes. Cloud files that would exceed it are not downloaded, and every admin gets an email at 80, 90, 95 and 100 %. A value that does not parse stops the server at startup. See [Dashboard](../administration/dashboard.md). |
+| `ASSET_SYNC_MAX_DELETION_PERCENT` | `20` | Share of a source's folders and files that may be absent from one listing before the sync refuses to mark them for deletion (whole number, 0 to 100; the check only applies above 20 items). `100` disables it. A value that does not parse stops the server at startup. See [Sources](../integrations/sources.md#how-the-runs-work). |
 | `STORAGE_DISK_PATH` | `/` | Path whose disk is measured with `statfs` for the hosting contact. Inside a container `/` reports the host disk that holds Docker's data, which is where the MinIO volume lives on a single-disk server. Set it to the volume's mount point when MinIO sits on another disk. |
 | `SERVER_ALERT_EMAILS` | unset | Comma-separated addresses of whoever runs the server and must be told about a critical server problem. They receive the `disk-alert` emails, an admin logged in with one of these addresses sees the server disk on the dashboard, and every admin sees them as the contact to raise the plan when storage passes 80 %. Unset means no disk alert and no disk figure for anyone. |
 | `ANALYTICS_RETENTION_DAYS` | `365` | Days of activity events kept for [Insights](../administration/analytics.md). The `activity/prune-events` job deletes older events every night. `0` keeps them forever. |
