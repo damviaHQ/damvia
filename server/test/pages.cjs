@@ -103,6 +103,20 @@ test('only an admin or the collection owner can read and change a page', async (
     assert.equal(collection.id, (await caller(member).collection.findById(collection.id)).id)
 })
 
+test('an admin shows or hides the action bar of a page for every reader', async () => {
+    const page = await caller(admin).page.create({ name: 'Landing' })
+    assert.equal(page.showActionBar, true)
+    assert.equal((await caller(member).page.findById(page.id)).showActionBar, true)
+
+    const hidden = await caller(admin).page.update({ pageId: page.id, name: null, showActionBar: false })
+    assert.equal(hidden.showActionBar, false)
+    assert.equal(hidden.name, 'Landing')
+    assert.equal((await caller(member).page.findById(page.id)).showActionBar, false)
+
+    await forbidden(caller(member).page.update({ pageId: page.id, name: null, showActionBar: true }))
+    assert.equal((await caller(member).page.findById(page.id)).showActionBar, false)
+})
+
 test('saving a page creates, reorders and deletes blocks in one call', async () => {
     const { page } = await makePage(member)
     const [collections, files] = page.blocks

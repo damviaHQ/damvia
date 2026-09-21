@@ -43,6 +43,9 @@ export class Page {
 	@JoinColumn()
 	collection: Collection | null
 
+	@Column({ type: 'boolean', default: true })
+	showActionBar: boolean
+
 	@OneToMany(() => PageBlock, (block) => block.page)
 	blocks: PageBlock[]
 

@@ -55,6 +55,8 @@ A listing block can leave its display to the reader's own preference, or fix it.
 
 Readers can narrow a page the way they narrow a collection: the funnel button lists the filters the page can offer — name, asset type, file type, format and each record attribute present — and the reader ticks the ones they want. Whatever they tick applies to every listing block at once, in grid, masonry and list alike, and a block whose every item is filtered out disappears with its title. No filter ever applies while the page is being edited, so an author always sees the blocks as they are. See [Collections and sharing](./collections-and-sharing.md#narrow-what-is-on-screen).
 
+A page shows this action bar by default. To take it off a page, open **Admin → Pages**, choose **Settings** on the page and turn off **Show the action bar**. The choice applies to every reader, admins included: with the bar off, the funnel button and the filter chips are gone and nothing narrows the page.
+
 Page layouts do not have a history or draft state. Saving publishes the new layout immediately to everyone who can reach it.
 
 ## Uploaded media and library files are different

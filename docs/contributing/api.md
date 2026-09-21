@@ -256,10 +256,10 @@ Every procedure requires `userAdmin`. Writes re-run the entity stage of the enri
 | `menuItem.setHome` | mutation | `userAdmin` | Flags the home item |
 | `menuItem.updatePositions` | mutation | `userAdmin` | Reorders and reparents |
 | `page.list` | query | `userAdmin` | Pages |
-| `page.findById` | query | `userApproved` | One standalone page with its blocks and the `assets` its blocks refer to, resolved for the caller |
-| `page.create` | mutation | `userAdmin` | Standalone page |
+| `page.findById` | query | `userApproved` | One standalone page with its blocks, `showActionBar`, and the `assets` its blocks refer to, resolved for the caller |
+| `page.create` | mutation | `userAdmin` | Standalone page; `showActionBar` defaults to true |
 | `page.createForCollection` | mutation | `userApproved` | Empty page bound to a collection the caller can edit, or the one it already has |
-| `page.update` | mutation | `userAdmin` | Renames a page |
+| `page.update` | mutation | `userAdmin` | Renames a page and shows or hides its action bar (`showActionBar`, omitted keeps it) |
 | `page.remove` | mutation | `userApproved` | Deletes a page the caller can edit |
 | `page.save` | mutation | `userApproved` | Writes the whole block list in one transaction, checked with `page.canEdit(user)`: blocks are created, updated, reordered and deleted together, `data` is validated against the schema for its type, text is sanitised, and objects no longer referenced are removed afterwards |
 | `page.collectionPreviews` | query | `userApproved` | Cards for the named collections, resolved for the caller, so the editor can preview a collection the moment it is chosen rather than after a save |

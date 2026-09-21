@@ -40,6 +40,7 @@ export async function formatPage(page: Page, user?: User) {
 	return {
 		id: page.id,
 		name: page.name,
+		showActionBar: page.showActionBar,
 		blocks: page.blocks ? blocks.map(formatPageBlock) : undefined,
 		// Legacy rows never went through the sanitizer, so assets and text are
 		// both resolved for the reader rather than trusted from the database.
@@ -89,10 +90,12 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.input(z.object({
 			name: z.string(),
+			showActionBar: z.boolean().optional(),
 		}))
 		.mutation(async ({ input, ctx }) => {
 			const page = new Page()
 			page.name = input.name
+			page.showActionBar = input.showActionBar ?? true
 			page.blocks = []
 			await dataSource.getRepository(Page).save(page)
 			return formatPage(page, ctx.user)
@@ -136,6 +139,7 @@ export default router({
 		.input(z.object({
 			pageId: z.uuid(),
 			name: z.string().nullable(),
+			showActionBar: z.boolean().optional(),
 		}))
 		.mutation(async ({ input, ctx }) => {
 			const page = await dataSource.getRepository(Page).findOne({
@@ -149,6 +153,9 @@ export default router({
 
 			if (input.name) {
 				page.name = input.name
+			}
+			if (input.showActionBar !== undefined) {
+				page.showActionBar = input.showActionBar
 			}
 
 			await dataSource.getRepository(Page).save(page)

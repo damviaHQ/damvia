@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -51,12 +52,12 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { CirclePlus, FilePenLine, PencilLine, Trash2 } from "@lucide/vue"
+import { CirclePlus, FilePenLine, Settings2, Trash2 } from "@lucide/vue"
 import { ref } from "vue"
 
 export type Page = RouterOutput["page"]["list"][number]
 
-const form = ref<{ pageId?: string; name: string }>({ name: "" })
+const form = ref<{ pageId?: string; name: string; showActionBar: boolean }>({ name: "", showActionBar: true })
 const modalState = ref<"creating" | "editing" | "closed">("closed")
 const queryClient = useQueryClient()
 const toast = useGlobalToast()
@@ -66,7 +67,7 @@ const { status, data, error } = useQuery({
 })
 
 function openCreateModal() {
-  form.value = { name: "" }
+  form.value = { name: "", showActionBar: true }
   modalState.value = "creating"
 }
 
@@ -74,6 +75,7 @@ function openEditModal(page: Page) {
   form.value = {
     pageId: page.id,
     name: page.name!,
+    showActionBar: page.showActionBar,
   }
   modalState.value = "editing"
 }
@@ -140,8 +142,8 @@ async function onModalSubmit(event: Event) {
                 </router-link>
               </Button>
               <Button variant="ghost" size="sm" @click="openEditModal(page)">
-                <PencilLine class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
-                Rename
+                <Settings2 class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
+                Settings
               </Button>
               <AlertDialog>
                 <AlertDialogTrigger as-child>
@@ -180,8 +182,7 @@ async function onModalSubmit(event: Event) {
         <DialogHeader>
           <DialogTitle>{{ modalState === "creating" ? "Create" : "Edit" }} page</DialogTitle>
           <DialogDescription>
-            Enter the name for your page and click
-            {{ modalState === "creating" ? "Create" : "Edit" }}.
+            Name the page and choose whether readers see its action bar.
           </DialogDescription>
         </DialogHeader>
         <div class="flex flex-col gap-4 py-4">
@@ -189,6 +190,13 @@ async function onModalSubmit(event: Event) {
             <Label for="name">Name</Label>
             <Input id="name" v-model="form.name" placeholder="Page name" />
           </FieldGroup>
+          <label class="flex cursor-pointer items-start gap-2 text-body text-neutral-800">
+            <Switch id="page-show-action-bar" class="mt-0.5" v-model="form.showActionBar" />
+            <span class="grid gap-0.5">
+              <span>Show the action bar</span>
+              <span class="text-caption text-[color:var(--dv-text-secondary)]">Every reader sees the filter button above the page. Off, no one does.</span>
+            </span>
+          </label>
         </div>
         <DialogFooter class="items-center">
           <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>

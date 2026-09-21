@@ -33,17 +33,20 @@ const { status, data: page, error } = useQuery({
 // A custom page lists files and collections like a collection does, so it gets
 // the same filter. The blocks announce what they draw, which is what the bar
 // counts and builds its facets from.
+// An admin can take the action bar off a page; a hidden filter then narrows
+// nothing, even with filters ticked on another page.
+const showsBar = computed(() => page.value?.showActionBar ?? true)
 const { files: shownFiles, collections: shownCollections } = providePageListings()
-const pageFilter = providePageFilter()
+const pageFilter = providePageFilter(showsBar)
 watch(() => route.params.id, () => pageFilter.clear())
 </script>
 
 <template>
   <div v-if="page" class="page__container">
-    <div class="page__header-actions mb-4 flex items-center justify-end">
+    <div v-if="showsBar" class="page__header-actions mb-4 flex items-center justify-end">
       <PageFilterToggle :files="shownFiles" />
     </div>
-    <PageFilterBar :files="shownFiles" :collections="shownCollections" />
+    <PageFilterBar v-if="showsBar" :files="shownFiles" :collections="shownCollections" />
     <PageRenderer :blocks="page.blocks ?? []" :assets="page.assets"
       :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
   </div>
