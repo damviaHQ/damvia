@@ -54,6 +54,7 @@ const { status, data: privateCollections } = useQuery({
 const { data: publicCollections } = useQuery({
   queryKey: ['collection', 'treeAdmin', 'public'],
   queryFn: () => trpc.collection.treeAdmin.query(),
+  enabled: computed(() => globalStore.user?.role === 'admin'),
 })
 
 const usablePublicCollections = computed(() => (publicCollections.value ?? []).filter(
