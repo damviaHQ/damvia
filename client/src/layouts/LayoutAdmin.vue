@@ -175,10 +175,6 @@ const storageLevel = computed(() => {
               <Folders class="w-4 h-4 mr-2" />
               Assets
             </router-link>
-            <router-link :to="{ name: 'admin-asset-types' }" class="menu-item">
-              <FileCog class="w-4 h-4 mr-2" />
-              Asset Types
-            </router-link>
             <router-link :to="{ name: 'admin-licenses' }" class="menu-item">
               <Copyright class="w-4 h-4 mr-2" />
               Licenses
@@ -216,6 +212,10 @@ const storageLevel = computed(() => {
               <Layers class="w-4 h-4 mr-2" />
               Variants
               <span v-if="badges?.unnamedAxes" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${badges.unnamedAxes} axes waiting for a name`">{{ badges.unnamedAxes }}</span>
+            </router-link>
+            <router-link :to="{ name: 'admin-asset-types' }" class="menu-item">
+              <FileCog class="w-4 h-4 mr-2" />
+              Asset Types
             </router-link>
           </div>
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
