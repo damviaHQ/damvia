@@ -30,7 +30,7 @@ import {
 import { Filter } from "@lucide/vue"
 import { computed } from "vue"
 
-const props = withDefaults(defineProps<{ files?: DisplayFile[] }>(), { files: () => [] })
+const props = withDefaults(defineProps<{ files?: DisplayFile[], restricted?: boolean }>(), { files: () => [], restricted: false })
 
 const store = useGlobalStore()
 const filter = usePageFilter()
@@ -75,7 +75,7 @@ function clearAll() {
         variant="ghost"
         size="icon-sm"
         aria-label="Filters"
-        title="Choose the filters shown on this page"
+        :title="`Choose the filters shown on this page${restricted ? ' · Hidden for some people' : ''}`"
         class="relative text-neutral-500 data-[state=open]:bg-neutral-100 data-[state=open]:text-neutral-950"
       >
         <Filter aria-hidden="true" />

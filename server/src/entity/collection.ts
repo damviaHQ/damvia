@@ -33,6 +33,17 @@ import { CollectionInvitation } from "./collection-invitation"
 import { Page } from "./page"
 import { User, UserRole } from "./user"
 
+export const ACTION_BAR_ACTIONS = ['filter', 'search', 'display', 'share'] as const
+export type ActionBarAction = typeof ACTION_BAR_ACTIONS[number]
+export type ActionBarRule = {
+	mode: 'everyone' | 'only' | 'except' | 'nobody'
+	roles: UserRole[]
+	groupIds: string[]
+	userIds: string[]
+}
+// An action left out is shown to everyone.
+export type ActionBarSettings = Partial<Record<ActionBarAction, ActionBarRule>>
+
 @Entity('collections')
 @Tree('materialized-path')
 @Index('idx_collections_parent_asset_folder', ['parentId', 'assetFolderId'], { unique: true, where: 'asset_folder_id IS NOT NULL' })
@@ -103,6 +114,10 @@ export class Collection {
 
 	@Column({ type: "boolean", nullable: false, default: true })
 	canEditLimitedToGroupIds: boolean
+
+	// Null follows the parent.
+	@Column({ type: 'jsonb', nullable: true })
+	actionBar: ActionBarSettings | null
 
 	@OneToOne(() => Page, (page) => page.collection)
 	page?: Page | null

@@ -28,7 +28,8 @@ const props = withDefaults(defineProps<{
   collections?: DisplayCollection[]
   grouped?: boolean
   layoutLocked?: boolean
-}>(), { files: () => [], collections: () => [], grouped: false, layoutLocked: false })
+  restricted?: boolean
+}>(), { files: () => [], collections: () => [], grouped: false, layoutLocked: false, restricted: false })
 const store = useGlobalStore()
 const selectedId = ref('')
 const groups = computed(() => {
@@ -58,7 +59,7 @@ const masonrySizeLabel = computed(() => MASONRY_SIZES.find(size => size.id === m
 const displays = computed(() => groups.value.map(item => store.displayPreferences[item.id] ?? item.defaultDisplay))
 const sharedDisplay = computed(() => displays.value.every(value => value === displays.value[0]) ? displays.value[0] : null)
 const triggerIcon = computed(() => sharedDisplay.value ? viewIcons[sharedDisplay.value] : SlidersHorizontal)
-const triggerTitle = computed(() => `Display preferences — ${sharedDisplay.value ? viewLabels[sharedDisplay.value] : 'mixed'}`)
+const triggerTitle = computed(() => `Display preferences — ${sharedDisplay.value ? viewLabels[sharedDisplay.value] : 'mixed'}${props.restricted ? ' · Hidden for some people' : ''}`)
 const customized = computed(() => groups.value.some(item => store.displayPreferences[item.id] !== undefined || store.displayDetails[item.id] !== undefined))
 
 function toggleColumn(id: string) {

@@ -21,7 +21,7 @@ import {
   type FilterableFile,
   type PageFilterState,
 } from '@/utils/pageFilter'
-import { computed, inject, provide, ref, type ComputedRef, type InjectionKey, type Ref } from 'vue'
+import { computed, inject, provide, ref, toValue, type ComputedRef, type InjectionKey, type MaybeRefOrGetter, type Ref } from 'vue'
 
 export type PageFilter = {
   state: Ref<PageFilterState>
@@ -38,10 +38,11 @@ const key = Symbol('page-filter') as InjectionKey<PageFilter>
 
 // The reader narrows what a page draws without leaving for the search: the state
 // lives in the view, the renderers ask for it. Deliberately shaped like
-// usePageListings, so a page has one idiom rather than two.
-export function providePageFilter(): PageFilter {
+// usePageListings, so a page has one idiom rather than two. A page that hides
+// its filter passes enabled false, and nothing narrows it.
+export function providePageFilter(enabled: MaybeRefOrGetter<boolean> = true): PageFilter {
   const state = ref<PageFilterState>(emptyPageFilter())
-  const isActive = computed(() => isPageFilterActive(state.value))
+  const isActive = computed(() => toValue(enabled) && isPageFilterActive(state.value))
 
   function setName(name: string) {
     state.value = { ...state.value, name }

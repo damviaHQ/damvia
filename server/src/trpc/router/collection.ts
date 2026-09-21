@@ -16,7 +16,8 @@ import { TRPCError } from "@trpc/server"
 import { Brackets, ILike, In, IsNull, Not } from "typeorm"
 import { z } from "zod"
 import { AssetFolder } from "../../entity/asset-folder"
-import { Collection } from "../../entity/collection"
+import { ACTION_BAR_ACTIONS, Collection } from "../../entity/collection"
+import { Group } from "../../entity/group"
 import { CollectionFile } from "../../entity/collection-file"
 import { RecordAttribute } from "../../entity/record-attribute"
 import { User, UserRole } from "../../entity/user"
@@ -30,6 +31,7 @@ import {
 	userCollectionFilesQuery,
 	userCollectionsQuery
 } from "../../services/collection"
+import { formatActionBar, resetDescendantActionBars } from "../../services/collection-action-bar"
 import { loadViewableMetadata, ViewableMetadata } from "../../services/file-metadata"
 import { loadVariantGroups, VariantGroupSummary } from "../../services/variant-grouping"
 import { applySearchOrder, buildRangeQuery, buildSearchQuery, loadSearchContext, onePerFile, searchFacets } from "../../services/search"
@@ -198,6 +200,14 @@ export async function formatCollectionFile({ file, recordAttributes, metadata, v
 		} : null,
 	}
 }
+
+const actionBarRule = z.object({
+	mode: z.enum(['everyone', 'only', 'except', 'nobody']),
+	roles: z.enum(UserRole).array().max(4),
+	groupIds: z.uuid().array().max(200),
+	userIds: z.uuid().array().max(500),
+})
+const actionBarSettings = z.partialRecord(z.enum(ACTION_BAR_ACTIONS), actionBarRule)
 
 const searchScope = z.enum(['all', 'current', 'current_with_sub']).optional().nullable()
 const RANGE_RESULTS = 60
@@ -376,14 +386,17 @@ export default router({
 
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 			const metadata = await loadViewableMetadata(collection.files.map((file) => file.assetFileId))
-			return formatCollection({
-				collection,
-				user: ctx.user,
-				userVisibleCollections,
-				recordAttributes,
-				metadata,
-				sampleFiles,
-			})
+			return {
+				...await formatCollection({
+					collection,
+					user: ctx.user,
+					userVisibleCollections,
+					recordAttributes,
+					metadata,
+					sampleFiles,
+				}),
+				...await formatActionBar(collection, ctx.user),
+			}
 		}),
 	lastAddedFiles: publicProcedure
 		.use(authMiddleware(userApproved))
@@ -545,6 +558,8 @@ export default router({
 				draft: z.boolean().optional(),
 				hasThumbnail: z.boolean().optional(),
 				limitedToGroupIds: z.string().array().optional(),
+				actionBar: actionBarSettings.nullable().optional(),
+				resetDescendantActionBars: z.boolean().optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
@@ -572,9 +587,15 @@ export default router({
 			if (collection.canEditLimitedToGroupIds && input.limitedToGroupIds !== undefined) {
 				collection.limitedToGroupIds = input.limitedToGroupIds
 			}
+			if (input.actionBar !== undefined) {
+				collection.actionBar = input.actionBar
+			}
 
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
+				if (input.resetDescendantActionBars) {
+					await resetDescendantActionBars(em, collection)
+				}
 				const children = await em.getTreeRepository(Collection).findDescendants(collection)
 				await em.getRepository(Collection).update({
 					id: In(children.map((child) => child.id).filter((childId) => childId !== collection.id)),
@@ -589,7 +610,35 @@ export default router({
 					await mainS3().removeObjects(mainS3Bucket(), [collection.thumbnailStorageKey])
 				}
 			})
-			return formatCollection({ collection, user: ctx.user })
+			return {
+				...await formatCollection({ collection, user: ctx.user }),
+				...await formatActionBar(collection, ctx.user),
+			}
+		}),
+	// Whom an editor can name in the action bar settings. Owners are often
+	// members, who cannot list groups or users anywhere else.
+	actionBarAudience: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.uuid())
+		.query(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input }).getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			}
+			const [groups, users] = await Promise.all([
+				dataSource.getRepository(Group).find({ order: { name: 'ASC' } }),
+				dataSource.getRepository(User).find({
+					where: ctx.user.role === UserRole.ADMIN ? { approved: true } : { approved: true, regionId: ctx.user.regionId },
+					select: { id: true, name: true, email: true },
+					order: { name: 'ASC' },
+				}),
+			])
+			return {
+				groups: groups.map((group) => ({ id: group.id, name: group.name })),
+				users: users.map((user) => ({ id: user.id, name: user.name, email: user.email })),
+			}
 		}),
 	presignedThumbnailUploadUrl: publicProcedure
 		.use(authMiddleware(userApproved))

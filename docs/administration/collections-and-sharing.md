@@ -124,6 +124,23 @@ In list view, the column headers sort the rows. Clicking a header sorts ascendin
 
 This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, use the magnifier in the same action bar, which opens the search scoped to that collection. The search has its own facets, counted across the whole library — see [Products and PIM](./records.md#configure-record-fields).
 
+## Choose who sees the action bar tools
+
+**Action bar** in the collection settings decides who sees three tools above the collection: **Search in collection**, **Filter** and **Display preferences**. Each tool takes one of four choices:
+
+| Choice | Who sees the tool |
+|---|---|
+| **Everyone** | Everyone who can open the collection. This is the default. |
+| **Only…** | The roles, groups and people you pick. |
+| **Everyone except…** | Everyone but the roles, groups and people you pick. |
+| **No one** | Nobody but admins and the owner. |
+
+Admins and the collection's owner always see every tool, so the people who set the rules never lose them. When a tool is hidden from someone, its tooltip tells them so with **Hidden for some people**. Only admins and the owner can see or change the rules; readers only get the tools they are allowed.
+
+A sub-collection starts on **Same as parent** and follows the nearest collection above it that has its own setting. It keeps following when it is moved, or when the synchronisation creates new sub-collections. Choose **Custom** to give one collection its own setting; the sub-collections under it then follow that one. When some sub-collections already have their own setting, **Apply to all sub-collections** puts them back on **Same as parent** when you save.
+
+Hiding a tool changes what the page shows, not what people can reach. A hidden **Filter** stops narrowing the page. The search behind the magnifier still opens from its address, and it only ever returns what that person can already see. **Share collection** is not in the list: only admins and the owner can share, and they always see it.
+
 ## Variants show as one card in search
 
 When an asset type groups its variants, search shows the formats, languages and durations of one creative as a single stacked card that opens on every version, with **Download all**. Collections and pages keep listing every file. See [Variants](./variants.md).

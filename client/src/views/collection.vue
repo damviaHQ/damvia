@@ -28,6 +28,7 @@ import { trpc } from "@/services/server.ts"
 import { providePageFilter } from "@/composables/usePageFilter"
 import { providePageListings } from "@/composables/usePageListings"
 import { useGlobalStore } from "@/stores/globalStore"
+import { isRestricted, type ActionBarAction } from "@/utils/actionBar"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   ChevronRight,
@@ -105,7 +106,8 @@ const { files: shownFiles, collections: shownCollections } = providePageListings
 // values are not: they describe the collection being read, so they start empty
 // on the next one. The view is reused from one collection to the next, so the
 // reset has to be asked for.
-const pageFilter = providePageFilter()
+// Hidden filters must not keep narrowing the page from a value typed elsewhere.
+const pageFilter = providePageFilter(computed(() => collection.value?.visibleActions?.filter ?? true))
 watch(() => route.params.id, () => pageFilter.clear())
 
 // A page block can fix its own layout, which quietly wins over the reader's
@@ -115,6 +117,19 @@ const layoutLocked = computed(() =>
     ["collections", "files", "last_files"].includes(block.type) && !!block.data?.layout
   )
 )
+
+// The collection settings decide who sees which action. Editors always see
+// all of them, and are told when others do not.
+function shows(action: ActionBarAction) {
+  return collection.value?.visibleActions?.[action] ?? true
+}
+function restricted(action: ActionBarAction) {
+  const actionBar = collection.value?.actionBar
+  return !!actionBar && isRestricted((actionBar.own ?? actionBar.inherited)[action])
+}
+function actionTitle(action: ActionBarAction, title: string) {
+  return restricted(action) ? `${title} · Hidden for some people` : title
+}
 
 const collectionPath = computed(() => {
   if (!collection.value) {
@@ -240,15 +255,15 @@ function removeSelectedFiles() {
             <FilePenLine class="text-neutral-500 hover:text-neutral-800" />
           </router-link>
         </Button>
-        <Button aria-label="Search in this collection" title="Search in this collection" as-child type="button"
+        <Button v-if="shows('search')" aria-label="Search in this collection" :title="actionTitle('search', 'Search in this collection')" as-child type="button"
           variant="ghost" size="icon-sm">
           <router-link :to="{ name: 'search', query: { from_collection: collection.id, search_scope: 'current_with_sub' } }">
             <Search class="text-neutral-500 hover:text-neutral-800" />
           </router-link>
         </Button>
-        <PageFilterToggle :files="shownFiles" />
-        <DisplayPreferences :files="shownFiles" :collections="shownCollections" :layout-locked="layoutLocked" />
-        <Button aria-label="Share collection" title="Share collection" v-if="collection.canEdit" @click="isShareModalOpen = true" type="button" variant="ghost"
+        <PageFilterToggle v-if="shows('filter')" :files="shownFiles" :restricted="restricted('filter')" />
+        <DisplayPreferences v-if="shows('display')" :files="shownFiles" :collections="shownCollections" :layout-locked="layoutLocked" :restricted="restricted('display')" />
+        <Button aria-label="Share collection" :title="actionTitle('share', 'Share collection')" v-if="collection.canEdit && shows('share')" @click="isShareModalOpen = true" type="button" variant="ghost"
           size="icon-sm">
           <Link class="text-neutral-500 hover:text-neutral-800" />
         </Button>
@@ -256,7 +271,7 @@ function removeSelectedFiles() {
           :collection="collection" />
       </div>
     </div>
-    <PageFilterBar :files="shownFiles" :collections="shownCollections" />
+    <PageFilterBar v-if="shows('filter')" :files="shownFiles" :collections="shownCollections" />
     <CollectionRenderLayout :key="collection.id" :collection="collection"
       :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
     <CollectionDialogEdit v-model="isEditCollectionModalOpen" :collection="collection" />

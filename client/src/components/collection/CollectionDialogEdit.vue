@@ -28,6 +28,8 @@ import { computed, ref, toRefs, watch } from "vue"
 import { useRouter } from "vue-router"
 import Treeselect from "vue3-treeselect-ts"
 import SelectGroupInput from "@/components/SelectGroupInput.vue";
+import CollectionActionBarSettings from "@/components/collection/CollectionActionBarSettings.vue"
+import { editableSettings, type ActionBarAction, type ActionBarRule } from "@/utils/actionBar"
 
 const props = defineProps<{
   collection: RouterOutput["collection"]["findById"] | RouterOutput["collection"]["treeAdmin"][number];
@@ -50,7 +52,12 @@ const form = ref<{
   thumbnailURL?: string | null;
   limitedToGroupIds?: string[];
   parentId?: string | null;
-}>({})
+  actionBarCustom: boolean;
+  actionBarRules: Record<ActionBarAction, ActionBarRule>;
+  resetDescendantActionBars: boolean;
+}>({ actionBarCustom: false, actionBarRules: editableSettings(null), resetDescendantActionBars: false })
+// Only the collection page asks for the rules; the admin list does not.
+const actionBar = computed(() => "actionBar" in collection.value ? collection.value.actionBar : null)
 function updateForm() {
   form.value = {
     name: collection.value.name,
@@ -59,6 +66,9 @@ function updateForm() {
     thumbnailURL: collection.value.thumbnailURL,
     limitedToGroupIds: collection.value.limitedToGroupIds,
     parentId: collection.value.parentId,
+    actionBarCustom: !!actionBar.value?.own,
+    actionBarRules: editableSettings(actionBar.value?.own ?? actionBar.value?.inherited),
+    resetDescendantActionBars: false,
   }
 }
 
@@ -146,6 +156,10 @@ async function onSubmit() {
       hasThumbnail: !!form.value.thumbnailURL,
       limitedToGroupIds: form.value.limitedToGroupIds,
     }
+    if (actionBar.value) {
+      updateData.actionBar = form.value.actionBarCustom ? form.value.actionBarRules : null
+      updateData.resetDescendantActionBars = form.value.actionBarCustom && form.value.resetDescendantActionBars
+    }
 
     if (!props.collection.synchronized) {
       updateData.name = form.value.name
@@ -174,7 +188,7 @@ async function onSubmit() {
     <DialogContent class="sm:max-w-[640px] collection-edit-dialog gap-6">
       <DialogHeader>
         <DialogTitle>Edit collection</DialogTitle>
-        <DialogDescription>Manage collection details, visibility and appearance.</DialogDescription>
+        <DialogDescription>Manage collection details, visibility, action bar and appearance.</DialogDescription>
       </DialogHeader>
 
       <section class="grid gap-4" aria-labelledby="collection-details-heading">
@@ -213,6 +227,11 @@ async function onSubmit() {
           <SelectGroupInput v-model="form.limitedToGroupIds" id="limitedToGroupIds" placeholder="Select groups..." />
         </FieldGroup>
       </section>
+
+      <CollectionActionBarSettings v-if="actionBar" :collection-id="collection.id"
+        :inherited="actionBar.inherited" :inherited-from="actionBar.inheritedFrom" :descendant-overrides="actionBar.descendantOverrides"
+        v-model:custom="form.actionBarCustom" v-model:rules="form.actionBarRules"
+        v-model:reset-descendants="form.resetDescendantActionBars" />
 
       <section class="grid gap-4" aria-labelledby="collection-appearance-heading">
         <h3 id="collection-appearance-heading" class="text-sm font-semibold">Appearance</h3>
