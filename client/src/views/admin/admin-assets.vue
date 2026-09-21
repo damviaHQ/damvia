@@ -48,7 +48,7 @@ import {
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Copyright, FileCog, Folder, GripVertical, Server } from "lucide-vue-next"
+import { Copyright, FileCog, Folder, GripVertical, Loader2, Server } from "lucide-vue-next"
 import { computed, ref, watch } from "vue"
 import { useRoute } from "vue-router"
 
@@ -58,6 +58,7 @@ const route = useRoute()
 const queryClient = useQueryClient()
 const toast = useGlobalToast()
 const isEditModalOpen = ref(false)
+const isSaving = ref(false)
 const NO_ASSET_TYPE = "NO_ASSET_TYPE"
 const NO_LICENSE = "NO_LICENSE"
 const itemsToDisplay = 3
@@ -136,6 +137,10 @@ const visibleItems = computed(() => {
 })
 
 function onSubmit() {
+  if (isSaving.value) {
+    return
+  }
+  isSaving.value = true
   trpc.asset.update
     .mutate({
       id: asset.value.id,
@@ -149,6 +154,9 @@ function onSubmit() {
       isEditModalOpen.value = false
     })
     .catch((error) => toast.error((error as Error).message))
+    .finally(() => {
+      isSaving.value = false
+    })
 }
 
 function onAssetTypeChange(value: string) {
@@ -275,7 +283,10 @@ function getFileExtension(filename: string): string {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="button" @click="onSubmit">Save</Button>
+            <Button type="button" :disabled="isSaving" @click="onSubmit">
+              <Loader2 v-if="isSaving" class="w-4 h-4 mr-2 animate-spin" />
+              {{ isSaving ? "Saving…" : "Save" }}
+            </Button>
           </div>
           <div class="asset__folder-container flex flex-wrap gap-5 mb-5">
             <div v-for="folder in asset.children" :key="folder.id" class="asset__folder">
