@@ -54,7 +54,7 @@ const toast = useGlobalToast()
 const parsedData = ref<Record<string, any>[]>([])
 const columns = ref<string[]>([])
 const selectedColumns = ref<{ [key: string]: boolean }>({})
-const primaryKeyName = ref<string>("_placeholder")
+const keyColumnName = ref<string>("_placeholder")
 const existingColumns = ref<string[]>([])
 const comparisonResults = ref<
   {
@@ -80,7 +80,7 @@ const handleFileUpload = async (e: Event) => {
     parsedData.value = []
     comparisonResults.value = []
     selectedOverrides.value = {}
-    primaryKeyName.value = "_placeholder"
+    keyColumnName.value = "_placeholder"
     primaryKeyError.value = ""
 
     const parseConfig = {
@@ -104,8 +104,8 @@ const filteredColumnsForPrimaryKey = computed(() => {
 })
 
 watchEffect(() => {
-  if (primaryKeyName.value && !selectedColumns.value[primaryKeyName.value]) {
-    primaryKeyName.value = ""
+  if (keyColumnName.value && !selectedColumns.value[keyColumnName.value]) {
+    keyColumnName.value = ""
   }
 })
 
@@ -124,8 +124,8 @@ const previewData = computed(() => {
 })
 
 const compareCsvMutation = useMutation({
-  mutationFn: (csvData: { primaryKeyName: string; data: Record<string, string>[] }) => {
-    return trpc.pim.compareCsv.mutate(csvData)
+  mutationFn: (csvData: { keyColumnName: string; data: Record<string, string>[] }) => {
+    return trpc.record.compareCsv.mutate(csvData)
   },
   onSuccess: (response) => {
     comparisonResults.value = response
@@ -138,7 +138,7 @@ const compareCsvMutation = useMutation({
 const showComparisonDialog = ref(false)
 
 const handleCsvCompare = async () => {
-  if (!primaryKeyName.value || primaryKeyName.value === "_placeholder") {
+  if (!keyColumnName.value || keyColumnName.value === "_placeholder") {
     primaryKeyError.value = "Please select a valid primary key column."
     toast.error(primaryKeyError.value)
     return
@@ -160,7 +160,7 @@ const handleCsvCompare = async () => {
 
   try {
     await compareCsvMutation.mutateAsync({
-      primaryKeyName: primaryKeyName.value,
+      keyColumnName: keyColumnName.value,
       data: filteredData,
     })
   } finally {
@@ -173,12 +173,12 @@ const closeComparisonDialog = () => {
 }
 
 const importCsvMutation = useMutation({
-  mutationFn: (csvData: { primaryKeyName: string; data: Record<string, string>[] }) => {
-    return trpc.pim.importCsv.mutate(csvData)
+  mutationFn: (csvData: { keyColumnName: string; data: Record<string, string>[] }) => {
+    return trpc.record.importCsv.mutate(csvData)
   },
   onSuccess: () => {
     toast.success("Records successfully imported")
-    router.push("/admin/products")
+    router.push({ name: 'admin-records' })
   },
   onError: (error) => {
     toast.error(`Import failed: ${(error as Error).message}`)
@@ -186,7 +186,7 @@ const importCsvMutation = useMutation({
 })
 
 const handleCsvImport = () => {
-  if (!primaryKeyName.value) {
+  if (!keyColumnName.value) {
     primaryKeyError.value = "Please select a primary key column."
     toast.error(primaryKeyError.value)
     return
@@ -199,7 +199,7 @@ const handleCsvImport = () => {
       (result) =>
         result.status === "new" ||
         (result.status === "changed" &&
-          (overrideAll.value || selectedOverrides.value[result.new[primaryKeyName.value]]))
+          (overrideAll.value || selectedOverrides.value[result.new[keyColumnName.value]]))
     )
     .map((result) => {
       const filteredRow: Record<string, string> = {}
@@ -209,7 +209,7 @@ const handleCsvImport = () => {
           overrideAll.value ||
           (result.status === "changed" &&
             (result.differences[key] ||
-              selectedOverrides.value[result.new[primaryKeyName.value]]))
+              selectedOverrides.value[result.new[keyColumnName.value]]))
         ) {
           filteredRow[key] = result.new[key]
         } else {
@@ -220,7 +220,7 @@ const handleCsvImport = () => {
     })
 
   importCsvMutation.mutate(
-    { primaryKeyName: primaryKeyName.value, data: dataToImport },
+    { keyColumnName: keyColumnName.value, data: dataToImport },
     {
       onSettled: () => {
         isImporting.value = false
@@ -285,7 +285,7 @@ const isNewColumn = (column: string) => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="row in previewData" :key="row[primaryKeyName]">
+            <TableRow v-for="row in previewData" :key="row[keyColumnName]">
               <TableCell v-for="column in filteredColumnsForPrimaryKey" :key="column">
                 {{ row[column] }}
               </TableCell>
@@ -302,7 +302,7 @@ const isNewColumn = (column: string) => {
           </p>
 
           <div class="w-full max-w-xs">
-            <Select v-model="primaryKeyName" @update:model-value="primaryKeyError = ''">
+            <Select v-model="keyColumnName" @update:model-value="primaryKeyError = ''">
               <SelectTrigger aria-labelledby="primary-key-heading" :aria-invalid="!!primaryKeyError || undefined"
                 :aria-describedby="primaryKeyError ? 'primary-key-error' : undefined">
                 <SelectValue placeholder="Select the Primary Key column" />
@@ -337,7 +337,7 @@ const isNewColumn = (column: string) => {
           <p class="text-body admin-text-secondary">
             Before saving compare your data with the existing record database.
           </p>
-          <Button v-if="columns.length > 0 && parsedData.length > 0" :disabled="primaryKeyName === ''" type="button"
+          <Button v-if="columns.length > 0 && parsedData.length > 0" :disabled="keyColumnName === ''" type="button"
             @click="handleCsvCompare" class="mt-4 w-fit">
             Compare now
           </Button>
@@ -387,7 +387,7 @@ const isNewColumn = (column: string) => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow v-for="result in comparisonResults" :key="result.new[primaryKeyName]" :class="{
+                  <TableRow v-for="result in comparisonResults" :key="result.new[keyColumnName]" :class="{
                     'new-entry': result.status === 'new',
                     'duplicate-entry': result.status === 'duplicate',
                   }">
@@ -395,11 +395,11 @@ const isNewColumn = (column: string) => {
                       comparisonResults.some((result) => result.status === 'changed')
                     ">
                       <Checkbox v-if="result.status === 'changed'"
-                        v-model="selectedOverrides[result.new[primaryKeyName]]" :disabled="overrideAll"
-                        :aria-label="`Override ${result.new[primaryKeyName]}`" />
+                        v-model="selectedOverrides[result.new[keyColumnName]]" :disabled="overrideAll"
+                        :aria-label="`Override ${result.new[keyColumnName]}`" />
                     </TableCell>
                     <TableCell v-for="column in filteredColumnsForPrimaryKey" :key="column">
-                      <div v-if="result.status !== 'new' && column !== primaryKeyName" class="existing-value">
+                      <div v-if="result.status !== 'new' && column !== keyColumnName" class="existing-value">
                         {{ result.existing[column] }}
                       </div>
                       <div class="new-value" :class="{

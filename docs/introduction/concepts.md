@@ -1,9 +1,9 @@
 ---
 title: Core concepts
-description: Understand sources, assets, collections, pages, products and access rules before configuring an instance.
+description: Understand sources, assets, collections, pages, records and access rules before configuring an instance.
 sidebar:
   order: 2
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
 Damvia separates the files it discovers from the ways those files are organised and presented. That distinction explains most administrative decisions and prevents accidental assumptions about licences, copies and deletion.
@@ -49,11 +49,11 @@ A page arranges banners, text, pictures, videos, collections, files and latest-f
 
 A block that points to a library file displays that asset with its existing access and licence rules. A picture or video uploaded directly into the page is editorial media in Damvia's main bucket; it is not a library asset and has no asset licence. A block never adds a file to the collection behind the page. See [Menu and pages](../administration/menu-and-pages.md).
 
-## Products enrich assets
+## Records enrich assets
 
-Products are imported from CSV. Damvia applies `PRODUCT_MATCHING_REGEX` to filenames, links a matching file to its product key and can record an optional view such as front, side or detail.
+Records describe what files are about: products, events, venues. They are imported from CSV and named by an administrator. Damvia applies `PRODUCT_MATCHING_REGEX` to filenames, links a matching file to its record key and can record an optional view such as front, side or detail.
 
-Selected product columns become searchable text, filters or displayed metadata. This enriches the asset; it does not move or rename the source file. See [Products and PIM](../administration/products-and-pim.md).
+Selected record columns become searchable text, filters or displayed metadata. This enriches the asset; it does not move or rename the source file. See [Records](../administration/records.md).
 
 ## People receive access through several rules
 

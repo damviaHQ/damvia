@@ -3,7 +3,7 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
@@ -76,14 +76,14 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 | `GOOGLE_DRIVE_FOLDER_ID` | unset | Id of the folder to sync; it becomes the single top-level asset folder. |
 | `GOOGLE_DRIVE_IMPERSONATE` | unset | Optional Workspace user the service account acts as, with domain-wide delegation. |
 
-### PIM linking
+### Record linking
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PRODUCT_MATCHING_REGEX` | unset (job logs an error and skips) | Regex applied to each asset file name every 5 minutes. Capture group 1 is the product key, optional group 2 the product view. Example: `^(.{6}-\d{3})(?:\.(\d{2}))?`. |
-| `PIM_PRODUCT_VIEW` | unset | The product view code (group 2 above) whose thumbnail represents the product in the admin product list, for example `00`. |
+| `PRODUCT_MATCHING_REGEX` | unset (job logs an error and skips) | Regex applied to each asset file name every 5 minutes. Capture group 1 is the record key, optional group 2 the record view. The name is kept for compatibility; records were called products before. Example: `^(.{6}-\d{3})(?:\.(\d{2}))?`. |
+| `PIM_PRODUCT_VIEW` | unset | The record view code (group 2 above) whose thumbnail represents the record in the admin record list, for example `00`. |
 
-See [Products and PIM](../administration/products-and-pim.md).
+See [Records](../administration/records.md).
 
 ## Client
 

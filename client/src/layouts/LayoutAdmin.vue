@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { RouterOutput, trpc } from "@/services/server.ts"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { useGlobalStore } from "@/stores/globalStore"
 import { formatStorage } from "@/utils/fileSize"
 import { useQuery } from "@tanstack/vue-query"
@@ -43,13 +44,14 @@ import PathBreadcrumb, { type PathBreadcrumbItem } from '@/components/navigation
 import '@/styles/admin.css'
 provide('damvia-admin-theme', true)
 const route = useRoute()
+const recordLabel = useRecordLabel()
 const router = useRouter()
 const mobileOpen = ref(false)
 watch(() => route.fullPath, () => { mobileOpen.value = false })
 // Child routes highlight no sidebar entry, so the breadcrumb is their only locator.
 const adminParents: Record<string, string> = {
-  'admin-product-import': 'admin-products',
-  'admin-product-attributes': 'admin-products',
+  'admin-record-import': 'admin-records',
+  'admin-record-attributes': 'admin-records',
   'admin-page': 'admin-pages',
 }
 const routeTitle = (name: string) => String(router.resolve({ name }).meta.title ?? name)
@@ -176,20 +178,24 @@ const storageLevel = computed(() => {
               Licenses
             </router-link>
           </div>
-          <!-- Product Information Management -->
+          <!-- Data enrichment -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
             <div class="menu-section-title">Data Enrichment</div>
-            <router-link :to="{ name: 'admin-products' }" class="menu-item">
+            <router-link :to="{ name: 'admin-records' }" class="menu-item">
               <Package class="w-4 h-4 mr-2" />
-              Records
+              {{ recordLabel.plural.value }}
             </router-link>
-            <router-link :to="{ name: 'admin-product-attributes' }" class="menu-item">
+            <router-link :to="{ name: 'admin-record-attributes' }" class="menu-item">
               <Blocks class="w-4 h-4 mr-2" />
               Attributes
             </router-link>
             <router-link :to="{ name: 'admin-folder-rules' }" class="menu-item">
               <FolderCog class="w-4 h-4 mr-2" />
               Folder rules
+            </router-link>
+            <router-link :to="{ name: 'admin-enrichment-settings' }" class="menu-item">
+              <Settings class="w-4 h-4 mr-2" />
+              Settings
             </router-link>
           </div>
         </div>

@@ -27,7 +27,7 @@ import { AssetFolder } from "./asset-folder"
 import { AssetType } from "./asset-type"
 import { CollectionFile } from "./collection-file"
 import { License } from "./license"
-import { Product } from "./product"
+import { DataRecord } from "./data-record"
 
 export enum AssetFileStatus {
 	CREATING = 'creating',
@@ -96,13 +96,13 @@ export class AssetFile {
 	license: License | null
 
 	@Column({ type: 'varchar', nullable: true })
-	productId: string | null
+	recordId: string | null
 
-	@ManyToOne(() => Product, (product) => product.assetFiles)
-	product: Product | null
+	@ManyToOne(() => DataRecord, (record) => record.assetFiles)
+	record: DataRecord | null
 
 	@Column({ type: 'varchar', nullable: true })
-	productView: string | null
+	recordView: string | null
 
 	@CreateDateColumn()
 	createdAt: Date

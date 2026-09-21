@@ -215,9 +215,9 @@ const columns = computed<ColumnDef<typeof features, File, any>[]>(() => [
     header: "Format",
     cell: (info) => info.getValue(),
   }),
-  columnHelper.accessor((row) => row.productView, {
-    id: "product_view",
-    header: "Product view",
+  columnHelper.accessor((row) => row.recordView, {
+    id: "record_view",
+    header: "Record view",
     cell: (info) => info.getValue(),
   }),
   columnHelper.accessor((row) => row.license?.name, {
@@ -226,10 +226,10 @@ const columns = computed<ColumnDef<typeof features, File, any>[]>(() => [
     cell: (info) => info.getValue(),
     enableHiding: true,
   }),
-  ...displayGroup.value.properties.filter(property => property.id.startsWith("product_attribute.")).map(attribute =>
+  ...displayGroup.value.properties.filter(property => property.id.startsWith("record_attribute.")).map(attribute =>
     columnHelper.accessor(
       (row) =>
-        row.product?.attributes?.find((current: any) => `product_attribute.${current.id}` === attribute.id)
+        row.record?.attributes?.find((current: any) => `record_attribute.${current.id}` === attribute.id)
           ?.value,
       {
         id: attribute.id,

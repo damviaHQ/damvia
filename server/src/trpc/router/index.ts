@@ -12,6 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { Region } from "../../entity/region"
 import { dataSource, passwordLessAuth } from "../../env"
 import { publicProcedure, router } from "../index"
@@ -28,8 +29,8 @@ import groupRouter from "./group"
 import licenseRouter from "./license"
 import menuItemRouter from "./menu-item"
 import pageRouter from "./page"
-import pimRouter from "./pim"
-import productAttributeRouter from "./product-attributes"
+import recordRouter from "./record"
+import recordAttributeRouter from "./record-attribute"
 import regionRouter from "./region"
 import settingsRouter from "./settings"
 import userRouter from "./user"
@@ -47,18 +48,20 @@ const appRouter = router({
 	favorite: favoriteRouter,
 	license: licenseRouter,
 	download: downloadRouter,
-	pim: pimRouter,
-	productAttribute: productAttributeRouter,
+	record: recordRouter,
+	recordAttribute: recordAttributeRouter,
 	menuItem: menuItemRouter,
 	page: pageRouter,
 	settings: settingsRouter,
 	dashboard: dashboardRouter,
 	env: publicProcedure.query(async () => {
 		const regions = await dataSource.getRepository(Region).find()
+		const enrichment = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })
 		return {
 			passwordLessAuthentication: passwordLessAuth(),
 			appName: process.env.APP_NAME ?? 'Damvia - Open Source Digital Asset Management',
-			regions: regions.map((region) => ({ id: region.id, name: region.name }))
+			regions: regions.map((region) => ({ id: region.id, name: region.name })),
+			recordLabel: { singular: enrichment.recordLabelSingular, plural: enrichment.recordLabelPlural },
 		}
 	})
 })

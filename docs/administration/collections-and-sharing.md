@@ -110,7 +110,7 @@ The bar narrows what the page already draws. It never fetches anything and never
 |---|---|
 | **Name** | Part of a name, ignoring case, on the files **and** the sub-collections shown on the page. |
 | **Asset type**, **File type**, **Format** | The values present on the page, with a count beside each. |
-| Each **product attribute** | Its values on the page, for attributes marked viewable. |
+| Each **record attribute** | Its values on the page, for attributes marked viewable. |
 
 Several values inside one filter widen the result; values in different filters narrow it together. A count says how many items picking that value would show, so the other values never read zero. A filter whose page holds a single value is not offered, and only **Name** touches sub-collections: a chip on **Format** hides none of them.
 

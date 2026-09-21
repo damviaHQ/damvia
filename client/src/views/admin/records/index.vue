@@ -34,6 +34,7 @@ import {
   PaginationPrev,
 } from "@/components/ui/pagination"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { trpc } from "@/services/server.ts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { columnVisibilityFeature, createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table"
@@ -49,6 +50,7 @@ import {
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 
 const toast = useGlobalToast()
+const recordLabel = useRecordLabel()
 const currentPage = ref(1)
 const pageSize = ref(200)
 const queryClient = useQueryClient()
@@ -66,11 +68,11 @@ const showFilters = ref(false)
 const isSaving = ref(false)
 const editorPosition = ref<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
 
-// Query to fetch products data
+// Query to fetch records data
 const { status, data, error, refetch } = useQuery({
-  queryKey: ["products", currentPage, pageSize, activeFilter],
+  queryKey: ["records", currentPage, pageSize, activeFilter],
   queryFn: () =>
-    trpc.pim.listProducts.query({
+    trpc.record.list.query({
       page: currentPage.value,
       size: pageSize.value,
       columnFilter: activeFilter.value || undefined,
@@ -101,7 +103,7 @@ function getNestedValue(obj: any, path: string) {
 
 // Function to check if a cell is editable
 function isEditableCell(columnId: string) {
-  return columnId !== "thumbnailURL" && columnId !== "productKey"
+  return columnId !== "thumbnailURL" && columnId !== "recordKey"
 }
 
 // Create column helper for TanStack Table
@@ -110,9 +112,9 @@ const columnHelper = createColumnHelper<typeof features, any>()
 
 // Define columns for the table
 const columns = computed(() => {
-  if (!data.value || !data.value.products.length) return []
+  if (!data.value || !data.value.records.length) return []
 
-  const primaryKey = data.value.products[0].primaryKeyName
+  const primaryKey = data.value.records[0].keyColumnName
   const result = [
     columnHelper.accessor("thumbnailURL", {
       header: "Picture",
@@ -122,14 +124,14 @@ const columns = computed(() => {
         value: info.getValue(),
       }),
     }),
-    columnHelper.accessor("productKey", {
-      header: data.value.products[0].primaryKeyName,
-      id: "productKey",
+    columnHelper.accessor("recordKey", {
+      header: data.value.records[0].keyColumnName,
+      id: "recordKey",
     }),
   ]
 
   // Add metadata columns
-  Object.keys(data.value.products[0].metaData)
+  Object.keys(data.value.records[0].metaData)
     .filter((key) => key !== primaryKey)
     .forEach((key) => {
       result.push(
@@ -151,7 +153,7 @@ const columns = computed(() => {
 const table = useTable({
   features,
   get data() {
-    return data.value?.products || []
+    return data.value?.records || []
   },
   get columns() {
     return columns.value
@@ -171,7 +173,7 @@ const activeCellLabel = computed(() => {
   const { rowIndex, columnId } = activeCell.value
   const column = table.getAllFlatColumns().find(col => col.id === columnId)
   const row = table.getRowModel().rows[rowIndex]
-  return `Edit ${column?.columnDef.header ?? columnId} for record ${row?.original.productKey ?? rowIndex + 1}`
+  return `Edit ${column?.columnDef.header ?? columnId} for record ${row?.original.recordKey ?? rowIndex + 1}`
 })
 
 // Save cell value after editing
@@ -182,9 +184,9 @@ function saveCellValue() {
   const row = table.getRowModel().rows[rowIndex]
   if (!row) return
 
-  const product = row.original
+  const record = row.original
   const metaDataKey = columnId.replace("metaData.", "")
-  const oldValue = getNestedValue(product, columnId)
+  const oldValue = getNestedValue(record, columnId)
 
   // Skip if no changes
   if (editingValue.value === oldValue) {
@@ -196,17 +198,17 @@ function saveCellValue() {
   const savedCell = activeCell.value
   try {
     isSaving.value = true
-    trpc.pim.updateProduct.mutate({
-      id: product.id,
+    trpc.record.update.mutate({
+      id: record.id,
       metaData: {
-        ...product.metaData,
+        ...record.metaData,
         [metaDataKey]: editingValue.value,
       },
     }).then(() => {
       toast.success("Record updated successfully")
-      queryClient.invalidateQueries({ queryKey: ["products"] })
+      queryClient.invalidateQueries({ queryKey: ["records"] })
     }).catch((error) => {
-      console.error("Error updating product:", error)
+      console.error("Error updating record:", error)
       toast.error("Failed to update record")
     }).finally(() => {
       isSaving.value = false
@@ -216,7 +218,7 @@ function saveCellValue() {
       }
     })
   } catch (error) {
-    console.error("Error updating product:", error)
+    console.error("Error updating record:", error)
     toast.error("Failed to update record")
     isSaving.value = false
     activeCell.value = null
@@ -386,16 +388,16 @@ function clearFilters() {
   refetch()
 }
 
-// Mutation to remove all products
-const removeAllProducts = useMutation({
-  mutationFn: () => trpc.pim.removeAllProducts.mutate(),
+// Mutation to remove all records
+const removeAllRecords = useMutation({
+  mutationFn: () => trpc.record.removeAll.mutate(),
   onError: (error: Error) => { deleteError.value = error.message },
   onMutate: () => {
     isDeleting.value = true
     deleteError.value = ''
   },
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["products"] })
+    queryClient.invalidateQueries({ queryKey: ["records"] })
     toast.success("All records removed successfully")
     showDeleteDialog.value = false
   },
@@ -548,11 +550,11 @@ onUnmounted(() => {
   <div v-else-if="status === 'error'" class="admin-error" role="alert">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="admin-page admin-resource-page admin-products">
-    <div class="admin-product-toolbar">
+  <div v-else-if="status === 'success'" class="admin-page admin-resource-page admin-records">
+    <div class="admin-record-toolbar">
       <AdminPageHeader>
-        <Button as-child variant="outline"><router-link :to="{ name: 'admin-product-attributes' }"><Blocks class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />Attributes</router-link></Button>
-        <Button v-if="data?.products.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
+        <Button as-child variant="outline"><router-link :to="{ name: 'admin-record-attributes' }"><Blocks class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />Attributes</router-link></Button>
+        <Button v-if="data?.records.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
           class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
           <Filter class="w-[var(--dv-icon-default)] h-[var(--dv-icon-default)]" />
           {{ showFilters ? "Hide Filters" : "Show Filters" }}
@@ -562,21 +564,21 @@ onUnmounted(() => {
           <FilterX class="w-[var(--dv-icon-default)] h-[var(--dv-icon-default)]" />
           Clear Filters
         </Button>
-        <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-product-import' }"><FileUp />Import CSV</router-link></Button>
+        <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-record-import' }"><FileUp />Import CSV</router-link></Button>
         <DropdownMenu v-model:open="isDropdownOpen">
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Record actions">
+            <Button variant="ghost" size="icon" aria-label="Actions">
               <EllipsisVertical class="h-[var(--dv-icon-default)] w-[var(--dv-icon-default)]" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem :disabled="!data?.products.length" @select="deleteError = ''; showDeleteDialog = true">
-              <PackageX class="mr-2 h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /><span>Remove all records</span>
+            <DropdownMenuItem :disabled="!data?.records.length" @select="deleteError = ''; showDeleteDialog = true">
+              <PackageX class="mr-2 h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /><span>Remove all {{ recordLabel.lowerPlural.value }}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </AdminPageHeader>
-      <Pagination v-if="data && data.products.length" :total="totalItems" :sibling-count="1" show-edges
+      <Pagination v-if="data && data.records.length" :total="totalItems" :sibling-count="1" show-edges
         :default-page="currentPage" v-model:page="currentPage" :items-per-page="pageSize">
         <PaginationList v-slot="{ items }" class="flex items-center gap-1">
           <PaginationFirst @click="changePage(1)" />
@@ -597,15 +599,15 @@ onUnmounted(() => {
       </Pagination>
     </div>
     
-    <section v-if="!data?.products.length" class="dv-panel admin-empty">
-      <h2>{{ Object.keys(columnFilters).length ? 'No matching records' : 'No records yet' }}</h2>
-      <p>{{ Object.keys(columnFilters).length ? 'Clear the filters to see your record list.' : 'Import a CSV file to add your records.' }}</p>
+    <section v-if="!data?.records.length" class="dv-panel admin-empty">
+      <h2>{{ Object.keys(columnFilters).length ? `No matching ${recordLabel.lowerPlural.value}` : `No ${recordLabel.lowerPlural.value} yet` }}</h2>
+      <p>{{ Object.keys(columnFilters).length ? `Clear the filters to see your ${recordLabel.lower.value} list.` : `Import a CSV file to add your ${recordLabel.lowerPlural.value}.` }}</p>
       <Button v-if="Object.keys(columnFilters).length" variant="outline" @click="clearFilters">Clear filters</Button>
-      <Button v-else as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-product-import' }"><FileUp />Import CSV</router-link></Button>
+      <Button v-else as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-record-import' }"><FileUp />Import CSV</router-link></Button>
     </section>
     <div v-else class="dv-panel w-full overflow-x-auto flex-grow">
       <div class="data-grid">
-        <table class="spreadsheet-table" role="grid" aria-label="Records">
+        <table class="spreadsheet-table" role="grid" :aria-label="recordLabel.plural.value">
           <thead>
             <tr>
               <th v-for="column in table.getFlatHeaders()" :key="column.id">
@@ -628,9 +630,9 @@ onUnmounted(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-if="!data || !data.products.length">
+            <tr v-if="!data || !data.records.length">
               <td colspan="100%" class="admin-text-secondary text-center p-4">
-                No Product database found. Import a CSV file to get started.
+                No {{ recordLabel.lower.value }} database found. Import a CSV file to get started.
               </td>
             </tr>
             <template v-else>
@@ -659,11 +661,11 @@ onUnmounted(() => {
                       v-if="cell.getValue()"
                       type="button"
                       tabindex="-1"
-                      class="product-thumbnail-button"
-                      :aria-label="`Enlarge image of ${row.original.productKey}`"
+                      class="record-thumbnail-button"
+                      :aria-label="`Enlarge image of ${row.original.recordKey}`"
                       @click.stop="handleImageClick($event, cell.getValue() as string)"
                     >
-                      <img :src="cell.getValue() as string" alt="" loading="lazy" decoding="async" class="product-thumbnail" />
+                      <img :src="cell.getValue() as string" alt="" loading="lazy" decoding="async" class="record-thumbnail" />
                     </button>
                   </template>
                   
@@ -722,14 +724,14 @@ onUnmounted(() => {
       top: `${enlargedImage.top}px`,
       left: `${enlargedImage.left}px`,
     }">
-      <img :src="enlargedImage.src" alt="Enlarged product image" />
+      <img :src="enlargedImage.src" alt="Enlarged record image" />
     </div>
   </Teleport>
   <AlertDialog :open="showDeleteDialog" @update:open="open => { if (!isDeleting) showDeleteDialog = open }">
     <AlertDialogContent @escape-key-down="event => { if (isDeleting) event.preventDefault() }">
-      <AlertDialogHeader><AlertDialogTitle>Remove all records?</AlertDialogTitle><AlertDialogDescription>This removes all records, including records outside the current filters. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+      <AlertDialogHeader><AlertDialogTitle>Remove all {{ recordLabel.lowerPlural.value }}?</AlertDialogTitle><AlertDialogDescription>This removes all records, including records outside the current filters. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
       <p v-if="deleteError" role="alert" class="admin-form-error">{{ deleteError }}</p>
-      <AlertDialogFooter><AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel><Button variant="destructive" :disabled="isDeleting" @click="removeAllProducts.mutate()">{{ isDeleting ? 'Removing…' : 'Remove all products' }}</Button></AlertDialogFooter>
+      <AlertDialogFooter><AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel><Button variant="destructive" :disabled="isDeleting" @click="removeAllRecords.mutate()">{{ isDeleting ? 'Removing…' : 'Remove all records' }}</Button></AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
 </template>
@@ -819,13 +821,13 @@ onUnmounted(() => {
   width: 60px;
   text-align: center;
 }
-.spreadsheet-table tbody td.cell-image .product-thumbnail-button {
+.spreadsheet-table tbody td.cell-image .record-thumbnail-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   vertical-align: middle;
 }
-.spreadsheet-table tbody td.cell-image .product-thumbnail {
+.spreadsheet-table tbody td.cell-image .record-thumbnail {
   max-width: 32px;
   max-height: 32px;
   width: auto;

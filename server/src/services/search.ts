@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Brackets, In, SelectQueryBuilder } from "typeorm"
 import { CollectionFile } from "../entity/collection-file"
-import { ProductAttribute } from "../entity/product-attribute"
+import { RecordAttribute } from "../entity/record-attribute"
 import { User } from "../entity/user"
 import { dataSource } from "../env"
 import { userCollectionFilesQuery } from "./collection"
@@ -31,7 +31,7 @@ export type SearchInput = {
 	maxSize?: number | null
 	collectionId?: string | null
 	assetTypes?: string[] | null
-	productViews?: string[] | null
+	recordViews?: string[] | null
 	fileTypes?: string[] | null
 	searchScope?: string | null
 	exactMatch?: boolean | null
@@ -39,12 +39,12 @@ export type SearchInput = {
 }
 
 // A facet dimension left out of the predicate set so its counts show what selecting it would add.
-export type SearchDimension = 'assetTypes' | 'fileTypes' | 'extensions' | 'productViews' | `attribute:${string}`
+export type SearchDimension = 'assetTypes' | 'fileTypes' | 'extensions' | 'recordViews' | `attribute:${string}`
 
 export type SearchContext = {
-	searchableAttributes: ProductAttribute[]
-	filterAttributes: ProductAttribute[]
-	facetableAttributes: ProductAttribute[]
+	searchableAttributes: RecordAttribute[]
+	filterAttributes: RecordAttribute[]
+	facetableAttributes: RecordAttribute[]
 }
 
 export const FACET_VALUES_LIMIT = 200
@@ -86,7 +86,7 @@ export function activeAttributeIds(input: SearchInput): string[] {
 }
 
 export async function loadSearchContext(input: SearchInput): Promise<SearchContext> {
-	const repository = dataSource.getRepository(ProductAttribute)
+	const repository = dataSource.getRepository(RecordAttribute)
 	const ids = activeAttributeIds(input)
 	const [searchableAttributes, filterAttributes, facetableAttributes] = await Promise.all([
 		repository.findBy({ searchable: true }),
@@ -100,7 +100,7 @@ export async function loadSearchContext(input: SearchInput): Promise<SearchConte
 function tokenMatch(context: SearchContext, parameter: string): string {
 	const parts = [
 		`asset_file.name ILIKE :${parameter}`,
-		...context.searchableAttributes.map((_, index) => `(product.meta_data -> :attribute${index}) ILIKE :${parameter}`),
+		...context.searchableAttributes.map((_, index) => `(record.meta_data -> :attribute${index}) ILIKE :${parameter}`),
 	]
 	return `(${parts.join(' OR ')})`
 }
@@ -130,9 +130,9 @@ export function buildSearchQuery(
 		query.andWhere('asset_file.asset_type_id IN (:...assetTypeIds)', { assetTypeIds: input.assetTypes })
 	}
 
-	if (exclude !== 'productViews' && input.productViews?.length) {
-		query.andWhere('asset_file.product_view IN (:...productViews)', { productViews: input.productViews })
-		query.andWhere('asset_type.is_related_to_products IS TRUE')
+	if (exclude !== 'recordViews' && input.recordViews?.length) {
+		query.andWhere('asset_file.record_view IN (:...recordViews)', { recordViews: input.recordViews })
+		query.andWhere('asset_type.is_related_to_records IS TRUE')
 	}
 
 	if (input.searchScope === 'current_with_sub' && input.collectionId) {
@@ -146,7 +146,7 @@ export function buildSearchQuery(
 	context.filterAttributes
 		.filter((attribute) => exclude !== `attribute:${attribute.id}` && (inputAttributes[attribute.id]?.length ?? 0) > 0)
 		.forEach((attribute, index) => {
-			query.andWhere(`product.meta_data[:attributekey${index}] IN (:...attributevalue${index})`, {
+			query.andWhere(`record.meta_data[:attributekey${index}] IN (:...attributevalue${index})`, {
 				[`attributekey${index}`]: attribute.name,
 				[`attributevalue${index}`]: inputAttributes[attribute.id],
 			})
@@ -206,7 +206,7 @@ export type SearchFacets = {
 	assetTypes: Record<string, number>
 	fileTypes: Record<string, number>
 	extensions: Record<string, number>
-	productViews: Record<string, number>
+	recordViews: Record<string, number>
 	attributes: Record<string, Record<string, number>>
 }
 
@@ -229,17 +229,17 @@ async function countBy(query: SelectQueryBuilder<CollectionFile>, expression: st
 
 // Counts run over the whole result set, each dimension with its own filter left out.
 export async function searchFacets(user: User, input: SearchInput, context: SearchContext): Promise<SearchFacets> {
-	const [assetTypes, fileTypes, extensions, productViews, ...attributes] = await Promise.all([
+	const [assetTypes, fileTypes, extensions, recordViews, ...attributes] = await Promise.all([
 		countBy(buildSearchQuery(user, input, context, 'assetTypes'), 'asset_file.asset_type_id'),
 		countBy(buildSearchQuery(user, input, context, 'fileTypes'), fileTypeExpression),
 		countBy(buildSearchQuery(user, input, context, 'extensions'), fileExtensionExpression),
-		countBy(buildSearchQuery(user, input, context, 'productViews').andWhere('asset_type.is_related_to_products IS TRUE'), 'asset_file.product_view'),
+		countBy(buildSearchQuery(user, input, context, 'recordViews').andWhere('asset_type.is_related_to_records IS TRUE'), 'asset_file.record_view'),
 		...context.facetableAttributes.map((attribute) =>
 			countBy(
 				buildSearchQuery(user, input, context, `attribute:${attribute.id}`).setParameter('facetName', attribute.name),
-				'product.meta_data -> :facetName',
+				'record.meta_data -> :facetName',
 			).then((counts) => [attribute.id, counts] as const)
 		),
 	])
-	return { assetTypes, fileTypes, extensions, productViews, attributes: Object.fromEntries(attributes) }
+	return { assetTypes, fileTypes, extensions, recordViews, attributes: Object.fromEntries(attributes) }
 }

@@ -25,12 +25,12 @@ describe('search query parsing', () => {
 
   test('route query maps onto the search input with defaults', () => {
     expect(parseSearchQuery({}, 'all')).toEqual({
-      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], productViews: [], fileTypes: [], extensions: [], minSize: undefined, maxSize: undefined, searchScope: 'all', exactMatch: false, attributes: {}, sort: undefined,
+      query: undefined, page: undefined, collectionId: undefined, assetTypes: [], recordViews: [], fileTypes: [], extensions: [], minSize: undefined, maxSize: undefined, searchScope: 'all', exactMatch: false, attributes: {}, sort: undefined,
     })
     expect(parseSearchQuery({
-      q: 'red hat', page: '2', from_collection: 'c1', asset_types: 't1', product_views: ['front', 'back'], file_types: 'image', search_scope: 'current', exact_match: 'true', sort: 'newest', extensions: 'jpg', size_min: '2', size_max: '50',
+      q: 'red hat', page: '2', from_collection: 'c1', asset_types: 't1', record_views: ['front', 'back'], file_types: 'image', search_scope: 'current', exact_match: 'true', sort: 'newest', extensions: 'jpg', size_min: '2', size_max: '50',
     }, 'all')).toEqual({
-      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], productViews: ['front', 'back'], fileTypes: ['image'], extensions: ['jpg'], minSize: 2097152, maxSize: 52428800, searchScope: 'current', exactMatch: true, attributes: {}, sort: 'newest',
+      query: 'red hat', page: 2, collectionId: 'c1', assetTypes: ['t1'], recordViews: ['front', 'back'], fileTypes: ['image'], extensions: ['jpg'], minSize: 2097152, maxSize: 52428800, searchScope: 'current', exactMatch: true, attributes: {}, sort: 'newest',
     })
     expect(parseSearchQuery({ sort: 'random' }, 'all').sort).toBeUndefined()
     expect(parseSearchQuery({ size_min: 'abc', size_max: '-3' }, 'all')).toMatchObject({ minSize: undefined, maxSize: undefined })
@@ -66,7 +66,7 @@ describe('search query parsing', () => {
   })
 
   test('clearing filters keeps the terms, scope and mode', () => {
-    expect(clearFilterQuery({ q: 'a', exact_match: 'true', search_scope: 'current', from_collection: 'c', asset_types: 't', product_views: 'v', file_types: 'image', extensions: 'jpg', size_min: '2', size_max: '50', 'attributes[color]': 'red', sort: 'name' }))
+    expect(clearFilterQuery({ q: 'a', exact_match: 'true', search_scope: 'current', from_collection: 'c', asset_types: 't', record_views: 'v', file_types: 'image', extensions: 'jpg', size_min: '2', size_max: '50', 'attributes[color]': 'red', sort: 'name' }))
       .toEqual({ q: 'a', exact_match: 'true', search_scope: 'current', from_collection: 'c', sort: 'name' })
   })
 

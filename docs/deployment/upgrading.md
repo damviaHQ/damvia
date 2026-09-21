@@ -84,6 +84,14 @@ Before restarting, set a randomly generated `APP_SECRET` of at least 32 bytes. T
 
 Back up first and apply the migration with application writers stopped. Validate a restricted collection, an invited guest and an administrator before reopening access.
 
+## Records in this upgrade
+
+- Products are called records in the code, the database, the API and the documentation. What people see keeps the word "Products" until an administrator changes the label on `/admin/data-enrichment/settings`.
+- The admin routes `/admin/products`, `/admin/products/import` and `/admin/products/attributes` redirect to their new addresses under `/admin/data-enrichment/`.
+- The tRPC procedures moved: `pim.listProducts` is `record.list`, `pim.removeAllProducts` is `record.removeAll`, `pim.updateProduct` is `record.update`, `productAttribute.*` is `recordAttribute.*`, `asset.listProductViews` is `asset.listRecordViews`, and the search input and facets say `recordViews`. Deploy the client with the server.
+- `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` keep their names for now.
+- Readers who had chosen the "Product view" column in their saved display preferences pick it again, as its id changed.
+
 ## Folder rules in this upgrade
 
 - The migration stores the path of every folder and marks every typed folder as set by hand when its type differs from its parent's. Nothing is re-typed: the first enrichment pass after the restart writes only the `inherited` mark on the other folders, which is why it can report thousands of folders updated on a large library while no file changes type.
@@ -119,6 +127,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1790035200000-collection-favorites` | `user_collection_favorites` table (each user's starred collections) with its index on `collection_id`; starts empty |
 | `1790208000000-page-block-layout` | Rewrites `page_blocks` for the new page editor: adds `position` and `size`, converts `data` from text to `jsonb` with one shape per block type, and drops `row`, `column` and `width`. Reading order is preserved; a row that held two blocks becomes two `half` blocks, three becomes `third`, anything else becomes `full`. Text alignment chosen in the old editor is dropped, since the new editor has no alignment control. Rolling this migration back puts every block on a row of its own and deletes `hero` blocks, which the old schema cannot represent |
 | `1790121600000-asset-sources` | `source_key` on `asset_folders` and `asset_files` (empty for existing rows, adopted at the next start), unique index on (`source_key`, `external_id`) replacing the unique `external_id`, and the `asset_sources` table holding each configured source's last run |
+| `1790553600000-records` | Renames `products` to `records` (`product_key` to `record_key`, `primary_key_name` to `key_column_name`), `product_attributes` to `record_attributes`, `asset_files.product_id` and `product_view` to `record_id` and `record_view`, `asset_types.is_related_to_products` to `is_related_to_records`; rewrites the `product_attribute.` prefix of `list_display_items` to `record_attribute.`; creates the single-row `enrichment_settings` table holding the record label. Renames only; rolling back reverses them |
 | `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |
 | `1790467200000-asset-type-rules` | `asset_type_rules` table; `asset_type_source` and `asset_type_rule_id` on `asset_folders`. Existing typed folders whose type differs from their parent's, and typed roots, are marked `manual`; the others `inherited`. Rolling back drops the table and the three columns and loses nothing the previous version reads |
 | `1790294400000-collection-nesting` | `orphaned_at`, `orphaned_from_name` and `orphaned_reason` on `collections`; retires duplicate mirrors of one folder under one parent; rebuilds `mpath` of `collections` and `menu_items` from `parent_id`; recounts `number_of_files`; drops the unique `(parent_id, name)` constraint and adds the partial unique index `idx_collections_parent_asset_folder` on `(parent_id, asset_folder_id)` plus `text_pattern_ops` indexes on the `mpath` of `collections`, `menu_items` and `asset_folders` |

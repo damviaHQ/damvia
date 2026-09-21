@@ -51,6 +51,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useGlobalToast } from "@/composables/useGlobalToast"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { ArrowDown, ArrowUp, CirclePlus, GripVertical, PencilLine, Trash2 } from "@lucide/vue"
@@ -58,18 +59,19 @@ import { computed, nextTick, ref } from "vue"
 import Draggable from "vuedraggable"
 
 const toast = useGlobalToast()
+const recordLabel = useRecordLabel()
 const form = ref<{
   id?: string
   name: string
   description: string
-  isRelatedToProducts: boolean
+  isRelatedToRecords: boolean
   includeInSearchByDefault: boolean
   defaultDisplay: "grid" | "list"
   listDisplayItems: string[]
 }>({
   name: "",
   description: '',
-  isRelatedToProducts: false,
+  isRelatedToRecords: false,
   includeInSearchByDefault: false,
   defaultDisplay: "grid",
   listDisplayItems: [],
@@ -80,9 +82,9 @@ const { status, data, error } = useQuery({
   queryKey: ["asset-types"],
   queryFn: () => trpc.assetType.list.query(),
 })
-const { data: productAttributes } = useQuery({
-  queryKey: ["products", "attributes"],
-  queryFn: () => trpc.productAttribute.list.query(),
+const { data: recordAttributes } = useQuery({
+  queryKey: ["records", "attributes"],
+  queryFn: () => trpc.recordAttribute.list.query(),
 })
 
 const listItems = computed(() => [
@@ -91,11 +93,11 @@ const listItems = computed(() => [
   { name: "Format", value: "format" },
   { name: "Dimensions", value: "dimensions" },
   { name: "Updated at", value: "updated_at" },
-  ...(productAttributes.value ?? [])
+  ...(recordAttributes.value ?? [])
     .filter((attr) => attr.viewable)
     .map((item) => ({
       name: item.displayName || item.name,
-      value: `product_attribute.${item.id}`,
+      value: `record_attribute.${item.id}`,
     })),
 ])
 const allListItems = computed(() =>
@@ -109,7 +111,7 @@ function openCreateModal() {
   form.value = {
     name: "",
     description: "",
-    isRelatedToProducts: false,
+    isRelatedToRecords: false,
     includeInSearchByDefault: false,
     defaultDisplay: "grid",
     listDisplayItems: [],
@@ -122,7 +124,7 @@ function openEditModal(assetType: RouterOutput["assetType"]["list"][number]) {
     id: assetType.id,
     name: assetType.name,
     description: assetType.description ?? '',
-    isRelatedToProducts: assetType.isRelatedToProducts,
+    isRelatedToRecords: assetType.isRelatedToRecords,
     includeInSearchByDefault: assetType.includeInSearchByDefault,
     defaultDisplay: assetType.defaultDisplay,
     listDisplayItems: [...assetType.listDisplayItems],
@@ -140,8 +142,8 @@ async function submitChanges(event: Event) {
       listDisplayItems: form.value.listDisplayItems,
       ...(form.value.id && { id: form.value.id }),
       description: form.value.description,
-      ...(form.value.isRelatedToProducts !== undefined && {
-        isRelatedToProducts: form.value.isRelatedToProducts,
+      ...(form.value.isRelatedToRecords !== undefined && {
+        isRelatedToRecords: form.value.isRelatedToRecords,
       }),
       ...(form.value.includeInSearchByDefault !== undefined && {
         includeInSearchByDefault: form.value.includeInSearchByDefault,
@@ -230,7 +232,7 @@ async function onModalSubmit(event: Event) {
         <TableRow>
           <TableHead>Name</TableHead>
           <TableHead>Description</TableHead>
-          <TableHead>Related products</TableHead>
+          <TableHead>Related to {{ recordLabel.lowerPlural.value }}</TableHead>
           <TableHead>Include in search by default</TableHead>
           <TableHead></TableHead>
         </TableRow>
@@ -239,7 +241,7 @@ async function onModalSubmit(event: Event) {
         <TableRow v-for="assetType in items" :key="assetType.id">
           <TableCell>{{ assetType.name }}</TableCell>
           <TableCell>{{ assetType.description }}</TableCell>
-          <TableCell>{{ assetType.isRelatedToProducts ? "Yes" : "No" }}</TableCell>
+          <TableCell>{{ assetType.isRelatedToRecords ? "Yes" : "No" }}</TableCell>
           <TableCell>{{ assetType.includeInSearchByDefault ? "Yes" : "No" }}</TableCell>
           <TableCell>
             <div class="flex space-x-2">
@@ -277,7 +279,7 @@ async function onModalSubmit(event: Event) {
       <form :aria-busy="saving" @submit.prevent="onModalSubmit" class="admin-form">
         <DialogHeader>
           <DialogTitle >{{ modalState === "creating" ? "Create" : "Edit" }} asset type</DialogTitle>
-          <DialogDescription>Set search defaults, product linking and list columns.</DialogDescription>
+          <DialogDescription>Set search defaults, {{ recordLabel.lower.value }} linking and list columns.</DialogDescription>
         </DialogHeader>
         <div class="modal-editor-grid">
           <div class="flex flex-col gap-5 min-w-0">
@@ -290,8 +292,8 @@ async function onModalSubmit(event: Event) {
               <Input id="description" v-model="form.description" placeholder="Description" />
             </FieldGroup>
             <div class="flex items-center space-x-2">
-              <Checkbox id="isRelatedToProducts" v-model="form.isRelatedToProducts" />
-              <Label for="isRelatedToProducts">Related to products</Label>
+              <Checkbox id="isRelatedToRecords" v-model="form.isRelatedToRecords" />
+              <Label for="isRelatedToRecords">Related to {{ recordLabel.lowerPlural.value }}</Label>
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox id="includeInSearchByDefault" v-model="form.includeInSearchByDefault" />

@@ -18,7 +18,7 @@ import { z } from "zod"
 import { AssetFolder } from "../../entity/asset-folder"
 import { Collection } from "../../entity/collection"
 import { CollectionFile } from "../../entity/collection-file"
-import { ProductAttribute } from "../../entity/product-attribute"
+import { RecordAttribute } from "../../entity/record-attribute"
 import { User, UserRole } from "../../entity/user"
 import { assetsS3, assetsS3Bucket, dataSource, mainS3, mainS3Bucket } from "../../env"
 import {
@@ -41,7 +41,7 @@ export type FormatCollectionOptions = {
 	collection: Collection,
 	user?: User,
 	userVisibleCollections?: Collection[],
-	productAttributes?: ProductAttribute[],
+	recordAttributes?: RecordAttribute[],
 	sampleFiles?: CollectionFile[],
 }
 
@@ -64,7 +64,7 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		files: collection.files?.length
 			? await Promise.all(collection.files.map(file => formatCollectionFile({
 				file,
-				productAttributes: opts.productAttributes,
+				recordAttributes: opts.recordAttributes,
 			})))
 			: undefined,
 		page: collection.page ? await formatPage(collection.page, opts.user) : null,
@@ -129,19 +129,19 @@ export async function buildTree({ collections, user, parent, sampleFiles }: Buil
 
 export type FormatCollectionFileOptions = {
 	file: CollectionFile,
-	productAttributes?: ProductAttribute[],
+	recordAttributes?: RecordAttribute[],
 }
 
-export async function formatCollectionFile({ file, productAttributes }: FormatCollectionFileOptions) {
-	const attributes = productAttributes
+export async function formatCollectionFile({ file, recordAttributes }: FormatCollectionFileOptions) {
+	const attributes = recordAttributes
 		? Object
-			.entries(file.assetFile.product?.metaData ?? {})
+			.entries(file.assetFile.record?.metaData ?? {})
 			.map(([key, value]) => {
-				const productAttribute = productAttributes.find(v => v.viewable && v.name === key)
-				return productAttribute ? {
-					id: productAttribute.id,
-					name: productAttribute.name,
-					displayName: productAttribute.displayName,
+				const recordAttribute = recordAttributes.find(v => v.viewable && v.name === key)
+				return recordAttribute ? {
+					id: recordAttribute.id,
+					name: recordAttribute.name,
+					displayName: recordAttribute.displayName,
 					value,
 				} : null
 			})
@@ -153,10 +153,10 @@ export async function formatCollectionFile({ file, productAttributes }: FormatCo
 		name: file.assetFile.name,
 		mimeType: file.assetFile.mimeType,
 		assetTypeId: file.assetFile.assetTypeId,
-		product: file.assetFile.product ? { id: file.assetFile.product.id, attributes } : null,
+		record: file.assetFile.record ? { id: file.assetFile.record.id, attributes } : null,
 		assetType: file.assetFile.assetType ? {
 			...file.assetFile.assetType,
-			productAttributes: productAttributes
+			recordAttributes: recordAttributes
 				?.filter(attribute => attribute.viewable)
 				.map(attribute => ({
 					id: attribute.id,
@@ -164,7 +164,7 @@ export async function formatCollectionFile({ file, productAttributes }: FormatCo
 					displayName: attribute.displayName,
 				})) ?? [],
 		} : null,
-		productView: file.assetFile.productView,
+		recordView: file.assetFile.recordView,
 		size: parseInt(file.assetFile.size, 10),
 		collectionId: file.collectionId,
 		updatedAt: file.assetFile.updatedAt,
@@ -218,7 +218,7 @@ export default router({
 			query: z.string().max(2000).nullable().optional(),
 			collectionId: z.uuid().nullable().optional(),
 			assetTypes: z.uuid().array().optional().nullable(),
-			productViews: z.string().array().optional().nullable(),
+			recordViews: z.string().array().optional().nullable(),
 			fileTypes: z.string().array().optional().nullable(),
 			extensions: z.string().max(20).array().max(50).optional().nullable(),
 			minSize: z.number().int().min(0).max(1e15).optional().nullable(),
@@ -251,7 +251,7 @@ export default router({
 					)
 				`, [ctx.user.id, ['current', 'current_with_sub'].includes(input.searchScope ?? '') ? input.collectionId : null, JSON.stringify({ query: searchTerm, total }), searchTerm])
 			}
-			const productAttributes = await dataSource.getRepository(ProductAttribute).find()
+			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 
 			return {
 				total,
@@ -260,7 +260,7 @@ export default router({
 				previousPage: input.page > 1 ? input.page - 1 : null,
 				nextPage: totalPages > input.page ? input.page + 1 : null,
 				facets,
-				results: await Promise.all(results.map(file => formatCollectionFile({ file, productAttributes }))),
+				results: await Promise.all(results.map(file => formatCollectionFile({ file, recordAttributes }))),
 			}
 		}),
 	searchNotFound: publicProcedure
@@ -269,7 +269,7 @@ export default router({
 			query: z.string().max(200).array().max(300),
 			collectionId: z.uuid().nullable().optional(),
 			assetTypes: z.uuid().array().optional().nullable(),
-			productViews: z.string().array().optional().nullable(),
+			recordViews: z.string().array().optional().nullable(),
 			fileTypes: z.string().array().optional().nullable(),
 			extensions: z.string().max(20).array().max(50).optional().nullable(),
 			minSize: z.number().int().min(0).max(1e15).optional().nullable(),
@@ -281,7 +281,7 @@ export default router({
 			const scope = { ...input, query: null, attributes: null }
 			const context = await loadSearchContext(scope)
 			const visible = buildSearchQuery(ctx.user, scope, context).select('asset_file.name', 'name')
-			context.searchableAttributes.forEach((_, index) => visible.addSelect(`product.meta_data -> :attribute${index}`, `attr${index}`))
+			context.searchableAttributes.forEach((_, index) => visible.addSelect(`record.meta_data -> :attribute${index}`, `attr${index}`))
 			const [sql, parameters] = visible.getQueryAndParameters()
 			const shifted = sql.replace(/\$(\d+)/g, (_, n) => `$${Number(n) + 1}`)
 			const columns = ['visible.name', ...context.searchableAttributes.map((_, index) => `visible."attr${index}"`)]
@@ -320,12 +320,12 @@ export default router({
 				? await userCollectionFilesQuery(ctx.user).andWhere({ id: In(sampleFileIds) }).getMany()
 				: []
 
-			const productAttributes = await dataSource.getRepository(ProductAttribute).find()
+			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 			return formatCollection({
 				collection,
 				user: ctx.user,
 				userVisibleCollections,
-				productAttributes,
+				recordAttributes,
 				sampleFiles,
 			})
 		}),
@@ -348,8 +348,8 @@ export default router({
 			}
 
 			const files = await filesQuery.getMany()
-			const productAttributes = await dataSource.getRepository(ProductAttribute).find()
-			return Promise.all(files.map((file) => formatCollectionFile({ file, productAttributes })))
+			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
+			return Promise.all(files.map((file) => formatCollectionFile({ file, recordAttributes })))
 		}),
 	create: publicProcedure
 		.use(authMiddleware(userApproved))
@@ -671,10 +671,10 @@ export default router({
 					return licenses
 				}, {})
 			)
-			const productAttributes = await dataSource.getRepository(ProductAttribute).find()
+			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 
 			return {
-				files: await Promise.all(collectionFiles.map(file => formatCollectionFile({ file, productAttributes }))),
+				files: await Promise.all(collectionFiles.map(file => formatCollectionFile({ file, recordAttributes }))),
 				licenses: await Promise.all(licenses.map(formatLicense)),
 				allowDirectDownload:
 					collectionFiles.reduce((total, file) => total + parseInt(file.assetFile.size, 10), 0) <= 2_000_000_000, // 2GB

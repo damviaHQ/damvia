@@ -41,7 +41,7 @@ export const fileProperties: DisplayProperty[] = [
   { id: 'updated_at', label: 'Updated at' },
   { id: 'format', label: 'Format' },
   { id: 'license', label: 'License' },
-  { id: 'product_view', label: 'Product view' },
+  { id: 'record_view', label: 'Record view' },
 ]
 export type DisplayCollection = { description?: string | null; numberOfFiles?: number }
 export function collectionDisplayGroup(collections: DisplayCollection[]): DisplayGroup {
@@ -62,8 +62,8 @@ export function fileDisplayGroup(files: DisplayFile[]): DisplayGroup {
   const type = firstType && files.every(file => file.assetType?.id === firstType.id) ? firstType : null
   const attributes = new Map<string, DisplayProperty>()
   for (const file of files) {
-    for (const attribute of [...(file.assetType?.productAttributes ?? []), ...(file.product?.attributes ?? [])]) {
-      if (attribute) attributes.set(attribute.id, { id: `product_attribute.${attribute.id}`, label: attribute.displayName || attribute.name })
+    for (const attribute of [...(file.assetType?.recordAttributes ?? []), ...(file.record?.attributes ?? [])]) {
+      if (attribute) attributes.set(attribute.id, { id: `record_attribute.${attribute.id}`, label: attribute.displayName || attribute.name })
     }
   }
   return {

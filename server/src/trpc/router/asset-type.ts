@@ -25,7 +25,7 @@ export function formatAssetType(type: AssetType) {
 		id: type.id,
 		name: type.name,
 		description: type.description,
-		isRelatedToProducts: type.isRelatedToProducts,
+		isRelatedToRecords: type.isRelatedToRecords,
 		includeInSearchByDefault: type.includeInSearchByDefault,
 		defaultDisplay: type.defaultDisplay,
 		listDisplayItems: type.listDisplayItems,
@@ -45,7 +45,7 @@ export default router({
 			z.object({
 				name: z.string().min(1).max(30),
 				description: z.string().max(255).optional(),
-				isRelatedToProducts: z.boolean().optional(),
+				isRelatedToRecords: z.boolean().optional(),
 				includeInSearchByDefault: z.boolean().optional(),
 				defaultDisplay: z.union([z.literal('list'), z.literal('grid')]),
 				listDisplayItems: z.string().array(),
@@ -55,7 +55,7 @@ export default router({
 			const assetType = new AssetType()
 			assetType.name = input.name
 			assetType.description = input.description ?? null
-			assetType.isRelatedToProducts = input.isRelatedToProducts ?? false
+			assetType.isRelatedToRecords = input.isRelatedToRecords ?? false
 			assetType.includeInSearchByDefault = input.includeInSearchByDefault ?? false
 			assetType.defaultDisplay = input.defaultDisplay
 			assetType.listDisplayItems = input.listDisplayItems
@@ -69,7 +69,7 @@ export default router({
 				id: z.uuid(),
 				name: z.string().min(1).max(30),
 				description: z.string().max(255).optional(),
-				isRelatedToProducts: z.boolean().optional(),
+				isRelatedToRecords: z.boolean().optional(),
 				includeInSearchByDefault: z.boolean().optional(),
 				defaultDisplay: z.union([z.literal('list'), z.literal('grid')]),
 				listDisplayItems: z.string().array(),
@@ -83,7 +83,7 @@ export default router({
 
 			assetType.name = input.name
 			assetType.description = input.description ?? null
-			assetType.isRelatedToProducts = input.isRelatedToProducts ?? assetType.isRelatedToProducts
+			assetType.isRelatedToRecords = input.isRelatedToRecords ?? assetType.isRelatedToRecords
 			assetType.includeInSearchByDefault = input.includeInSearchByDefault ?? assetType.includeInSearchByDefault
 			assetType.defaultDisplay = input.defaultDisplay
 			assetType.listDisplayItems = input.listDisplayItems

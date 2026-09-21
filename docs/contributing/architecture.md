@@ -6,7 +6,7 @@ sidebar:
 lastUpdated: 2026-09-21
 ---
 
-This page gives a developer the shape of the code: what runs, how a request travels, what each folder holds, and where to add something. The meaning of the objects (collections, pages, products) is in [Core concepts](../introduction/concepts.md).
+This page gives a developer the shape of the code: what runs, how a request travels, what each folder holds, and where to add something. The meaning of the objects (collections, pages, records) is in [Core concepts](../introduction/concepts.md).
 
 ## One Node process does four things
 
@@ -50,7 +50,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
 | `entity/` | 24 TypeORM entities and their enums |
 | `migrations/` | Hand-written SQL migrations, run at startup |
-| `services/` | `asset.ts` (upsert, deletion, thumbnails, product matching), `asset-type-rules.ts` (folder rule compilation, the pure resolution of folder asset types, the set-based write), `enrichment.ts` (`runEnrichmentPass()`, the post-sync pass under an advisory lock), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation), `search-insights.ts` (search demand, daily spikes and contactable search audiences) |
+| `services/` | `asset.ts` (upsert, deletion, thumbnails, record matching), `asset-type-rules.ts` (folder rule compilation, the pure resolution of folder asset types, the set-based write), `enrichment.ts` (`runEnrichmentPass()`, the post-sync pass under an advisory lock), `collection.ts` (access queries, synchronisation, duplication), `download.ts` (archives, format conversion, expiry), `image-processor.ts` (sharp, ffmpeg, LibreOffice, Ghostscript thumbnails), `mailer.ts` (one sender per template), `page.ts` (page and block helpers), `system.ts` (integrity check), `user.ts` (create, guest, JWT, removal), `credentials.ts` (password hashing, reset-token hashing, signing-secret validation), `search-insights.ts` (search demand, daily spikes and contactable search audiences) |
 | `trpc/index.ts` | tRPC init, context, `authMiddleware` and the four predicates |
 | `trpc/router/` | 18 domain routers plus `collection/invitation.ts`, merged in `index.ts` with the public `env` query |
 | `util/array.ts` | `compact()` |
@@ -63,7 +63,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `app.vue` | Root component: shows a loader while the user loads, `LayoutAuth` with the "verify your email" or "wait for approval" message for unapproved users, `LayoutRouter` otherwise; handles `?verificationCode=` and mounts the toaster |
 | `router/index.ts` | 29 routes; each has `meta.layout` set to `auth`, `main`, `admin`, `editor` or `public`, and a `beforeEach` guard that redirects unauthenticated users to `login` |
 | `layouts/` | `LayoutRouter.vue` maps `route.meta.layout` to `LayoutMain`, `LayoutAuth`, `LayoutAdmin`, `LayoutEditor` or `LayoutPublic`, loading each layout on demand so portal visitors never download the admin shell; also `LayoutDialogMember.vue`. `LayoutEditor.vue` is the full-height page editor shell, with no navigation tree or top bar |
-| `views/` | One component per route: `home`, `collection`, `search`, `favorites`, `page`, `page-edit` (the editor, for a collection page and a standalone page alike), `admin/` (one file per admin screen, `products/` and `pages/` sub-folders), `auth/`, `public/` |
+| `views/` | One component per route: `home`, `collection`, `search`, `favorites`, `page`, `page-edit` (the editor, for a collection page and a standalone page alike), `admin/` (one file per admin screen, `records/` and `pages/` sub-folders), `auth/`, `public/` |
 | `components/` | Feature components grouped by area: `admin/`, `collection/`, `dialog-member/`, `layout-main/`, `page-renderer/` (`PageRenderer.vue`, the one grid used by readers and by the editor, with one component per block type in `blocks/`), `page-editor/` (the editing shell, block library, block toolbar, media chooser and settings, loaded on demand so readers never download it), `icons/` |
 | `components/ui/` | shadcn-vue primitives (button, dialog, form, table, tabs...) generated from `components.json`; `lib/utils.ts` holds the `cn()` helper they use |
 | `stores/` | Pinia stores: `globalStore.ts` (auth token and `dam_token` cookie, current user, `env`, selection, display preferences) and `downloadStore.ts` (polls `download.list` with Vue Query) |

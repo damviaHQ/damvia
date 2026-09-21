@@ -25,7 +25,7 @@ import {AssetFile, AssetFileStatus} from "../entity/asset-file"
 import {AssetFolder, AssetFolderStatus} from "../entity/asset-folder"
 import {AssetSource} from "../entity/asset-source"
 import {CollectionFile} from "../entity/collection-file"
-import {Product} from "../entity/product"
+import {DataRecord} from "../entity/data-record"
 import {assetsS3, assetsS3Bucket, assetUpdaterFor, dataSource, logger} from "../env"
 import {assetUpdateContentQueue, collectionSynchronizationQueue} from "../worker"
 import {destroySynchronizedCollections, moveSynchronizedCollections, reparentSubtree} from "./collection"
@@ -601,10 +601,10 @@ export async function assignProductsToAssetFiles() {
 			continue
 		}
 
-		const [, productKey, productView] = match
-		const product = await dataSource.getRepository(Product).findOneBy({ productKey })
-		assetFile.product = product
-		assetFile.productView = productView || null
+		const [, recordKey, recordView] = match
+		const record = await dataSource.getRepository(DataRecord).findOneBy({ recordKey })
+		assetFile.record = record
+		assetFile.recordView = recordView || null
 
 		await dataSource.getRepository(AssetFile).save(assetFile)
 	}

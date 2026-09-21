@@ -41,7 +41,7 @@ const PER_PAGE = 300
 const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange } = useSearchState()
 
 const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
-const { data: productFacets } = useQuery({ queryKey: ["products", "attributes", "facets"], queryFn: () => trpc.productAttribute.listFacets.query() })
+const { data: recordFacets } = useQuery({ queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
@@ -57,7 +57,7 @@ const notFoundInput = computed(() => ({
   query: terms.value,
   collectionId: form.value.collectionId,
   assetTypes: form.value.assetTypes,
-  productViews: form.value.productViews,
+  recordViews: form.value.recordViews,
   fileTypes: form.value.fileTypes,
   searchScope: form.value.searchScope,
 }))
@@ -68,7 +68,7 @@ const { data: notFound } = useQuery({
   placeholderData: keepPreviousData,
 })
 
-const emptyFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, productViews: {}, attributes: {} }
+const emptyFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {} }
 const facets = computed(() => search.value?.facets ?? emptyFacets)
 const results = computed<any[]>(() => search.value?.results ?? [])
 const total = computed(() => search.value?.total ?? results.value.length)
@@ -111,10 +111,10 @@ const chips = computed<FilterChip[]>(() =>
       return { key: filter.key, value: filter.value, label: `Size: ${filter.value}`, category: "Size", displayValue: filter.value }
     } else if (filter.group === "extensions") {
       return { key: filter.key, value: filter.value, label: `Format: ${filter.value.toUpperCase()}`, category: "Format", displayValue: filter.value.toUpperCase() }
-    } else if (filter.group === "product_views") {
+    } else if (filter.group === "record_views") {
       return { key: filter.key, value: filter.value, label: `View: ${filter.value}`, category: "View", displayValue: filter.value }
     }
-    const facet = productFacets.value?.find((entry: any) => entry.id === filter.attributeId)
+    const facet = recordFacets.value?.find((entry: any) => entry.id === filter.attributeId)
     return { key: filter.key, value: filter.value, label: `${facet?.displayName || facet?.name || "Attribute"}: ${filter.value}`, category: facet?.displayName || facet?.name || "Attribute", displayValue: filter.value }
   })
 )

@@ -36,7 +36,7 @@ const emit = defineEmits<{ searchEverywhere: [], clearFilters: [], useAnyWord: [
         <template v-if="terms.length && scoped">Nothing in {{ scopeLabel }} matches <strong class="text-neutral-800">{{ terms.join(", ") }}</strong>.</template>
         <template v-else-if="terms.length">Nothing matches <strong class="text-neutral-800">{{ terms.join(", ") }}</strong>.</template>
         <template v-else-if="hasFilters">No file matches the selected filters.</template>
-        <template v-else>Type a word, a file name or a product reference to start.</template>
+        <template v-else>Type a word, a file name or a record reference to start.</template>
       </p>
       <p v-if="notFound.length" class="text-body text-[color:var(--dv-color-warning)]">Not found: {{ notFound.join(", ") }}</p>
     </div>

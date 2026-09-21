@@ -3,7 +3,7 @@ title: Acceptance checklist
 description: An isolated technical verification procedure for installation, upgrades and restore drills.
 sidebar:
   order: 10
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-21
 ---
 
 Run these checks on a separate test instance before an installation, upgrade or restore goes live. Record which checks pass and which fail. They have not all been run during this documentation review; completed checks are listed in [Validation status](../reference/validation-status.md).
@@ -25,7 +25,7 @@ Prepare a nested folder containing an image, a PDF, a short video and a file typ
 | Synchronised collection | After the jobs finish, sub-collections and files match the source folder. Each new sub-collection inherits its parent’s group restrictions. |
 | Access | Use separate accounts to check public and draft collections, group restrictions, regional licences and invitations. Owners, group members and invitees must meet licence restrictions; admins are exempt. Drafts are visible only to admins and owners. |
 | Editorial upload | Upload a collection thumbnail and page image/video; validate PUT preflight and rendered GET URLs from the actual browser origin. |
-| PIM | Import the two-row [CSV fixture](../administration/products-and-pim.md#reproducible-import-fixture); verify key/view links after the scheduled job. |
+| Records | Import the two-row [CSV fixture](../administration/records.md#reproducible-import-fixture); verify key/view links after the scheduled job. |
 | Exports | Build a small direct export and an email export. Check archive contents, queue completion and delivery in the test sink. |
 | Source deletion | Delete only a disposable fixture; after a complete listing and worker pass, confirm its database and mirrored-object removal. |
 | Restore | Restore database plus main bucket/configuration with the original application version; verify custom media and restricted access before testing any upgrade. |

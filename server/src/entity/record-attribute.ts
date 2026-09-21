@@ -12,34 +12,29 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import {
-    Column,
-    CreateDateColumn,
-    Entity,
-    OneToMany,
-    PrimaryColumn,
-    PrimaryGeneratedColumn,
-    UpdateDateColumn
-} from "typeorm"
-import { AssetFile } from "./asset-file"
+import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
 
-@Entity('products')
-export class Product {
+@Entity('record_attributes')
+export class RecordAttribute {
     @PrimaryColumn()
     @PrimaryGeneratedColumn("uuid")
     id: string
 
     @Column({ unique: true })
-    productKey: string // Stores the value of the primary key. Example "078998-777-M"
+    name: string
 
-    @Column()
-    primaryKeyName: string // Stores the name of the column that is the primary key. Example "Product SKU"
+    @Column({ type: 'varchar', nullable: true })
+    displayName: string | null
 
-    @Column('hstore', { hstoreType: 'object', nullable: true })
-    metaData: Record<string, string>
+    @Column({ default: false })
+    facetable: boolean
 
-    @OneToMany(() => AssetFile, (assetFile) => assetFile.product)
-    assetFiles: AssetFile[]
+    @Column({ default: false })
+    @Index()
+    searchable: boolean
+
+    @Column({ default: false })
+    viewable: boolean
 
     @CreateDateColumn()
     createdAt: Date

@@ -14,12 +14,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { z } from "zod"
 import { AssetFile } from "../../entity/asset-file"
-import { Product } from "../../entity/product"
+import { DataRecord } from "../../entity/data-record"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
 export default router({
-  listProducts: publicProcedure
+  list: publicProcedure
     .use(authMiddleware(userAdmin))
     .input(
       z.object({
@@ -33,35 +33,35 @@ export default router({
     )
     .query(async ({ input }) => {
       const { page, size, columnFilter } = input
-      const productRepository = dataSource.getRepository(Product)
+      const recordRepository = dataSource.getRepository(DataRecord)
       const assetFileRepository = dataSource.getRepository(AssetFile)
 
-      let queryBuilder = productRepository.createQueryBuilder("product")
+      let queryBuilder = recordRepository.createQueryBuilder("record")
 
       if (columnFilter) {
-        if (columnFilter.column === 'productKey') {
-          queryBuilder = queryBuilder.where("product.productKey ILIKE :value", { value: `%${columnFilter.value}%` })
+        if (columnFilter.column === 'recordKey') {
+          queryBuilder = queryBuilder.where("record.recordKey ILIKE :value", { value: `%${columnFilter.value}%` })
         } else {
           const key = columnFilter.column.replace('metaData.', '')
-          queryBuilder = queryBuilder.where(`product.metaData -> :key ILIKE :value`, {
+          queryBuilder = queryBuilder.where(`record.metaData -> :key ILIKE :value`, {
             key: key,
             value: `%${columnFilter.value}%`
           })
         }
       }
-      const [products, total] = await queryBuilder
-        .orderBy("product.createdAt", "ASC")
+      const [records, total] = await queryBuilder
+        .orderBy("record.createdAt", "ASC")
         .skip((page - 1) * size)
         .take(size)
         .getManyAndCount()
 
-      const productsWithThumbnails = await Promise.all(
-        products.map(async (product) => {
+      const recordsWithThumbnails = await Promise.all(
+        records.map(async (record) => {
           const assetFile = await assetFileRepository.findOne({
             where: {
-              productId: product.id,
+              recordId: record.id,
               hasThumbnail: true,
-              productView: process.env.PIM_PRODUCT_VIEW,
+              recordView: process.env.PIM_PRODUCT_VIEW,
             },
           })
 
@@ -69,71 +69,71 @@ export default router({
             ? await assetsS3().presignedGetObject(assetsS3Bucket(), assetFile.thumbnailStorageKey)
             : null
           return {
-            id: product.id,
-            productKey: product.productKey,
-            primaryKeyName: product.primaryKeyName,
-            metaData: product.metaData,
+            id: record.id,
+            recordKey: record.recordKey,
+            keyColumnName: record.keyColumnName,
+            metaData: record.metaData,
             thumbnailURL,
           }
         })
       )
 
-      return { products: productsWithThumbnails, total }
+      return { records: recordsWithThumbnails, total }
     }),
-  removeAllProducts: publicProcedure
+  removeAll: publicProcedure
     .use(authMiddleware(userAdmin))
     .mutation(async () => {
-      const productRepository = dataSource.getRepository(Product)
+      const recordRepository = dataSource.getRepository(DataRecord)
       const assetFileRepository = dataSource.getRepository(AssetFile)
-      const products = await productRepository.find()
+      const records = await recordRepository.find()
 
-      for (const product of products) {
-        const assetFiles = await assetFileRepository.find({ where: { productId: product.id } })
+      for (const record of records) {
+        const assetFiles = await assetFileRepository.find({ where: { recordId: record.id } })
 
         for (const assetFile of assetFiles) {
-          assetFile.productId = null
+          assetFile.recordId = null
           await assetFileRepository.save(assetFile)
         }
       }
 
-      await productRepository.createQueryBuilder().delete().execute()
+      await recordRepository.createQueryBuilder().delete().execute()
     }),
   compareCsv: publicProcedure
     .use(authMiddleware(userAdmin))
     .input(
       z.object({
-        primaryKeyName: z.string(),
+        keyColumnName: z.string(),
         data: z.array(z.record(z.string(), z.string())),
       })
     )
-    .mutation(async ({ input: { primaryKeyName, data } }) => {
-      const productRepository = dataSource.getRepository(Product)
-      const allProducts = await productRepository.find()
-      const existingPrimaryKeyName = allProducts[0]?.primaryKeyName || primaryKeyName
+    .mutation(async ({ input: { keyColumnName, data } }) => {
+      const recordRepository = dataSource.getRepository(DataRecord)
+      const allRecords = await recordRepository.find()
+      const existingKeyColumnName = allRecords[0]?.keyColumnName || keyColumnName
       const primaryKeyCounts = data.reduce((acc, row) => {
-        const key = row[primaryKeyName]
+        const key = row[keyColumnName]
         acc[key] = (acc[key] || 0) + 1
         return acc
       }, {} as Record<string, number>)
 
       const comparisonResults = data.map(newRow => {
-        const primaryKeyValue = newRow[existingPrimaryKeyName] || newRow[primaryKeyName]
-        const existingProduct = allProducts.find(p => p.productKey === primaryKeyValue)
+        const primaryKeyValue = newRow[existingKeyColumnName] || newRow[keyColumnName]
+        const existingRecord = allRecords.find(p => p.recordKey === primaryKeyValue)
 
         // Flag duplicates
         if (primaryKeyCounts[primaryKeyValue] > 1) {
           return { existing: {}, new: newRow, differences: {}, status: 'duplicate' }
         }
 
-        if (existingProduct) {
+        if (existingRecord) {
           const differences = {}
           for (const key in newRow) {
-            if (key !== primaryKeyName && (newRow[key] !== existingProduct.metaData[key] || (newRow[key] === "" && existingProduct.metaData[key] !== ""))) {
-              differences[key] = { old: existingProduct.metaData[key], new: newRow[key] }
+            if (key !== keyColumnName && (newRow[key] !== existingRecord.metaData[key] || (newRow[key] === "" && existingRecord.metaData[key] !== ""))) {
+              differences[key] = { old: existingRecord.metaData[key], new: newRow[key] }
             }
           }
           const status = Object.keys(differences).length > 0 ? 'changed' : 'unchanged'
-          return { existing: { ...existingProduct.metaData, [existingPrimaryKeyName]: existingProduct.productKey }, new: newRow, differences, status }
+          return { existing: { ...existingRecord.metaData, [existingKeyColumnName]: existingRecord.recordKey }, new: newRow, differences, status }
         } else {
           return { existing: {}, new: newRow, differences: {}, status: 'new' }
         }
@@ -145,70 +145,70 @@ export default router({
     .use(authMiddleware(userAdmin))
     .input(
       z.object({
-        primaryKeyName: z.string(),
+        keyColumnName: z.string(),
         data: z.array(z.record(z.string(), z.string())),
       })
     )
-    .mutation(async ({ input: { primaryKeyName, data } }) => {
-      const log: { newProducts: string[], updatedProducts: string[] } = { newProducts: [], updatedProducts: [] }
-      const productRepository = dataSource.getRepository(Product)
-      const allProducts = await productRepository.find()
-      const existingPrimaryKeyName = allProducts[0]?.primaryKeyName || primaryKeyName
+    .mutation(async ({ input: { keyColumnName, data } }) => {
+      const log: { newRecords: string[], updatedRecords: string[] } = { newRecords: [], updatedRecords: [] }
+      const recordRepository = dataSource.getRepository(DataRecord)
+      const allRecords = await recordRepository.find()
+      const existingKeyColumnName = allRecords[0]?.keyColumnName || keyColumnName
       const allCsvKeys = new Set(data.flatMap(row => Object.keys(row)))
-      for (const product of allProducts) {
+      for (const record of allRecords) {
         let updated = false
         allCsvKeys.forEach(key => {
-          if (!(key in product.metaData)) {
-            product.metaData[key] = ""
+          if (!(key in record.metaData)) {
+            record.metaData[key] = ""
             updated = true
           }
         })
 
         if (updated) {
-          await productRepository.save(product)
-          log.updatedProducts.push(product.productKey)
+          await recordRepository.save(record)
+          log.updatedRecords.push(record.recordKey)
         }
       }
 
       for (const row of data) {
-        const primaryKeyValue = row[existingPrimaryKeyName] || row[primaryKeyName]
+        const primaryKeyValue = row[existingKeyColumnName] || row[keyColumnName]
         if (!primaryKeyValue) {
-          console.error(`Missing product key for primary key column '${existingPrimaryKeyName || primaryKeyName}' in row:`, row)
+          console.error(`Missing record key for primary key column '${existingKeyColumnName || keyColumnName}' in row:`, row)
           continue
         }
 
-        const existing = await productRepository.findOne({ where: { productKey: primaryKeyValue } })
+        const existing = await recordRepository.findOne({ where: { recordKey: primaryKeyValue } })
         if (existing) {
           let updated = false
           allCsvKeys.forEach(key => {
-            if (key !== primaryKeyName && (row[key] !== existing.metaData[key] || (row[key] === "" && existing.metaData[key] !== ""))) {
+            if (key !== keyColumnName && (row[key] !== existing.metaData[key] || (row[key] === "" && existing.metaData[key] !== ""))) {
               existing.metaData[key] = row[key] || ""
               updated = true
             }
           })
 
           if (updated) {
-            await productRepository.save(existing)
-            log.updatedProducts.push(existing.productKey)
+            await recordRepository.save(existing)
+            log.updatedRecords.push(existing.recordKey)
           }
         } else {
-          const product = new Product()
-          product.productKey = primaryKeyValue
-          product.primaryKeyName = existingPrimaryKeyName || primaryKeyName
-          product.metaData = {}
+          const record = new DataRecord()
+          record.recordKey = primaryKeyValue
+          record.keyColumnName = existingKeyColumnName || keyColumnName
+          record.metaData = {}
 
           allCsvKeys.forEach(key => {
-            product.metaData[key] = row[key] || ""
+            record.metaData[key] = row[key] || ""
           })
 
-          await productRepository.save(product)
-          log.newProducts.push(product.productKey)
+          await recordRepository.save(record)
+          log.newRecords.push(record.recordKey)
         }
       }
 
       return log
     }),
-  updateProduct: publicProcedure
+  update: publicProcedure
     .use(authMiddleware(userAdmin))
     .input(
       z.object({
@@ -217,16 +217,16 @@ export default router({
       })
     )
     .mutation(async ({ input }) => {
-      const productRepository = dataSource.getRepository(Product)
-      const product = await productRepository.findOneBy({ id: input.id })
-      if (!product) {
-        throw new Error("Product not found")
+      const recordRepository = dataSource.getRepository(DataRecord)
+      const record = await recordRepository.findOneBy({ id: input.id })
+      if (!record) {
+        throw new Error("Record not found")
       }
 
-      product.metaData = input.metaData
+      record.metaData = input.metaData
 
-      await productRepository.save(product)
-      return product
+      await recordRepository.save(record)
+      return record
     }),
 
 })

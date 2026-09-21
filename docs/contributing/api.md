@@ -104,8 +104,8 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 |---|---|---|---|
 | `tree` | query | `userApproved` | Collections visible to the user, as a tree |
 | `treeAdmin` | query | `userAdmin` | Public collection tree for the admin screen |
-| `search` | query | `userApproved` | Files matching text, asset types, file formats, product facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored. Values of one attribute are alternatives, different attributes narrow each other. `sort` is `relevance` (default with a query: files matching more words first, then names starting with a word), `name` or `newest`; the order is stable across pages. `extensions` keeps only files whose name ends in one of the given extensions, compared in lower case and with a leading dot ignored. `minSize` and `maxSize` bound the file size in bytes and either may be omitted. The response carries `facets`: counts per asset type, file type (`image`, `video`, `document`, `other`), file extension, product view and facetable attribute value, computed over the whole result set with the dimension's own filter left out |
-| `searchNotFound` | query | `userApproved` | Returns the search terms found neither in a visible file name nor in a searchable attribute, within the same scope, asset type, product view, file type and extension filters |
+| `search` | query | `userApproved` | Files matching text, asset types, file formats, record facets and scope; without `exactMatch` every whitespace-separated word may match and surrounding whitespace is ignored. Values of one attribute are alternatives, different attributes narrow each other. `sort` is `relevance` (default with a query: files matching more words first, then names starting with a word), `name` or `newest`; the order is stable across pages. `extensions` keeps only files whose name ends in one of the given extensions, compared in lower case and with a leading dot ignored. `minSize` and `maxSize` bound the file size in bytes and either may be omitted. The response carries `facets`: counts per asset type, file type (`image`, `video`, `document`, `other`), file extension, product view and facetable attribute value, computed over the whole result set with the dimension's own filter left out |
+| `searchNotFound` | query | `userApproved` | Returns the search terms found neither in a visible file name nor in a searchable attribute, within the same scope, asset type, record view, file type and extension filters |
 | `findById` | query | `userApproved` | One collection with files, children, invitations |
 | `lastAddedFiles` | query | `userApproved` | 10 most recent collection files, optionally under one collection |
 | `create` | mutation | `userApproved` | New collection, under any parent including a synchronized one; `public` is forced to `false` for non-admins, so only admins create public ones. `BAD_REQUEST` when a sibling already has that name |
@@ -133,7 +133,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `asset.tree` | query | `userAdmin` | Asset folder tree |
 | `asset.findById` | query | `userAdmin` | One folder with children, files and ancestors |
 | `asset.update` | mutation | `userAdmin` | Sets `assetTypeId` and `licenseId` on a folder, its descendants and their files. When `assetTypeId` is given, also records `assetTypeSource` (`manual` on the folder, `inherited` on the descendants, `null` when the type is cleared) and clears `assetTypeRuleId` |
-| `asset.listProductViews` | query | `userApproved` | Distinct `productView` values |
+| `asset.listRecordViews` | query | `userApproved` | Distinct `recordView` values |
 | `assetType.list` | query | `userApproved` | Asset types |
 | `assetType.create`, `update`, `remove` | mutation | `userAdmin` | CRUD; removing a type deletes its folder rules |
 | `assetTypeRule.list` | query | `userAdmin` | Every rule with its asset type, `enabled`, `lastError`, `createdById`, the number of folders it types, up to 10 example paths and the ids of the rules it overlaps with, plus `folderCount` (folders with a stored path) |
@@ -151,19 +151,23 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `download.list` | query | `userApproved` | The caller's `ready`, `preparing` and `failed` downloads, plus those `expired` in the last month |
 | `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` at or above 10,000,000,000 bytes); `email` type pushes `download/create-archive` |
 
-### `pim` and `productAttribute`
+### `record` and `recordAttribute`
+
+Records were called products until the 2026-09-21 rename; the tables, columns, procedures and response fields all carry the record name now. The admin-chosen label (`enrichment_settings`) only changes what people read on screen.
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `pim.listProducts` | query | `userAdmin` | Products by `page` and `size`, optional `columnFilter` |
-| `pim.compareCsv` | mutation | `userAdmin` | Diff of a parsed CSV against existing products |
-| `pim.importCsv` | mutation | `userAdmin` | Upserts products from a parsed CSV |
-| `pim.removeAllProducts` | mutation | `userAdmin` | Deletes every product |
-| `pim.updateProduct` | mutation | `userAdmin` | Replaces one product's `metaData` |
-| `productAttribute.listAvailable` | query | `userAdmin` | Distinct `hstore` keys found in products |
-| `productAttribute.list` | query | `userAdmin` | Declared attributes |
-| `productAttribute.listFacets` | query | login | Facetable attributes with their distinct values |
-| `productAttribute.create`, `update`, `remove` | mutation | `userAdmin` | CRUD |
+| `record.list` | query | `userAdmin` | Records by `page` and `size`, optional `columnFilter`; `records` and `total` |
+| `record.compareCsv` | mutation | `userAdmin` | Diff of a parsed CSV against existing records |
+| `record.importCsv` | mutation | `userAdmin` | Upserts records from a parsed CSV (`keyColumnName`, `data`) |
+| `record.removeAll` | mutation | `userAdmin` | Deletes every record |
+| `record.update` | mutation | `userAdmin` | Replaces one record's `metaData` |
+| `recordAttribute.listAvailable` | query | `userAdmin` | Distinct `hstore` keys found in records |
+| `recordAttribute.list` | query | `userAdmin` | Declared attributes |
+| `recordAttribute.listFacets` | query | login | Facetable attributes with their distinct values |
+| `recordAttribute.create`, `update`, `remove` | mutation | `userAdmin` | CRUD |
+| `settings.getEnrichment` | query | `userAdmin` | `recordLabelSingular` and `recordLabelPlural` |
+| `settings.updateEnrichment` | mutation | `userAdmin` | Sets both labels (1 to 30 characters each); `env` returns them as `recordLabel` |
 
 ### `menuItem`, `page`, `settings`
 

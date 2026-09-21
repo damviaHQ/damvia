@@ -12,7 +12,7 @@ The Assets area is Damvia's mirror of the configured cloud sources. Administrato
 
 Open `/admin/assets`. Each configured source appears at the root with its latest state, item counts and last error when relevant. Opening a folder shows its subfolders and files together with two inherited settings:
 
-- **Asset Type** controls product linkage, search defaults and file presentation.
+- **Asset Type** controls record linkage, search defaults and file presentation.
 - **Licence** controls where and when non-admin users may see the files.
 
 Choose values and press **Save** to apply them to that folder, all descendant folders and all files below it. New folders inherit from their parent; every source run refreshes each file from its current folder.

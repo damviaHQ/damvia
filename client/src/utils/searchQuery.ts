@@ -33,7 +33,7 @@ export const FILE_TYPE_OPTIONS = [
 ] as const
 
 // Filter keys that "Clear all filters" resets; the terms, scope and mode stay.
-export const FILTER_KEYS = ['asset_types', 'product_views', 'file_types', 'extensions', 'size_min', 'size_max'] as const
+export const FILTER_KEYS = ['asset_types', 'record_views', 'file_types', 'extensions', 'size_min', 'size_max'] as const
 
 export const BYTES_PER_MB = 1024 * 1024
 
@@ -100,7 +100,7 @@ export function parseSearchQuery(query: LocationQuery, defaultSearchScope: Searc
     page: queryValueToPage(query.page),
     collectionId: queryValueToString(query.from_collection),
     assetTypes: queryValueToArray(query.asset_types),
-    productViews: queryValueToArray(query.product_views),
+    recordViews: queryValueToArray(query.record_views),
     fileTypes: queryValueToArray(query.file_types),
     extensions: queryValueToArray(query.extensions),
     minSize: megabytesToBytes(query.size_min as string | undefined),
@@ -146,12 +146,12 @@ export function clearFilterQuery(query: LocationQuery): LocationQuery {
   return patchSearchQuery(query, patch)
 }
 
-export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'product_views' | 'file_types' | 'extensions' | 'size' | 'attribute', attributeId?: string }
+export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'record_views' | 'file_types' | 'extensions' | 'size' | 'attribute', attributeId?: string }
 
 export function activeFilters(form: SearchForm): ActiveFilter[] {
   return [
     ...form.assetTypes.map((value) => ({ key: 'asset_types', value, group: 'asset_types' as const })),
-    ...form.productViews.map((value) => ({ key: 'product_views', value, group: 'product_views' as const })),
+    ...form.recordViews.map((value) => ({ key: 'record_views', value, group: 'record_views' as const })),
     ...form.fileTypes.map((value) => ({ key: 'file_types', value, group: 'file_types' as const })),
     ...form.extensions.map((value) => ({ key: 'extensions', value, group: 'extensions' as const })),
     ...(form.minSize !== undefined || form.maxSize !== undefined

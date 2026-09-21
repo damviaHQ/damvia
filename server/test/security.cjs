@@ -20,7 +20,7 @@ const { Readable } = require('node:stream')
 const { sign } = require('jsonwebtoken')
 const harness = require('./lib/helpers.cjs')
 const { env, db, worker, server, storage, state, fixtures, save, caller, makeUser, makeCollection, forbidden } = harness
-const { User, Group, UserGroup, Collection, CollectionFile, CollectionInvitation, AssetFolder, AssetFile, License, Product, Download } = harness.entities
+const { User, Group, UserGroup, Collection, CollectionFile, CollectionInvitation, AssetFolder, AssetFile, License, DataRecord, Download } = harness.entities
 const { credentials, users, collections } = harness.services
 const { createDownloadArchive } = harness.services.download
 const { queued, processors, sentMails, removedKeys, fetchedFiles } = state
@@ -37,13 +37,13 @@ test('upgrade repairs existing restrictions; invited guests do not join the defa
     assert.equal(row.canEditLimitedToGroupIds, false)
 })
 
-test('product changes require an approved and verified admin', async () => {
-    const product = await save(Product, { productKey: randomUUID(), primaryKeyName: 'SKU', metaData: {} })
-    const input = { id: product.id, metaData: { name: 'Changed' } }
+test('record changes require an approved and verified admin', async () => {
+    const record = await save(DataRecord, { recordKey: randomUUID(), keyColumnName: 'SKU', metaData: {} })
+    const input = { id: record.id, metaData: { name: 'Changed' } }
     for (const user of [null, member, manager, { ...admin, approved: false }, { ...admin, emailVerified: false }]) {
-        await forbidden(caller(user).pim.updateProduct(input))
+        await forbidden(caller(user).record.update(input))
     }
-    assert.deepEqual((await caller(admin).pim.updateProduct(input)).metaData, input.metaData)
+    assert.deepEqual((await caller(admin).record.update(input)).metaData, input.metaData)
 })
 
 test('verification resend is self-only and never returns credentials', async () => {
@@ -920,7 +920,7 @@ test('search demand compares exact periods, detects daily spikes and surfaces ga
     for (let day = 1; day <= 7; day++) record('summer launch', String(day).padStart(2, '0'), 1)
     record('summer launch', '08', 15, 0)
     record('summer launch', '15', 70, 0)
-    record('new product', '09', 5)
+    record('new record', '09', 5)
     record('quiet term', '10', 4)
     record('missing content', '11', 3, 0)
     for (let index = 0; index < 51; index++) record(`regular term ${index}`, '12', 4)

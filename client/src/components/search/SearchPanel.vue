@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Switch } from "@/components/ui/switch"
 import { useGlobalToast } from "@/composables/useGlobalToast"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { useSearchState } from "@/composables/useSearchState"
 import { type SearchScope } from "@/utils/searchQuery"
 import { RouterOutput, trpc } from "@/services/server"
@@ -29,10 +30,11 @@ import { computed } from "vue"
 
 const { form, terms, hasQuery, filters, setTerms, setExactMatch, setScope, toggleValue, clearFilters } = useSearchState()
 const toast = useGlobalToast()
+const recordLabel = useRecordLabel()
 
 const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
-const { data: productViews } = useQuery({ queryKey: ["product-views"], queryFn: () => trpc.asset.listProductViews.query() })
-const { data: productFacets } = useQuery({ queryKey: ["products", "attributes", "facets"], queryFn: () => trpc.productAttribute.listFacets.query() })
+const { data: recordViews } = useQuery({ queryKey: ["record-views"], queryFn: () => trpc.asset.listRecordViews.query() })
+const { data: recordFacets } = useQuery({ queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
@@ -49,7 +51,7 @@ const notFoundInput = computed(() => ({
   query: terms.value,
   collectionId: form.value.collectionId,
   assetTypes: form.value.assetTypes,
-  productViews: form.value.productViews,
+  recordViews: form.value.recordViews,
   fileTypes: form.value.fileTypes,
   searchScope: form.value.searchScope,
 }))
@@ -62,7 +64,7 @@ const { data: notFound } = useQuery({
 const missing = computed(() => (form.value.exactMatch ? [] : notFound.value ?? []))
 
 type SearchFacets = RouterOutput["collection"]["search"]["facets"]
-const emptyFacets: SearchFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, productViews: {}, attributes: {} }
+const emptyFacets: SearchFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {} }
 const facets = computed<SearchFacets>(() => search.value?.facets ?? emptyFacets)
 const collectionName = computed(() => collection.value?.name ?? "this collection")
 
@@ -71,13 +73,13 @@ const assetTypeOptions = computed<FacetOption[]>(() =>
     .map((assetType: any) => ({ id: assetType.id, label: assetType.name, count: facets.value.assetTypes[assetType.id] ?? 0 }))
     .sort((a, b) => a.label.localeCompare(b.label))
 )
-const productViewOptions = computed<FacetOption[]>(() =>
-  (productViews.value ?? [])
-    .map((view: string) => ({ id: view, label: view, count: facets.value.productViews[view] ?? 0 }))
+const recordViewOptions = computed<FacetOption[]>(() =>
+  (recordViews.value ?? [])
+    .map((view: string) => ({ id: view, label: view, count: facets.value.recordViews[view] ?? 0 }))
     .sort((a, b) => a.label.localeCompare(b.label))
 )
 const attributeGroups = computed(() =>
-  (productFacets.value ?? []).map((facet: any) => {
+  (recordFacets.value ?? []).map((facet: any) => {
     const counts = facets.value.attributes[facet.id] ?? {}
     const values = new Set<string>([...facet.values, ...(form.value.attributes[facet.id] ?? [])])
     return {
@@ -181,7 +183,7 @@ function removeMissing() {
     </section>
 
     <SearchFacetGroup id="search-asset-types" title="Asset type" :options="assetTypeOptions" :selected="form.assetTypes" @toggle="toggleValue('asset_types', $event)" />
-    <SearchFacetGroup v-if="productViewOptions.length" id="search-product-views" title="Product view" :options="productViewOptions" :selected="form.productViews" :open="form.productViews.length > 0" @toggle="toggleValue('product_views', $event)" />
+    <SearchFacetGroup v-if="recordViewOptions.length" id="search-record-views" :title="`${recordLabel.singular.value} view`" :options="recordViewOptions" :selected="form.recordViews" :open="form.recordViews.length > 0" @toggle="toggleValue('record_views', $event)" />
     <SearchFacetGroup v-for="group in attributeGroups" :id="`search-facet-${group.id}`" :key="group.id" :title="group.title" :options="group.options" :selected="form.attributes[group.id] ?? []" :open="(form.attributes[group.id]?.length ?? 0) > 0 || attributeGroups.length <= 3" @toggle="toggleValue(`attributes[${group.id}]`, $event)" />
 
     </div>

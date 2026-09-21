@@ -12,35 +12,14 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { Column, CreateDateColumn, Entity, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
+import { useGlobalStore } from "@/stores/globalStore"
+import { computed } from "vue"
 
-@Entity('asset_types')
-export class AssetType {
-	@PrimaryColumn()
-	@PrimaryGeneratedColumn("uuid")
-	id: string
-
-	@Column()
-	name: string
-
-	@Column({ type: 'varchar', nullable: true })
-	description: string | null
-
-	@Column({ default: false })
-	isRelatedToRecords: boolean
-
-	@Column({ default: false })
-	includeInSearchByDefault: boolean
-
-	@Column({ default: 'grid' })
-	defaultDisplay: 'grid' | 'list'
-
-	@Column({ type: 'text', default: [], array: true })
-	listDisplayItems: string[]
-
-	@CreateDateColumn()
-	createdAt: Date
-
-	@UpdateDateColumn()
-	updatedAt: Date
+export function useRecordLabel() {
+  const store = useGlobalStore()
+  const singular = computed(() => store.env?.recordLabel.singular ?? "Product")
+  const plural = computed(() => store.env?.recordLabel.plural ?? "Products")
+  const lower = computed(() => singular.value.toLocaleLowerCase())
+  const lowerPlural = computed(() => plural.value.toLocaleLowerCase())
+  return { singular, plural, lower, lowerPlural }
 }

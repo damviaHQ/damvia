@@ -14,12 +14,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
-import { Product } from "../../entity/product"
-import { ProductAttribute } from "../../entity/product-attribute"
+import { DataRecord } from "../../entity/data-record"
+import { RecordAttribute } from "../../entity/record-attribute"
 import { dataSource } from "../../env"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
-export function formatProductAttribute(attribute: ProductAttribute) {
+export function formatRecordAttribute(attribute: RecordAttribute) {
 	return {
 		id: attribute.id,
 		name: attribute.name,
@@ -34,27 +34,27 @@ export default router({
 	listAvailable: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.query(async () => {
-			const products = await dataSource.getRepository(Product)
-				.createQueryBuilder('products')
-				.select('distinct skeys(products.meta_data) as name')
+			const records = await dataSource.getRepository(DataRecord)
+				.createQueryBuilder('records')
+				.select('distinct skeys(records.meta_data) as name')
 				.getRawMany<{ name: string }>()
-			return products.map((product) => product.name)
+			return records.map((record) => record.name)
 		}),
 	list: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.query(async () => {
-			const attributes = await dataSource.getRepository(ProductAttribute).find()
-			return attributes.map(formatProductAttribute)
+			const attributes = await dataSource.getRepository(RecordAttribute).find()
+			return attributes.map(formatRecordAttribute)
 		}),
 	listFacets: publicProcedure
 		.use(authMiddleware())
 		.query(async () => {
-			const facets = await dataSource.getRepository(ProductAttribute).findBy({ facetable: true })
-			const facetValues = await dataSource.getRepository(ProductAttribute)
-				.createQueryBuilder('product_attributes')
-				.select('name, products.meta_data[name] as value')
-				.innerJoin('products', 'products', 'exist(products.meta_data, name)')
-				.where('product_attributes.facetable is true')
+			const facets = await dataSource.getRepository(RecordAttribute).findBy({ facetable: true })
+			const facetValues = await dataSource.getRepository(RecordAttribute)
+				.createQueryBuilder('record_attributes')
+				.select('name, records.meta_data[name] as value')
+				.innerJoin('records', 'records', 'exist(records.meta_data, name)')
+				.where('record_attributes.facetable is true')
 				.groupBy('name, value')
 				.getRawMany<{ name: string, value: string }>()
 			return facets.map((facet) => ({
@@ -74,14 +74,14 @@ export default router({
 			searchable: z.boolean(),
 		}))
 		.mutation(async ({ input }) => {
-			const attribute = new ProductAttribute()
+			const attribute = new RecordAttribute()
 			attribute.name = input.name
 			attribute.displayName = input.displayName
 			attribute.facetable = input.facetable
 			attribute.viewable = input.facetable || input.viewable
 			attribute.searchable = input.searchable
-			await dataSource.getRepository(ProductAttribute).save(attribute)
-			return formatProductAttribute(attribute)
+			await dataSource.getRepository(RecordAttribute).save(attribute)
+			return formatRecordAttribute(attribute)
 		}),
 	update: publicProcedure
 		.use(authMiddleware(userAdmin))
@@ -93,28 +93,28 @@ export default router({
 			searchable: z.boolean(),
 		}))
 		.mutation(async ({ input }) => {
-			const attribute = await dataSource.getRepository(ProductAttribute).findOneBy({ id: input.id })
+			const attribute = await dataSource.getRepository(RecordAttribute).findOneBy({ id: input.id })
 			if (!attribute) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Product attribute not found.' })
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Record attribute not found.' })
 			}
 
 			attribute.displayName = input.displayName
 			attribute.facetable = input.facetable
 			attribute.viewable = input.facetable || input.viewable
 			attribute.searchable = input.searchable
-			await dataSource.getRepository(ProductAttribute).save(attribute)
-			return formatProductAttribute(attribute)
+			await dataSource.getRepository(RecordAttribute).save(attribute)
+			return formatRecordAttribute(attribute)
 		}),
 	remove: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.uuid())
 		.mutation(async ({ input }) => {
-			const attribute = await dataSource.getRepository(ProductAttribute).findOneBy({ id: input })
+			const attribute = await dataSource.getRepository(RecordAttribute).findOneBy({ id: input })
 			if (!attribute) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Product attribute not found.' })
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Record attribute not found.' })
 			}
 
-			await dataSource.getRepository(ProductAttribute).remove(attribute)
-			return formatProductAttribute(attribute)
+			await dataSource.getRepository(RecordAttribute).remove(attribute)
+			return formatRecordAttribute(attribute)
 		})
 })

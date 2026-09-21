@@ -43,8 +43,8 @@ export async function formatAssetFile(file: AssetFile) {
 		name: file.name,
 		mimeType: file.mimeType,
 		assetTypeId: file.assetTypeId,
-		productView: file.productView,
-		productId: file.productId,
+		recordView: file.recordView,
+		recordId: file.recordId,
 		licenseId: file.licenseId,
 		thumbnailURL: file.hasThumbnail ? await assetsS3().presignedGetObject(assetsS3Bucket(), file.thumbnailStorageKey) : null,
 		fileURL: await assetsS3().presignedGetObject(assetsS3Bucket(), file.originalStorageKey),
@@ -67,16 +67,16 @@ export default router({
 			const tree = await dataSource.getTreeRepository(AssetFolder).findTrees()
 			return Promise.all(tree.map(formatAssetFolder))
 		}),
-	listProductViews: publicProcedure
+	listRecordViews: publicProcedure
 		.use(authMiddleware(userApproved))
 		.query(async () => {
 			const query = await dataSource.getRepository(AssetFile)
 				.createQueryBuilder('asset_file')
-				.select('asset_file.product_view')
-				.addGroupBy('asset_file.product_view')
-				.where('asset_file.product_view IS NOT NULL')
+				.select('asset_file.record_view')
+				.addGroupBy('asset_file.record_view')
+				.where('asset_file.record_view IS NOT NULL')
 				.getRawMany()
-			return query.map((value) => value.product_view) as string[]
+			return query.map((value) => value.record_view) as string[]
 		}),
 	findById: publicProcedure
 		.use(authMiddleware(userAdmin))

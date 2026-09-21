@@ -36,7 +36,7 @@ const file = (
   name,
   mimeType,
   assetType: assetType ?? null,
-  product: attributes.length ? { attributes } : null,
+  record: attributes.length ? { attributes } : null,
 })
 
 const packshot = { id: 'type-packshot', name: 'Packshots' }

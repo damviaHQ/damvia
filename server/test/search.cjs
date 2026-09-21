@@ -17,7 +17,7 @@ const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
 const { db, state, save, makeUser, makeCollection, makeFolder, makeFile } = harness
-const { CollectionFile, AssetType, Product, ProductAttribute } = harness.entities
+const { CollectionFile, AssetType, DataRecord, RecordAttribute } = harness.entities
 const { caller } = harness
 let fixtures, root, child, color, related, unrelated, colorAttr, sizeAttr
 const names = result => result.results.map(file => file.name).sort()
@@ -28,18 +28,18 @@ before(async () => {
     const childFolder = await makeFolder({ name: 'Child', parent: rootFolder })
     root = await makeCollection({ name: 'Root', assetFolderId: rootFolder.id })
     child = await makeCollection({ name: 'Child', assetFolderId: childFolder.id, parent: root })
-    related = await save(AssetType, { name: 'Packshot', isRelatedToProducts: true, defaultDisplay: 'grid', listDisplayItems: [] })
-    unrelated = await save(AssetType, { name: 'Document', isRelatedToProducts: false, defaultDisplay: 'grid', listDisplayItems: [] })
-    colorAttr = await save(ProductAttribute, { name: 'color', searchable: true, facetable: true, viewable: true })
-    sizeAttr = await save(ProductAttribute, { name: 'size', searchable: false, facetable: true, viewable: true })
-    const product = await save(Product, { productKey: 'SKU-1', primaryKeyName: 'SKU', metaData: { color: 'red', size: 'M' } })
-    const blue = await save(Product, { productKey: 'SKU-2', primaryKeyName: 'SKU', metaData: { color: 'navy', size: 'M' } })
+    related = await save(AssetType, { name: 'Packshot', isRelatedToRecords: true, defaultDisplay: 'grid', listDisplayItems: [] })
+    unrelated = await save(AssetType, { name: 'Document', isRelatedToRecords: false, defaultDisplay: 'grid', listDisplayItems: [] })
+    colorAttr = await save(RecordAttribute, { name: 'color', searchable: true, facetable: true, viewable: true })
+    sizeAttr = await save(RecordAttribute, { name: 'size', searchable: false, facetable: true, viewable: true })
+    const record = await save(DataRecord, { recordKey: 'SKU-1', keyColumnName: 'SKU', metaData: { color: 'red', size: 'M' } })
+    const blue = await save(DataRecord, { recordKey: 'SKU-2', keyColumnName: 'SKU', metaData: { color: 'navy', size: 'M' } })
     const files = [
         [rootFolder, root, { name: 'shirt-red.png', mimeType: 'image/png', size: String(5 * 1024 * 1024) }],
-        [rootFolder, root, { name: 'hat.mp4', mimeType: 'video/mp4', assetTypeId: related.id, productView: 'front', size: String(250 * 1024 * 1024) }],
-        [rootFolder, root, { name: 'spec.pdf', mimeType: 'application/pdf', assetTypeId: unrelated.id, productView: 'front', size: String(40 * 1024 * 1024) }],
-        [childFolder, child, { name: 'notes.txt', mimeType: 'text/plain', productId: product.id }],
-        [childFolder, child, { name: 'blue-cap.png', mimeType: 'image/png', productId: blue.id, assetTypeId: related.id }],
+        [rootFolder, root, { name: 'hat.mp4', mimeType: 'video/mp4', assetTypeId: related.id, recordView: 'front', size: String(250 * 1024 * 1024) }],
+        [rootFolder, root, { name: 'spec.pdf', mimeType: 'application/pdf', assetTypeId: unrelated.id, recordView: 'front', size: String(40 * 1024 * 1024) }],
+        [childFolder, child, { name: 'notes.txt', mimeType: 'text/plain', recordId: record.id }],
+        [childFolder, child, { name: 'blue-cap.png', mimeType: 'image/png', recordId: blue.id, assetTypeId: related.id }],
     ]
     for (const [folder, collection, extra] of files) {
         const file = await makeFile(folder, extra)
@@ -49,7 +49,7 @@ before(async () => {
 after(() => harness.teardown())
 
 test('search treats imported attribute names as data', async () => {
-    await save(ProductAttribute, { name: "name'] OR true --", searchable: true })
+    await save(RecordAttribute, { name: "name'] OR true --", searchable: true })
     for (const exactMatch of [true, false]) {
         const result = await searchAs({ query: 'does-not-exist-unique', exactMatch, page: 1 })
         assert.equal(result.total, 0)
@@ -107,8 +107,8 @@ test('facet counts cover the whole result set and leave out their own filter', a
     const all = (await searchAs({})).facets
     assert.deepEqual(all.fileTypes, { image: 2, video: 1, document: 1, other: 1 })
     assert.deepEqual(all.assetTypes, { [related.id]: 2, [unrelated.id]: 1 })
-    assert.deepEqual(all.productViews, { front: 1 })
-    assert.equal(all.productViews.front, (await searchAs({ productViews: ['front'] })).total)
+    assert.deepEqual(all.recordViews, { front: 1 })
+    assert.equal(all.recordViews.front, (await searchAs({ recordViews: ['front'] })).total)
     assert.deepEqual(all.attributes[colorAttr.id], { red: 1, navy: 1 })
     assert.deepEqual(all.attributes[sizeAttr.id], { M: 2 })
     const filtered = (await searchAs({ fileTypes: ['video'], attributes: { [colorAttr.id]: ['navy'] } })).facets
@@ -139,7 +139,7 @@ test('search scope limits results to one collection or to its subtree', async ()
     assert.equal((await searchAs({ searchScope: 'all', collectionId: child.id })).total, 5)
 })
 
-test('file type, asset type and product view filters narrow results and unknown file types are ignored', async () => {
+test('file type, asset type and record view filters narrow results and unknown file types are ignored', async () => {
     assert.deepEqual(names(await searchAs({ fileTypes: ['document'] })), ['spec.pdf'])
     assert.deepEqual(names(await searchAs({ fileTypes: ['video'] })), ['hat.mp4'])
     assert.deepEqual(names(await searchAs({ fileTypes: ['image'] })), ['blue-cap.png', 'shirt-red.png'])
@@ -147,7 +147,7 @@ test('file type, asset type and product view filters narrow results and unknown 
     assert.equal((await searchAs({ fileTypes: ['archive'] })).total, 5)
     assert.equal((await searchAs({ fileTypes: ['constructor', '__proto__'] })).total, 5)
     assert.deepEqual(names(await searchAs({ assetTypes: [related.id] })), ['blue-cap.png', 'hat.mp4'])
-    assert.deepEqual(names(await searchAs({ productViews: ['front'] })), ['hat.mp4'])
+    assert.deepEqual(names(await searchAs({ recordViews: ['front'] })), ['hat.mp4'])
 })
 
 test('a first-page search is recorded once per minute with its total and scoped collection', async () => {

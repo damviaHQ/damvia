@@ -3,7 +3,7 @@ title: Insights
 description: The admin analytics screen at /admin/analytics with views, downloads, active users, searches and shares over a date range, what each figure counts, and how long events are kept.
 sidebar:
   order: 13
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-21
 ---
 
 Insights, at `/admin/analytics`, tells an admin which files are used, by whom, and what people look for without finding it. The [dashboard](./dashboard.md) answers "is the instance healthy right now"; Insights answers "what happened over the last 30 days". It is rendered for the `admin` role only, and every figure comes from the `analytics` router, gated by `userAdmin`.
@@ -59,7 +59,7 @@ The attention list evaluates all terms before limiting the display, so an uncomm
 
 Select a term to see its daily chart and contactable users. The audience includes approved, email-verified non-guest accounts that searched that exact term in the selected period. Deleted accounts still contribute to event totals but cannot be contacted. Up to 200 users are shown and exported; the full contactable count is displayed alongside that limit.
 
-Use **Find matching content** to open the portal search with the term prefilled, or **Manage assets** to review the asset tree. Missing content may need to be added in the connected cloud storage, exposed through collections, or made searchable in [Products and PIM](./products-and-pim.md).
+Use **Find matching content** to open the portal search with the term prefilled, or **Manage assets** to review the asset tree. Missing content may need to be added in the connected cloud storage, exposed through collections, or made searchable in [Records](./records.md).
 
 Choose a waiting or availability-update message, then **Draft email** beside a person to open a prefilled message in your email application. Review the text and supply any confirmed dates or links before sending. **Copy message** copies the suggested text. Damvia does not send emails, schedule alerts or publish assets automatically from this report.
 

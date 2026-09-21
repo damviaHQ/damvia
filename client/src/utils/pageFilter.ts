@@ -26,7 +26,7 @@ export type FilterableFile = {
   name: string
   mimeType?: string | null
   assetType?: { id: string, name: string } | null
-  product?: { attributes?: ({ id: string, name: string, displayName?: string | null, value?: string | null } | null)[] | null } | null
+  record?: { attributes?: ({ id: string, name: string, displayName?: string | null, value?: string | null } | null)[] | null } | null
 }
 export type FilterableCollection = { name: string }
 
@@ -71,7 +71,7 @@ export function fileExtensionOf(file: FilterableFile): string {
 }
 
 function attributeValues(file: FilterableFile, attributeId: string): string[] {
-  return (file.product?.attributes ?? [])
+  return (file.record?.attributes ?? [])
     .filter(attribute => attribute?.id === attributeId && !!attribute.value)
     .map(attribute => attribute!.value as string)
 }
@@ -135,7 +135,7 @@ export function fileFacets(files: FilterableFile[], state: PageFilterState): Pag
   const attributeLabels = new Map<string, string>()
   for (const file of files) {
     if (file.assetType) assetTypeNames.set(file.assetType.id, file.assetType.name)
-    for (const attribute of file.product?.attributes ?? []) {
+    for (const attribute of file.record?.attributes ?? []) {
       if (attribute?.value) attributeLabels.set(attribute.id, attribute.displayName || attribute.name)
     }
   }

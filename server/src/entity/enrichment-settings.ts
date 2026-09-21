@@ -12,33 +12,19 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
+import { Column, Entity, PrimaryColumn, UpdateDateColumn } from "typeorm"
 
-@Entity('product_attributes')
-export class ProductAttribute {
-    @PrimaryColumn()
-    @PrimaryGeneratedColumn("uuid")
-    id: string
+@Entity('enrichment_settings')
+export class EnrichmentSettings {
+	@PrimaryColumn({ type: 'int' })
+	id: number
 
-    @Column({ unique: true })
-    name: string
+	@Column({ default: 'Product' })
+	recordLabelSingular: string
 
-    @Column({ type: 'varchar', nullable: true })
-    displayName: string | null
+	@Column({ default: 'Products' })
+	recordLabelPlural: string
 
-    @Column({ default: false })
-    facetable: boolean
-
-    @Column({ default: false })
-    @Index()
-    searchable: boolean
-
-    @Column({ default: false })
-    viewable: boolean
-
-    @CreateDateColumn()
-    createdAt: Date
-
-    @UpdateDateColumn()
-    updatedAt: Date
+	@UpdateDateColumn()
+	updatedAt: Date
 }

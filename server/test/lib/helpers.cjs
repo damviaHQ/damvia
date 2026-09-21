@@ -28,8 +28,8 @@ process.env.APP_SECRET = 'security-tests-only-random-fixture-secret-20260916'
 process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../../dist/env')
 const { dataSource: db } = env
-const LATEST_MIGRATION = 'AssetTypeRules1790467200000'
-const UPGRADE_MIGRATIONS = 12
+const LATEST_MIGRATION = 'Records1790553600000'
+const UPGRADE_MIGRATIONS = 13
 const state = {
     disk: { totalBytes: 10000, freeBytes: 9000 },
     bucketObjects: [],
@@ -77,8 +77,8 @@ const entities = {
     AssetTypeRule: require('../../dist/entity/asset-type-rule').AssetTypeRule,
     AuthorizedDomain: require('../../dist/entity/authorized-domain').AuthorizedDomain,
     License: require('../../dist/entity/license').License,
-    Product: require('../../dist/entity/product').Product,
-    ProductAttribute: require('../../dist/entity/product-attribute').ProductAttribute,
+    DataRecord: require('../../dist/entity/data-record').DataRecord,
+    RecordAttribute: require('../../dist/entity/record-attribute').RecordAttribute,
     Download: require('../../dist/entity/download').Download,
 }
 const services = {

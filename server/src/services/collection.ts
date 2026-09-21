@@ -86,10 +86,10 @@ export function userCollectionFilesQuery(user: User, em: EntityManager = dataSou
 			'asset_type.id = asset_file.asset_type_id',
 		)
 		.leftJoinAndMapOne(
-			'asset_file.product',
-			'asset_file.product',
-			'product',
-			'product.id = asset_file.product_id',
+			'asset_file.record',
+			'asset_file.record',
+			'record',
+			'record.id = asset_file.record_id',
 		)
 		.where(new Brackets((q) => {
 			q = q.where("collection.owner_id = :userId", { userId: user.id })

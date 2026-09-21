@@ -16,7 +16,7 @@ import { userCollectionFilesQuery, userCollectionsQuery } from '../../services/c
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 import { ActivityEvent, ActivityEventType } from "../../entity/activity-event"
-import { ProductAttribute } from "../../entity/product-attribute"
+import { RecordAttribute } from "../../entity/record-attribute"
 import { UserCollectionFavorite } from "../../entity/user-collection-favorite"
 import { UserFavorite } from "../../entity/user-favorite"
 import { dataSource } from "../../env"
@@ -62,11 +62,11 @@ export default router({
 			const files = await userCollectionFilesQuery(ctx.user)
 				.innerJoin(UserFavorite, 'favorite', 'favorite.collection_file_id = collection_file.id AND favorite.user_id = :favoriteUserId', { favoriteUserId: ctx.user.id })
 				.getMany()
-			const productAttributes = await dataSource.getRepository(ProductAttribute).find()
+			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 
 			return Promise.all(files.map((file) => formatCollectionFile({
 				file,
-				productAttributes,
+				recordAttributes,
 			})))
 		}),
 	add: publicProcedure

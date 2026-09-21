@@ -50,17 +50,17 @@ import { CirclePlus, FileUp, PencilLine, Trash2 } from "@lucide/vue"
 import { ref, watchEffect } from "vue"
 import { RouterOutput, trpc } from "../../../services/server.ts"
 
-type ProductAttribute = RouterOutput["productAttribute"]["list"][number]
+type RecordAttribute = RouterOutput["recordAttribute"]["list"][number]
 
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
-const { data: productAttributeNames } = useQuery({
-  queryKey: ["products", "available-attributes"],
-  queryFn: () => trpc.productAttribute.listAvailable.query(),
+const { data: recordAttributeNames } = useQuery({
+  queryKey: ["records", "available-attributes"],
+  queryFn: () => trpc.recordAttribute.listAvailable.query(),
 })
-const { data: productAttributes } = useQuery({
-  queryKey: ["products", "attributes"],
-  queryFn: () => trpc.productAttribute.list.query(),
+const { data: recordAttributes } = useQuery({
+  queryKey: ["records", "attributes"],
+  queryFn: () => trpc.recordAttribute.list.query(),
 })
 const form = ref<{
   id?: string
@@ -91,14 +91,14 @@ function openCreateModal() {
   modalState.value = "creating"
 }
 
-function openEditModal(productAttribute: ProductAttribute) {
+function openEditModal(recordAttribute: RecordAttribute) {
   form.value = {
-    id: productAttribute.id,
-    name: productAttribute.name,
-    displayName: productAttribute.displayName,
-    facetable: productAttribute.facetable,
-    viewable: productAttribute.viewable,
-    searchable: productAttribute.searchable,
+    id: recordAttribute.id,
+    name: recordAttribute.name,
+    displayName: recordAttribute.displayName,
+    facetable: recordAttribute.facetable,
+    viewable: recordAttribute.viewable,
+    searchable: recordAttribute.searchable,
   }
   nameError.value = ""
   modalState.value = "editing"
@@ -110,9 +110,9 @@ watchEffect(() => {
   }
 })
 
-async function remove(productAttribute: ProductAttribute) {
-  await trpc.productAttribute.remove.mutate(productAttribute.id)
-  await queryClient.invalidateQueries({ queryKey: ["products", "attributes"] })
+async function remove(recordAttribute: RecordAttribute) {
+  await trpc.recordAttribute.remove.mutate(recordAttribute.id)
+  await queryClient.invalidateQueries({ queryKey: ["records", "attributes"] })
   toast.success("Record attribute removed!")
 }
 
@@ -128,11 +128,11 @@ function submitChanges(event: Event) {
 
   const action: any =
     modalState.value === "creating"
-      ? trpc.productAttribute.create
-      : trpc.productAttribute.update
+      ? trpc.recordAttribute.create
+      : trpc.recordAttribute.update
   return action
     .mutate(form.value)
-    .then(() => queryClient.invalidateQueries({ queryKey: ["products", "attributes"] }))
+    .then(() => queryClient.invalidateQueries({ queryKey: ["records", "attributes"] }))
     .then(() => {
       toast.success(
         modalState.value === "creating"
@@ -160,12 +160,12 @@ async function onModalSubmit(event: Event) {
         Add attribute
       </Button>
     </AdminPageHeader>
-    <div v-if="productAttributes && !productAttributes.length" class="admin-text-secondary flex items-center gap-2">
-      You must first <router-link :to="{ name: 'admin-product-import' }" class="underline flex items-center gap-2">
-        <FileUp class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />import products data
+    <div v-if="recordAttributes && !recordAttributes.length" class="admin-text-secondary flex items-center gap-2">
+      You must first <router-link :to="{ name: 'admin-record-import' }" class="underline flex items-center gap-2">
+        <FileUp class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />import records data
       </router-link> to use attributes.
     </div>
-    <AdminList v-else :items="productAttributes" :fields="['name', 'displayName']" label="Record attributes" v-slot="{ items }">
+    <AdminList v-else :items="recordAttributes" :fields="['name', 'displayName']" label="Record attributes" v-slot="{ items }">
     <Table>
       <TableHeader>
         <TableRow>
@@ -223,8 +223,8 @@ async function onModalSubmit(event: Event) {
                   <SelectValue placeholder="Available Attributes..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="name in productAttributeNames" :key="name" :value="name"
-                    :disabled="!!productAttributes?.find((attr) => attr.name === name)">
+                  <SelectItem v-for="name in recordAttributeNames" :key="name" :value="name"
+                    :disabled="!!recordAttributes?.find((attr) => attr.name === name)">
                     {{ name }}
                   </SelectItem>
                 </SelectContent>

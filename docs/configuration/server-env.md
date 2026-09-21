@@ -3,7 +3,7 @@ title: Server configuration
 description: What each group of server variables controls, and the values that trip people up.
 sidebar:
   order: 2
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
 `server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
@@ -75,9 +75,9 @@ For several folders, accounts or providers, set `ASSET_SOURCES` to the raw or ba
 
 A source key becomes part of every mirrored row. Changing a provider, root or key on an existing instance can remove, duplicate or re-import assets if it is treated as an ordinary environment edit. Follow the rename and removal procedures in the Sources guide.
 
-## PIM matching
+## Record matching
 
-`PRODUCT_MATCHING_REGEX` is compiled with `new RegExp()` and run against each file name every 5 minutes. Group 1 must capture the product key exactly as it appears in the `productKey` column of imported products; optional group 2 captures the view code. `PIM_PRODUCT_VIEW` names the view whose thumbnail represents the product in the admin list. Write the regex without surrounding slashes and without flags. See [Products and PIM](../administration/products-and-pim.md).
+`PRODUCT_MATCHING_REGEX` is compiled with `new RegExp()` and run against each file name every 5 minutes. Group 1 must capture the record key exactly as it appears in the `recordKey` column of imported records; optional group 2 captures the view code. `PIM_PRODUCT_VIEW` names the view whose thumbnail represents the product in the admin list. Write the regex without surrounding slashes and without flags. See [Records](../administration/records.md).
 
 ## Variables you rarely set
 

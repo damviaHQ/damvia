@@ -1,6 +1,6 @@
 ---
 title: Administration
-description: Choose the administrative guide for access, assets, collections, pages, products or workspace health.
+description: Choose the administrative guide for access, assets, collections, pages, records or workspace health.
 sidebar:
   order: 1
 lastUpdated: 2026-09-21
@@ -32,7 +32,7 @@ Managers only receive the Users area and can act only on users in their own regi
 ## Assets and rights
 
 - [Assets tree](./assets-tree.md): inspect each source and assign a type and licence to folders.
-- [Asset types](./asset-types.md): control default display, product linkage and search defaults, and type folders by rules on their path.
+- [Asset types](./asset-types.md): control default display, record linkage and search defaults, and type folders by rules on their path.
 - [Licences](./licenses.md): restrict files by region and date and understand why a licence follows a file into every collection.
 
 Source files are managed in the connected cloud storage. Damvia's asset tree is for inspection and classification; it does not upload or reorganise those files.
@@ -45,9 +45,9 @@ Source files are managed in the connected cloud storage. Damvia's asset tree is 
 
 Collections organise references to assets. Copying a file into another collection does not copy the asset or change its type or licence. A page block also does not add a file to its collection.
 
-## Product data and reporting
+## Data enrichment and reporting
 
-- [Products and PIM](./products-and-pim.md): import CSV data, choose the product key and configure searchable/filterable attributes.
+- [Records](./records.md): import CSV data of products, events or anything files are about, choose the key column, name the records and configure searchable/filterable attributes.
 - [Insights](./analytics.md): interpret recorded activity and retention.
 - [Dashboard](./dashboard.md): storage usage, source state and items needing attention.
 
@@ -63,6 +63,6 @@ Collections organise references to assets. Copying a file into another collectio
 | Folder rules | `/admin/folder-rules` | admin |
 | Users | `/admin/users` | admin or manager for their region |
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
-| Products and attributes | `/admin/products`, `/admin/products/import`, `/admin/products/attributes` | admin |
+| Records, attributes and the record label | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/records/attributes`, `/admin/data-enrichment/settings` | admin |
 
 The labels and exact layout may evolve; the permission and data consequences documented on each linked page are the durable contract.

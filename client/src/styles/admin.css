@@ -63,12 +63,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .admin-resource-page tbody tr:hover { background:var(--dv-surface-canvas); }
 .dv-admin .admin-tree { width:100%; margin-top:20px; overflow:auto; padding:8px 0; }
 .dv-admin .admin-tree > li { min-height:60px; border-bottom:1px solid var(--dv-color-line); min-width:620px; }
-.dv-admin .admin-product-toolbar { display:flex; flex-direction:column; gap:18px; margin-bottom:24px; }
-.dv-admin .admin-product-toolbar > div { flex-wrap:wrap; }
-.dv-admin .admin-product-toolbar .admin-heading { width:100%; margin:0; }
+.dv-admin .admin-record-toolbar { display:flex; flex-direction:column; gap:18px; margin-bottom:24px; }
+.dv-admin .admin-record-toolbar > div { flex-wrap:wrap; }
+.dv-admin .admin-record-toolbar .admin-heading { width:100%; margin:0; }
 .dv-admin .admin-assets-workspace { height:100% !important; min-height:420px; }
 .dv-admin .admin-assets-workspace > [data-panel] { min-width:0; }
-@media(max-width:760px) { .dv-admin .admin-list-toolbar { padding:12px 16px; } .dv-admin .admin-list-footer { padding:16px; } .dv-admin .admin-product-toolbar > div { gap:8px; } .dv-admin .admin-resource-page td { padding:12px 16px; } }
+@media(max-width:760px) { .dv-admin .admin-list-toolbar { padding:12px 16px; } .dv-admin .admin-list-footer { padding:16px; } .dv-admin .admin-record-toolbar > div { gap:8px; } .dv-admin .admin-resource-page td { padding:12px 16px; } }
 .dv-admin .admin-menu-tree { padding:20px; }
 .dv-admin .admin-menu-tree > .admin-form-note { margin-bottom:20px; }
 .dv-admin .admin-menu-tree .items-tree__item { border-radius:0; min-height:56px; margin:0; border:0; border-bottom:1px solid var(--dv-color-line); }

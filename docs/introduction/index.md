@@ -3,7 +3,7 @@ title: What is Damvia
 description: Damvia adds controlled discovery, presentation and sharing to assets that remain in your cloud storage.
 sidebar:
   order: 1
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-21
 ---
 
 Damvia is a self-hosted Digital Asset Management application for organisations that already keep their files in Dropbox, OneDrive or Google Drive. It mirrors selected cloud folders, adds product data and access rules, and presents the result as a searchable library without asking teams to migrate their source files.
@@ -20,7 +20,7 @@ Damvia keeps a working copy of originals and previews in S3-compatible storage s
 
 ## What Damvia adds
 
-- **Search and product data.** Import a CSV catalogue, extract a product reference from filenames and use selected columns as search terms and filters.
+- **Search and record data.** Import a CSV catalogue of products, events or any other record, extract its reference from filenames and use selected columns as search terms and filters.
 - **Collections.** Mirror a cloud folder as a synchronised collection, or curate a manual collection from files already in the library.
 - **Pages and navigation.** Present collections, files, text, pictures and videos in editorial pages and arrange them in a controlled menu.
 - **Access control.** Approve accounts and combine roles, regions, groups, collection visibility and file licences.
