@@ -14,6 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
 
+export const RECORD_VALUE_TYPES = ['text', 'long_text', 'number', 'date', 'single_select', 'multi_select', 'url'] as const
+export type RecordValueType = typeof RECORD_VALUE_TYPES[number]
+
 @Entity('record_attributes')
 export class RecordAttribute {
     @PrimaryColumn()
@@ -25,6 +28,15 @@ export class RecordAttribute {
 
     @Column({ type: 'varchar', nullable: true })
     displayName: string | null
+
+    @Column({ type: 'varchar', default: 'text' })
+    valueType: RecordValueType
+
+    @Column('text', { array: true, default: '{}' })
+    options: string[]
+
+    @Column({ type: 'int', default: 0 })
+    position: number
 
     @Column({ default: false })
     facetable: boolean

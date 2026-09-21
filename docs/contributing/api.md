@@ -162,18 +162,29 @@ Records were called products until the 2026-09-21 rename; the tables, columns, p
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `record.list` | query | `userAdmin` | Records by `page` and `size`, optional `columnFilter`; `records` and `total` |
-| `record.compareCsv` | mutation | `userAdmin` | Diff of a parsed CSV against existing records |
-| `record.importCsv` | mutation | `userAdmin` | Upserts records from a parsed CSV (`keyColumnName`, `data`) |
-| `record.removeAll` | mutation | `userAdmin` | Deletes every record |
-| `record.update` | mutation | `userAdmin` | Replaces one record's `metaData` |
+| `record.list` | query | `userAdmin` | Records by `page` and `size` (at most 500), with optional `search` (the key or any value, `ILIKE`), `filters` (at most 10; `column` is `recordKey` or a field name, `op` is `contains`, `is`, `is_not`, `is_empty`, `is_not_empty` or `has_any` with `values`) and `sort` (`recordKey`, `createdAt`, `updatedAt`, `fileCount` or a field; numbers and dates sort by value, values that do not fit last). Each row carries `thumbnailURL` (a file at the thumbnail view first, else any linked file with a thumbnail), `fileCount`, `filledCount` and `updatedAt`; the result carries `total` and `keyColumnName`. An unknown column is `BAD_REQUEST` |
+| `record.get` | query | `userAdmin` | One record as a list row, plus `files.direct` (links with strategy, status, `isPrimary`, source folder, step pattern, author and thumbnail; files whose `record_id` only the old job set come as `strategy: 'legacy'`) and `files.range` (files linked through a value the record has). 500 rows each at most |
+| `record.create` | mutation | `userAdmin` | `recordKey` (trimmed, 1 to 200 characters) and optional `values`. `CONFLICT` when the key exists, `NOT_FOUND` for an unknown field, `BAD_REQUEST` for a value its type refuses. Re-runs the entity stage |
+| `record.patch` | mutation | `userAdmin` | Sets 1 to 50 fields of one record (`values`) and leaves the others; `source` is `grid` or `panel`. The key column is `BAD_REQUEST`. Writes a history row only when a value changes. Re-runs the entity stage only when a changed field is used by a range link, a folder attachment or the CSV mapping |
+| `record.bulkPatch` | mutation | `userAdmin` | Sets 1 to 10 fields on up to 500 records; one history row per changed record; returns `updated` |
+| `record.remove` | mutation | `userAdmin` | Deletes up to 500 records, their last values kept in the history, then re-runs the entity stage so links to their keys turn dangling |
+| `record.removeAll` | mutation | `userAdmin` | Same for every record |
+| `record.history` | query | `userAdmin` | Changes of a record, newest first, including those made under the same key before it was deleted; `before` (the id of the last item) and `limit` (1 to 100) page through them |
+| `record.exportRows` | mutation | `userAdmin` | `columns` (key first, then fields by position) and `rows` for the `ids` given, or for the `search`, `filters` and `sort`; more than 10,000 rows is `BAD_REQUEST` |
+| `record.compareCsv` | mutation | `userAdmin` | `rows` with `status` `new`, `changed`, `unchanged`, `duplicate` or `invalid` and the `invalid` message per column, plus `newColumns` (created as text on import) and `newOptions` per select field. Writes nothing |
+| `record.importCsv` | mutation | `userAdmin` | In one transaction: creates the new columns as text fields, adds the new options, creates and updates rows, skips a row with an invalid value whole, and writes one history row per record with the same `importBatchId`. Returns `newRecords`, `updatedRecords` and `skipped`. Missing columns are not written as empty strings on other records |
 | `recordAttribute.listAvailable` | query | `userAdmin` | Distinct `hstore` keys found in records |
-| `recordAttribute.list` | query | `userAdmin` | Declared attributes |
-| `recordAttribute.listFacets` | query | login | Facetable attributes with their distinct values |
-| `recordAttribute.create`, `update`, `remove` | mutation | `userAdmin` | CRUD |
+| `recordAttribute.list` | query | `userAdmin` | Fields in `position` order, with `valueType` and `options` |
+| `recordAttribute.listFacets` | query | login | Facetable fields with their distinct values; each option of a multiple select is a value of its own |
+| `recordAttribute.create` | mutation | `userAdmin` | `name` (1 to 100 characters, not the key column; `CONFLICT` when taken), `valueType`, `options`, switches. Placed last. A select without options takes them from the stored values. Returns `invalidCount` |
+| `recordAttribute.update` | mutation | `userAdmin` | Any of display name, `valueType`, `options` (no `\|`, at most 200) and switches. Stored values are never rewritten; `invalidCount` says how many no longer fit |
+| `recordAttribute.reorder` | mutation | `userAdmin` | `ids` in their new order |
+| `recordAttribute.usage` | query | `userAdmin` | `filled` and `invalid` value counts of a field |
+| `recordAttribute.remove` | mutation | `userAdmin` | Removes the field and its value from every record, with a history row per record that held one (`source: 'attribute'`); returns `cleared` |
 | `settings.getEnrichment` | query | `userAdmin` | `recordLabelSingular` and `recordLabelPlural` |
 | `settings.updateEnrichment` | mutation | `userAdmin` | Sets both labels (1 to 30 characters each); `env` returns them as `recordLabel` |
-| `record.linkedFiles` | query | `userAdmin` | `direct`: files linked to the record with the strategy, status, source folder path, step pattern and author of each link, plus files whose `record_id` only the old job set (`strategy: 'legacy'`); `range`: files linked through an attribute value the record has. 500 rows each at most |
+
+Values stay text in the `hstore`. A field's `valueType` fixes one stored form: `number` is `-?digits(.digits)` (a comma is read as the decimal point), `date` is `YYYY-MM-DD`, `url` is an `http` or `https` address, `single_select` is one option, and `multi_select` joins its options with `|` in option order. `server/src/services/record-values.ts` holds the rules and `client/src/utils/recordValues.ts` repeats them for instant feedback. Search filters and facets split a multiple select on `|`; the file details shown to readers join it with commas.
 
 ### `metadataField` and `entityCsv`
 

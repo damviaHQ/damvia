@@ -136,3 +136,136 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .block__action-container { background:var(--dv-surface-panel); border-color:var(--dv-color-line); }
 .dv-admin .block__action-container button svg { color:var(--dv-text-secondary); }
 .dv-admin .block__action-container button:hover svg { color:var(--dv-text-primary); }
+
+/* Records: grid, toolbar, card panel */
+.dv-admin .records-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px; }
+.dv-admin .records-search { position:relative; flex:1 1 280px; max-width:460px; }
+.dv-admin .records-search > svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--dv-text-secondary); pointer-events:none; }
+.dv-admin .records-search input { padding-left:36px; }
+.dv-admin .records-sort-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; background:var(--dv-action-soft); font-size:var(--dv-size-caption); }
+.dv-admin .records-sort-chip button { display:grid; place-items:center; }
+.dv-admin .records-fetching { font-size:var(--dv-size-caption); }
+.dv-admin .records-panel { padding:0; overflow:hidden; }
+.dv-admin .records-panel + .records-footer, .dv-admin .records-footer { display:flex; flex-wrap:wrap; align-items:center; gap:16px; margin-top:14px; font-size:var(--dv-size-caption); }
+.dv-admin .records-footer nav { margin-left:auto; }
+.dv-admin .records-page-size { display:inline-flex; align-items:center; gap:8px; }
+.dv-admin .admin-records .admin-empty { margin-bottom:16px; }
+.dv-admin.records-popover { width:340px; padding:14px; }
+.dv-admin.records-popover--wide { width:min(560px, calc(100vw - 32px)); }
+.dv-admin .record-native-select { height:36px; min-width:0; border:1px solid var(--dv-color-line-strong); border-radius:0; background:var(--dv-surface-panel); padding:0 8px; font-size:var(--dv-size-body); }
+.dv-admin .record-native-select:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; }
+
+.dv-admin .records-grid-wrap { overflow:auto; max-height:calc(100dvh - 300px); }
+.dv-admin .records-grid { border-collapse:separate; border-spacing:0; table-layout:fixed; width:max-content; min-width:100%; font-size:var(--dv-size-body); }
+.dv-admin .records-grid th { position:sticky; top:0; z-index:3; height:38px; padding:0; background:var(--dv-surface-canvas); border-bottom:1px solid var(--dv-color-line); border-right:1px solid var(--dv-color-line); text-align:left; font-weight:500; color:var(--dv-text-secondary); }
+.dv-admin .records-grid td { height:36px; padding:0; border-bottom:1px solid var(--dv-color-line); border-right:1px solid var(--dv-color-line); background:var(--dv-surface-panel); position:relative; white-space:nowrap; overflow:hidden; }
+.dv-admin .records-grid tbody tr:hover td { background:var(--dv-surface-canvas); }
+.dv-admin .records-grid tbody tr.is-selected td { background:var(--dv-action-soft); }
+.dv-admin .records-grid tbody tr.is-selected .record-chip { background:var(--dv-surface-panel); }
+.dv-admin .records-grid .records-grid-select { position:sticky; left:0; z-index:2; width:40px; text-align:center; }
+.dv-admin .records-grid th.records-grid-select { z-index:4; }
+.dv-admin .records-grid .is-thumbnail { position:sticky; left:40px; z-index:2; text-align:center; }
+.dv-admin .records-grid th.is-thumbnail { z-index:4; }
+.dv-admin .records-grid .is-sticky-key { position:sticky; left:96px; z-index:2; box-shadow:1px 0 0 var(--dv-color-line-strong); }
+.dv-admin .records-grid th.is-sticky-key { z-index:4; }
+.dv-admin .records-grid td[data-cell] { cursor:default; }
+.dv-admin .records-grid td.is-editable { cursor:cell; }
+.dv-admin .records-grid td[data-cell]:focus { outline:2px solid var(--dv-action-primary); outline-offset:-2px; z-index:1; }
+.dv-admin .records-grid td.is-editing { outline:2px solid var(--dv-action-primary); outline-offset:-2px; overflow:visible; z-index:5; }
+.dv-admin .records-grid-heading { display:flex; align-items:stretch; height:100%; position:relative; }
+.dv-admin .records-grid-heading-button { display:flex; flex:1; min-width:0; align-items:center; gap:4px; padding:0 10px; color:inherit; font:inherit; }
+.dv-admin .records-grid-heading-button:hover, .dv-admin .records-grid-heading-button[data-state=open] { color:var(--dv-text-primary); background:var(--dv-action-soft); }
+.dv-admin .records-grid-heading-chevron { margin-left:auto; opacity:.55; }
+.dv-admin .records-grid-resize { position:absolute; right:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:5; touch-action:none; }
+.dv-admin .records-grid-resize:hover, .dv-admin .records-grid-resize:focus-visible { background:var(--dv-action-primary); outline:none; }
+.dv-admin .records-grid-thumbnail { display:grid; place-items:center; width:100%; height:36px; }
+.dv-admin .records-grid-thumbnail img { width:30px; height:30px; object-fit:contain; border-radius:4px; background:var(--dv-surface-canvas); }
+.dv-admin .records-grid-key { display:flex; align-items:center; gap:6px; height:100%; padding:0 10px; font-weight:500; }
+.dv-admin .records-grid-open { display:grid; place-items:center; width:22px; height:22px; margin-left:auto; color:var(--dv-text-secondary); opacity:0; }
+.dv-admin .records-grid tr:hover .records-grid-open, .dv-admin .records-grid td:focus .records-grid-open { opacity:1; }
+.dv-admin .records-grid-open:hover { color:var(--dv-action-primary); background:var(--dv-action-soft); }
+.dv-admin .records-grid-count { width:100%; height:100%; padding:0 10px; text-align:right; font-variant-numeric:tabular-nums; }
+.dv-admin .records-grid-count:hover { color:var(--dv-action-primary); text-decoration:underline; }
+.dv-admin .records-grid-filled { display:flex; align-items:center; gap:8px; height:100%; padding:0 10px; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); font-variant-numeric:tabular-nums; }
+.dv-admin .records-grid-meter { flex:1; height:4px; background:var(--dv-color-line); border-radius:2px; overflow:hidden; }
+.dv-admin .records-grid-meter > span { display:block; height:100%; background:var(--dv-action-primary); }
+.dv-admin .records-grid-new td { background:var(--dv-surface-canvas); }
+.dv-admin .records-grid-new-form { display:flex; align-items:center; gap:12px; height:100%; }
+.dv-admin .records-grid-new-form input { flex:0 1 420px; height:36px; padding:0 10px; background:transparent; border:0; font:inherit; }
+.dv-admin .records-grid-new-form input:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; background:var(--dv-surface-panel); }
+.dv-admin .records-grid-new-form .admin-form-error { margin:0; }
+
+.dv-admin .record-value { display:flex; align-items:center; gap:6px; height:36px; padding:0 10px; overflow:hidden; text-overflow:ellipsis; }
+.dv-admin .record-value.is-number { justify-content:flex-end; font-variant-numeric:tabular-nums; }
+.dv-admin .record-value.is-invalid { color:var(--dv-color-danger); text-decoration:underline dotted; text-underline-offset:3px; }
+.dv-admin .record-value.is-hidden-behind-editor { visibility:hidden; }
+.dv-admin .record-url a { display:grid; place-items:center; color:var(--dv-text-secondary); }
+.dv-admin .record-url a:hover { color:var(--dv-action-primary); }
+.dv-admin .record-chips { display:flex; flex-wrap:nowrap; gap:4px; overflow:hidden; }
+.dv-admin .record-chip { display:inline-flex; align-items:center; max-width:100%; padding:1px 8px; border-radius:999px; background:var(--dv-action-soft); color:var(--dv-text-primary); font-size:var(--dv-size-caption); line-height:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dv-admin .record-cell-input { position:absolute; inset:0; width:100%; height:100%; padding:0 10px; border:0; background:var(--dv-surface-panel); font:inherit; }
+.dv-admin .record-cell-input:focus { outline:none; }
+.dv-admin .record-cell-anchor { position:absolute; inset:0; pointer-events:none; }
+.dv-admin.record-cell-popover { width:300px; padding:0; }
+.dv-admin .record-long-text { display:grid; gap:6px; padding:10px; }
+.dv-admin .record-long-text textarea { width:100%; min-height:140px; padding:8px; border:1px solid var(--dv-color-line-strong); font:inherit; resize:vertical; }
+.dv-admin .record-long-text p { font-size:var(--dv-size-caption); }
+.dv-admin .record-option-picker { display:grid; }
+.dv-admin .record-option-search { height:38px; padding:0 12px; border:0; border-bottom:1px solid var(--dv-color-line); font:inherit; }
+.dv-admin .record-option-search:focus { outline:none; box-shadow:inset 0 -2px 0 var(--dv-action-primary); }
+.dv-admin .record-option-list { max-height:260px; overflow:auto; padding:4px 0; }
+.dv-admin .record-option-list li[role=option] { display:flex; align-items:center; gap:8px; padding:6px 12px; cursor:pointer; }
+.dv-admin .record-option-list li.is-highlighted { background:var(--dv-action-soft); }
+.dv-admin .record-option-check { display:grid; place-items:center; width:16px; color:var(--dv-action-primary); }
+.dv-admin .record-option-empty { padding:10px 12px; color:var(--dv-text-secondary); }
+.dv-admin .record-option-footer { display:flex; justify-content:flex-end; gap:12px; padding:6px 12px; border-top:1px solid var(--dv-color-line); font-size:var(--dv-size-caption); }
+.dv-admin .record-option-footer:empty { display:none; }
+.dv-admin .record-option-done { color:var(--dv-action-primary); font-weight:600; }
+.dv-admin .record-option-clear { color:var(--dv-text-secondary); }
+
+.dv-admin .record-field-input { display:grid; gap:4px; }
+.dv-admin .record-field-control { width:100%; min-height:38px; padding:8px 10px; border:1px solid var(--dv-color-line-strong); border-radius:0; background:var(--dv-surface-panel); font:inherit; }
+.dv-admin .record-field-control:focus-visible, .dv-admin .record-field-select:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-1px; }
+.dv-admin .record-field-control[aria-invalid=true], .dv-admin .record-field-select[aria-invalid=true] { border-color:var(--dv-color-danger); }
+.dv-admin .record-field-select { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; min-height:38px; padding:6px 10px; border:1px solid var(--dv-color-line-strong); background:var(--dv-surface-panel); text-align:left; }
+.dv-admin .record-field-select .record-chips { flex-wrap:wrap; }
+
+.dv-admin.admin-sheet { width:min(560px, 100vw); background:var(--dv-surface-panel); font-family:var(--dv-font-body); }
+.dv-admin.record-panel { display:flex; flex-direction:column; }
+.dv-admin .record-panel-header { display:flex; align-items:center; gap:16px; padding:24px 56px 16px 24px; border-bottom:1px solid var(--dv-color-line); }
+.dv-admin .record-panel-picture { width:72px; height:72px; flex-shrink:0; object-fit:contain; border-radius:var(--dv-radius-graphic); background:var(--dv-surface-canvas); }
+.dv-admin .record-panel-tabs { display:flex; flex-direction:column; flex:1; min-height:0; padding:12px 24px 0; }
+.dv-admin .record-panel-body { flex:1; min-height:0; overflow:auto; padding:16px 0 24px; display:flex; flex-direction:column; gap:16px; }
+.dv-admin .record-panel-field { display:grid; gap:6px; }
+.dv-admin .record-panel-field > label { font-size:var(--dv-size-caption); font-weight:600; color:var(--dv-text-secondary); }
+.dv-admin .record-panel-subheading { font-size:var(--dv-size-body); font-weight:600; margin-top:8px; }
+.dv-admin .record-panel-files { display:grid; gap:10px; }
+.dv-admin .record-panel-files li { display:grid; grid-template-columns:64px 1fr; gap:12px; align-items:center; font-size:var(--dv-size-caption); }
+.dv-admin .record-panel-files img { width:64px; height:64px; object-fit:contain; border-radius:var(--dv-radius-graphic); background:var(--dv-surface-canvas); }
+.dv-admin .record-panel-files strong { font-size:var(--dv-size-body); font-weight:500; }
+.dv-admin .record-history { display:grid; gap:14px; }
+.dv-admin .record-history > li { display:grid; gap:4px; padding-left:14px; border-left:2px solid var(--dv-color-line); font-size:var(--dv-size-caption); }
+.dv-admin .record-history > li > p strong { font-size:var(--dv-size-body); font-weight:600; }
+.dv-admin .record-history ul li { display:flex; flex-wrap:wrap; gap:6px; }
+.dv-admin .record-history-old { color:var(--dv-text-secondary); text-decoration:line-through; }
+.dv-admin .record-panel-footer { padding:12px 24px; border-top:1px solid var(--dv-color-line); }
+
+.dv-admin .record-filters { display:grid; gap:12px; }
+.dv-admin .record-filter-row { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, .8fr) 28px; gap:8px; align-items:center; }
+.dv-admin .record-filter-row > .record-filter-value, .dv-admin .record-filter-options { grid-column:1 / -1; }
+.dv-admin .record-filter-options { display:flex; flex-wrap:wrap; gap:8px 14px; max-height:160px; overflow:auto; }
+.dv-admin .record-filter-remove { display:grid; place-items:center; width:28px; height:28px; color:var(--dv-text-secondary); }
+.dv-admin .record-columns { display:grid; gap:12px; }
+.dv-admin .record-columns ul { display:grid; gap:2px; max-height:360px; overflow:auto; }
+.dv-admin .record-columns-item { display:flex; align-items:center; gap:8px; padding:4px 2px; }
+.dv-admin .record-columns-item button:disabled { opacity:.3; }
+.dv-admin .record-columns-handle { cursor:grab; color:var(--dv-text-secondary); }
+.dv-admin .record-options-editor { display:flex; flex-wrap:wrap; gap:6px; }
+.dv-admin .record-options-editor li { display:inline-flex; align-items:center; gap:2px; }
+.dv-admin .record-options-editor button { display:grid; place-items:center; width:20px; height:20px; color:var(--dv-text-secondary); }
+.dv-admin .record-options-editor button:disabled { opacity:.3; }
+.dv-admin .records-bulk-bar { position:sticky; bottom:16px; z-index:20; display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:16px; padding:12px 16px; background:var(--dv-surface-nav); color:#fff; box-shadow:0 12px 40px rgb(0 5 47 / .25); }
+.dv-admin .records-bulk-bar strong { margin-right:auto; }
+.dv-admin .records-bulk-bar button { background:transparent; color:#fff; border-color:rgb(255 255 255 / .4); }
+.dv-admin .records-bulk-bar button:hover { background:rgb(255 255 255 / .12); color:#fff; }
+@media(max-width:760px) { .dv-admin .records-grid .is-sticky-key, .dv-admin .records-grid .is-thumbnail { position:static; } .dv-admin .records-grid-wrap { max-height:none; } }

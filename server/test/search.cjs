@@ -217,3 +217,11 @@ test('malformed search input is rejected before it reaches the database', async 
     assert.equal((await searchAs({ query: 'zz '.repeat(600), page: 1 })).total, 0)
     assert.deepEqual(await notFound({ query: Array(300).fill('zzz') }), Array(300).fill('zzz'))
 })
+
+test('a multi-select field filters and counts each of its options', async () => {
+    const tags = await save(RecordAttribute, { name: 'tags', valueType: 'multi_select', options: ['eco', 'sale'], facetable: true, viewable: true })
+    await db.query(`UPDATE records SET meta_data = meta_data || hstore('tags', CASE record_key WHEN 'SKU-1' THEN 'eco|sale' ELSE 'eco' END) WHERE record_key IN ('SKU-1', 'SKU-2')`)
+    assert.deepEqual((await searchAs({})).facets.attributes[tags.id], { eco: 2, sale: 1 })
+    assert.deepEqual(names(await searchAs({ attributes: { [tags.id]: ['sale'] } })), ['notes.txt'])
+    assert.deepEqual(names(await searchAs({ attributes: { [tags.id]: ['eco'] } })), ['blue-cap.png', 'notes.txt'])
+})

@@ -209,7 +209,7 @@ test('with views enabled a file name step without a view group reads the view af
     await admin.settings.updateEnrichment({ ...settings, viewSeparator: '_', viewDigits: 2, thumbnailView: '03' })
     assert.deepEqual([(await fileRow(front.id)).recordView, (await fileRow(side.id)).recordView], [null, '03'])
     await db.getRepository(AssetFile).update(side.id, { hasThumbnail: true })
-    const listed = await admin.record.list({ page: 1, size: 100, columnFilter: { column: 'recordKey', value: 'VW-100' } })
+    const listed = await admin.record.list({ page: 1, size: 100, search: 'VW-100' })
     assert.equal(listed.records[0].thumbnailURL, 'https://example.test/fixture')
     await admin.settings.updateEnrichment({ ...settings, viewsEnabled: false })
     assert.deepEqual([(await fileRow(front.id)).recordView, (await fileRow(side.id)).recordView, (await fileRow(side.id)).recordId], [null, null, record.id])

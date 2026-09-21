@@ -224,7 +224,7 @@ test('the matching screen saves ordered steps, refuses a broken one with its pos
     await assert.rejects(admin.entityResolution.createRecord({ key: 'SCR-2' }), e => e.code === 'BAD_REQUEST')
     const found = await admin.entityResolution.findTargets({ query: 'scr' })
     assert.ok(found.records.some(record => record.key === 'SCR-1'))
-    const linked = await admin.record.linkedFiles(found.records.find(record => record.key === 'SCR-1').id)
+    const linked = (await admin.record.get(found.records.find(record => record.key === 'SCR-1').id)).files
     assert.equal(linked.direct.length, 15)
     assert.equal(linked.direct[0].pattern, '^(SCR-\\d)')
 })
@@ -316,7 +316,7 @@ test('matching and the unmatched queue require an approved and verified admin', 
         await forbidden(as.entityResolution.detach({ linkId: id }))
         await forbidden(as.entityResolution.fileLinks(id))
         await forbidden(as.entityResolution.createRecord({ key: 'X' }))
-        await forbidden(as.record.linkedFiles(id))
+        await forbidden(as.record.get(id))
     }
 })
 

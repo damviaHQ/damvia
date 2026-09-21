@@ -43,7 +43,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useGlobalToast } from "@/composables/useGlobalToast"
-import { trpc } from "@/services/server.ts"
+import { trpc, type RouterOutput } from "@/services/server.ts"
 import { useMutation } from "@tanstack/vue-query"
 import { Pencil, Upload } from "@lucide/vue"
 import { parse } from "papaparse"
@@ -56,14 +56,9 @@ const columns = ref<string[]>([])
 const selectedColumns = ref<{ [key: string]: boolean }>({})
 const keyColumnName = ref<string>("_placeholder")
 const existingColumns = ref<string[]>([])
-const comparisonResults = ref<
-  {
-    existing: Record<string, any>
-    new: Record<string, any>
-    differences: Record<string, any>
-    status: string
-  }[]
->([])
+type Comparison = RouterOutput["record"]["compareCsv"]
+const comparison = ref<Comparison | null>(null)
+const comparisonResults = ref<Comparison["rows"]>([])
 const overrideAll = ref(false)
 const selectedOverrides = ref<{ [key: string]: boolean }>({})
 const isComparing = ref(false)
@@ -78,6 +73,7 @@ const handleFileUpload = async (e: Event) => {
   const file = fileInput?.files?.[0]
   if (file) {
     parsedData.value = []
+    comparison.value = null
     comparisonResults.value = []
     selectedOverrides.value = {}
     keyColumnName.value = "_placeholder"
@@ -128,7 +124,8 @@ const compareCsvMutation = useMutation({
     return trpc.record.compareCsv.mutate(csvData)
   },
   onSuccess: (response) => {
-    comparisonResults.value = response
+    comparison.value = response
+    comparisonResults.value = response.rows
   },
   onError: (error) => {
     toast.error(`Comparison failed: ${(error as Error).message}`)
@@ -176,8 +173,12 @@ const importCsvMutation = useMutation({
   mutationFn: (csvData: { keyColumnName: string; data: Record<string, string>[] }) => {
     return trpc.record.importCsv.mutate(csvData)
   },
-  onSuccess: () => {
-    toast.success("Records successfully imported")
+  onSuccess: (result) => {
+    toast.success(`${result.newRecords.length} created, ${result.updatedRecords.length} updated`)
+    if (result.skipped.length) {
+      const keys = [...new Set(result.skipped.map((row) => row.key))]
+      toast.error(`${keys.length} ${keys.length === 1 ? "row was" : "rows were"} skipped for invalid values: ${keys.slice(0, 5).join(", ")}${keys.length > 5 ? "…" : ""}`)
+    }
     router.push({ name: 'admin-records' })
   },
   onError: (error) => {
@@ -236,8 +237,12 @@ watchEffect(() => {
 })
 
 const isNewColumn = (column: string) => {
-  return !existingColumns.value.includes(column)
+  return comparison.value ? comparison.value.newColumns.includes(column) : !existingColumns.value.includes(column)
 }
+
+const invalidCount = computed(() => comparisonResults.value.filter((result) => result.status === "invalid").length)
+const importCount = computed(() => comparisonResults.value.filter((result) =>
+  result.status === "new" || (result.status === "changed" && (overrideAll.value || selectedOverrides.value[result.new[keyColumnName.value]]))).length)
 
 </script>
 
@@ -357,15 +362,32 @@ const isNewColumn = (column: string) => {
                 <AlertTitle>Review the comparison results and select the records you want to
                   override.</AlertTitle>
                 <AlertDescription>
-                  Light Greyed values are already present in the database and unchanged.
+                  Grey values are already stored and unchanged.
                   <br />
-                  Green values are new and will be added to the database.
+                  Green rows are new and will be added.
                   <br />
-                  Red are duplicated Primary Keys and will be ignored.
+                  Red rows repeat a key and will be ignored.
                   <br />
-                  Yellow values marked with a pencil icon have differences. Check the override box to update the
-                  database with the new values.
+                  Rows marked "Not imported" hold a value their field refuses; fix the file and compare again.
+                  <br />
+                  Yellow values marked with a pencil differ from what is stored. Check the override box to replace them.
                 </AlertDescription>
+              </Alert>
+              <Alert v-if="comparison?.newColumns.length" variant="default" class="mb-4">
+                <AlertTitle>{{ comparison.newColumns.length }} new {{ comparison.newColumns.length === 1 ? "column" : "columns" }} will be added as text fields</AlertTitle>
+                <AlertDescription>{{ comparison.newColumns.join(", ") }}. Change their type afterwards from the Fields screen.</AlertDescription>
+              </Alert>
+              <Alert v-if="comparison && Object.keys(comparison.newOptions).length" variant="default" class="mb-4">
+                <AlertTitle>New options will be added to select fields</AlertTitle>
+                <AlertDescription>
+                  <ul class="list-disc pl-4">
+                    <li v-for="(options, name) in comparison.newOptions" :key="name">{{ name }}: {{ options.join(", ") }}</li>
+                  </ul>
+                </AlertDescription>
+              </Alert>
+              <Alert v-if="invalidCount" variant="destructive" class="mb-4">
+                <AlertTitle>{{ invalidCount }} {{ invalidCount === 1 ? "row" : "rows" }} will not be imported</AlertTitle>
+                <AlertDescription>Each holds a value its field refuses, such as text in a number field. The reason shows in the cell.</AlertDescription>
               </Alert>
               <div v-if="comparisonResults.some((result) => result.status === 'changed')"
                 class="ml-4 mb-2 flex items-center">
@@ -376,7 +398,7 @@ const isNewColumn = (column: string) => {
                 <TableHeader>
                   <TableRow>
                     <TableHead v-if="
-                      comparisonResults.some((result) => result.status === 'changed')
+                      comparisonResults.some((result) => result.status === 'changed' || result.status === 'invalid')
                     ">
                       <span class="sr-only">Override</span>
                     </TableHead>
@@ -390,11 +412,13 @@ const isNewColumn = (column: string) => {
                   <TableRow v-for="result in comparisonResults" :key="result.new[keyColumnName]" :class="{
                     'new-entry': result.status === 'new',
                     'duplicate-entry': result.status === 'duplicate',
+                    'invalid-entry': result.status === 'invalid',
                   }">
                     <TableCell v-if="
-                      comparisonResults.some((result) => result.status === 'changed')
+                      comparisonResults.some((result) => result.status === 'changed' || result.status === 'invalid')
                     ">
-                      <Checkbox v-if="result.status === 'changed'"
+                      <span v-if="result.status === 'invalid'" class="record-chip">Not imported</span>
+                      <Checkbox v-else-if="result.status === 'changed'"
                         v-model="selectedOverrides[result.new[keyColumnName]]" :disabled="overrideAll"
                         :aria-label="`Override ${result.new[keyColumnName]}`" />
                     </TableCell>
@@ -410,6 +434,7 @@ const isNewColumn = (column: string) => {
                         {{ result.new[column] }}
                         <span v-if="result.differences[column]" class="sr-only">(changed)</span>
                       </div>
+                      <div v-if="result.invalid[column]" class="admin-form-error">{{ result.invalid[column] }}</div>
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -417,9 +442,9 @@ const isNewColumn = (column: string) => {
             </div>
             <DialogFooter class="mt-4">
               <Button variant="outline" :disabled="isImporting" @click="closeComparisonDialog">Cancel</Button>
-              <Button @click="handleCsvImport" variant="default" :disabled="isImporting">
+              <Button @click="handleCsvImport" variant="default" :disabled="isImporting || !importCount">
                 <Loader v-if="isImporting" />
-                {{ isImporting ? "Importing..." : "Import" }}
+                {{ isImporting ? "Importing..." : `Import ${importCount} ${importCount === 1 ? "row" : "rows"}` }}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -442,6 +467,10 @@ const isNewColumn = (column: string) => {
 
 .duplicate-entry {
   @apply bg-red-100;
+}
+
+.invalid-entry {
+  box-shadow: inset 3px 0 0 var(--dv-color-danger);
 }
 
 .existing-value {

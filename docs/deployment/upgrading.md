@@ -102,6 +102,13 @@ Back up first and apply the migration with application writers stopped. Validate
 - The old every-5-minutes job keeps linking the files no step owns. Set `ENABLE_LEGACY_PRODUCT_MATCHING=false` once every record-related type has steps; the two variables can then be removed.
 - Search lists each file once even when it sits in several collections, and facet counts count files rather than collection entries: totals can drop on instances where the same folder is mirrored by more than one collection.
 
+## Record fields and history in this upgrade
+
+- Every column already in the catalogue becomes a declared field of type Text, in the order it appears in the oldest records. Nothing changes for readers: the new fields have their switches off, and fields declared before keep theirs.
+- The history of each record starts empty at the upgrade. Changes made before it are not listed.
+- `record.update` and `record.linkedFiles` are gone: `record.patch` sets some fields and `record.get` returns the linked files. Deploy the client with the server.
+- A CSV import no longer writes an empty value into records that lack one of its columns; an absent field reads as empty everywhere, so search and filters behave the same.
+
 ## Records in this upgrade
 
 - Products are called records in the code, the database, the API and the documentation. What people see keeps the word "Products" until an administrator changes the record label in **Settings** (`/admin/settings`). Settings is now the last entry of the admin menu.
@@ -145,6 +152,7 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1790035200000-collection-favorites` | `user_collection_favorites` table (each user's starred collections) with its index on `collection_id`; starts empty |
 | `1790208000000-page-block-layout` | Rewrites `page_blocks` for the new page editor: adds `position` and `size`, converts `data` from text to `jsonb` with one shape per block type, and drops `row`, `column` and `width`. Reading order is preserved; a row that held two blocks becomes two `half` blocks, three becomes `third`, anything else becomes `full`. Text alignment chosen in the old editor is dropped, since the new editor has no alignment control. Rolling this migration back puts every block on a row of its own and deletes `hero` blocks, which the old schema cannot represent |
 | `1790121600000-asset-sources` | `source_key` on `asset_folders` and `asset_files` (empty for existing rows, adopted at the next start), unique index on (`source_key`, `external_id`) replacing the unique `external_id`, and the `asset_sources` table holding each configured source's last run |
+| `1790985600000-record-fields` | `value_type` (default `text`), `options` and `position` on `record_attributes`; a `text` row for every `hstore` key of the catalogue but the key column, positioned by first appearance; the `record_changes` table, empty. Rolling back drops the table and the three columns and keeps the added attribute rows |
 | `1790899200000-enrichment-runs` | `enrichment_runs`, empty; filled by each pass. Rolling back drops it |
 | `1790812800000-variant-groups` | `group_variants` on `asset_types` (false), `variant_groups`, `variant_group_members`, `variant_axes`, `variant_group_axes`, `variant_group_overrides` and the single-row `variant_grouping_settings`. Rolling back drops them and the column |
 | `1790726400000-file-metadata` | `metadata_fields`, `asset_file_metadata_values` and `asset_entity_csv_mappings`, empty. Rolling back drops them |

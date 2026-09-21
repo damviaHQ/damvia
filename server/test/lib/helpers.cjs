@@ -28,8 +28,8 @@ process.env.APP_SECRET = 'security-tests-only-random-fixture-secret-20260916'
 process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../../dist/env')
 const { dataSource: db } = env
-const LATEST_MIGRATION = 'EnrichmentRuns1790899200000'
-const UPGRADE_MIGRATIONS = 17
+const LATEST_MIGRATION = 'RecordFields1790985600000'
+const UPGRADE_MIGRATIONS = 18
 const state = {
     disk: { totalBytes: 10000, freeBytes: 9000 },
     bucketObjects: [],
@@ -79,6 +79,7 @@ const entities = {
     License: require('../../dist/entity/license').License,
     DataRecord: require('../../dist/entity/data-record').DataRecord,
     RecordAttribute: require('../../dist/entity/record-attribute').RecordAttribute,
+    RecordChange: require('../../dist/entity/record-change').RecordChange,
     Download: require('../../dist/entity/download').Download,
 }
 const services = {

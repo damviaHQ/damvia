@@ -14,260 +14,200 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
 import { z } from "zod"
-import { AssetFile } from "../../entity/asset-file"
 import { DataRecord } from "../../entity/data-record"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
+import { rerunEntityStage } from "../../services/enrichment"
+import { linkedFilesOf } from "../../services/record-files"
+import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, patchRecords, removeRecords, RecordRow } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
+
+const filter = z.object({
+  column: z.string().min(1).max(200),
+  op: z.enum(['contains', 'is', 'is_not', 'is_empty', 'is_not_empty', 'has_any']),
+  value: z.string().max(500).optional(),
+  values: z.array(z.string().max(500)).max(200).optional(),
+})
+const query = {
+  search: z.string().max(200).optional(),
+  filters: z.array(filter).max(10).optional(),
+  sort: z.object({ column: z.string().min(1).max(200), direction: z.enum(['asc', 'desc']) }).optional(),
+}
+const values = z.record(z.string().min(1).max(200), z.string().max(10000))
+const ids = z.array(z.uuid()).min(1).max(LIST_MAX)
+const csv = z.object({
+  keyColumnName: z.string().min(1),
+  data: z.array(z.record(z.string(), z.string())),
+})
+
+async function thumbnailView(): Promise<string | null> {
+  return (await dataSource.getRepository(EnrichmentSettings).findOneBy({ id: 1 }))?.thumbnailView ?? null
+}
+
+function presign(key: string | null): Promise<string | null> {
+  return key ? assetsS3().presignedGetObject(assetsS3Bucket(), key) : Promise.resolve(null)
+}
+
+async function formatRow(row: RecordRow) {
+  const { thumbnailStorageKey, ...rest } = row
+  return { ...rest, thumbnailURL: await presign(thumbnailStorageKey) }
+}
+
+async function getRecord(id: string) {
+  const { rows } = await listRecords(dataSource.manager, { ids: [id] }, { offset: 0, limit: 1 }, await thumbnailView())
+  if (!rows.length) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Record not found.' })
+  }
+  return formatRow(rows[0])
+}
 
 export default router({
   list: publicProcedure
     .use(authMiddleware(userAdmin))
-    .input(
-      z.object({
-        page: z.number().min(1),
-        size: z.number().min(1),
-        columnFilter: z.object({
-          column: z.string(),
-          value: z.string()
-        }).optional()
-      })
-    )
+    .input(z.object({ page: z.number().int().min(1), size: z.number().int().min(1).max(LIST_MAX), ...query }))
     .query(async ({ input }) => {
-      const { page, size, columnFilter } = input
-      const recordRepository = dataSource.getRepository(DataRecord)
-      const assetFileRepository = dataSource.getRepository(AssetFile)
-
-      let queryBuilder = recordRepository.createQueryBuilder("record")
-
-      if (columnFilter) {
-        if (columnFilter.column === 'recordKey') {
-          queryBuilder = queryBuilder.where("record.recordKey ILIKE :value", { value: `%${columnFilter.value}%` })
-        } else {
-          const key = columnFilter.column.replace('metaData.', '')
-          queryBuilder = queryBuilder.where(`record.metaData -> :key ILIKE :value`, {
-            key: key,
-            value: `%${columnFilter.value}%`
-          })
-        }
+      const { page, size, ...rest } = input
+      const result = await listRecords(dataSource.manager, rest, { offset: (page - 1) * size, limit: size }, await thumbnailView())
+      return {
+        records: await Promise.all(result.rows.map(formatRow)),
+        total: result.total,
+        keyColumnName: result.keyColumnName,
       }
-      const [records, total] = await queryBuilder
-        .orderBy("record.createdAt", "ASC")
-        .skip((page - 1) * size)
-        .take(size)
-        .getManyAndCount()
-
-      const { thumbnailView } = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })
-      const recordsWithThumbnails = await Promise.all(
-        records.map(async (record) => {
-          const assetFile = await assetFileRepository.findOne({
-            where: {
-              recordId: record.id,
-              hasThumbnail: true,
-              recordView: thumbnailView,
-            },
-          })
-
-          const thumbnailURL = assetFile
-            ? await assetsS3().presignedGetObject(assetsS3Bucket(), assetFile.thumbnailStorageKey)
-            : null
-          return {
-            id: record.id,
-            recordKey: record.recordKey,
-            keyColumnName: record.keyColumnName,
-            metaData: record.metaData,
-            thumbnailURL,
-          }
-        })
-      )
-
-      return { records: recordsWithThumbnails, total }
     }),
-  removeAll: publicProcedure
-    .use(authMiddleware(userAdmin))
-    .mutation(async () => {
-      const recordRepository = dataSource.getRepository(DataRecord)
-      const assetFileRepository = dataSource.getRepository(AssetFile)
-      const records = await recordRepository.find()
-
-      for (const record of records) {
-        const assetFiles = await assetFileRepository.find({ where: { recordId: record.id } })
-
-        for (const assetFile of assetFiles) {
-          assetFile.recordId = null
-          await assetFileRepository.save(assetFile)
-        }
-      }
-
-      await recordRepository.createQueryBuilder().delete().execute()
-    }),
-  compareCsv: publicProcedure
-    .use(authMiddleware(userAdmin))
-    .input(
-      z.object({
-        keyColumnName: z.string(),
-        data: z.array(z.record(z.string(), z.string())),
-      })
-    )
-    .mutation(async ({ input: { keyColumnName, data } }) => {
-      const recordRepository = dataSource.getRepository(DataRecord)
-      const allRecords = await recordRepository.find()
-      const existingKeyColumnName = allRecords[0]?.keyColumnName || keyColumnName
-      const primaryKeyCounts = data.reduce((acc, row) => {
-        const key = row[keyColumnName]
-        acc[key] = (acc[key] || 0) + 1
-        return acc
-      }, {} as Record<string, number>)
-
-      const comparisonResults = data.map(newRow => {
-        const primaryKeyValue = newRow[existingKeyColumnName] || newRow[keyColumnName]
-        const existingRecord = allRecords.find(p => p.recordKey === primaryKeyValue)
-
-        // Flag duplicates
-        if (primaryKeyCounts[primaryKeyValue] > 1) {
-          return { existing: {}, new: newRow, differences: {}, status: 'duplicate' }
-        }
-
-        if (existingRecord) {
-          const differences = {}
-          for (const key in newRow) {
-            if (key !== keyColumnName && (newRow[key] !== existingRecord.metaData[key] || (newRow[key] === "" && existingRecord.metaData[key] !== ""))) {
-              differences[key] = { old: existingRecord.metaData[key], new: newRow[key] }
-            }
-          }
-          const status = Object.keys(differences).length > 0 ? 'changed' : 'unchanged'
-          return { existing: { ...existingRecord.metaData, [existingKeyColumnName]: existingRecord.recordKey }, new: newRow, differences, status }
-        } else {
-          return { existing: {}, new: newRow, differences: {}, status: 'new' }
-        }
-      })
-
-      return comparisonResults
-    }),
-  importCsv: publicProcedure
-    .use(authMiddleware(userAdmin))
-    .input(
-      z.object({
-        keyColumnName: z.string(),
-        data: z.array(z.record(z.string(), z.string())),
-      })
-    )
-    .mutation(async ({ input: { keyColumnName, data } }) => {
-      const log: { newRecords: string[], updatedRecords: string[] } = { newRecords: [], updatedRecords: [] }
-      const recordRepository = dataSource.getRepository(DataRecord)
-      const allRecords = await recordRepository.find()
-      const existingKeyColumnName = allRecords[0]?.keyColumnName || keyColumnName
-      const allCsvKeys = new Set(data.flatMap(row => Object.keys(row)))
-      for (const record of allRecords) {
-        let updated = false
-        allCsvKeys.forEach(key => {
-          if (!(key in record.metaData)) {
-            record.metaData[key] = ""
-            updated = true
-          }
-        })
-
-        if (updated) {
-          await recordRepository.save(record)
-          log.updatedRecords.push(record.recordKey)
-        }
-      }
-
-      for (const row of data) {
-        const primaryKeyValue = row[existingKeyColumnName] || row[keyColumnName]
-        if (!primaryKeyValue) {
-          console.error(`Missing record key for primary key column '${existingKeyColumnName || keyColumnName}' in row:`, row)
-          continue
-        }
-
-        const existing = await recordRepository.findOne({ where: { recordKey: primaryKeyValue } })
-        if (existing) {
-          let updated = false
-          allCsvKeys.forEach(key => {
-            if (key !== keyColumnName && (row[key] !== existing.metaData[key] || (row[key] === "" && existing.metaData[key] !== ""))) {
-              existing.metaData[key] = row[key] || ""
-              updated = true
-            }
-          })
-
-          if (updated) {
-            await recordRepository.save(existing)
-            log.updatedRecords.push(existing.recordKey)
-          }
-        } else {
-          const record = new DataRecord()
-          record.recordKey = primaryKeyValue
-          record.keyColumnName = existingKeyColumnName || keyColumnName
-          record.metaData = {}
-
-          allCsvKeys.forEach(key => {
-            record.metaData[key] = row[key] || ""
-          })
-
-          await recordRepository.save(record)
-          log.newRecords.push(record.recordKey)
-        }
-      }
-
-      return log
-    }),
-  update: publicProcedure
-    .use(authMiddleware(userAdmin))
-    .input(
-      z.object({
-        id: z.string(),
-        metaData: z.record(z.string(), z.string()),
-      })
-    )
-    .mutation(async ({ input }) => {
-      const recordRepository = dataSource.getRepository(DataRecord)
-      const record = await recordRepository.findOneBy({ id: input.id })
-      if (!record) {
-        throw new Error("Record not found")
-      }
-
-      record.metaData = input.metaData
-
-      await recordRepository.save(record)
-      return record
-    }),
-
-  linkedFiles: publicProcedure
+  get: publicProcedure
     .use(authMiddleware(userAdmin))
     .input(z.uuid())
     .query(async ({ input }) => {
-      const record = await dataSource.getRepository(DataRecord).findOneBy({ id: input })
+      const record = await getRecord(input)
+      const files = await linkedFilesOf(dataSource.manager, record)
+      return {
+        ...record,
+        files: {
+          direct: await Promise.all(files.direct.map(async ({ thumbnailStorageKey, ...file }) => ({ ...file, thumbnailURL: await presign(thumbnailStorageKey) }))),
+          range: await Promise.all(files.range.map(async ({ thumbnailStorageKey, ...file }) => ({ ...file, thumbnailURL: await presign(thumbnailStorageKey) }))),
+        },
+      }
+    }),
+  create: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ recordKey: z.string().trim().min(1).max(200), values: values.optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const id = await dataSource.transaction((em) => createRecord(em, input, { userId: ctx.user.id, source: 'grid' }))
+      // Files that already carry the key attach now.
+      await rerunEntityStage()
+      return getRecord(id)
+    }),
+  patch: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ id: z.uuid(), values: values.refine((value) => Object.keys(value).length >= 1 && Object.keys(value).length <= 50, 'Send between 1 and 50 fields.'), source: z.enum(['grid', 'panel']) }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await dataSource.transaction((em) => patchRecords(em, [input.id], input.values, { userId: ctx.user.id, source: input.source }))
+      if (!result.found) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Record not found.' })
+      }
+      if (result.updated.length && await fieldIsLinked(dataSource.manager, Object.keys(input.values))) await rerunEntityStage()
+      const [row] = await dataSource.query('SELECT hstore_to_json(meta_data) AS meta_data, updated_at FROM records WHERE id = $1', [input.id])
+      return { id: input.id, metaData: (row?.meta_data ?? {}) as Record<string, string>, updatedAt: row?.updated_at as Date }
+    }),
+  bulkPatch: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ ids, values: values.refine((value) => Object.keys(value).length >= 1 && Object.keys(value).length <= 10, 'Send between 1 and 10 fields.') }))
+    .mutation(async ({ input, ctx }) => {
+      const result = await dataSource.transaction((em) => patchRecords(em, input.ids, input.values, { userId: ctx.user.id, source: 'bulk' }))
+      if (result.updated.length && await fieldIsLinked(dataSource.manager, Object.keys(input.values))) await rerunEntityStage()
+      return { updated: result.updated.length }
+    }),
+  remove: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ ids }))
+    .mutation(async ({ input, ctx }) => {
+      const removed = await dataSource.transaction((em) => removeRecords(em, input.ids, { userId: ctx.user.id, source: input.ids.length > 1 ? 'bulk' : 'grid' }))
+      // Links to the removed keys turn dangling with their reason.
+      await rerunEntityStage()
+      return { removed }
+    }),
+  removeAll: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .mutation(async ({ ctx }) => {
+      const removed = await dataSource.transaction((em) => removeRecords(em, null, { userId: ctx.user.id, source: 'bulk' }))
+      await rerunEntityStage()
+      return { removed }
+    }),
+  history: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ id: z.uuid(), before: z.uuid().optional(), limit: z.number().int().min(1).max(100).default(50) }))
+    .query(async ({ input }) => {
+      const record = await dataSource.getRepository(DataRecord).findOneBy({ id: input.id })
       if (!record) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Record not found.' })
       }
-      const direct: { id: string, name: string, path: string, strategy: string, status: string, source_path: string | null, pattern: string | null, created_by: string | null, created_at: Date | null }[] = await dataSource.query(`
-        SELECT a.id, a.name, f.path, l.strategy, l.status, sf.path AS source_path, s.config ->> 'pattern' AS pattern, u.name AS created_by, l.created_at
-        FROM asset_entity_links l
-        INNER JOIN asset_files a ON a.id = l.asset_file_id
-        INNER JOIN asset_folders f ON f.id = a.folder_id
-        LEFT JOIN asset_folders sf ON sf.id = l.source_folder_id
-        LEFT JOIN asset_type_resolver_steps s ON s.id = l.resolver_step_id
-        LEFT JOIN users u ON u.id = l.created_by_id
-        WHERE l.target_kind = 'record' AND l.record_key = $1
-        UNION ALL
-        SELECT a.id, a.name, f.path, 'legacy', 'active', NULL, NULL, NULL, NULL
-        FROM asset_files a INNER JOIN asset_folders f ON f.id = a.folder_id
-        WHERE a.record_id = $2 AND NOT EXISTS (SELECT 1 FROM asset_entity_links l WHERE l.asset_file_id = a.id AND l.target_kind = 'record')
-        ORDER BY 2 LIMIT 500
-      `, [record.recordKey, record.id])
-      const range: { id: string, name: string, path: string, attribute_name: string, attribute_value: string, strategy: string }[] = await dataSource.query(`
-        SELECT a.id, a.name, f.path, l.attribute_name, l.attribute_value, l.strategy
-        FROM asset_entity_links l
-        INNER JOIN asset_files a ON a.id = l.asset_file_id
-        INNER JOIN asset_folders f ON f.id = a.folder_id
-        INNER JOIN records r ON r.id = $1 AND (r.meta_data -> l.attribute_name) = l.attribute_value
-        WHERE l.target_kind = 'attribute' AND l.status = 'active'
-        ORDER BY a.name LIMIT 500
-      `, [record.id])
+      // A key deleted and created again keeps its earlier life.
+      const rows: { id: string, action: string, source: string, changes: Record<string, { old: string | null, new: string | null }>, changed_by_id: string | null, changed_by_name: string | null, import_batch_id: string | null, created_at: Date }[] = await dataSource.query(`
+        SELECT c.id, c.action, c.source, c.changes, c.changed_by_id, u.name AS changed_by_name, c.import_batch_id, c.created_at
+        FROM record_changes c LEFT JOIN users u ON u.id = c.changed_by_id
+        WHERE (c.record_id = $1 OR c.record_key = $2) AND ($3::uuid IS NULL OR (c.created_at, c.id) < (SELECT created_at, id FROM record_changes WHERE id = $3::uuid))
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT $4
+      `, [record.id, record.recordKey, input.before ?? null, input.limit + 1])
       return {
-        direct: direct.map((row) => ({ id: row.id, name: row.name, path: row.path, strategy: row.strategy, status: row.status, sourcePath: row.source_path, pattern: row.pattern, createdBy: row.created_by, createdAt: row.created_at })),
-        range: range.map((row) => ({ id: row.id, name: row.name, path: row.path, attributeName: row.attribute_name, attributeValue: row.attribute_value, strategy: row.strategy })),
+        items: rows.slice(0, input.limit).map((row) => ({
+          id: row.id,
+          action: row.action as 'create' | 'update' | 'delete',
+          source: row.source,
+          changes: row.changes,
+          changedBy: row.changed_by_id ? { id: row.changed_by_id, name: row.changed_by_name } : null,
+          importBatchId: row.import_batch_id,
+          createdAt: row.created_at,
+        })),
+        hasMore: rows.length > input.limit,
       }
     }),
-
+  exportRows: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ ...query, ids: z.array(z.uuid()).max(LIST_MAX).optional() }))
+    .mutation(async ({ input }) => {
+      const result = await listRecords(dataSource.manager, input, { offset: 0, limit: EXPORT_MAX + 1 }, null)
+      if (result.rows.length > EXPORT_MAX) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: `More than ${EXPORT_MAX} records match. Narrow the filters or import-export in several parts.` })
+      }
+      const keyColumnName = result.keyColumnName ?? 'Key'
+      const columns = [keyColumnName, ...result.fields.map((field) => field.name).filter((name) => name !== keyColumnName)]
+      return {
+        columns,
+        rows: result.rows.map((row) => [row.recordKey, ...columns.slice(1).map((name) => row.metaData[name] ?? '')]),
+      }
+    }),
+  compareCsv: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(csv)
+    .mutation(async ({ input }) => {
+      const analysis = await analyseCsv(dataSource.manager, input.keyColumnName, input.data)
+      return {
+        keyColumnName: analysis.keyColumnName,
+        newColumns: analysis.newColumns,
+        newOptions: analysis.newOptions,
+        rows: analysis.rows.map((row) => ({
+          existing: row.existing ? { ...row.existing.metaData, [analysis.keyColumnName]: row.key } : {},
+          new: row.row,
+          differences: row.differences,
+          invalid: row.invalid,
+          status: row.duplicate ? 'duplicate' as const
+            : Object.keys(row.invalid).length ? 'invalid' as const
+            : !row.existing ? 'new' as const
+            : Object.keys(row.differences).length ? 'changed' as const
+            : 'unchanged' as const,
+        })),
+      }
+    }),
+  importCsv: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(csv)
+    .mutation(async ({ input, ctx }) => {
+      const result = await dataSource.transaction(async (em) => {
+        await em.query('LOCK TABLE records IN SHARE ROW EXCLUSIVE MODE')
+        return importCsv(em, await analyseCsv(em, input.keyColumnName, input.data), ctx.user.id)
+      })
+      await rerunEntityStage()
+      return result
+    }),
 })

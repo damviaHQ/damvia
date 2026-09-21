@@ -20,6 +20,7 @@ import { AssetFolderEntityAttachment } from "../../entity/asset-folder-entity-at
 import { DataRecord } from "../../entity/data-record"
 import { dataSource } from "../../env"
 import { rerunEntityStage } from "../../services/enrichment"
+import { createRecord } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
 const LIST_LIMIT = 500
@@ -33,16 +34,14 @@ type Target = z.infer<typeof target>
 
 // A key nobody imported yet can be created on the spot with the key only; the
 // next CSV import fills its data.
-async function ensureRecord(value: Target): Promise<boolean> {
+async function ensureRecord(value: Target, userId: string): Promise<boolean> {
 	if (value.kind !== 'record') return false
 	const repository = dataSource.getRepository(DataRecord)
 	if (await repository.existsBy({ recordKey: value.key })) return false
 	if (!value.create) {
 		throw new TRPCError({ code: 'NOT_FOUND', message: `No record with key ${value.key}.` })
 	}
-	const sample = await repository.findOne({ where: {}, order: { createdAt: 'ASC' } })
-	const keyColumnName = sample?.keyColumnName ?? 'Key'
-	await repository.save(repository.create({ recordKey: value.key, keyColumnName, metaData: { [keyColumnName]: value.key } }))
+	await dataSource.transaction((em) => createRecord(em, { recordKey: value.key }, { userId, source: 'unmatched' }))
 	return true
 }
 
@@ -208,7 +207,7 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.input(z.object({ target, folderId: z.uuid().optional(), fileIds: z.uuid().array().max(500).optional() }).refine((value) => !!value.folderId !== !!value.fileIds?.length, 'Attach either a folder or files.'))
 		.mutation(async ({ input, ctx }) => {
-			const created = await ensureRecord(input.target)
+			const created = await ensureRecord(input.target, ctx.user.id)
 			const record = input.target.kind === 'record' ? await dataSource.getRepository(DataRecord).findOneBy({ recordKey: input.target.key }) : null
 			const fields = input.target.kind === 'record'
 				? { targetKind: 'record' as const, recordId: record?.id ?? null, recordKey: input.target.key, attributeName: null, attributeValue: null }
@@ -268,8 +267,8 @@ export default router({
 	createRecord: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({ key: z.string().trim().min(1).max(200) }))
-		.mutation(async ({ input }) => {
-			if (!(await ensureRecord({ kind: 'record', key: input.key, create: true }))) {
+		.mutation(async ({ input, ctx }) => {
+			if (!(await ensureRecord({ kind: 'record', key: input.key, create: true }, ctx.user.id))) {
 				throw new TRPCError({ code: 'BAD_REQUEST', message: `A record with key ${input.key} already exists.` })
 			}
 			return rerunEntityStage()

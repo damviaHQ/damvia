@@ -38,6 +38,7 @@ import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from
 import invitationRouter, { formatInvitation } from "./collection/invitation"
 import { formatLicense } from "./license"
 import { formatPage } from "./page"
+import { splitMulti } from "../../services/record-values"
 
 export type FormatCollectionOptions = {
 	collection: Collection,
@@ -148,7 +149,8 @@ export async function formatCollectionFile({ file, recordAttributes, metadata, v
 					id: recordAttribute.id,
 					name: recordAttribute.name,
 					displayName: recordAttribute.displayName,
-					value,
+					// Readers see the options of a multi-select, not their stored form.
+					value: recordAttribute.valueType === 'multi_select' ? splitMulti(value).join(', ') : value,
 				} : null
 			})
 			.filter(v => v)

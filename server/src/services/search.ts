@@ -168,7 +168,11 @@ export function buildSearchQuery(
 	context.filterAttributes
 		.filter((attribute) => exclude !== `attribute:${attribute.id}` && (inputAttributes[attribute.id]?.length ?? 0) > 0)
 		.forEach((attribute, index) => {
-			query.andWhere(`record.meta_data[:attributekey${index}] IN (:...attributevalue${index})`, {
+			// A multi-select value holds several options joined by |; any selected one matches.
+			const condition = attribute.valueType === 'multi_select'
+				? `string_to_array(record.meta_data -> :attributekey${index}, '|') && ARRAY[:...attributevalue${index}]::text[]`
+				: `record.meta_data[:attributekey${index}] IN (:...attributevalue${index})`
+			query.andWhere(condition, {
 				[`attributekey${index}`]: attribute.name,
 				[`attributevalue${index}`]: inputAttributes[attribute.id],
 			})
@@ -321,6 +325,23 @@ function toCounts(rows: CountRow[]): Record<string, number> {
 	return Object.fromEntries(rows.filter((row) => row.key !== null).map((row) => [row.key as string, parseInt(row.count, 10)]))
 }
 
+// A multi-select field counts each option on its own: the rows of the search
+// are wrapped so their value can be split (TypeORM has no lateral join).
+async function countOptions(query: SelectQueryBuilder<CollectionFile>, expression: string): Promise<Record<string, number>> {
+	const [sql, parameters] = query
+		.select('asset_file.id', 'file_id')
+		.addSelect(expression, 'raw')
+		.orderBy()
+		.getQueryAndParameters()
+	const rows: CountRow[] = await dataSource.query(`
+		SELECT option AS key, COUNT(DISTINCT rows.file_id) AS count
+		FROM (${sql}) rows CROSS JOIN LATERAL unnest(string_to_array(rows.raw, '|')) AS option
+		WHERE option <> ''
+		GROUP BY option ORDER BY 2 DESC LIMIT ${FACET_VALUES_LIMIT}
+	`, parameters)
+	return toCounts(rows)
+}
+
 async function countBy(query: SelectQueryBuilder<CollectionFile>, expression: string): Promise<Record<string, number>> {
 	const rows = await query
 		.select(expression, 'key')
@@ -366,7 +387,7 @@ export async function searchFacets(user: User, input: SearchInput, context: Sear
 		countBy(buildSearchQuery(user, input, context, 'extensions'), fileExtensionExpression),
 		countBy(buildSearchQuery(user, input, context, 'recordViews').andWhere('asset_type.is_related_to_records IS TRUE'), 'asset_file.record_view'),
 		...context.facetableAttributes.map((attribute) =>
-			countBy(
+			(attribute.valueType === 'multi_select' ? countOptions : countBy)(
 				buildSearchQuery(user, input, context, `attribute:${attribute.id}`).setParameter('facetName', attribute.name),
 				'record.meta_data -> :facetName',
 			).then((counts) => [attribute.id, counts] as const)

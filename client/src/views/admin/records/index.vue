@@ -14,967 +14,421 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import Loader from "@/components/Loader.vue"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import FieldEditorDialog from "@/components/records/FieldEditorDialog.vue"
+import RecordColumns from "@/components/records/RecordColumns.vue"
+import RecordFilters from "@/components/records/RecordFilters.vue"
+import RecordPanel, { type PanelTab } from "@/components/records/RecordPanel.vue"
+import RecordsBulkBar from "@/components/records/RecordsBulkBar.vue"
+import RecordsGrid, { type GridColumn, type GridField, type GridRecord, type GridSort } from "@/components/records/RecordsGrid.vue"
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Pagination,
-  PaginationEllipsis,
-  PaginationFirst,
-  PaginationLast,
-  PaginationList,
-  PaginationListItem,
-  PaginationNext,
-  PaginationPrev,
-} from "@/components/ui/pagination"
-import { useGlobalToast } from "@/composables/useGlobalToast.ts"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Pagination, PaginationEllipsis, PaginationFirst, PaginationLast, PaginationList, PaginationListItem, PaginationNext, PaginationPrev } from "@/components/ui/pagination"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
-import { trpc } from "@/services/server.ts"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
-import { columnVisibilityFeature, createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table"
-import { onKeyStroke } from "@vueuse/core"
-import {
-  Blocks,
-  EllipsisVertical,
-  FileUp,
-  Filter,
-  FilterX,
-  PackageX,
-} from "@lucide/vue"
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
+import { PAGE_SIZES, useRecordsGridPreferences } from "@/composables/useRecordsGridPreferences"
+import { trpc, type RouterOutput } from "@/services/server"
+import { filterIsComplete, operatorsFor, type RecordFilter } from "@/utils/recordFilters"
+import { csvSafe, fieldLabel } from "@/utils/recordValues"
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/vue-query"
+import { refDebounced } from "@vueuse/core"
+import { ArrowDown, ArrowUp, Blocks, Columns3, Download, EllipsisVertical, FileUp, Filter, PackageX, Plus, Search, X } from "@lucide/vue"
+import { unparse } from "papaparse"
+import { toast as sonner } from "vue-sonner"
+import { computed, ref, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
+
+type Field = RouterOutput["recordAttribute"]["list"][number]
+type ListResult = RouterOutput["record"]["list"]
 
 const toast = useGlobalToast()
 const recordLabel = useRecordLabel()
-const linkedRecord = ref<{ id: string; recordKey: string } | null>(null)
-const { data: linkedFiles, status: linkedStatus } = useQuery({
-  queryKey: computed(() => ["records", "linked-files", linkedRecord.value?.id]),
-  queryFn: () => trpc.record.linkedFiles.query(linkedRecord.value!.id),
-  enabled: computed(() => !!linkedRecord.value),
-})
-function provenance(file: { strategy: string; sourcePath: string | null; pattern: string | null; createdBy: string | null; createdAt: string | Date | null }) {
-  const date = file.createdAt ? new Date(file.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : ""
-  if (file.strategy === "filename_regex") return file.pattern ? `file name, ${file.pattern}` : "file name"
-  if (file.strategy === "folder_regex") return file.pattern ? `folder path, ${file.pattern}` : "folder path"
-  if (file.strategy === "manual_folder") return `folder ${file.sourcePath ?? ""}`
-  if (file.strategy === "manual_file") return file.createdBy ? `set by hand by ${file.createdBy} on ${date}` : "set by hand"
-  if (file.strategy === "legacy") return "file name, PRODUCT_MATCHING_REGEX job"
-  return file.strategy
-}
-const currentPage = ref(1)
-const pageSize = ref(200)
+const route = useRoute()
+const router = useRouter()
 const queryClient = useQueryClient()
-const isDeleting = ref(false)
-const showDeleteDialog = ref(false)
-const deleteError = ref('')
-const activeCell = ref<{ rowIndex: number; columnId: string } | null>(null)
-const focusedCell = ref<{ rowIndex: number; columnId: string }>({ rowIndex: 0, columnId: "thumbnailURL" })
-const editingValue = ref<string>("")
-const columnFilters = ref<{ [key: string]: string }>({})
-const activeFilter = ref<{ column: string; value: string } | null>(null)
-const isDropdownOpen = ref(false)
-const enlargedImage = ref<{ src: string; top: number; left: number } | null>(null)
-const showFilters = ref(false)
-const isSaving = ref(false)
-const editorPosition = ref<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
+const preferences = useRecordsGridPreferences()
+const grid = ref<InstanceType<typeof RecordsGrid> | null>(null)
 
-// Query to fetch records data
-const { status, data, error, refetch } = useQuery({
-  queryKey: ["records", currentPage, pageSize, activeFilter],
-  queryFn: () =>
-    trpc.record.list.query({
-      page: currentPage.value,
-      size: pageSize.value,
-      columnFilter: activeFilter.value || undefined,
-    }),
+const search = ref("")
+const filters = ref<RecordFilter[]>([])
+const filtersOpen = ref(false)
+const page = ref(1)
+const selected = ref<string[]>([])
+const debouncedSearch = refDebounced(search, 300)
+const completeFilters = computed(() => filters.value.filter(filterIsComplete))
+const debouncedFilters = refDebounced(completeFilters, 300)
+const narrowed = computed(() => !!debouncedSearch.value.trim() || debouncedFilters.value.length > 0)
+
+// A new search, filter, order or page size starts again from page 1 with
+// nothing selected.
+watch([debouncedSearch, debouncedFilters, () => preferences.value.sort, () => preferences.value.pageSize], () => {
+  page.value = 1
+  selected.value = []
+}, { deep: true })
+
+const query = computed(() => ({
+  search: debouncedSearch.value.trim() || undefined,
+  filters: debouncedFilters.value.length ? debouncedFilters.value : undefined,
+  sort: preferences.value.sort ?? undefined,
+}))
+const listInput = computed(() => ({ page: page.value, size: preferences.value.pageSize, ...query.value }))
+const listKey = computed(() => ["records", "list", listInput.value])
+const { data, status, error, isFetching } = useQuery({
+  queryKey: listKey,
+  queryFn: () => trpc.record.list.query(listInput.value),
+  placeholderData: keepPreviousData,
+})
+const { data: attributes } = useQuery({ queryKey: ["records", "attributes"], queryFn: () => trpc.recordAttribute.list.query() })
+const { data: undeclared } = useQuery({ queryKey: ["records", "available-attributes"], queryFn: () => trpc.recordAttribute.listAvailable.query() })
+
+const fields = computed<GridField[]>(() => (attributes.value ?? []).map((field) => ({ id: field.id, name: field.name, displayName: field.displayName, valueType: field.valueType, options: field.options })))
+const keyLabel = computed(() => data.value?.keyColumnName ?? "Key")
+const total = computed(() => data.value?.total ?? 0)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / preferences.value.pageSize)))
+const firstShown = computed(() => total.value ? (page.value - 1) * preferences.value.pageSize + 1 : 0)
+const lastShown = computed(() => Math.min(total.value, page.value * preferences.value.pageSize))
+
+const DEFAULT_WIDTHS: Record<string, number> = { number: 120, date: 150, long_text: 280, multi_select: 220, url: 200 }
+const allColumns = computed<GridColumn[]>(() => [
+  { id: "thumbnail", kind: "thumbnail", label: "Picture", width: 56 },
+  { id: "key", kind: "key", label: keyLabel.value, width: 180, sortKey: "recordKey" },
+  ...fields.value.map((field): GridColumn => ({ id: `field:${field.name}`, kind: "field", label: fieldLabel(field), width: DEFAULT_WIDTHS[field.valueType] ?? 180, sortKey: field.name, field })),
+  { id: "files", kind: "files", label: "Files", width: 90, sortKey: "fileCount" },
+  { id: "filled", kind: "filled", label: "Filled", width: 130 },
+])
+// The saved order first, then columns it does not know yet in their natural place.
+const orderedColumns = computed(() => {
+  const byId = new Map(allColumns.value.map((column) => [column.id, column]))
+  const known = preferences.value.order.filter((id) => byId.has(id))
+  return [...known, ...allColumns.value.map((column) => column.id).filter((id) => !known.includes(id))].map((id) => byId.get(id)!)
+})
+const columns = computed(() => orderedColumns.value
+  .filter((column) => column.kind === "key" || !preferences.value.hidden.includes(column.id))
+  .map((column) => ({ ...column, width: preferences.value.widths[column.id] ?? column.width })))
+const columnChoices = computed(() => orderedColumns.value.filter((column) => column.kind !== "key").map((column) => ({ id: column.id, label: column.label, hidden: preferences.value.hidden.includes(column.id) })))
+const sortLabel = computed(() => {
+  const sort = preferences.value.sort
+  if (!sort) return null
+  return allColumns.value.find((column) => column.sortKey === sort.column)?.label ?? sort.column
 })
 
-// Pagination computed properties
-const totalItems = computed(() => data.value?.total || 0)
-const totalPages = computed(() => {
-  return data.value ? Math.ceil(data.value.total / pageSize.value) : 1
-})
-
-// Handle data changes when changing pages
-watch(currentPage, () => {
-  activeCell.value = null
-  refetch()
-})
-
-function changePage(newPage: number) {
-  activeCell.value = null
-  currentPage.value = newPage
+function setOrder(ids: string[]) {
+  const key = orderedColumns.value.find((column) => column.kind === "key")!
+  const rest = ids.filter((id) => id !== key.id)
+  const keyIndex = orderedColumns.value.indexOf(key)
+  preferences.value.order = [...rest.slice(0, keyIndex), key.id, ...rest.slice(keyIndex)]
+}
+function toggleColumn(id: string, visible: boolean) {
+  preferences.value.hidden = visible ? preferences.value.hidden.filter((item) => item !== id) : [...new Set([...preferences.value.hidden, id])]
+}
+function resetLayout() {
+  preferences.value = { ...preferences.value, hidden: [], order: [], widths: {} }
 }
 
-// Function to access nested object properties
-function getNestedValue(obj: any, path: string) {
-  return path.split(".").reduce((acc, part) => acc && acc[part], obj)
+const statusMessage = ref("")
+function announce(message: string) {
+  statusMessage.value = ""
+  requestAnimationFrame(() => { statusMessage.value = message })
 }
 
-// Function to check if a cell is editable
-function isEditableCell(columnId: string) {
-  return columnId !== "thumbnailURL" && columnId !== "recordKey"
+function patchCachedRow(id: string, change: (row: GridRecord) => GridRecord) {
+  queryClient.setQueryData<ListResult>(listKey.value, (old) => old && { ...old, records: old.records.map((row) => row.id === id ? { ...row, ...change(row) } : row) })
+}
+function refreshRecord(id: string) {
+  queryClient.invalidateQueries({ queryKey: ["records", "list"] })
+  queryClient.invalidateQueries({ queryKey: ["records", "get", id] })
 }
 
-// Create column helper for TanStack Table
-const features = tableFeatures({ columnVisibilityFeature })
-const columnHelper = createColumnHelper<typeof features, any>()
-
-// Define columns for the table
-const columns = computed(() => {
-  if (!data.value || !data.value.records.length) return []
-
-  const primaryKey = data.value.records[0].keyColumnName
-  const result = [
-    columnHelper.accessor("thumbnailURL", {
-      header: "Picture",
-      id: "thumbnailURL",
-      cell: (info) => ({
-        type: "image",
-        value: info.getValue(),
-      }),
-    }),
-    columnHelper.accessor("recordKey", {
-      header: data.value.records[0].keyColumnName,
-      id: "recordKey",
-    }),
-  ]
-
-  // Add metadata columns
-  Object.keys(data.value.records[0].metaData)
-    .filter((key) => key !== primaryKey)
-    .forEach((key) => {
-      result.push(
-        columnHelper.accessor(`metaData.${key}`, {
-          header: key,
-          id: `metaData.${key}`,
-          cell: (info) => ({
-            type: "text",
-            value: info.getValue(),
-          }),
-        })
-      )
-    })
-
-  return result
-})
-
-// Setup tanstack table
-const table = useTable({
-  features,
-  get data() {
-    return data.value?.records || []
-  },
-  get columns() {
-    return columns.value
-  },
-})
-
-const rovingCell = computed(() => {
-  const { rowIndex, columnId } = focusedCell.value
-  const isAvailable =
-    rowIndex < table.getRowModel().rows.length &&
-    table.getAllFlatColumns().some(col => col.id === columnId)
-  return isAvailable ? focusedCell.value : { rowIndex: 0, columnId: "thumbnailURL" }
-})
-
-const activeCellLabel = computed(() => {
-  if (!activeCell.value) return ""
-  const { rowIndex, columnId } = activeCell.value
-  const column = table.getAllFlatColumns().find(col => col.id === columnId)
-  const row = table.getRowModel().rows[rowIndex]
-  return `Edit ${column?.columnDef.header ?? columnId} for record ${row?.original.recordKey ?? rowIndex + 1}`
-})
-
-// Save cell value after editing
-function saveCellValue() {
-  if (!activeCell.value || isSaving.value) return
-
-  const { rowIndex, columnId } = activeCell.value
-  const row = table.getRowModel().rows[rowIndex]
-  if (!row) return
-
-  const record = row.original
-  const metaDataKey = columnId.replace("metaData.", "")
-  const oldValue = getNestedValue(record, columnId)
-
-  // Skip if no changes
-  if (editingValue.value === oldValue) {
-    activeCell.value = null
-    editorPosition.value = null
-    return
-  }
-
-  const savedCell = activeCell.value
+// A grid edit shows at once, is taken back if the server refuses it, and can
+// be undone from the toast (the undo is a change of its own in the history).
+async function commitCell(record: GridRecord, field: GridField, value: string) {
+  const previous = queryClient.getQueryData<ListResult>(listKey.value)
+  const old = record.metaData[field.name] ?? ""
+  patchCachedRow(record.id, (row) => ({ ...row, metaData: { ...row.metaData, [field.name]: value } }))
   try {
-    isSaving.value = true
-    trpc.record.update.mutate({
-      id: record.id,
-      metaData: {
-        ...record.metaData,
-        [metaDataKey]: editingValue.value,
+    await trpc.record.patch.mutate({ id: record.id, values: { [field.name]: value }, source: "grid" })
+    sonner(`${fieldLabel(field)} of ${record.recordKey} updated`, {
+      action: {
+        label: "Undo",
+        onClick: () => trpc.record.patch.mutate({ id: record.id, values: { [field.name]: old }, source: "grid" })
+          .then(() => refreshRecord(record.id))
+          .catch((failure: Error) => toast.error(failure.message)),
       },
-    }).then(() => {
-      toast.success("Record updated successfully")
-      queryClient.invalidateQueries({ queryKey: ["records"] })
-    }).catch((error) => {
-      console.error("Error updating record:", error)
-      toast.error("Failed to update record")
-    }).finally(() => {
-      isSaving.value = false
-      if (activeCell.value === savedCell) {
-        activeCell.value = null
-        editorPosition.value = null
-      }
     })
-  } catch (error) {
-    console.error("Error updating record:", error)
-    toast.error("Failed to update record")
-    isSaving.value = false
-    activeCell.value = null
-    editorPosition.value = null
+  } catch (failure) {
+    queryClient.setQueryData(listKey.value, previous)
+    toast.error((failure as Error).message)
+    throw failure
+  } finally {
+    refreshRecord(record.id)
   }
 }
 
-// Cancel cell editing
-function cancelEditing() {
-  const cell = activeCell.value
-  activeCell.value = null
-  editorPosition.value = null
-  if (cell) {
-    nextTick(() => focusCell(cell.rowIndex, cell.columnId))
+async function savePanelField(recordId: string, field: GridField, value: string) {
+  await trpc.record.patch.mutate({ id: recordId, values: { [field.name]: value }, source: "panel" })
+  refreshRecord(recordId)
+}
+
+async function addOption(field: GridField, option: string) {
+  try {
+    await trpc.recordAttribute.update.mutate({ id: field.id, options: [...field.options, option] })
+    await queryClient.invalidateQueries({ queryKey: ["records", "attributes"] })
+  } catch (failure) {
+    toast.error((failure as Error).message)
+    throw failure
   }
 }
 
-function focusCell(rowIndex: number, columnId: string) {
-  focusedCell.value = { rowIndex, columnId }
-  nextTick(() => {
-    const cellEl = document.querySelector(`[data-cell="${rowIndex}-${columnId}"]`) as HTMLElement | null
-    cellEl?.focus()
-  })
+// A new record opens straight away as a card to fill in.
+async function createRecord(key: string) {
+  const created = await trpc.record.create.mutate({ recordKey: key })
+  await queryClient.invalidateQueries({ queryKey: ["records", "list"] })
+  announce(`${recordLabel.singular.value} ${created.recordKey} added`)
+  openRecord(created.id, "fields")
 }
 
-function handleGridKeydown(event: KeyboardEvent, rowIndex: number, columnId: string) {
-  if (event.target !== event.currentTarget) return
-
-  const flatColumns = table.getAllFlatColumns()
-  const columnIndex = flatColumns.findIndex(col => col.id === columnId)
-  const rowsCount = table.getRowModel().rows.length
-
-  if (event.key === "ArrowUp" && rowIndex > 0) {
-    focusCell(rowIndex - 1, columnId)
-  } else if (event.key === "ArrowDown" && rowIndex < rowsCount - 1) {
-    focusCell(rowIndex + 1, columnId)
-  } else if (event.key === "ArrowLeft" && columnIndex > 0) {
-    focusCell(rowIndex, flatColumns[columnIndex - 1].id || "")
-  } else if (event.key === "ArrowRight" && columnIndex < flatColumns.length - 1) {
-    focusCell(rowIndex, flatColumns[columnIndex + 1].id || "")
-  } else if (event.key === "Enter" || event.key === "F2") {
-    if (columnId === "thumbnailURL") {
-      (event.currentTarget as HTMLElement).querySelector("button")?.click()
-    } else {
-      handleCellClick(rowIndex, columnId)
-    }
-  } else if (event.key === "Escape" && enlargedImage.value) {
-    enlargedImage.value = null
-  } else {
-    return
-  }
-  event.preventDefault()
-  event.stopPropagation()
+async function removeRecords(ids: string[]) {
+  const { removed } = await trpc.record.remove.mutate({ ids })
+  selected.value = selected.value.filter((id) => !ids.includes(id))
+  await queryClient.invalidateQueries({ queryKey: ["records"] })
+  toast.success(`${removed} ${removed === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value} deleted`)
 }
 
-// Handle cell click to prepare for editing
-function handleCellClick(rowIndex: number, columnId: string) {
-  if (!isEditableCell(columnId)) return
-  
-  const row = table.getRowModel().rows[rowIndex]
-  if (!row) return
-
-  editingValue.value = getNestedValue(row.original, columnId) || ""
-  activeCell.value = { rowIndex, columnId }
-  focusedCell.value = { rowIndex, columnId }
-  
-  // Calculate editor position
-  nextTick(() => {
-    const cellEl = document.querySelector(`[data-cell="${rowIndex}-${columnId}"]`) as HTMLElement
-    if (cellEl) {
-      const rect = cellEl.getBoundingClientRect()
-      const tableEl = document.querySelector('.spreadsheet-table') as HTMLElement
-      const tableRect = tableEl?.getBoundingClientRect()
-      
-      if (tableRect) {
-        // Check if cell is close to the right edge of the window
-        const distanceToRightEdge = window.innerWidth - rect.right
-        const idealEditorWidth = Math.max(rect.width, 250) // Minimum editor width for comfort
-        const isNearRightEdge = distanceToRightEdge < idealEditorWidth - rect.width
-        
-        // Calculate optimal left position
-        let leftPos = rect.left - tableRect.left
-        let editorWidth = idealEditorWidth
-        
-        // If near right edge, adjust position to expand to the left
-        if (isNearRightEdge) {
-          // Calculate how much we can expand to the left
-          const availableSpace = Math.min(rect.right - 20, window.innerWidth - 20)
-          editorWidth = Math.min(idealEditorWidth, availableSpace)
-          leftPos = rect.right - tableRect.left - editorWidth
-        }
-        
-        // Position the editor
-        editorPosition.value = {
-          top: rect.top - tableRect.top,
-          left: leftPos,
-          width: editorWidth,
-          maxHeight: Math.min(400, window.innerHeight - rect.top - 50) // Allow more height but limit by window
-        }
-        
-        // Focus input in the next tick after editor is rendered
-        setTimeout(() => {
-          const textareaEl = document.getElementById(`cell-input-${rowIndex}-${columnId}`) as HTMLTextAreaElement
-          if (textareaEl) {
-            textareaEl.focus()
-            // Place cursor at the end of the text
-            const len = editingValue.value.length
-            textareaEl.selectionStart = len
-            textareaEl.selectionEnd = len
-            
-            // Auto-adjust height
-            adjustTextareaHeight(textareaEl)
-          }
-        }, 10)
-      }
-    }
-  })
+async function setFieldOnSelection(field: GridField, value: string) {
+  const { updated } = await trpc.record.bulkPatch.mutate({ ids: selected.value, values: { [field.name]: value } })
+  await queryClient.invalidateQueries({ queryKey: ["records"] })
+  toast.success(`${fieldLabel(field)} set on ${updated} ${updated === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value}`)
 }
 
-// Function to adjust textarea height based on content
-function adjustTextareaHeight(textarea: HTMLTextAreaElement) {
-  // Reset height to ensure proper calculation
-  textarea.style.height = 'auto'
-  
-  // Get the scrollHeight (content height) and set it as the textarea height
-  const newHeight = Math.max(32, Math.min(textarea.scrollHeight, parseInt(editorPosition.value?.maxHeight.toString() || '400')))
-  textarea.style.height = `${newHeight}px`
-}
-
-// Watch for changes in editing value to adjust height
-watch(editingValue, () => {
-  nextTick(() => {
-    if (activeCell.value) {
-      const textareaEl = document.getElementById(`cell-input-${activeCell.value.rowIndex}-${activeCell.value.columnId}`) as HTMLTextAreaElement
-      if (textareaEl) {
-        adjustTextareaHeight(textareaEl)
-      }
-    }
-  })
-})
-
-// Handle filtering
-function applyColumnFilter(column: string, value: string) {
-  columnFilters.value[column] = value
-  activeCell.value = null
-}
-
-function applyColumnFilterEvent(column: string, event: Event) {
-  if (event.target instanceof HTMLInputElement) applyColumnFilter(column, event.target.value)
-}
-
-function handleFilterKeydown(event: KeyboardEvent, column: string) {
-  if (event.key === "Enter") {
-    activeFilter.value = { column, value: columnFilters.value[column] || "" }
-    currentPage.value = 1
-    refetch()
+// The selection when there is one, otherwise every record the search and
+// filters find, never only the visible page.
+const exporting = ref(false)
+async function exportCsv() {
+  exporting.value = true
+  try {
+    const result = await trpc.record.exportRows.mutate(selected.value.length ? { ids: selected.value, sort: query.value.sort } : query.value)
+    const csv = unparse({ fields: result.columns.map(csvSafe), data: result.rows.map((row) => row.map(csvSafe)) })
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${recordLabel.lowerPlural.value}-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success(`${result.rows.length} ${result.rows.length === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value} exported`)
+  } catch (failure) {
+    toast.error((failure as Error).message)
+  } finally {
+    exporting.value = false
   }
 }
 
-function toggleFilters() {
-  showFilters.value = !showFilters.value
+// The open card lives in the address, so a link to it can be shared.
+const panelId = computed(() => typeof route.query.record === "string" ? route.query.record : null)
+const panelTab = computed<PanelTab>(() => ["files", "history"].includes(String(route.query.tab)) ? route.query.tab as PanelTab : "fields")
+function openRecord(id: string, tab: PanelTab = "fields") {
+  router.replace({ query: { ...route.query, record: id, tab: tab === "fields" ? undefined : tab } })
+}
+function closeRecord() {
+  const { record: _, tab: __, ...rest } = route.query
+  router.replace({ query: rest })
 }
 
-function clearFilters() {
-  columnFilters.value = {}
-  activeFilter.value = null
-  refetch()
+function filterBy(column: GridColumn) {
+  const name = column.kind === "key" ? "recordKey" : column.field!.name
+  const type = column.kind === "key" ? "key" : column.field!.valueType
+  filters.value = [...filters.value, { column: name, op: operatorsFor(type)[0], value: "", values: [] }]
+  filtersOpen.value = true
 }
 
-// Mutation to remove all records
-const removeAllRecords = useMutation({
-  mutationFn: () => trpc.record.removeAll.mutate(),
-  onError: (error: Error) => { deleteError.value = error.message },
-  onMutate: () => {
-    isDeleting.value = true
-    deleteError.value = ''
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["records"] })
-    toast.success("All records removed successfully")
-    showDeleteDialog.value = false
-  },
-  onSettled: () => {
-    isDeleting.value = false
-  },
-})
+function clearNarrowing() {
+  search.value = ""
+  filters.value = []
+}
 
-// Image preview functionality
-function handleImageClick(event: MouseEvent, src: string) {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  enlargedImage.value = {
-    src,
-    top: rect.top,
-    left: rect.left,
+const fieldDialog = ref<{ open: boolean, field: Field | null }>({ open: false, field: null })
+function editField(field: GridField | null) {
+  fieldDialog.value = { open: true, field: field ? attributes.value?.find((item) => item.id === field.id) ?? null : null }
+}
+
+const fieldToRemove = ref<GridField | null>(null)
+const fieldUsage = ref<number | null>(null)
+const removingField = ref(false)
+async function askRemoveField(field: GridField) {
+  fieldToRemove.value = field
+  fieldUsage.value = null
+  fieldUsage.value = (await trpc.recordAttribute.usage.query(field.id)).filled
+}
+async function removeField() {
+  if (!fieldToRemove.value) return
+  removingField.value = true
+  try {
+    await trpc.recordAttribute.remove.mutate(fieldToRemove.value.id)
+    await queryClient.invalidateQueries({ queryKey: ["records"] })
+    toast.success(`${fieldLabel(fieldToRemove.value)} removed`)
+    fieldToRemove.value = null
+  } catch (failure) {
+    toast.error((failure as Error).message)
+  } finally {
+    removingField.value = false
   }
 }
 
-function closeEnlargedImage(event: MouseEvent) {
-  if (enlargedImage.value && event.target instanceof Element && !event.target.closest(".enlarged-image")) {
-    enlargedImage.value = null
+const showRemoveAll = ref(false)
+const removingAll = ref(false)
+async function removeAll() {
+  removingAll.value = true
+  try {
+    await trpc.record.removeAll.mutate()
+    selected.value = []
+    await queryClient.invalidateQueries({ queryKey: ["records"] })
+    toast.success(`All ${recordLabel.lowerPlural.value} removed`)
+    showRemoveAll.value = false
+  } catch (failure) {
+    toast.error((failure as Error).message)
+  } finally {
+    removingAll.value = false
   }
 }
 
-// Handle keyboard navigation for spreadsheet-like experience
-onKeyStroke(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Escape'], (e) => {
-  if (!activeCell.value) return
-  const target = e.target as HTMLElement
-  if (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLTextAreaElement && !target.classList.contains("floating-cell-input")) ||
-    target.isContentEditable
-  ) return
-  
-  const { rowIndex, columnId } = activeCell.value
-  const columnIndex = table.getAllFlatColumns().findIndex(col => col.id === columnId)
-  const rowsCount = table.getRowModel().rows.length
-  const columnsCount = table.getAllFlatColumns().length
-  
-  if (e.key === 'Escape') {
-    cancelEditing()
-    e.preventDefault()
-    return
-  }
-  
-  if (e.key === 'Enter') {
-    if (e.shiftKey) { 
-      // Previous row
-      if (rowIndex > 0) {
-        saveCellValue()
-        nextTick(() => handleCellClick(rowIndex - 1, columnId))
-      }
-    } else {
-      // Next row
-      if (rowIndex < rowsCount - 1) {
-        saveCellValue()
-        nextTick(() => handleCellClick(rowIndex + 1, columnId))
-      } else {
-        saveCellValue()
-      }
-    }
-    e.preventDefault()
-    return
-  }
-  
-  if (e.key === 'Tab') {
-    if (e.shiftKey) { 
-      // Previous column
-      if (columnIndex > 0) {
-        let prevColIndex = columnIndex - 1
-        // Skip non-editable columns
-        while (prevColIndex >= 0 && !isEditableCell(table.getAllFlatColumns()[prevColIndex].id || '')) {
-          prevColIndex--
-        }
-        if (prevColIndex >= 0) {
-          saveCellValue()
-          nextTick(() => handleCellClick(rowIndex, table.getAllFlatColumns()[prevColIndex].id || ''))
-        }
-      }
-    } else {
-      // Next column
-      if (columnIndex < columnsCount - 1) {
-        let nextColIndex = columnIndex + 1
-        // Skip non-editable columns
-        while (nextColIndex < columnsCount && !isEditableCell(table.getAllFlatColumns()[nextColIndex].id || '')) {
-          nextColIndex++
-        }
-        if (nextColIndex < columnsCount) {
-          saveCellValue()
-          nextTick(() => handleCellClick(rowIndex, table.getAllFlatColumns()[nextColIndex].id || ''))
-        }
-      }
-    }
-    e.preventDefault()
-    return
-  }
-  
-  if (e.key === 'ArrowUp' && rowIndex > 0) {
-    saveCellValue()
-    nextTick(() => handleCellClick(rowIndex - 1, columnId))
-    e.preventDefault()
-  }
-  
-  if (e.key === 'ArrowDown' && rowIndex < rowsCount - 1) {
-    saveCellValue()
-    nextTick(() => handleCellClick(rowIndex + 1, columnId))
-    e.preventDefault()
-  }
-  
-  if (e.key === 'ArrowLeft' && columnIndex > 0) {
-    let prevColIndex = columnIndex - 1
-    while (prevColIndex >= 0 && !isEditableCell(table.getAllFlatColumns()[prevColIndex].id || '')) {
-      prevColIndex--
-    }
-    if (prevColIndex >= 0) {
-      saveCellValue()
-      nextTick(() => handleCellClick(rowIndex, table.getAllFlatColumns()[prevColIndex].id || ''))
-      e.preventDefault()
-    }
-  }
-  
-  if (e.key === 'ArrowRight' && columnIndex < columnsCount - 1) {
-    let nextColIndex = columnIndex + 1
-    while (nextColIndex < columnsCount && !isEditableCell(table.getAllFlatColumns()[nextColIndex].id || '')) {
-      nextColIndex++
-    }
-    if (nextColIndex < columnsCount) {
-      saveCellValue()
-      nextTick(() => handleCellClick(rowIndex, table.getAllFlatColumns()[nextColIndex].id || ''))
-      e.preventDefault()
-    }
-  }
-})
-
-// Setup event listeners
-onMounted(() => {
-  document.addEventListener("click", closeEnlargedImage)
-})
-
-onUnmounted(() => {
-  document.removeEventListener("click", closeEnlargedImage)
+watch(() => data.value?.total, (count) => {
+  if (count !== undefined) announce(`${count} ${count === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value}`)
 })
 </script>
 
 <template>
-  <div v-if="status === 'pending'">
-    <Loader :text="true" />
-  </div>
-  <div v-else-if="status === 'error'" class="admin-error" role="alert">
-    {{ error?.message }}
-  </div>
-  <div v-else-if="status === 'success'" class="admin-page admin-resource-page admin-records">
-    <div class="admin-record-toolbar">
-      <AdminPageHeader>
-        <Button as-child variant="outline"><router-link :to="{ name: 'admin-record-attributes' }"><Blocks class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />Attributes</router-link></Button>
-        <Button v-if="data?.records.length || Object.keys(columnFilters).length" variant="outline" type="button" :aria-expanded="showFilters" @click="toggleFilters"
-          class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
-          <Filter class="w-[var(--dv-icon-default)] h-[var(--dv-icon-default)]" />
-          {{ showFilters ? "Hide Filters" : "Show Filters" }}
-        </Button>
-        <Button v-if="Object.keys(columnFilters).length > 0" variant="link" type="button" @click="clearFilters"
-          class="flex px-0 gap-2 admin-text-secondary admin-text-primary-hover">
-          <FilterX class="w-[var(--dv-icon-default)] h-[var(--dv-icon-default)]" />
-          Clear Filters
-        </Button>
-        <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-record-import' }"><FileUp />Import CSV</router-link></Button>
-        <DropdownMenu v-model:open="isDropdownOpen">
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Actions">
-              <EllipsisVertical class="h-[var(--dv-icon-default)] w-[var(--dv-icon-default)]" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem :disabled="!data?.records.length" @select="deleteError = ''; showDeleteDialog = true">
-              <PackageX class="mr-2 h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" /><span>Remove all {{ recordLabel.lowerPlural.value }}</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </AdminPageHeader>
-      <Pagination v-if="data && data.records.length" :total="totalItems" :sibling-count="1" show-edges
-        :default-page="currentPage" v-model:page="currentPage" :items-per-page="pageSize">
-        <PaginationList v-slot="{ items }" class="flex items-center gap-1">
-          <PaginationFirst @click="changePage(1)" />
-          <PaginationPrev @click="changePage(currentPage - 1)" />
-          <template v-for="(item, index) in items">
-            <PaginationListItem v-if="item.type === 'page'" :key="index" :value="item.value" as-child>
-              <Button class="w-10 h-10 p-0" :variant="item.value === currentPage ? 'default' : 'link'"
-                @click="changePage(item.value)">
-                {{ item.value }}
-              </Button>
-            </PaginationListItem>
-            <PaginationEllipsis v-else :key="item.type" :index="index" />
-          </template>
+  <div class="admin-page admin-resource-page admin-records">
+    <AdminPageHeader :title="recordLabel.plural.value" :description="`Create, correct and complete your ${recordLabel.lowerPlural.value}. Changes save as you go and are kept in each ${recordLabel.lower.value}'s history.`">
+      <Button as-child variant="outline"><router-link :to="{ name: 'admin-record-import' }"><FileUp class="size-4" />Import CSV</router-link></Button>
+      <Button class="dv-button dv-button--primary" @click="grid?.focusNewRow()"><Plus class="size-4" />Add {{ recordLabel.lower.value }}</Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <Button variant="ghost" size="icon" aria-label="More actions"><EllipsisVertical class="size-5" /></Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem :disabled="exporting || !total" @select="exportCsv"><Download class="size-4" />Export {{ narrowed ? "matching" : "all" }} {{ recordLabel.lowerPlural.value }} (CSV)</DropdownMenuItem>
+          <DropdownMenuItem @select="editField(null)"><Plus class="size-4" />Add a field</DropdownMenuItem>
+          <DropdownMenuItem as-child><router-link :to="{ name: 'admin-fields' }"><Blocks class="size-4" />Manage fields</router-link></DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem :disabled="!total && !narrowed" class="text-destructive" @select="showRemoveAll = true"><PackageX class="size-4" />Remove all {{ recordLabel.lowerPlural.value }}</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </AdminPageHeader>
 
-          <PaginationNext @click="changePage(currentPage + 1)" />
-          <PaginationLast @click="changePage(totalPages)" />
-        </PaginationList>
-      </Pagination>
-    </div>
-    
-    <section v-if="!data?.records.length" class="dv-panel admin-empty">
-      <h2>{{ Object.keys(columnFilters).length ? `No matching ${recordLabel.lowerPlural.value}` : `No ${recordLabel.lowerPlural.value} yet` }}</h2>
-      <p>{{ Object.keys(columnFilters).length ? `Clear the filters to see your ${recordLabel.lower.value} list.` : `Import a CSV file to add your ${recordLabel.lowerPlural.value}.` }}</p>
-      <Button v-if="Object.keys(columnFilters).length" variant="outline" @click="clearFilters">Clear filters</Button>
-      <Button v-else as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-record-import' }"><FileUp />Import CSV</router-link></Button>
-    </section>
-    <div v-else class="dv-panel w-full overflow-x-auto flex-grow">
-      <div class="data-grid">
-        <table class="spreadsheet-table" role="grid" :aria-label="recordLabel.plural.value">
-          <thead>
-            <tr>
-              <th v-for="column in table.getFlatHeaders()" :key="column.id">
-                <span>{{ column.column.columnDef.header as string }}</span>
-              </th>
-            </tr>
-            <tr v-show="showFilters">
-              <th v-for="column in table.getFlatHeaders()" :key="column.id">
-                <input 
-                  v-if="column.id !== 'thumbnailURL'" 
-                  type="text" 
-                  :placeholder="`Filter`"
-                  :aria-label="`Filter ${column.column.columnDef.header}`"
-                  v-model="columnFilters[column.id || '']"
-                  @input="(e) => applyColumnFilterEvent(column.id || '', e)"
-                  @keydown="(e) => handleFilterKeydown(e, column.id || '')"
-                  class="filter-input" 
-                />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!data || !data.records.length">
-              <td colspan="100%" class="admin-text-secondary text-center p-4">
-                No {{ recordLabel.lower.value }} database found. Import a CSV file to get started.
-              </td>
-            </tr>
-            <template v-else>
-              <tr 
-                v-for="(row, rowIndex) in table.getRowModel().rows" 
-                :key="rowIndex"
-                :class="{ 'row-active': activeCell?.rowIndex === rowIndex }"
-              >
-                <td 
-                  v-for="cell in row.getVisibleCells()" 
-                  :key="cell.id"
-                  :data-cell="`${rowIndex}-${cell.column.id}`"
-                  :tabindex="rovingCell.rowIndex === rowIndex && rovingCell.columnId === cell.column.id ? 0 : -1"
-                  :class="{
-                    'cell-editable': isEditableCell(cell.column.id || ''),
-                    'cell-active': activeCell?.rowIndex === rowIndex && activeCell?.columnId === cell.column.id,
-                    'cell-image': cell.column.id === 'thumbnailURL'
-                  }"
-                  @click="handleCellClick(rowIndex, cell.column.id || '')"
-                  @focus="focusedCell = { rowIndex, columnId: cell.column.id || '' }"
-                  @keydown="handleGridKeydown($event, rowIndex, cell.column.id || '')"
-                >
-                  <!-- Image cell -->
-                  <template v-if="cell.column.id === 'thumbnailURL'">
-                    <button
-                      v-if="cell.getValue()"
-                      type="button"
-                      tabindex="-1"
-                      class="record-thumbnail-button"
-                      :aria-label="`Enlarge image of ${row.original.recordKey}`"
-                      @click.stop="handleImageClick($event, cell.getValue() as string)"
-                    >
-                      <img :src="cell.getValue() as string" alt="" loading="lazy" decoding="async" class="record-thumbnail" />
-                    </button>
-                  </template>
-                  
-                  <!-- Editable cell -->
-                  <template v-else-if="isEditableCell(cell.column.id || '')">
-                    <!-- Display -->
-                    <div class="cell-content">
-                      {{ getNestedValue(row.original, cell.column.id || '') }}
-                    </div>
-                  </template>
-                  
-                  <!-- Non-editable cell -->
-                  <template v-else>
-                    <div class="cell-content">
-                      {{ cell.getValue() }}
-                      <button v-if="cell.column.id === 'recordKey'" type="button" tabindex="-1" class="record-files-button" :aria-label="`Files linked to ${row.original.recordKey}`" @click.stop="linkedRecord = row.original">Files</button>
-                    </div>
-                  </template>
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-        
-        <!-- Floating editor for active cell -->
-        <div 
-          v-if="activeCell && editorPosition" 
-          class="floating-cell-editor"
-          :style="{
-            top: `${editorPosition.top}px`,
-            left: `${editorPosition.left}px`,
-            width: `${editorPosition.width}px`,
-            maxHeight: `${editorPosition.maxHeight}px`
-          }"
-        >
-          <textarea
-            :id="`cell-input-${activeCell.rowIndex}-${activeCell.columnId}`"
-            v-model="editingValue"
-            @input="adjustTextareaHeight($event.target as HTMLTextAreaElement)"
-            @blur="saveCellValue"
-            @keydown.enter.exact.prevent="saveCellValue"
-            @keydown.esc.prevent="cancelEditing"
-            :aria-label="activeCellLabel"
-            class="floating-cell-input"
-            rows="1"
-            :style="{
-              minHeight: '32px'
-            }"
-          ></textarea>
-        </div>
+    <div class="records-toolbar">
+      <div class="records-search">
+        <Search class="size-4" aria-hidden="true" />
+        <Input v-model="search" type="search" :aria-label="`Search ${recordLabel.lowerPlural.value}`" :placeholder="`Search every field of every ${recordLabel.lower.value}`" />
       </div>
+      <Popover v-model:open="filtersOpen">
+        <PopoverTrigger as-child>
+          <Button variant="outline" :aria-pressed="completeFilters.length > 0"><Filter class="size-4" />Filters<span v-if="completeFilters.length" class="record-chip">{{ completeFilters.length }}</span></Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" class="records-popover records-popover--wide">
+          <RecordFilters v-model="filters" :fields="fields" :key-label="keyLabel" />
+        </PopoverContent>
+      </Popover>
+      <Popover>
+        <PopoverTrigger as-child><Button variant="outline"><Columns3 class="size-4" />Columns</Button></PopoverTrigger>
+        <PopoverContent align="start" class="records-popover">
+          <RecordColumns :columns="columnChoices" @order="setOrder" @toggle="toggleColumn" @reset="resetLayout" @add-field="editField(null)" />
+        </PopoverContent>
+      </Popover>
+      <span v-if="sortLabel" class="records-sort-chip">
+        <ArrowUp v-if="preferences.sort?.direction === 'asc'" class="size-3.5" aria-hidden="true" /><ArrowDown v-else class="size-3.5" aria-hidden="true" />
+        Sorted by {{ sortLabel }}
+        <button type="button" :aria-label="`Stop sorting by ${sortLabel}`" @click="preferences.sort = null"><X class="size-3.5" /></button>
+      </span>
+      <Button v-if="narrowed" variant="ghost" @click="clearNarrowing">Clear search and filters</Button>
+      <span v-if="isFetching && status === 'success'" class="admin-text-secondary records-fetching">Updating…</span>
     </div>
+
+    <p class="sr-only" role="status" aria-live="polite">{{ statusMessage }}</p>
+
+    <Loader v-if="status === 'pending'" :text="true" />
+    <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
+    <template v-else>
+      <section v-if="!total && !narrowed" class="dv-panel admin-empty">
+        <h2>No {{ recordLabel.lowerPlural.value }} yet</h2>
+        <p>Add a {{ recordLabel.lower.value }} by typing its {{ keyLabel }} in the last row below, or import a CSV file of your catalogue.</p>
+        <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-record-import' }"><FileUp class="size-4" />Import CSV</router-link></Button>
+      </section>
+      <section v-else-if="!total" class="dv-panel admin-empty">
+        <h2>No {{ recordLabel.lowerPlural.value }} match</h2>
+        <p>Nothing matches the search and filters.</p>
+        <Button variant="outline" @click="clearNarrowing">Clear search and filters</Button>
+      </section>
+      <div class="dv-panel records-panel">
+        <RecordsGrid ref="grid" v-model:selected="selected" :rows="data?.records ?? []" :columns="columns" :field-count="fields.length"
+          :sort="preferences.sort" :record-label="recordLabel.lower.value" :key-label="keyLabel"
+          :commit="commitCell" :add-option="addOption" :create="createRecord"
+          @open="(row, tab) => openRecord(row.id, tab)" @sort="(sort: GridSort) => preferences.sort = sort"
+          @resize="(id, width) => preferences.widths = { ...preferences.widths, [id]: width }" @hide="(id) => toggleColumn(id, false)"
+          @filter="filterBy" @edit-field="editField" @remove-field="askRemoveField" />
+      </div>
+      <footer v-if="total" class="records-footer">
+        <span class="admin-text-secondary">{{ firstShown }}–{{ lastShown }} of {{ total }}</span>
+        <label class="records-page-size admin-text-secondary">Rows per page
+          <select v-model.number="preferences.pageSize" class="record-native-select">
+            <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
+          </select>
+        </label>
+        <Pagination v-if="totalPages > 1" v-model:page="page" :total="total" :sibling-count="1" show-edges :items-per-page="preferences.pageSize">
+          <PaginationList v-slot="{ items }" class="flex items-center gap-1">
+            <PaginationFirst />
+            <PaginationPrev />
+            <template v-for="(item, index) in items">
+              <PaginationListItem v-if="item.type === 'page'" :key="index" :value="item.value" as-child>
+                <Button class="w-10 h-10 p-0" :variant="item.value === page ? 'default' : 'link'">{{ item.value }}</Button>
+              </PaginationListItem>
+              <PaginationEllipsis v-else :key="item.type" :index="index" />
+            </template>
+            <PaginationNext />
+            <PaginationLast />
+          </PaginationList>
+        </Pagination>
+      </footer>
+    </template>
+
+    <RecordsBulkBar v-if="selected.length" :count="selected.length" :fields="fields" :record-label="recordLabel.lower.value" :record-label-plural="recordLabel.lowerPlural.value"
+      :set-field="setFieldOnSelection" :remove="() => removeRecords(selected)" @export="exportCsv" @clear="selected = []" />
+
+    <RecordPanel :record-id="panelId" :tab="panelTab" :fields="fields" :record-label="recordLabel.lower.value"
+      :save="savePanelField" :add-option="addOption" :remove="(id) => removeRecords([id])"
+      @close="closeRecord" @update:tab="(tab) => openRecord(panelId!, tab)" />
+
+    <FieldEditorDialog v-model:open="fieldDialog.open" :field="fieldDialog.field" :suggestions="(undeclared ?? []).filter((name) => name !== keyLabel && !fields.some((field) => field.name === name))" />
+
+    <AlertDialog :open="!!fieldToRemove" @update:open="(open) => { if (!open && !removingField) fieldToRemove = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove {{ fieldToRemove ? fieldLabel(fieldToRemove) : "" }}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <template v-if="fieldUsage === null">Counting the values…</template>
+            <template v-else>{{ fieldUsage }} {{ fieldUsage === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value }} hold a value in this field.</template>
+            The field and its values are removed from every {{ recordLabel.lower.value }}; each one keeps the value it lost in its history. A later CSV import with this column adds it back as text.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="removingField">Cancel</AlertDialogCancel>
+          <Button variant="destructive" :disabled="removingField" @click="removeField">{{ removingField ? "Removing…" : "Remove field" }}</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog :open="showRemoveAll" @update:open="(open) => { if (!removingAll) showRemoveAll = open }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove all {{ recordLabel.lowerPlural.value }}?</AlertDialogTitle>
+          <AlertDialogDescription>This removes every {{ recordLabel.lower.value }}, including those outside the current search and filters. Their values stay in the history and linked files wait, listed as dangling, until the keys exist again.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="removingAll">Cancel</AlertDialogCancel>
+          <Button variant="destructive" :disabled="removingAll" @click="removeAll">{{ removingAll ? "Removing…" : `Remove all ${recordLabel.lowerPlural.value}` }}</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
-  
-  <Teleport to="body">
-    <div v-if="enlargedImage" class="enlarged-image" :style="{
-      top: `${enlargedImage.top}px`,
-      left: `${enlargedImage.left}px`,
-    }">
-      <img :src="enlargedImage.src" alt="Enlarged record image" />
-    </div>
-  </Teleport>
-  <Dialog :open="!!linkedRecord" @update:open="(open) => !open && (linkedRecord = null)">
-    <DialogContent class="admin-dialog--wide flex flex-col">
-      <DialogHeader>
-        <DialogTitle>Files linked to {{ linkedRecord?.recordKey }}</DialogTitle>
-        <DialogDescription>Each file with what linked it. Range files are linked to every {{ recordLabel.lower.value }} sharing the value.</DialogDescription>
-      </DialogHeader>
-      <Loader v-if="linkedStatus === 'pending'" />
-      <template v-else-if="linkedFiles">
-        <p v-if="!linkedFiles.direct.length && !linkedFiles.range.length" class="admin-text-secondary">No file is linked to this {{ recordLabel.lower.value }} yet.</p>
-        <ul v-if="linkedFiles.direct.length" class="record-linked-files">
-          <li v-for="file in linkedFiles.direct" :key="file.id + file.strategy">
-            <strong>{{ file.name }}</strong>
-            <span class="admin-text-secondary">{{ file.path }} · {{ provenance(file) }}<template v-if="file.status === 'dangling'"> · waiting for the {{ recordLabel.lower.value }}</template></span>
-          </li>
-        </ul>
-        <template v-if="linkedFiles.range.length">
-          <h3 class="font-semibold mt-2">Covering the range</h3>
-          <ul class="record-linked-files">
-            <li v-for="file in linkedFiles.range" :key="file.id + file.attributeValue">
-              <strong>{{ file.name }}</strong>
-              <span class="admin-text-secondary">{{ file.path }} · {{ file.attributeName }} = {{ file.attributeValue }}</span>
-            </li>
-          </ul>
-        </template>
-      </template>
-    </DialogContent>
-  </Dialog>
-  <AlertDialog :open="showDeleteDialog" @update:open="open => { if (!isDeleting) showDeleteDialog = open }">
-    <AlertDialogContent @escape-key-down="event => { if (isDeleting) event.preventDefault() }">
-      <AlertDialogHeader><AlertDialogTitle>Remove all {{ recordLabel.lowerPlural.value }}?</AlertDialogTitle><AlertDialogDescription>This removes all records, including records outside the current filters. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-      <p v-if="deleteError" role="alert" class="admin-form-error">{{ deleteError }}</p>
-      <AlertDialogFooter><AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel><Button variant="destructive" :disabled="isDeleting" @click="removeAllRecords.mutate()">{{ isDeleting ? 'Removing…' : 'Remove all records' }}</Button></AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
 </template>
-
-<style scoped>
-.record-files-button { margin-left:8px; font-size:var(--dv-size-caption); text-decoration:underline; color:var(--dv-text-secondary); }
-.record-linked-files { display:grid; gap:8px; max-height:60vh; overflow:auto; }
-.record-linked-files li { display:grid; gap:2px; }
-.data-grid {
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  position: relative;
-}
-
-.spreadsheet-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size:var(--dv-size-body);
-  table-layout: fixed;
-}
-.spreadsheet-table thead {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: var(--dv-surface-canvas);
-}
-.spreadsheet-table thead tr:first-child th {
-  height: 36px;
-  border-bottom: 1px solid var(--dv-color-line);
-  background: var(--dv-surface-canvas);
-  padding: 0 8px;
-  font-weight: 500;
-  color: var(--dv-text-secondary);
-  text-align: left;
-}
-.spreadsheet-table thead tr:nth-child(2) th {
-  padding: 4px 8px;
-  background-color: var(--dv-surface-canvas);
-  border-bottom: 1px solid var(--dv-color-line);
-}
-.spreadsheet-table thead tr:nth-child(2) th .filter-input {
-  width: 100%;
-  border: 1px solid var(--dv-color-line);
-  border-radius: 0;
-  padding: 4px 8px;
-  font-size:var(--dv-size-caption);
-}
-.spreadsheet-table thead tr:nth-child(2) th .filter-input:focus-visible {
-  outline: 2px solid var(--dv-action-primary);
-  outline-offset: -2px;
-  border-color: var(--dv-action-primary);
-}
-.spreadsheet-table tbody tr {
-  height: 32px;
-  background-color: white;
-  transition: background-color 0.1s ease;
-}
-.spreadsheet-table tbody tr:hover {
-  background-color: var(--dv-surface-canvas);
-}
-.spreadsheet-table tbody tr.row-active {
-  background-color: var(--dv-surface-canvas);
-}
-.spreadsheet-table tbody td {
-  border-bottom: 1px solid var(--dv-color-line);
-  position: relative;
-  padding: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  height: 32px;
-}
-.spreadsheet-table tbody td.cell-editable {
-  cursor: pointer;
-}
-.spreadsheet-table tbody td.cell-editable:hover {
-  background-color: color-mix(in srgb, var(--dv-action-primary) 5%, transparent);
-}
-.spreadsheet-table tbody td:focus-visible {
-  outline: 2px solid var(--dv-action-primary);
-  outline-offset: -2px;
-}
-.spreadsheet-table tbody td.cell-active {
-  border: 2px solid var(--dv-action-primary);
-  padding: 0;
-  z-index: 1;
-}
-.spreadsheet-table tbody td.cell-image {
-  width: 60px;
-  text-align: center;
-}
-.spreadsheet-table tbody td.cell-image .record-thumbnail-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-}
-.spreadsheet-table tbody td.cell-image .record-thumbnail {
-  max-width: 32px;
-  max-height: 32px;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  cursor: pointer;
-}
-.spreadsheet-table tbody td .cell-content {
-  padding: 0 8px;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.spreadsheet-table tbody td .cell-editor {
-  height: 100%;
-  width: 100%;
-  z-index: 2;
-  display: flex;
-  align-items: stretch;
-  padding: 0;
-  margin: 0;
-}
-.spreadsheet-table tbody td .cell-editor .cell-input {
-  width: 100%;
-  height: 100%;
-  border: none;
-  padding: 0 8px;
-  background-color: white;
-  font-size:var(--dv-size-body);
-  margin: 0;
-  box-sizing: border-box;
-  min-height: 32px;
-  line-height: 32px;
-  display: block;
-}
-.spreadsheet-table tbody td .cell-editor .cell-input:focus-visible {
-  outline: 2px solid var(--dv-action-primary);
-  outline-offset: -2px;
-}
-
-.enlarged-image {
-  position: fixed;
-  z-index: 1000;
-  background-color: white;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  padding: 8px;
-  border-radius: var(--dv-radius-graphic);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  transform: translate(25%, 0);
-}
-@media (prefers-reduced-motion: reduce) {
-  .enlarged-image {
-    transition: none;
-  }
-}
-.enlarged-image img {
-  max-width: 300px;
-  max-height: 300px;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-}
-
-.floating-cell-editor {
-  position: absolute;
-  z-index: 100;
-  background-color: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  border: 2px solid var(--dv-action-primary);
-  border-radius: 0;
-  overflow: visible;
-}
-.floating-cell-editor .floating-cell-input {
-  width: 100%;
-  resize: none;
-  border: none;
-  padding: 4px 8px;
-  font-size:var(--dv-size-body);
-  line-height: 1.5;
-  font-family: inherit;
-  margin: 0;
-  box-sizing: border-box;
-  overflow-y: auto;
-  display: block;
-}
-.floating-cell-editor .floating-cell-input:focus-visible {
-  outline: 2px solid var(--dv-action-primary);
-  outline-offset: -2px;
-}
-.floating-cell-editor .floating-cell-input::-webkit-scrollbar {
-  width: 6px;
-}
-.floating-cell-editor .floating-cell-input::-webkit-scrollbar-track {
-  background: var(--dv-surface-canvas);
-}
-.floating-cell-editor .floating-cell-input::-webkit-scrollbar-thumb {
-  background: var(--dv-color-line-strong);
-  border-radius: 0;
-}</style>

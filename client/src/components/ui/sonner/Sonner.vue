@@ -23,7 +23,7 @@ const forwarded = computed(() => { const { neutral: _, ...rest } = props; return
         title: 'dv-toast__title text-[13px] font-semibold leading-snug ' + (neutral ? 'text-[var(--dv-text-primary)]' : 'text-white'),
         description: 'dv-toast__description text-caption leading-relaxed ' + (neutral ? 'text-[var(--dv-text-secondary)]' : 'text-white/70'),
         closeButton: 'dv-toast__close top-[9px]! right-[9px]! left-auto! size-6! translate-none! rounded-none! border-0! bg-transparent! ' + (neutral ? 'text-[var(--dv-text-secondary)]! hover:bg-neutral-100!' : 'text-white/70!'),
-        actionButton: 'dv-toast__action h-8 px-3 text-[12px] bg-primary text-primary-foreground hover:bg-primary/90',
+        actionButton: 'dv-toast__action h-8 shrink-0 whitespace-nowrap px-3 text-[12px] bg-primary text-primary-foreground hover:bg-primary/90',
         cancelButton: 'dv-toast__cancel h-8 px-3 border text-caption ' + (neutral ? 'border-[var(--dv-color-line)] text-[var(--dv-text-secondary)]' : 'border-white/25 text-white/70'),
         success: 'dv-toast--success [&_[data-icon]]:text-[var(--dv-color-success)]',
         error: 'dv-toast--danger [&_[data-icon]]:text-[var(--dv-color-danger)]',

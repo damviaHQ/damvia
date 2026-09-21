@@ -48,7 +48,7 @@ Collections organise references to assets. Copying a file into another collectio
 ## Data enrichment and reporting
 
 - [Variants](./variants.md): show the versions of one creative as one card and name what differs between them.
-- [Records](./records.md): import CSV data of products, events or anything files are about, name the records, say how files find their record, fix the unmatched ones and configure searchable/filterable attributes.
+- [Records](./records.md): create and edit products, events or anything files are about in a spreadsheet grid or as a card with their files and history, import them by CSV, type their fields, say how files find their record and fix the unmatched ones.
 - [Insights](./analytics.md): interpret recorded activity and retention.
 - [Dashboard](./dashboard.md): storage usage, source state and items needing attention.
 

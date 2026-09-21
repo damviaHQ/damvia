@@ -20,7 +20,7 @@ const { Readable } = require('node:stream')
 const { sign } = require('jsonwebtoken')
 const harness = require('./lib/helpers.cjs')
 const { env, db, worker, server, storage, state, fixtures, save, caller, makeUser, makeCollection, forbidden } = harness
-const { User, Group, UserGroup, Collection, CollectionFile, CollectionInvitation, AssetFolder, AssetFile, License, DataRecord, Download } = harness.entities
+const { User, Group, UserGroup, Collection, CollectionFile, CollectionInvitation, AssetFolder, AssetFile, License, DataRecord, RecordAttribute, Download } = harness.entities
 const { credentials, users, collections } = harness.services
 const { createDownloadArchive } = harness.services.download
 const { queued, processors, sentMails, removedKeys, fetchedFiles } = state
@@ -39,11 +39,12 @@ test('upgrade repairs existing restrictions; invited guests do not join the defa
 
 test('record changes require an approved and verified admin', async () => {
     const record = await save(DataRecord, { recordKey: randomUUID(), keyColumnName: 'SKU', metaData: {} })
-    const input = { id: record.id, metaData: { name: 'Changed' } }
+    await save(RecordAttribute, { name: 'name' })
+    const input = { id: record.id, values: { name: 'Changed' }, source: 'grid' }
     for (const user of [null, member, manager, { ...admin, approved: false }, { ...admin, emailVerified: false }]) {
-        await forbidden(caller(user).record.update(input))
+        await forbidden(caller(user).record.patch(input))
     }
-    assert.deepEqual((await caller(admin).record.update(input)).metaData, input.metaData)
+    assert.deepEqual((await caller(admin).record.patch(input)).metaData, input.values)
 })
 
 test('verification resend is self-only and never returns credentials', async () => {

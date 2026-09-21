@@ -14,249 +14,144 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
-import FieldGroup from "@/components/ui/field/FieldGroup.vue"
-import { DialogClose } from "@/components/ui/dialog"
-import AdminList from "@/components/admin/AdminList.vue"
+import FieldEditorDialog from "@/components/records/FieldEditorDialog.vue"
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
+import { useRecordLabel } from "@/composables/useRecordLabel"
+import { fieldLabel, isSelect, VALUE_TYPE_LABELS } from "@/utils/recordValues"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { CirclePlus, FileUp, PencilLine, Trash2 } from "@lucide/vue"
-import { ref, watchEffect } from "vue"
+import { ArrowDown, ArrowUp, CirclePlus, GripVertical, PencilLine, Trash2 } from "@lucide/vue"
+import { ref } from "vue"
+import Draggable from "vuedraggable"
 import { RouterOutput, trpc } from "../../../services/server.ts"
 
 type RecordAttribute = RouterOutput["recordAttribute"]["list"][number]
 
 const toast = useGlobalToast()
+const recordLabel = useRecordLabel()
 const queryClient = useQueryClient()
-const { data: recordAttributeNames } = useQuery({
-  queryKey: ["records", "available-attributes"],
-  queryFn: () => trpc.recordAttribute.listAvailable.query(),
-})
-const { data: recordAttributes } = useQuery({
-  queryKey: ["records", "attributes"],
-  queryFn: () => trpc.recordAttribute.list.query(),
-})
-const form = ref<{
-  id?: string
-  name: string | null
-  displayName: string | null
-  facetable: boolean
-  viewable: boolean
-  searchable: boolean
-}>({
-  name: null,
-  displayName: null,
-  facetable: false,
-  viewable: false,
-  searchable: false,
-})
-const modalState = ref<"creating" | "editing" | "closed">("closed")
-const nameError = ref("")
+const { data: undeclared } = useQuery({ queryKey: ["records", "available-attributes"], queryFn: () => trpc.recordAttribute.listAvailable.query() })
+const { data: attributes } = useQuery({ queryKey: ["records", "attributes"], queryFn: () => trpc.recordAttribute.list.query() })
 
-function openCreateModal() {
-  form.value = {
-    name: "",
-    displayName: "",
-    facetable: false,
-    viewable: false,
-    searchable: false,
+const dialog = ref<{ open: boolean, field: RecordAttribute | null }>({ open: false, field: null })
+const toRemove = ref<RecordAttribute | null>(null)
+const usage = ref<number | null>(null)
+const removing = ref(false)
+const announcement = ref("")
+
+// The order here is the default column order of the grid and of the card.
+async function saveOrder(items: RecordAttribute[]) {
+  queryClient.setQueryData(["records", "attributes"], items)
+  try {
+    await trpc.recordAttribute.reorder.mutate({ ids: items.map((item) => item.id) })
+  } catch (failure) {
+    toast.error((failure as Error).message)
+  } finally {
+    queryClient.invalidateQueries({ queryKey: ["records", "attributes"] })
   }
-  nameError.value = ""
-  modalState.value = "creating"
 }
 
-function openEditModal(recordAttribute: RecordAttribute) {
-  form.value = {
-    id: recordAttribute.id,
-    name: recordAttribute.name,
-    displayName: recordAttribute.displayName,
-    facetable: recordAttribute.facetable,
-    viewable: recordAttribute.viewable,
-    searchable: recordAttribute.searchable,
-  }
-  nameError.value = ""
-  modalState.value = "editing"
+function move(index: number, delta: number) {
+  const items = [...(attributes.value ?? [])]
+  const target = index + delta
+  if (target < 0 || target >= items.length) return
+  ;[items[index], items[target]] = [items[target], items[index]]
+  announcement.value = `${fieldLabel(items[target])} moved to position ${target + 1} of ${items.length}`
+  saveOrder(items)
 }
 
-watchEffect(() => {
-  if (form.value.facetable) {
-    form.value.viewable = true
-  }
-})
-
-async function remove(recordAttribute: RecordAttribute) {
-  await trpc.recordAttribute.remove.mutate(recordAttribute.id)
-  await queryClient.invalidateQueries({ queryKey: ["records", "attributes"] })
-  toast.success("Record attribute removed!")
+async function askRemove(attribute: RecordAttribute) {
+  toRemove.value = attribute
+  usage.value = null
+  usage.value = (await trpc.recordAttribute.usage.query(attribute.id)).filled
 }
 
-function submitChanges(event: Event) {
-  event.preventDefault()
-
-  if (!form.value.name) {
-    nameError.value = "Please enter a name"
-    toast.error(nameError.value)
-    return
+async function remove() {
+  if (!toRemove.value) return
+  removing.value = true
+  try {
+    await trpc.recordAttribute.remove.mutate(toRemove.value.id)
+    await queryClient.invalidateQueries({ queryKey: ["records"] })
+    toast.success(`${fieldLabel(toRemove.value)} removed`)
+    toRemove.value = null
+  } catch (failure) {
+    toast.error((failure as Error).message)
+  } finally {
+    removing.value = false
   }
-  nameError.value = ""
-
-  const action: any =
-    modalState.value === "creating"
-      ? trpc.recordAttribute.create
-      : trpc.recordAttribute.update
-  return action
-    .mutate(form.value)
-    .then(() => queryClient.invalidateQueries({ queryKey: ["records", "attributes"] }))
-    .then(() => {
-      toast.success(
-        modalState.value === "creating"
-          ? "Record attribute created!"
-          : "Record attribute updated!"
-      )
-      modalState.value = "closed"
-    })
-    .catch((error: Error) => toast.error(error.message))
-}
-const saving = ref(false)
-async function onModalSubmit(event: Event) {
-  event.preventDefault()
-  if (saving.value) return
-  saving.value = true
-  try { await submitChanges(event) } finally { saving.value = false }
 }
 </script>
 
 <template>
-  <div class="admin-page admin-resource-page">
-    <AdminPageHeader description="Choose which record fields appear in lists, filters and search.">
-      <Button variant="default" @click="openCreateModal" class="dv-button dv-button--primary">
-        <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
-        Add attribute
+  <div class="admin-resource-page">
+    <AdminPageHeader :title="null" :description="`The fields every ${recordLabel.lower.value} has, their type and where they show. Drag to set the order of the grid and the card.`">
+      <Button class="dv-button dv-button--primary" @click="dialog = { open: true, field: null }">
+        <CirclePlus class="size-4" />Add field
       </Button>
     </AdminPageHeader>
-    <div v-if="recordAttributes && !recordAttributes.length" class="admin-text-secondary flex items-center gap-2">
-      You must first <router-link :to="{ name: 'admin-record-import' }" class="underline flex items-center gap-2">
-        <FileUp class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />import records data
-      </router-link> to use attributes.
+    <div v-if="attributes && !attributes.length" class="dv-panel admin-empty">
+      <h2>No field yet</h2>
+      <p>Add a field here, or import a CSV file: each of its columns becomes a text field.</p>
     </div>
-    <AdminList v-else :items="recordAttributes" :fields="['name', 'displayName']" label="Record attributes" v-slot="{ items }">
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Attribute Key</TableHead>
-          <TableHead>Display Name</TableHead>
-          <TableHead>Filter in Search</TableHead>
-          <TableHead>Visible in Record List</TableHead>
-          <TableHead>Searchable</TableHead>
-          <TableHead><span class="sr-only">Actions</span></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        <TableRow v-for="attribute in items" :key="attribute.id">
-          <TableCell>{{ attribute.name }}</TableCell>
-          <TableCell>{{ attribute.displayName }}</TableCell>
-          <TableCell>{{ attribute.facetable ? "Yes" : "No" }}</TableCell>
-          <TableCell>{{ attribute.viewable ? "Yes" : "No" }}</TableCell>
-          <TableCell>{{ attribute.searchable ? "Yes" : "No" }}</TableCell>
-          <TableCell>
-            <div class="flex space-x-2">
-              <Button variant="ghost" size="sm" @click="openEditModal(attribute)">
-                <PencilLine class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
-                Edit
-              </Button>
-              <Button variant="ghost" size="sm" @click="remove(attribute)">
-                <Trash2 class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] mr-2" />
-                Remove
-              </Button>
-            </div>
-          </TableCell>
-        </TableRow>
-      </TableBody>
-    </Table>
-    </AdminList>
+    <div v-else class="dv-panel overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr>
+            <th><span class="sr-only">Order</span></th>
+            <th>Name</th>
+            <th>Display name</th>
+            <th>Type</th>
+            <th>Filter in search</th>
+            <th>Visible on files</th>
+            <th>Searchable</th>
+            <th><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <Draggable :model-value="attributes ?? []" item-key="id" tag="tbody" handle=".field-handle" @update:model-value="saveOrder">
+          <template #item="{ element: attribute, index }: { element: RecordAttribute, index: number }">
+            <tr>
+              <td class="whitespace-nowrap">
+                <GripVertical class="field-handle inline size-4 cursor-grab admin-text-secondary" aria-hidden="true" />
+                <button type="button" class="p-1 disabled:opacity-30" :aria-label="`Move ${fieldLabel(attribute)} up`" :disabled="index === 0" @click="move(index, -1)"><ArrowUp class="size-3.5" /></button>
+                <button type="button" class="p-1 disabled:opacity-30" :aria-label="`Move ${fieldLabel(attribute)} down`" :disabled="index === (attributes?.length ?? 0) - 1" @click="move(index, 1)"><ArrowDown class="size-3.5" /></button>
+              </td>
+              <td>{{ attribute.name }}</td>
+              <td>{{ attribute.displayName }}</td>
+              <td>{{ VALUE_TYPE_LABELS[attribute.valueType] }}<span v-if="isSelect(attribute.valueType)" class="admin-text-secondary"> · {{ attribute.options.length }} options</span></td>
+              <td>{{ attribute.facetable ? "Yes" : "No" }}</td>
+              <td>{{ attribute.viewable ? "Yes" : "No" }}</td>
+              <td>{{ attribute.searchable ? "Yes" : "No" }}</td>
+              <td>
+                <div class="flex gap-2">
+                  <Button variant="ghost" size="sm" @click="dialog = { open: true, field: attribute }"><PencilLine class="size-4" />Edit</Button>
+                  <Button variant="ghost" size="sm" @click="askRemove(attribute)"><Trash2 class="size-4" />Remove</Button>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </Draggable>
+      </table>
+      <p role="status" class="sr-only">{{ announcement }}</p>
+    </div>
 
-    <Dialog :open="modalState !== 'closed'" @update:open="open => { if (!open && !saving) modalState = 'closed' }">
-      <DialogContent class="admin-dialog--compact">
-        <DialogHeader>
-          <DialogTitle>
-            {{ modalState === "creating" ? "Add" : "Edit" }} record attribute
-          </DialogTitle>
-          <DialogDescription>
-            Attributes are characteristics of your records. Define an attribute to let
-            users search or filter for records by this characteristic, or to display in
-            Record List View.
-          </DialogDescription>
-        </DialogHeader>
-        <form :aria-busy="saving" @submit="onModalSubmit">
-          <div class="flex flex-col gap-6 py-4">
-            <FieldGroup >
-              <Label for="name">Select an Attribute *</Label>
-              <Select v-model="form.name!" :disabled="modalState === 'editing'" class="w-full" @update:model-value="nameError = ''">
-                <SelectTrigger id="name" class="w-full" :aria-invalid="!!nameError || undefined"
-                  :aria-describedby="nameError ? 'name-error' : undefined">
-                  <SelectValue placeholder="Available Attributes..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="name in recordAttributeNames" :key="name" :value="name"
-                    :disabled="!!recordAttributes?.find((attr) => attr.name === name)">
-                    {{ name }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p v-if="nameError" id="name-error" class="admin-form-error" role="alert">{{ nameError }}</p>
-            </FieldGroup>
-            <FieldGroup >
-              <Label for="displayName">Change Display Name</Label>
-              <Input id="displayName" v-model="form.displayName!" placeholder="Keep empty for default value"
-                class="w-full" />
-            </FieldGroup>
-            <div class="flex items-center space-x-2">
-              <Checkbox id="facetable" v-model="form.facetable" />
-              <Label for="facetable">Add filter in search</Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <Checkbox id="viewable" v-model="form.viewable" :disabled="form.facetable" />
-              <Label for="viewable">Visible in Record List</Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <Checkbox id="searchable" v-model="form.searchable" />
-              <Label for="searchable">Searchable</Label>
-            </div>
-          </div>
-          <DialogFooter class="items-center">
-            <DialogClose as-child><Button type="button" variant="outline" :disabled="saving">Cancel</Button></DialogClose>
-            <Button type="submit" :disabled="saving || (!form.name)">
-              {{ modalState === "creating" ? "Create" : "Save changes" }}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <FieldEditorDialog v-model:open="dialog.open" :field="dialog.field" :suggestions="(undeclared ?? []).filter((name) => !attributes?.some((field) => field.name === name))" />
+
+    <AlertDialog :open="!!toRemove" @update:open="(open) => { if (!open && !removing) toRemove = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove {{ toRemove ? fieldLabel(toRemove) : "" }}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <template v-if="usage === null">Counting the values…</template>
+            <template v-else>{{ usage }} {{ usage === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value }} hold a value in this field.</template>
+            The field and its values are removed from every {{ recordLabel.lower.value }}; each one keeps the value it lost in its history.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="removing">Cancel</AlertDialogCancel>
+          <Button variant="destructive" :disabled="removing" @click="remove">{{ removing ? "Removing…" : "Remove field" }}</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
