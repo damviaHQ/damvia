@@ -161,7 +161,7 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
 <template>
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else class="admin-page admin-resource-page">
-    <AdminPageHeader :description="`Files no step could link, files where steps disagree, links to a ${label.lower.value} that does not exist, and everything linked by hand. New ones arrive with every sync.`" />
+    <AdminPageHeader :description="`Files Damvia could not link to a ${label.lower.value} on its own. Choose the right ${label.lower.value} for them here.`" />
     <Tabs v-model="tab">
       <TabsList>
         <TabsTrigger value="folders">Folders <Badge variant="secondary" class="ml-2">{{ counts?.folders ?? 0 }}</Badge></TabsTrigger>

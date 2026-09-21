@@ -53,8 +53,7 @@ const stageLines = computed(() => {
 })
 
 // The setup, in the order its steps depend on each other, each with where it
-// stands and where to go. Fields and variants are optional. Products and the
-// review queue are daily work, not steps, and are shown apart.
+// stands and where to go. Fields and variants are optional.
 const steps = computed(() => {
   const overview = data.value
   if (!overview) return []
@@ -136,25 +135,6 @@ async function runNow() {
           <router-link :to="step.to" class="dv-button">{{ step.action }}</router-link>
         </li>
       </ol>
-      <h2 class="daily-heading">Every day</h2>
-      <div class="daily-cards">
-        <section class="dv-panel setup-step" aria-labelledby="daily-records">
-          <div class="setup-step__body">
-            <h2 id="daily-records">{{ label.plural.value }}</h2>
-            <p>Your catalogue: create, correct and complete it, or import a CSV.</p>
-            <p class="setup-step__status">{{ data.records }} {{ data.records === 1 ? label.lower.value : label.lowerPlural.value }}</p>
-          </div>
-          <router-link :to="{ name: 'admin-records' }" class="dv-button">Open {{ label.lowerPlural.value }}</router-link>
-        </section>
-        <section class="dv-panel setup-step" aria-labelledby="daily-review">
-          <div class="setup-step__body">
-            <h2 id="daily-review">To review</h2>
-            <p>Files no step could link and files where steps disagree. New ones arrive with every sync.</p>
-            <p class="setup-step__status">{{ data.files.matched }} linked, {{ data.files.unmatched }} not linked, {{ data.files.conflicts }} in conflict</p>
-          </div>
-          <router-link :to="{ name: 'admin-unmatched' }" class="dv-button">Review files</router-link>
-        </section>
-      </div>
       <section class="dv-panel overview-card mt-6" aria-labelledby="overview-last-pass">
         <h2 id="overview-last-pass">Last pass</h2>
         <p v-if="!data.lastRun" class="admin-text-secondary">No pass has finished yet.</p>
@@ -180,8 +160,6 @@ async function runNow() {
 .setup-step__body p { color:var(--dv-text-secondary); }
 .setup-step__status { font-variant-numeric:tabular-nums; }
 .setup-step__optional { color:var(--dv-text-secondary); font-size:var(--dv-size-caption); font-weight:500; }
-.daily-heading { margin:28px 0 12px; font-size:var(--dv-size-section); }
-.daily-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px; }
 @media(max-width:640px) { .setup-step { flex-wrap:wrap; } }
 .overview-card { display:grid; gap:12px; align-content:start; padding:20px 24px; }
 .overview-card h2 { font-size:var(--dv-size-section); }
