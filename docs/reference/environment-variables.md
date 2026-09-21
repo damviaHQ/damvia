@@ -80,7 +80,7 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PRODUCT_MATCHING_REGEX` | unset (job logs an error and skips) | Deprecated. Copied once, at the upgrade that added the Matching screen, into a File name step of every record-related asset type (group 1 key, group 2 view); edit the steps in the admin afterwards. Until the old job is switched off it still applies to files no step owns. Example: `^(.{6}-\d{3})(?:\.(\d{2}))?`. |
+| `PRODUCT_MATCHING_REGEX` | unset (job logs an error and skips) | Deprecated. Copied once, at the upgrade that added the matching screen, into a File name step of every record-related asset type (group 1 key, group 2 view); edit the steps in the admin afterwards. Until the old job is switched off it still applies to files no step owns. Example: `^(.{6}-\d{3})(?:\.(\d{2}))?`. |
 | `PIM_PRODUCT_VIEW` | unset | Deprecated. Copied once, at the same upgrade, into the thumbnail view of Settings (`00` when unset). |
 | `ENABLE_LEGACY_PRODUCT_MATCHING` | `true` | `false` stops the `asset/assign-products-to-asset-files` job. Set it once every record-related asset type has matching steps. |
 

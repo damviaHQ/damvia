@@ -19,7 +19,7 @@ Choose values and press **Save** to apply them to that folder, all descendant fo
 
 Under the folder defaults, the screen says where the asset type came from: set by hand, set by a named [folder rule](./asset-types.md#assign-it-by-a-rule-on-the-folder-path), inherited from a parent, or not applied yet (a folder created by the last sync, typed by the enrichment pass that follows it). A folder typed by hand keeps that type when it is moved in the cloud storage; every other folder takes the type of its new place. Each folder also stores its path (`/Source/Season/Packshots`), refreshed after every sync, which is what the rules match.
 
-The **Linked record** section of a folder links every file of the folder and its subfolders to one record or one range, by hand, whatever the matching steps find. A section inherited from a parent folder names that folder. See [Records](./records.md#fix-what-matching-could-not).
+Links from a folder to a record are set in **Data enrichment → To review**, tab **Linked by hand**, not here. See [Records](./records.md#fix-what-matching-could-not).
 
 The type and licence then belong to the file. They follow it into every collection, page block and search result. A collection never replaces them. Moving the file to a different cloud folder gives it the new folder's values on the next run. See [Asset types](./asset-types.md) and [Licences](./licenses.md).
 

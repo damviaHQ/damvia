@@ -20,6 +20,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { extractErrors, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
+import { Check } from "@lucide/vue"
 import { computed, ref } from "vue"
 
 const toast = useGlobalToast()
@@ -51,6 +52,71 @@ const stageLines = computed(() => {
   ]
 })
 
+// The six steps in the order they depend on each other, each with where it
+// stands and where to go. Fields and variants are optional.
+const steps = computed(() => {
+  const overview = data.value
+  if (!overview) return []
+  const plural = label.lowerPlural.value
+  const types = overview.assetTypes
+  return [
+    {
+      title: "Asset types",
+      what: "Say what kind of file each folder holds. Everything after is set per type.",
+      status: `${types.total} ${types.total === 1 ? "type" : "types"}, ${overview.folders.untyped} ${overview.folders.untyped === 1 ? "folder" : "folders"} without a type`,
+      done: types.total > 0 && overview.folders.untyped === 0,
+      optional: false,
+      to: { name: "admin-asset-types" },
+      action: "Open asset types",
+    },
+    {
+      title: label.plural.value,
+      what: `Your catalogue, imported by CSV. Files are linked to it in step 4.`,
+      status: `${overview.records} ${overview.records === 1 ? label.lower.value : plural}`,
+      done: overview.records > 0,
+      optional: false,
+      to: { name: overview.records ? "admin-records" : "admin-record-import" },
+      action: overview.records ? `Open ${plural}` : "Import a CSV",
+    },
+    {
+      title: "Fields",
+      what: `What readers see and can search: ${label.lower.value} columns and the metadata read from photos.`,
+      status: `${overview.metadataFields.shown} of ${overview.metadataFields.total} photo metadata fields shown`,
+      done: overview.metadataFields.shown > 0,
+      optional: true,
+      to: { name: "admin-fields" },
+      action: "Open fields",
+    },
+    {
+      title: `Link to ${plural}`,
+      what: `For each type related to ${plural}, say how a file finds its ${label.lower.value}: name, folder or metadata.`,
+      status: types.relatedToRecords ? `${types.withSteps} of ${types.relatedToRecords} ${types.relatedToRecords === 1 ? "type has" : "types have"} steps` : `No asset type is related to ${plural} yet: tick it in step 1`,
+      done: types.relatedToRecords > 0 && types.withSteps === types.relatedToRecords,
+      optional: false,
+      to: { name: "admin-matching" },
+      action: "Set the steps",
+    },
+    {
+      title: "To review",
+      what: "The files no step could link, and the ones where steps disagree.",
+      status: `${overview.files.matched} linked, ${overview.files.unmatched} not linked, ${overview.files.conflicts} in conflict`,
+      done: overview.files.matched > 0 && overview.files.unmatched + overview.files.conflicts === 0,
+      optional: false,
+      to: { name: "admin-unmatched" },
+      action: "Review files",
+    },
+    {
+      title: "Variants",
+      what: "Show the formats of one creative as a single card. Switched on per asset type.",
+      status: `${types.groupingVariants} ${types.groupingVariants === 1 ? "type groups" : "types group"} variants, ${overview.variantGroups} groups, ${overview.unnamedAxes} to name`,
+      done: types.groupingVariants > 0 && overview.unnamedAxes === 0,
+      optional: true,
+      to: { name: "admin-variants" },
+      action: "Open variants",
+    },
+  ]
+})
+
 const starting = ref(false)
 async function runNow() {
   starting.value = true
@@ -70,41 +136,23 @@ async function runNow() {
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
   <div v-else-if="data" class="admin-page admin-resource-page">
-    <AdminPageHeader :description="`Folder rules, matching to ${label.lowerPlural.value} and variant groups run after every sync, every 5 minutes. Nothing is ever written to the cloud storage.`">
+    <AdminPageHeader :description="`Six steps give every file its type, its ${label.lower.value} and its variants. Follow them in order. Once set, they run by themselves after every sync, every 5 minutes. Nothing is ever written to the cloud storage.`">
       <Button class="dv-button dv-button--primary" :disabled="starting || !!data.running" :title="runningReason || undefined" @click="runNow">Run enrichment now</Button>
     </AdminPageHeader>
     <p v-if="data.running" role="status" class="admin-form-note mb-4">{{ runningReason }}.</p>
     <div v-if="!data.synced" class="admin-empty dv-panel"><h2>No sync has run yet.</h2><p>Enrichment starts after the first sync of a cloud source.</p></div>
     <template v-else>
-      <div class="overview-cards">
-        <section class="dv-panel overview-card" aria-labelledby="overview-folders">
-          <h2 id="overview-folders">Folders</h2>
-          <dl>
-            <div><dt>Typed by a rule</dt><dd>{{ data.folders.byRule }}</dd></div>
-            <div><dt>Typed by hand</dt><dd>{{ data.folders.byHand }}</dd></div>
-            <div><dt>Inherited</dt><dd>{{ data.folders.inherited }}</dd></div>
-            <div><dt>Untyped</dt><dd>{{ data.folders.untyped }}</dd></div>
-          </dl>
-          <router-link :to="{ name: 'admin-folder-rules' }" class="underline">Folder rules</router-link>
-        </section>
-        <section class="dv-panel overview-card" aria-labelledby="overview-files">
-          <h2 id="overview-files">Files and {{ label.lowerPlural.value }}</h2>
-          <dl>
-            <div><dt>Matched</dt><dd>{{ data.files.matched }}</dd></div>
-            <div><dt>Unmatched</dt><dd>{{ data.files.unmatched }}</dd></div>
-            <div><dt>In conflict</dt><dd>{{ data.files.conflicts }}</dd></div>
-          </dl>
-          <router-link :to="{ name: 'admin-unmatched' }" class="underline">Unmatched</router-link>
-        </section>
-        <section class="dv-panel overview-card" aria-labelledby="overview-variants">
-          <h2 id="overview-variants">Variants</h2>
-          <dl>
-            <div><dt>Groups</dt><dd>{{ data.variantGroups }}</dd></div>
-            <div><dt>Axes waiting for a name</dt><dd>{{ data.unnamedAxes }}</dd></div>
-          </dl>
-          <router-link :to="{ name: 'admin-variants' }" class="underline">Variants</router-link>
-        </section>
-      </div>
+      <ol class="setup-steps">
+        <li v-for="(step, index) in steps" :key="step.title" class="dv-panel setup-step" :class="{ 'setup-step--done': step.done }">
+          <span class="setup-step__number" aria-hidden="true"><Check v-if="step.done" class="size-4" /><template v-else>{{ index + 1 }}</template></span>
+          <div class="setup-step__body">
+            <h2>{{ step.title }}<span v-if="step.optional" class="setup-step__optional">Optional</span><span v-if="step.done" class="sr-only"> (done)</span></h2>
+            <p>{{ step.what }}</p>
+            <p class="setup-step__status">{{ step.status }}</p>
+          </div>
+          <router-link :to="step.to" class="dv-button">{{ step.action }}</router-link>
+        </li>
+      </ol>
       <section class="dv-panel overview-card mt-6" aria-labelledby="overview-last-pass">
         <h2 id="overview-last-pass">Last pass</h2>
         <p v-if="!data.lastRun" class="admin-text-secondary">No pass has finished yet.</p>
@@ -121,12 +169,17 @@ async function runNow() {
 </template>
 
 <style scoped>
-.overview-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px; }
+.setup-steps { display:grid; gap:12px; }
+.setup-step { display:flex; align-items:center; gap:16px; padding:18px 24px; }
+.setup-step__number { display:flex; flex-shrink:0; align-items:center; justify-content:center; width:32px; height:32px; border:1px solid var(--dv-color-line-strong); border-radius:999px; font-weight:650; font-variant-numeric:tabular-nums; }
+.setup-step--done .setup-step__number { border-color:var(--dv-action-primary); background:var(--dv-action-primary); color:white; }
+.setup-step__body { display:grid; flex:1; gap:4px; min-width:0; }
+.setup-step__body h2 { display:flex; align-items:center; gap:8px; font-size:var(--dv-size-section); }
+.setup-step__body p { color:var(--dv-text-secondary); }
+.setup-step__status { font-variant-numeric:tabular-nums; }
+.setup-step__optional { color:var(--dv-text-secondary); font-size:var(--dv-size-caption); font-weight:500; }
+@media(max-width:640px) { .setup-step { flex-wrap:wrap; } }
 .overview-card { display:grid; gap:12px; align-content:start; padding:20px 24px; }
 .overview-card h2 { font-size:var(--dv-size-section); }
-.overview-card dl { display:grid; gap:6px; }
-.overview-card dl div { display:flex; justify-content:space-between; gap:12px; }
-.overview-card dt { color:var(--dv-text-secondary); }
-.overview-card dd { font-variant-numeric:tabular-nums; font-weight:600; }
 .overview-stages { display:grid; gap:4px; color:var(--dv-text-secondary); }
 </style>

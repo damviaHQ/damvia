@@ -212,8 +212,8 @@ async function remove(id: string) {
   <div v-else-if="status === 'error'" class="admin-error" role="alert">
     {{ error?.message }}
   </div>
-  <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
-    <AdminPageHeader description="Give an asset type to every folder whose path matches a pattern. The rule that starts deepest wins, and a type set by hand always wins on its own folder.">
+  <div v-else-if="status === 'success'" class="admin-resource-page">
+    <AdminPageHeader :title="null" description="Give an asset type to every folder whose path matches a pattern. The rule that starts deepest wins, and a type set by hand always wins on its own folder.">
       <Button type="button" variant="default" @click="openCreateModal" class="dv-button dv-button--primary">
         <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
         Add folder rule

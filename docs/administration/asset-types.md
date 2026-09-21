@@ -32,7 +32,7 @@ A type chosen this way is recorded as **set by hand** on that folder and never c
 
 ## Assign it by a rule on the folder path
 
-Open `/admin/folder-rules` to give a type to every folder whose path matches a regular expression, without touching each folder. A rule has a pattern, an asset type and an enabled flag.
+Open the **Folder rules** tab of **Asset types** (`/admin/asset-types?tab=folder-rules`; `/admin/folder-rules` redirects there) to give a type to every folder whose path matches a regular expression, without touching each folder. A rule has a pattern, an asset type and an enabled flag.
 
 | Field | Rule |
 |---|---|

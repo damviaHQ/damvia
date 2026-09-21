@@ -26,13 +26,12 @@ import {
   Copyright,
   FileCog,
   FilePenLine,
-  FolderCog,
-  Gauge,
   Folders,
   HardDrive,
   KeyRound,
   Layers,
   Link2,
+  ListChecks,
   LayoutDashboard,
   Menu,
   Package,
@@ -180,12 +179,16 @@ const storageLevel = computed(() => {
               Licenses
             </router-link>
           </div>
-          <!-- Data enrichment -->
+          <!-- Data enrichment: the entries follow the order of the steps -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
             <div class="menu-section-title">Data Enrichment</div>
             <router-link :to="{ name: 'admin-enrichment-overview' }" class="menu-item" active-class="" exact-active-class="router-link-active">
-              <Gauge class="w-4 h-4 mr-2" />
-              Overview
+              <ListChecks class="w-4 h-4 mr-2" />
+              Start here
+            </router-link>
+            <router-link :to="{ name: 'admin-asset-types' }" class="menu-item">
+              <FileCog class="w-4 h-4 mr-2" />
+              Asset types
             </router-link>
             <router-link :to="{ name: 'admin-records' }" class="menu-item">
               <Package class="w-4 h-4 mr-2" />
@@ -195,27 +198,19 @@ const storageLevel = computed(() => {
               <Blocks class="w-4 h-4 mr-2" />
               Fields
             </router-link>
-            <router-link :to="{ name: 'admin-folder-rules' }" class="menu-item">
-              <FolderCog class="w-4 h-4 mr-2" />
-              Folder rules
-            </router-link>
             <router-link :to="{ name: 'admin-matching' }" class="menu-item">
               <Link2 class="w-4 h-4 mr-2" />
-              Matching
+              Link to {{ recordLabel.lowerPlural.value }}
             </router-link>
             <router-link :to="{ name: 'admin-unmatched' }" class="menu-item">
               <Unlink class="w-4 h-4 mr-2" />
-              Unmatched
+              To review
               <span v-if="unmatchedBadge" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${unmatchedBadge} files unmatched or in conflict`">{{ unmatchedBadge }}</span>
             </router-link>
             <router-link :to="{ name: 'admin-variants' }" class="menu-item">
               <Layers class="w-4 h-4 mr-2" />
               Variants
               <span v-if="badges?.unnamedAxes" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${badges.unnamedAxes} axes waiting for a name`">{{ badges.unnamedAxes }}</span>
-            </router-link>
-            <router-link :to="{ name: 'admin-asset-types' }" class="menu-item">
-              <FileCog class="w-4 h-4 mr-2" />
-              Asset Types
             </router-link>
           </div>
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">

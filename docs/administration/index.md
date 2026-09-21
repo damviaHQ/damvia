@@ -48,7 +48,7 @@ Collections organise references to assets. Copying a file into another collectio
 ## Data enrichment and reporting
 
 - [Variants](./variants.md): show the versions of one creative as one card and name what differs between them.
-- [Records](./records.md): create and edit products, events or anything files are about in a spreadsheet grid or as a card with their files and history, import them by CSV, type their fields, say how files find their record and fix the unmatched ones.
+- [Records](./records.md): the six steps of data enrichment and where to start; create and edit products, events or anything files are about in a spreadsheet grid or as a card with their files and history, import them by CSV, type their fields, say how files find their record and fix the unmatched ones.
 - [Insights](./analytics.md): interpret recorded activity and retention.
 - [Dashboard](./dashboard.md): storage usage, source state and items needing attention.
 
@@ -61,11 +61,11 @@ Collections organise references to assets. Copying a file into another collectio
 | Settings: branding and record label | `/admin/settings`, the last entry of the admin menu | admin |
 | Menu, collections and pages | `/admin/menu-items`, `/admin/collections`, `/admin/pages` | admin |
 | Assets, types and licences | `/admin/assets`, `/admin/asset-types`, `/admin/licenses` | admin |
-| Folder rules | `/admin/folder-rules` | admin |
+| Folder rules, a tab of Asset types | `/admin/asset-types?tab=folder-rules`; `/admin/folder-rules` redirects | admin |
 | Users | `/admin/users` | admin or manager for their region |
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
 | Records, fields and metadata | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/fields` | admin |
-| Matching and unmatched files | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
-| Data enrichment overview and variants | `/admin/data-enrichment`, `/admin/data-enrichment/variants` | admin |
+| Link to records and To review | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
+| Data enrichment Start here and variants | `/admin/data-enrichment`, `/admin/data-enrichment/variants` | admin |
 
 The labels and exact layout may evolve; the permission and data consequences documented on each linked page are the durable contract.

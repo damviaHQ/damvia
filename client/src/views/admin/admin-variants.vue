@@ -120,7 +120,9 @@ function addWord() {
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
   <div v-else class="admin-page admin-resource-page">
-    <AdminPageHeader description="Name what changes between the files of a variant group, and decide which names are never grouped." />
+    <AdminPageHeader description="Show the formats, languages and durations of one creative as a single card. Switch it on per asset type with Group variants, then name what changes between the files of a group.">
+      <template #lead><span class="admin-step">Step 6 of 6</span></template>
+    </AdminPageHeader>
     <Tabs default-value="axes">
       <TabsList>
         <TabsTrigger value="axes">Axes <Badge v-if="waiting.length" variant="secondary" class="ml-2">{{ waiting.length }}</Badge></TabsTrigger>

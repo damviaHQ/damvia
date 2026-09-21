@@ -10,20 +10,31 @@ The Data enrichment area adds context to mirrored assets. Damvia keeps a flat ca
 
 A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), section **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
 
-## See where enrichment stands
+## Start here: the six steps
 
-**Data enrichment → Overview** (`/admin/data-enrichment`) counts the folders typed by a rule, by hand, inherited or untyped; the files matched, unmatched or in conflict; the variant groups and the axes waiting for a name. It shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
+Data enrichment is six steps, and the menu lists them in the order they depend on each other. Each screen names its step at the top.
+
+| Step | Screen | Question it answers |
+|---|---|---|
+| 1 | **Asset types**, with the **Folder rules** tab | What kind of file is this? Everything after is set per type. |
+| 2 | **Products** (your record label) | What is the catalogue? |
+| 3 | **Fields**, optional | What do readers see and search: record columns and photo metadata? |
+| 4 | **Link to products** | How does a file of each type find its record? |
+| 5 | **To review** | Which files could not be linked, and what was linked by hand? |
+| 6 | **Variants**, optional | Which files are versions of one creative? |
+
+**Data enrichment → Start here** (`/admin/data-enrichment`) lists the six steps with where each stands: types defined and folders still without one, records imported, photo metadata fields shown, types with matching steps, files linked, not linked or in conflict, types grouping variants and axes waiting for a name. A step is ticked when it is done, and its button opens its screen. The page also shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
 
 ## Two questions, two tools
 
-- **Folder rules** answer "what kind of file is this?": they give an [asset type](./asset-types.md) from the folder path (packshot, video, logo).
-- **Matching** answers "which record is this file about?": it finds a record key in the file name or the folder path (product `WX5678-100`, event `EVT-25028`).
+- **Folder rules** (step 1) answer "what kind of file is this?": they give an [asset type](./asset-types.md) from the folder path (packshot, video, logo).
+- **Link to products** (step 4) answers "which record is this file about?": it finds a record key in the file name or the folder path (product `WX5678-100`, event `EVT-25028`).
 
-Matching only runs on files whose asset type is marked **Related to records**. Files of other types, such as logos or fonts, are left out and never appear in the Unmatched queue.
+Matching only runs on files whose asset type is marked **Related to records**. Files of other types, such as logos or fonts, are left out and never appear in **To review**.
 
 ## Set the matching steps
 
-Open **Data enrichment → Matching** (`/admin/data-enrichment/matching`). Choose an asset type on the left, then add its steps:
+Open **Data enrichment → Link to products** (the menu uses your record label, `/admin/data-enrichment/matching`). Choose an asset type on the left, then add its steps:
 
 | Step | What it reads | What its group gives |
 |---|---|---|
@@ -130,7 +141,7 @@ The **Files** tab of a record's card shows every file linked to it and what link
 
 ## Fix what matching could not
 
-Open **Data enrichment → Unmatched** (`/admin/data-enrichment/unmatched`). The menu badge counts unmatched files and conflicts.
+Open **Data enrichment → To review** (`/admin/data-enrichment/unmatched`). The menu badge counts unmatched files and conflicts.
 
 | Tab | Lists | Action |
 |---|---|---|
@@ -138,8 +149,9 @@ Open **Data enrichment → Unmatched** (`/admin/data-enrichment/unmatched`). The
 | Files | Every unmatched file and why | **Attach** one file or the selected ones by hand |
 | Conflicts | Files where steps found different keys | **Use** one of the keys, or **Other**. The choice is kept and no step changes it later |
 | Dangling | Links to a key or value no record has | **Create record** with the key only, filled by the next CSV import, or **Detach** a link set by hand |
+| Linked by hand | Every folder and file linked by hand, newest first, with the number of files, the target and who set it | **Link this folder** links any folder, including one whose files are already matched, such as a pack that covers a whole range. **Detach** removes a link |
 
-The attach dialog searches records by key and by searchable attribute, or picks a range by attribute and value. When the key does not exist, **Create record with this key** creates it. A folder can also be linked from its panel in [Assets](./assets-tree.md).
+The attach dialog searches records by key and by searchable attribute, or picks a range by attribute and value. When the key does not exist, **Create record with this key** creates it.
 
 ## Use the metadata written inside the files
 
@@ -150,13 +162,13 @@ Damvia reads the EXIF (camera, lens, date taken, GPS) and IPTC (title, caption, 
 | Searchable | Free-text search also looks in this field. |
 | Filter | The field becomes a filter in search: its values for text, a from/to range for dates. A GPS position cannot be a filter. Text fields show their 200 most used values. |
 | Visible | The value is shown under **From the file** in the file preview and can be chosen as a list column on an asset type. |
-| Can link | The field may link files to records, through a **Metadata** step on the Matching screen. Say whether the value is a record key or the value of an attribute (a range). |
+| Can link | The field may link files to records, through a **Metadata** step on the Link to products screen. Say whether the value is a record key or the value of an attribute (a range). |
 
 Metadata belongs to the file, so these filters also work on files no record is linked to. Cameras write some fields reliably; people write others, which can be wrong or outdated. Only tick **Can link** for a field your team fills reliably: until then, a value equal to a record key links nothing. When a trusted field has a record key on an unmatched file, the Unmatched screen suggests it with **Accept**. Dates are stored as the camera wrote them, without time zone conversion.
 
 ## Map files to records with a CSV
 
-For files whose name, folder and metadata say nothing, the **CSV mapping** section of the Matching screen imports a CSV with the columns `file_name` and `record_key`, or `file_name`, `attribute` and `value` for a range. The file name may leave out its extension and case does not matter. The first row must name the columns; the file is limited to 5 MB and 50,000 rows.
+For files whose name, folder and metadata say nothing, the **CSV mapping** section of the Link to products screen imports a CSV with the columns `file_name` and `record_key`, or `file_name`, `attribute` and `value` for a range. The file name may leave out its extension and case does not matter. The first row must name the columns; the file is limited to 5 MB and 50,000 rows.
 
 Choosing the file compares it with the current mapping before anything is written: rows new, changed and removed, keys no record has, and how many files of the library it names. **Replace the mapping** then applies it: a new import replaces the previous one entirely and links from the old one go. Links set by hand are kept. CSV links apply to every record-related asset type, after links set by hand and before file name steps.
 
@@ -171,7 +183,7 @@ A view is the angle or version a file shows of a record, written after the key i
 | Digits | 1 to 4, `2` by default. |
 | Thumbnail view | The view used as the record's picture in the admin list, `00` by default or the old `PIM_PRODUCT_VIEW`. |
 
-The view part is added after the pattern of every file name step that does not name its own view group, and the Matching screen shows the full pattern. Changing the separator, the digits or the switch re-runs matching straight away.
+The view part is added after the pattern of every file name step that does not name its own view group, and the Link to products screen shows the full pattern. Changing the separator, the digits or the switch re-runs matching straight away.
 
 ## Search shows exact files and range files apart
 

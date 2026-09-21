@@ -176,22 +176,31 @@ export default router({
 				values: [],
 			}
 		}),
-	folderAttachments: publicProcedure
+	// Every folder and file linked by hand, newest first, so an admin can see
+	// and undo them in one place.
+	manualLinks: publicProcedure
 		.use(authMiddleware(userAdmin))
-		.input(z.uuid())
-		.query(async ({ input }) => {
-			const rows: { id: string, folder_id: string, path: string, target_kind: string, record_key: string | null, attribute_name: string | null, attribute_value: string | null, created_by: string | null, created_at: Date }[] = await dataSource.query(`
-				SELECT at.id, at.asset_folder_id AS folder_id, f.path, at.target_kind, at.record_key, at.attribute_name, at.attribute_value, u.name AS created_by, at.created_at
+		.query(async () => {
+			const rows: { id: string, kind: 'folder' | 'file', name: string, path: string, target_kind: string, record_key: string | null, attribute_name: string | null, attribute_value: string | null, created_by: string | null, created_at: Date, files: number }[] = await dataSource.query(`
+				SELECT at.id, 'folder' AS kind, f.name, f.path, at.target_kind, at.record_key, at.attribute_name, at.attribute_value, u.name AS created_by, at.created_at,
+					(SELECT count(*) FROM asset_files a INNER JOIN asset_folders d ON d.id = a.folder_id WHERE d.mpath LIKE f.mpath || '%' AND a.status <> 'pending_deletion')::int AS files
 				FROM asset_folder_entity_attachments at
 				INNER JOIN asset_folders f ON f.id = at.asset_folder_id
 				LEFT JOIN users u ON u.id = at.created_by_id
-				WHERE at.asset_folder_id::text = ANY(string_to_array((SELECT mpath FROM asset_folders WHERE id = $1), '.'))
-				ORDER BY length(f.mpath) DESC, at.created_at
-			`, [input])
-			const nearest = rows[0]?.folder_id
-			return rows.filter((row) => row.folder_id === nearest).map((row) => ({
+				UNION ALL
+				SELECT l.id, 'file', a.name, f.path, l.target_kind, l.record_key, l.attribute_name, l.attribute_value, u.name, l.created_at, 1
+				FROM asset_entity_links l
+				INNER JOIN asset_files a ON a.id = l.asset_file_id
+				INNER JOIN asset_folders f ON f.id = a.folder_id
+				LEFT JOIN users u ON u.id = l.created_by_id
+				WHERE l.strategy = 'manual_file'
+				ORDER BY created_at DESC
+				LIMIT 500
+			`)
+			return rows.map((row) => ({
 				id: row.id,
-				inherited: row.folder_id !== input,
+				kind: row.kind,
+				name: row.name,
 				path: row.path,
 				targetKind: row.target_kind as 'record' | 'attribute',
 				recordKey: row.record_key,
@@ -199,6 +208,7 @@ export default router({
 				attributeValue: row.attribute_value,
 				createdBy: row.created_by,
 				createdAt: row.created_at,
+				files: row.files,
 			}))
 		}),
 	// One attach on a folder links every file inside it and below it; on files,

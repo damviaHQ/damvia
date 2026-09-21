@@ -33,13 +33,16 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
+import Treeselect from "vue3-treeselect-ts"
 import { refDebounced } from "@vueuse/core"
 import { computed, ref, watch } from "vue"
+import { useRoute } from "vue-router"
 
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
 const label = useRecordLabel()
-const tab = ref("folders")
+const route = useRoute()
+const tab = ref(route.query.tab === "manual" ? "manual" : "folders")
 const search = ref("")
 const debouncedSearch = refDebounced(search, 300)
 const page = ref(1)
@@ -53,6 +56,9 @@ const { data: files, status: filesStatus } = useQuery({
 })
 const { data: conflicts, status: conflictsStatus } = useQuery({ queryKey: ["entity-resolution", "conflicts"], queryFn: () => trpc.entityResolution.conflicts.query() })
 const { data: dangling, status: danglingStatus } = useQuery({ queryKey: ["entity-resolution", "dangling"], queryFn: () => trpc.entityResolution.dangling.query() })
+const { data: manualLinks, status: manualStatus } = useQuery({ queryKey: ["entity-resolution", "manual"], queryFn: () => trpc.entityResolution.manualLinks.query() })
+const { data: folderTree } = useQuery({ queryKey: ["asset", "tree"], queryFn: () => trpc.asset.tree.query() })
+const folderToLink = ref<string | null>(null)
 
 const strategyLabel: Record<string, string> = {
   filename_regex: "file name",
@@ -79,6 +85,13 @@ function attachFiles(ids: string[], name: string) {
   picker.value = { title: `Link ${name}`, description: `${ids.length} ${ids.length === 1 ? "file is" : "files are"} linked by hand. No matching rule changes this link later.`, fileIds: ids, name }
 }
 
+// Any folder, including one whose files are already matched, such as a pack
+// that covers a whole range.
+function attachAnyFolder() {
+  if (!folderToLink.value) return
+  picker.value = { title: "Link a folder", description: "Every file in this folder and its subfolders is linked, whatever the matching steps find, and files added later follow.", folderId: folderToLink.value, name: "the folder" }
+}
+
 async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
     await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
@@ -93,6 +106,7 @@ async function confirm(target: RecordTarget) {
     toast.success(`${result.files} ${result.files === 1 ? "file" : "files"} linked to ${name}${result.recordCreated ? ` (${label.lower.value} created)` : ""}`)
     picker.value = null
     selected.value = []
+    folderToLink.value = null
     await refresh()
   } catch (error) {
     toast.error((error as Error).message)
@@ -131,19 +145,32 @@ async function detach(linkId: string) {
   }
 }
 
+async function detachFolder(attachmentId: string) {
+  try {
+    await trpc.entityResolution.detach.mutate({ attachmentId })
+    toast.success("Link removed")
+    await refresh()
+  } catch (error) {
+    toast.error((error as Error).message)
+  }
+}
+
 const notScanned = computed(() => status.value === "success" && !counts.value?.unmatched && !counts.value?.conflicts && !counts.value?.dangling && !folders.value?.length)
 </script>
 
 <template>
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else class="admin-page admin-resource-page">
-    <AdminPageHeader :description="`Files of a type related to ${label.lowerPlural.value} that no matching step could link, the ones where steps disagree, and links pointing to a ${label.lower.value} that does not exist.`" />
+    <AdminPageHeader :description="`Files no step could link, files where steps disagree, links to a ${label.lower.value} that does not exist, and everything linked by hand.`">
+      <template #lead><span class="admin-step">Step 5 of 6</span></template>
+    </AdminPageHeader>
     <Tabs v-model="tab">
       <TabsList>
         <TabsTrigger value="folders">Folders <Badge variant="secondary" class="ml-2">{{ counts?.folders ?? 0 }}</Badge></TabsTrigger>
         <TabsTrigger value="files">Files <Badge variant="secondary" class="ml-2">{{ counts?.unmatched ?? 0 }}</Badge></TabsTrigger>
         <TabsTrigger value="conflicts">Conflicts <Badge variant="secondary" class="ml-2">{{ counts?.conflicts ?? 0 }}</Badge></TabsTrigger>
         <TabsTrigger value="dangling">Dangling <Badge variant="secondary" class="ml-2">{{ counts?.dangling ?? 0 }}</Badge></TabsTrigger>
+        <TabsTrigger value="manual">Linked by hand <Badge variant="secondary" class="ml-2">{{ manualLinks?.length ?? 0 }}</Badge></TabsTrigger>
       </TabsList>
 
       <TabsContent value="folders" class="mt-4">
@@ -235,6 +262,30 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
                   <Button v-if="link.manual" variant="ghost" size="sm" @click="detach(link.id)">Detach</Button>
                 </div>
               </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </TabsContent>
+
+      <TabsContent value="manual" class="mt-4">
+        <p class="admin-form-note mb-4">A folder or a file linked by hand keeps its {{ label.lower.value }} whatever the matching steps find. Link a folder here when its files are already matched but you want them on something else, such as a pack that covers a whole range.</p>
+        <div class="mb-4 flex flex-wrap items-end gap-3">
+          <div class="min-w-72 flex-1">
+            <treeselect v-model="folderToLink" placeholder="Choose a folder" :options="folderTree ?? []" :normalizer="(node: any) => ({ id: node.id, label: node.name })" />
+          </div>
+          <Button variant="outline" :disabled="!folderToLink" @click="attachAnyFolder">Link this folder</Button>
+        </div>
+        <div v-if="manualStatus === 'pending'"><Loader /></div>
+        <div v-else-if="!manualLinks?.length" class="admin-empty dv-panel"><h2>Nothing linked by hand.</h2><p>Files are linked by the matching steps of their asset type.</p></div>
+        <Table v-else>
+          <TableHeader><TableRow><TableHead>Folder or file</TableHead><TableHead>Linked to</TableHead><TableHead>Files</TableHead><TableHead>By</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableBody>
+            <TableRow v-for="link in manualLinks" :key="link.id">
+              <TableCell>{{ link.kind === "folder" ? "Folder" : "File" }} {{ link.name }}<p class="admin-text-secondary"><code>{{ link.path }}</code></p></TableCell>
+              <TableCell>{{ link.targetKind === "record" ? link.recordKey : `${link.attributeName} = ${link.attributeValue}` }}</TableCell>
+              <TableCell>{{ link.files }}</TableCell>
+              <TableCell>{{ link.createdBy ?? "—" }}</TableCell>
+              <TableCell><Button variant="ghost" size="sm" @click="link.kind === 'folder' ? detachFolder(link.id) : detach(link.id)">Detach</Button></TableCell>
             </TableRow>
           </TableBody>
         </Table>

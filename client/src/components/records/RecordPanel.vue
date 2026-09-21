@@ -159,7 +159,7 @@ function when(value: string | Date) {
           <TabsContent value="files" class="record-panel-body">
             <p v-if="!record.files.direct.length && !record.files.range.length" class="admin-text-secondary">
               No file is linked to this {{ recordLabel }} yet. Files link through the matching steps, or by hand from
-              <router-link :to="{ name: 'admin-unmatched' }" class="underline">Unmatched</router-link>.
+              <router-link :to="{ name: 'admin-unmatched' }" class="underline">To review</router-link>.
             </p>
             <ul v-if="record.files.direct.length" class="record-panel-files">
               <li v-for="file in record.files.direct" :key="file.id + file.strategy">

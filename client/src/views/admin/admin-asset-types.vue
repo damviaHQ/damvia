@@ -52,14 +52,24 @@ import {
 } from "@/components/ui/table"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import AdminFolderRules from "@/views/admin/admin-folder-rules.vue"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { ArrowDown, ArrowUp, CirclePlus, GripVertical, PencilLine, Trash2 } from "@lucide/vue"
 import { computed, nextTick, ref } from "vue"
+import { useRoute, useRouter } from "vue-router"
 import Draggable from "vuedraggable"
 
 const toast = useGlobalToast()
 const recordLabel = useRecordLabel()
+const route = useRoute()
+const router = useRouter()
+const tab = ref(route.query.tab === "folder-rules" ? "folder-rules" : "types")
+function onTab(value: string | number) {
+  tab.value = String(value)
+  router.replace({ query: { ...route.query, tab: value === "folder-rules" ? "folder-rules" : undefined } })
+}
 const form = ref<{
   id?: string
   name: string
@@ -234,7 +244,19 @@ async function onModalSubmit(event: Event) {
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="admin-page admin-resource-page">
-    <AdminPageHeader description="Configure search defaults and file information for each asset type.">
+    <AdminPageHeader :description="`Say what kind of file each folder holds: packshot, event photo, banner. The next steps are set per type: how its files find their ${recordLabel.lower.value} and whether its variants are grouped.`">
+      <template #lead><span class="admin-step">Step 1 of 6</span></template>
+    </AdminPageHeader>
+    <Tabs :model-value="tab" @update:model-value="onTab">
+      <TabsList>
+        <TabsTrigger value="types">Types</TabsTrigger>
+        <TabsTrigger value="folder-rules">Folder rules</TabsTrigger>
+      </TabsList>
+      <TabsContent value="folder-rules" class="mt-4">
+        <AdminFolderRules />
+      </TabsContent>
+      <TabsContent value="types" class="mt-4">
+    <AdminPageHeader :title="null" description="Search defaults, file information and list columns of each type. Type a folder in Assets, or many at once with folder rules.">
       <Button type="button" variant="default" @click="openCreateModal"
         class="dv-button dv-button--primary">
         <CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
@@ -290,6 +312,8 @@ async function onModalSubmit(event: Event) {
       </TableBody>
     </Table>
     </AdminList>
+      </TabsContent>
+    </Tabs>
   </div>
   <Dialog :open="modalState !== 'closed'" @update:open="(open) => !open && !saving && (modalState = 'closed')">
     <DialogContent class="admin-dialog--wide flex flex-col">

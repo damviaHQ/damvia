@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminList from "@/components/admin/AdminList.vue"
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import Loader from "@/components/Loader.vue"
 import {
   AlertDialog,
@@ -112,6 +113,9 @@ const linkMeaning = (field: Field) => !field.canLink ? "—" : field.linkTarget 
 
 <template>
   <div class="admin-page admin-resource-page">
+    <AdminPageHeader :description="`Choose what readers see and can search: the columns of your ${label.lowerPlural.value}, and the metadata read from the photos themselves (camera, date, keywords).`">
+      <template #lead><span class="admin-step">Step 3 of 6</span></template>
+    </AdminPageHeader>
     <Tabs :model-value="tab" @update:model-value="onTab">
       <TabsList>
         <TabsTrigger value="attributes">{{ label.singular.value }} attributes</TabsTrigger>

@@ -233,7 +233,9 @@ async function save() {
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
   <div v-else-if="data" class="admin-page admin-resource-page">
-    <AdminPageHeader :description="`Say how a file finds the ${label.lower.value} it is about. Folder rules give a file its type; matching steps give it its ${label.lower.value}.`" />
+    <AdminPageHeader :title="`Link to ${label.lowerPlural.value}`" :description="`For each asset type, say how a file finds its ${label.lower.value}: from its name, its folder or its metadata. The files no step can link wait in step 5.`">
+      <template #lead><span class="admin-step">Step 4 of 6</span></template>
+    </AdminPageHeader>
     <p v-if="data.legacyEnabled && data.legacyPattern" class="admin-form-note mb-4">
       The old job still applies <code>PRODUCT_MATCHING_REGEX</code> every 5 minutes to files of types without steps. Once every type related to {{ label.lowerPlural.value }} has steps, set <code>ENABLE_LEGACY_PRODUCT_MATCHING=false</code> on the server.
     </p>
@@ -259,7 +261,7 @@ async function save() {
         <p v-if="!selectedType.isRelatedToRecords" class="admin-form-note">
           Files of this type are not matched: mark the type “Related to {{ label.lowerPlural.value }}” in Asset types first.
         </p>
-        <p class="admin-text-secondary">Every step runs on every file. When two steps give a different {{ label.lower.value }}, the file is shown in Unmatched as a conflict, nothing is chosen for you. Folders and files linked by hand in Unmatched or in Assets always apply and win.</p>
+        <p class="admin-text-secondary">Every step runs on every file. When two steps give a different {{ label.lower.value }}, the file is shown in Unmatched as a conflict, nothing is chosen for you. Folders and files linked by hand in To review always apply and win.</p>
 
         <div v-if="!drafts.length" class="admin-empty dv-panel">
           <h2>No matching steps.</h2>

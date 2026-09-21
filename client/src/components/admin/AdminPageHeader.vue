@@ -23,14 +23,15 @@ const props = defineProps<{
 
 const route = useRoute()
 const slots = useSlots()
-const heading = computed(() => props.title ?? route.meta.title ?? '')
+// A null title, from a page shown as a tab of another, leaves the heading out.
+const heading = computed(() => props.title === null ? '' : props.title ?? route.meta.title ?? '')
 </script>
 
 <template>
   <header class="admin-heading">
     <div>
       <slot name="lead" />
-      <h1>{{ heading }}</h1>
+      <h1 v-if="heading">{{ heading }}</h1>
       <p v-if="description">{{ description }}</p>
     </div>
     <div v-if="slots.default" class="admin-actions">

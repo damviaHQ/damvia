@@ -120,7 +120,7 @@ Back up first and apply the migration with application writers stopped. Validate
 ## Folder rules in this upgrade
 
 - The migration stores the path of every folder and marks every typed folder as set by hand when its type differs from its parent's. Nothing is re-typed: the first enrichment pass after the restart writes only the `inherited` mark on the other folders, which is why it can report thousands of folders updated on a large library while no file changes type.
-- Rules start empty. Until an administrator adds one on `/admin/folder-rules`, typing by hand and inheritance behave as before, with one change: a folder typed by hand now keeps its type when it is moved in the cloud storage.
+- Rules start empty. Until an administrator adds one on the Folder rules tab of Asset types, typing by hand and inheritance behave as before, with one change: a folder typed by hand now keeps its type when it is moved in the cloud storage.
 - The pass runs after each sync in the API process and holds an advisory lock for its duration; on a library of 100,000 folders it takes a few seconds.
 
 ## Collection nesting in this upgrade

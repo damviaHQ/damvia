@@ -77,7 +77,7 @@ A source key becomes part of every mirrored row. Changing a provider, root or ke
 
 ## Record matching
 
-Record matching is set in the admin, on **Data enrichment → Matching**. `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` only seed it: at the upgrade that added that screen, the regex became the first File name step of every record-related asset type and the view became the thumbnail view in Settings. The old job that applies the regex every 5 minutes keeps running on the files no step owns until you set `ENABLE_LEGACY_PRODUCT_MATCHING=false`. See [Records](../administration/records.md).
+Record matching is set in the admin, on **Data enrichment → Link to products**. `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` only seed it: at the upgrade that added that screen, the regex became the first File name step of every record-related asset type and the view became the thumbnail view in Settings. The old job that applies the regex every 5 minutes keeps running on the files no step owns until you set `ENABLE_LEGACY_PRODUCT_MATCHING=false`. See [Records](../administration/records.md).
 
 ## Variables you rarely set
 

@@ -43,8 +43,16 @@ export default router({
 					(SELECT count(*) FROM asset_file_resolutions WHERE status = 'unmatched')::int AS files_unmatched,
 					(SELECT count(*) FROM asset_file_resolutions WHERE status = 'conflict')::int AS files_in_conflict,
 					(SELECT count(*) FROM variant_groups)::int AS variant_groups,
-					(SELECT count(*) FROM variant_axes a WHERE a.name IS NULL AND NOT a.ignored)::int AS unnamed_axes,
-					(SELECT count(*) FROM asset_folders)::int AS folders
+					(SELECT count(*) FROM variant_axes a WHERE a.name IS NULL AND NOT a.ignored AND EXISTS (SELECT 1 FROM variant_group_axes ga WHERE ga.variant_axis_id = a.id))::int AS unnamed_axes,
+					(SELECT count(*) FROM asset_folders)::int AS folders,
+					(SELECT count(*) FROM asset_types)::int AS asset_types,
+					(SELECT count(*) FROM asset_types WHERE is_related_to_records)::int AS record_types,
+					(SELECT count(*) FROM asset_types t WHERE t.is_related_to_records
+						AND EXISTS (SELECT 1 FROM asset_type_resolver_steps s WHERE s.asset_type_id = t.id AND s.enabled))::int AS record_types_with_steps,
+					(SELECT count(*) FROM asset_types WHERE group_variants)::int AS variant_types,
+					(SELECT count(*) FROM records)::int AS records,
+					(SELECT count(*) FROM metadata_fields)::int AS metadata_fields,
+					(SELECT count(*) FROM metadata_fields WHERE searchable OR facetable OR viewable)::int AS metadata_fields_shown
 			`)
 			const runs: RunRow[] = await dataSource.query(`
 				SELECT r.id, r.trigger, u.name AS started_by, r.started_at, r.finished_at, r.stats, r.error
@@ -55,6 +63,9 @@ export default router({
 				synced: counts.folders > 0,
 				folders: { byRule: counts.folders_by_rule, byHand: counts.folders_by_hand, inherited: counts.folders_inherited, untyped: counts.folders_untyped },
 				files: { matched: counts.files_matched, unmatched: counts.files_unmatched, conflicts: counts.files_in_conflict },
+				assetTypes: { total: counts.asset_types, relatedToRecords: counts.record_types, withSteps: counts.record_types_with_steps, groupingVariants: counts.variant_types },
+				records: counts.records,
+				metadataFields: { total: counts.metadata_fields, shown: counts.metadata_fields_shown },
 				variantGroups: counts.variant_groups,
 				unnamedAxes: counts.unnamed_axes,
 				running: running ? formatRun(runs.find((run) => !run.finished_at)) ?? { id: null, trigger: 'admin', startedBy: null, startedAt: null, finishedAt: null, durationMs: null, stats: null, error: null } : null,

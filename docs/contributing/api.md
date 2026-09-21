@@ -204,7 +204,7 @@ Values stay text in the `hstore`. A field's `valueType` fixes one stored form: `
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `enrichment.overview` | query | `userAdmin` | `synced`, folder counts by origin of their type, file counts by resolution status, `variantGroups`, `unnamedAxes`, `running` (the pass holding the lock, with its start and trigger) and `lastRun` (finished, with duration, per-stage `stats` or `error`) |
+| `enrichment.overview` | query | `userAdmin` | `synced`, folder counts by origin of their type, file counts by resolution status, `assetTypes` (`total`, `relatedToRecords`, `withSteps` among them, `groupingVariants`), `records`, `metadataFields` (`total`, `shown`), `variantGroups`, `unnamedAxes` used by a group, `running` (the pass holding the lock, with its start and trigger) and `lastRun` (finished, with duration, per-stage `stats` or `error`) |
 | `enrichment.run` | mutation | `userAdmin` | Starts a pass without waiting for it; `queued: true` when one is running, in which case it runs next |
 | `enrichment.badges` | query | `userAdmin` | `unmatched` (unmatched and conflicts) and `unnamedAxes` used by a group, for the menu |
 
@@ -236,9 +236,9 @@ Every procedure requires `userAdmin`. Writes re-run the entity stage of the enri
 | `resolverStep.preview` | query | Runs unsaved steps on up to 40 files of a folder subtree and returns, per file, the key found, the view, the status and the links. Writes nothing |
 | `resolverStep.rerun` | mutation | Re-runs the entity stage |
 | `entityResolution.counts` | query | `unmatched`, `conflicts`, `dangling` and the number of folders holding unmatched files |
-| `entityResolution.unmatchedFolders`, `unmatchedFiles`, `conflicts`, `dangling` | query | The four tabs of the Unmatched screen; files paginated by 100 with `search` and `folderId`, the others capped at 500 |
+| `entityResolution.unmatchedFolders`, `unmatchedFiles`, `conflicts`, `dangling` | query | Four tabs of the To review screen; files paginated by 100 with `search` and `folderId`, the others capped at 500 |
 | `entityResolution.findTargets` | query | Records whose key or searchable attribute contains `query` (20), or the values of `attributeName` containing it, with their record count |
-| `entityResolution.folderAttachments` | query | The attachments of the nearest folder carrying any, from the folder up, with `inherited` |
+| `entityResolution.manualLinks` | query | Every folder attachment and `manual_file` link, newest first, capped at 500, with `kind` (`folder` or `file`), name, path, target, author and the number of files covered |
 | `entityResolution.attach` | mutation | `target` is `{ kind: 'record', key, create? }` or `{ kind: 'attribute', name, value }`; with `folderId` it attaches the folder, with `fileIds` (at most 500) it pins `manual_file` links. `create: true` creates a missing record with the key only; without it a missing key is `NOT_FOUND`. Returns `files`, `recordCreated` and the stage counts |
 | `entityResolution.detach` | mutation | Removes a `manual_file` link (`linkId`) or a folder attachment (`attachmentId`); links made by steps are `NOT_FOUND` |
 | `entityResolution.createRecord` | mutation | Creates a record with the key only, so dangling links to it become active; `BAD_REQUEST` when it exists |
