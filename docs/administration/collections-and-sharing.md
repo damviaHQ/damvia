@@ -102,16 +102,23 @@ Deleting a collection removes its descendants, links, invitations, menu entries,
 
 ## Narrow what is on screen
 
-The funnel button in a collection's action bar, beside the display preferences, shows a filter bar above the content. It narrows what the page already draws; it never fetches anything and never looks into sub-collections.
+The funnel button in a collection's action bar, beside the display preferences, lists the filters that collection can be narrowed by. Nothing is on at first: tick a filter and it appears in a bar above the content. Only what is ticked is drawn, so the page carries the two or three controls that matter there rather than every facet at once.
 
-- **Filter by name** matches part of a name, ignoring case, on the files **and** the sub-collections shown on the page.
-- **Asset type**, **File type**, **Format** and each **product attribute** offer the values present on the page, with a count beside each. Several values inside one list widen the result; values in different lists narrow it together. A count says how many items picking that value would show, so the other values never read zero.
-- A dimension holding a single value is not offered, and the facets only describe files: a chip on **Format** hides no sub-collection.
-- Chips above the content list what is active. Each is removed on its own, and **Clear all** empties the bar.
+The bar narrows what the page already draws. It never fetches anything and never looks into sub-collections.
+
+| Filter | Narrows by |
+|---|---|
+| **Name** | Part of a name, ignoring case, on the files **and** the sub-collections shown on the page. |
+| **Asset type**, **File type**, **Format** | The values present on the page, with a count beside each. |
+| Each **product attribute** | Its values on the page, for attributes marked viewable. |
+
+Several values inside one filter widen the result; values in different filters narrow it together. A count says how many items picking that value would show, so the other values never read zero. A filter whose page holds a single value is not offered, and only **Name** touches sub-collections: a chip on **Format** hides none of them.
+
+Chips above the content list what is active. Each is removed on its own, **Clear all** empties the bar, and **Remove all filters** in the funnel also takes every filter back off it. Unticking a filter takes its values with it, so nothing keeps narrowing the page unseen.
 
 A section or a page block whose every item is filtered out disappears with its title, so the page does not keep a heading over nothing.
 
-The funnel stays on across navigation and reloads until it is switched off again; it is saved in that browser only, like the display preferences. The filter values themselves are not: they describe the collection being read, so they start empty on the next one.
+The chosen filters stay across navigation and reloads until they are unticked; they are saved in that browser only, like the display preferences. The values themselves are not: they describe the collection being read, so they start empty on the next one.
 
 In list view, the column headers sort the rows. Clicking a header sorts ascending, clicking it again descending. **Size** sorts by the real byte count and **Updated at** by the real date, not by the text in the cell. Sorting lasts as long as the view; it is not saved.
 

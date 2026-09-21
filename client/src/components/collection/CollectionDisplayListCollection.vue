@@ -16,14 +16,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import { listTableClasses, listActionsClasses } from "./listStyles"
 import { collectionDisplayGroup } from "@/utils/displayPreferences"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
+import TableSortHeader from "@/components/TableSortHeader.vue"
 import CollectionFavoriteButton from "@/components/collection/CollectionFavoriteButton.vue"
 import CollectionDropdownActions from "@/components/collection/CollectionDropdownActions.vue"
 import { RouterOutput } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import {
   createColumnHelper,
+  createSortedRowModel,
+  type SortingState,
+  type Updater,
   FlexRender,
   columnVisibilityFeature,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_text,
   tableFeatures,
   useTable,
 } from "@tanstack/vue-table"
@@ -39,7 +46,14 @@ const props = defineProps<{
   placeholder?: string | null
 }>()
 const globalStore = useGlobalStore()
-const features = tableFeatures({ columnVisibilityFeature })
+const features = tableFeatures({
+  columnVisibilityFeature,
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { text: sortFn_text, alphanumeric: sortFn_alphanumeric },
+})
+// A sorted column is a glance, not a preference: it is not stored anywhere.
+const sorting = ref<SortingState>([])
 const columnHelper = createColumnHelper<typeof features, Collection>()
 const hoveredRowId = ref<string | null>(null)
 const openDropdownId = ref<string | null>(null)
@@ -55,9 +69,12 @@ const selection = computed(() =>
 
 const visibleColumns = computed(() => {
   return [
-    columnHelper.display({
+    // An accessor rather than a display column, so the header can sort by name.
+    // The cell is drawn by the template, which keys off the column id.
+    columnHelper.accessor((row) => row.name, {
       id: "name",
-      header: "",
+      header: "Collection Name",
+      sortFn: "text",
     }),
     ...[
       columnHelper.accessor((row) => row.description, {
@@ -74,6 +91,7 @@ const visibleColumns = computed(() => {
     columnHelper.display({
       id: "actions",
       header: "",
+      enableSorting: false,
     }),
   ]
 })
@@ -125,6 +143,12 @@ const table = useTable({
   get columns() {
     return visibleColumns.value
   },
+  onSortingChange: (updater: Updater<SortingState>) => {
+    sorting.value = typeof updater === "function" ? updater(sorting.value) : updater
+  },
+  state: {
+    get sorting() { return sorting.value },
+  },
 })
 
 </script>
@@ -135,7 +159,8 @@ const table = useTable({
       <thead>
         <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
           <th v-for="header in headerGroup.headers" :key="header.id" :colSpan="header.colSpan"
-            class="text-neutral-600">
+            class="text-neutral-600"
+            :aria-sort="header.column.getIsSorted() === 'asc' ? 'ascending' : header.column.getIsSorted() === 'desc' ? 'descending' : undefined">
             <div v-if="header.column.id === 'name'" class="flex items-center gap-4">
               <CollectionCheckbox v-if="collections.length > 0" label="Select all" @click="toggleGlobalSelection()" :state="selection.length === collections.length
                 ? 'check'
@@ -143,8 +168,10 @@ const table = useTable({
                   ? 'undetermined'
                   : false
                 " />
-              Collection Name
+              <TableSortHeader :column="header.column" label="Collection Name" />
             </div>
+            <TableSortHeader v-else-if="!header.isPlaceholder && header.column.getCanSort()" :column="header.column"
+              :label="String(header.column.columnDef.header ?? '')" />
             <template v-else-if="!header.isPlaceholder">
               <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
             </template>

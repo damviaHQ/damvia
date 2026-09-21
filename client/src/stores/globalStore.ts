@@ -39,6 +39,33 @@ export const useGlobalStore = defineStore('global', () => {
 
 	const displayDetails = ref(readDisplayDetails())
 
+	// Which filters the reader has put on the bar. Showing every facet at once
+	// was a wall of controls, so the funnel offers the page's filters and only
+	// the chosen ones are drawn. A choice stays everywhere until it is taken
+	// back, the same promise the display preferences make.
+	const pageFilters = ref<string[]>(readPageFilters())
+
+	function readPageFilters(): string[] {
+		try {
+			const saved = JSON.parse(localStorage.getItem('dam_page_filters') || '[]')
+			return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === 'string') : []
+		} catch {
+			return []
+		}
+	}
+
+	function togglePageFilter(key: string) {
+		pageFilters.value = pageFilters.value.includes(key)
+			? pageFilters.value.filter(current => current !== key)
+			: [...pageFilters.value, key]
+		localStorage.setItem('dam_page_filters', JSON.stringify(pageFilters.value))
+	}
+
+	function clearPageFilters() {
+		pageFilters.value = []
+		localStorage.removeItem('dam_page_filters')
+	}
+
 	function setDisplayDetails(id: string, details: DisplayDetails) {
 		displayDetails.value[id] = { ...displayDetails.value[id], ...details }
 		localStorage.setItem('dam_display_details', JSON.stringify(displayDetails.value))
@@ -109,6 +136,9 @@ export const useGlobalStore = defineStore('global', () => {
 		env,
 		displayPreferences,
 		displayDetails,
+		pageFilters,
+		togglePageFilter,
+		clearPageFilters,
 		setDisplayDetails,
 		resetDisplayPreference,
 		clearDisplayPreferences,

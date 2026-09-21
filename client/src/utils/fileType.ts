@@ -50,3 +50,26 @@ export const isWord = (file: FileTypeInput) =>
 export const isExcel = (file: FileTypeInput) =>
   endsWithAny(file.name.toLowerCase(), ['.xls', '.xlsx', '.csv', '.ods']) ||
   ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.oasis.opendocument.spreadsheet'].includes(file.mimeType)
+
+// The four buckets the search facet offers. Paired with fileTypeConditions in
+// server/src/services/search.ts: both read the mime type and nothing else, so a
+// file lands in the same bucket whether it is counted there or filtered here.
+const documentMimeTypes = [
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/pdf',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]
+
+export type FileTypeCategory = 'image' | 'video' | 'document' | 'other'
+
+export const fileTypeOf = (file: { mimeType?: string | null }): FileTypeCategory => {
+  const mimeType = (file.mimeType ?? '').toLowerCase()
+  if (mimeType.startsWith('image/')) return 'image'
+  if (mimeType.startsWith('video/') || mimeType === 'application/mp4') return 'video'
+  if (documentMimeTypes.includes(mimeType)) return 'document'
+  return 'other'
+}

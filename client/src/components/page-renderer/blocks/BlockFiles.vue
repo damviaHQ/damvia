@@ -17,6 +17,8 @@ import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles
 import { Files } from "@lucide/vue"
 import BlockPlaceholder from "./BlockPlaceholder.vue"
 import { trpc } from "@/services/server.ts"
+import { usePageFilter } from "@/composables/usePageFilter"
+import { matchesFile } from "@/utils/pageFilter"
 import { useQuery } from "@tanstack/vue-query"
 import { computed } from "vue"
 import type { Collection } from "../types"
@@ -30,10 +32,17 @@ const { data: collection } = useQuery({
   enabled: computed(() => !!collectionId.value),
 })
 const forceView = computed(() => (["list", "grid", "masonry"].includes(props.data?.layout) ? props.data.layout : null))
+
+// The renderer below narrows the list; the block asks the same question so its
+// title goes away with it rather than standing over nothing. Never while
+// editing, where the author is looking at the block itself.
+const pageFilter = usePageFilter()
+const hiddenByFilter = computed(() => !props.editing && pageFilter.isActive.value &&
+  !(collection.value?.files ?? []).some((file: any) => matchesFile(file, pageFilter.state.value)))
 </script>
 
 <template>
-  <div v-if="collection && (editing || collection.files?.length)">
+  <div v-if="collection && (editing || collection.files?.length) && !hiddenByFilter">
     <div v-if="data.title" class="mb-0.5 text-sm font-medium text-muted-foreground">{{ data.title }}</div>
     <BlockPlaceholder v-if="editing && !collection.files?.length" :icon="Files" title="Files"
       explanation="Every file of the collection appears here, with its preview and its download."

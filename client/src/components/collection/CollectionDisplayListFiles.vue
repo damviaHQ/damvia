@@ -17,6 +17,7 @@ import { listTableClasses } from "./listStyles"
 import { fileDisplayGroup } from "@/utils/displayPreferences"
 import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
+import TableSortHeader from "@/components/TableSortHeader.vue"
 import CollectionModalGallery from "@/components/collection/CollectionModalDownloadUnique.vue"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,10 +34,16 @@ import { formatFileSize } from "@/utils/fileSize.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   createColumnHelper,
+  createSortedRowModel,
   type ColumnDef,
+  type SortingState,
+  type Updater,
   FlexRender,
   columnOrderingFeature,
   columnVisibilityFeature,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_text,
   tableFeatures,
   useTable,
 } from "@tanstack/vue-table"
@@ -160,17 +167,30 @@ async function copyToClipboard(text: string, cellId: string) {
 
 const displayGroup = computed(() => fileDisplayGroup(files.value))
 const listDisplayItems = computed(() => globalStore.displayDetails[displayGroup.value.id]?.columns ?? displayGroup.value.defaultColumns)
-const features = tableFeatures({ columnOrderingFeature, columnVisibilityFeature })
+const features = tableFeatures({
+  columnOrderingFeature,
+  columnVisibilityFeature,
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { text: sortFn_text, alphanumeric: sortFn_alphanumeric },
+})
+// A sorted column is a glance, not a preference: it is not stored anywhere.
+const sorting = ref<SortingState>([])
 const columnHelper = createColumnHelper<typeof features, File>()
 const columns = computed<ColumnDef<typeof features, File, any>[]>(() => [
-  columnHelper.display({
+  // An accessor rather than a display column, so the header can sort by name.
+  // The cell is drawn by the template, which keys off the column id.
+  columnHelper.accessor((row) => row.name, {
     id: "name",
-    header: "",
+    header: "File",
+    sortFn: "text",
   }),
   columnHelper.accessor((row) => formatFileSize(row.size), {
     id: "size",
     header: "Size",
     cell: (info) => info.getValue(),
+    // The cell reads "1.2 MB", so sorting the text would order by digit.
+    sortFn: (rowA, rowB) => rowA.original.size - rowB.original.size,
   }),
   columnHelper.accessor(
     (row) =>
@@ -187,6 +207,8 @@ const columns = computed<ColumnDef<typeof features, File, any>[]>(() => [
     id: "updated_at",
     header: "Updated at",
     cell: (info) => info.getValue(),
+    // The cell reads "03/09/2026", so sorting the text would order by day.
+    sortFn: (rowA, rowB) => dayjs(rowA.original.updatedAt).valueOf() - dayjs(rowB.original.updatedAt).valueOf(),
   }),
   columnHelper.accessor((row) => getFileExtension(row.name), {
     id: "format",
@@ -220,6 +242,7 @@ const columns = computed<ColumnDef<typeof features, File, any>[]>(() => [
   columnHelper.display({
     id: "actions",
     header: "",
+    enableSorting: false,
   }),
 ])
 
@@ -227,7 +250,11 @@ const table = useTable<typeof features, File>({
   features,
   get data() { return files.value },
   get columns() { return columns.value },
+  onSortingChange: (updater: Updater<SortingState>) => {
+    sorting.value = typeof updater === "function" ? updater(sorting.value) : updater
+  },
   state: {
+    get sorting() { return sorting.value },
     get columnOrder() { return ["name", ...listDisplayItems.value, "actions"] },
     get columnVisibility() {
       return Object.fromEntries(columns.value.map(column => [
@@ -245,7 +272,8 @@ const table = useTable<typeof features, File>({
       <thead>
         <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
           <th v-for="header in headerGroup.headers" :key="header.id" :colSpan="header.colSpan"
-            class="text-neutral-600">
+            class="text-neutral-600"
+            :aria-sort="header.column.getIsSorted() === 'asc' ? 'ascending' : header.column.getIsSorted() === 'desc' ? 'descending' : undefined">
             <div v-if="header.column.id === 'name'" class="flex items-center gap-4">
               <CollectionCheckbox v-if="files.length > 0" label="Select all" @click="toggleGlobalSelection()" :state="selection.length === files.length
                 ? 'check'
@@ -253,8 +281,10 @@ const table = useTable<typeof features, File>({
                   ? 'undetermined'
                   : false
                 " />
-              <div>File</div>
+              <TableSortHeader :column="header.column" label="File" />
             </div>
+            <TableSortHeader v-else-if="!header.isPlaceholder && header.column.getCanSort()" :column="header.column"
+              :label="String(header.column.columnDef.header ?? '')" />
             <FlexRender v-else-if="!header.isPlaceholder" :render="header.column.columnDef.header"
               :props="header.getContext()" />
           </th>

@@ -246,7 +246,7 @@ function removeSelectedFiles() {
             <Search class="text-neutral-500 hover:text-neutral-800" />
           </router-link>
         </Button>
-        <PageFilterToggle />
+        <PageFilterToggle :files="shownFiles" />
         <DisplayPreferences :files="shownFiles" :collections="shownCollections" :layout-locked="layoutLocked" />
         <Button aria-label="Share collection" title="Share collection" v-if="collection.canEdit" @click="isShareModalOpen = true" type="button" variant="ghost"
           size="icon-sm">
@@ -256,7 +256,7 @@ function removeSelectedFiles() {
           :collection="collection" />
       </div>
     </div>
-    <PageFilterBar v-if="globalStore.filtersVisible" :files="shownFiles" :collections="shownCollections" />
+    <PageFilterBar :files="shownFiles" :collections="shownCollections" />
     <CollectionRenderLayout :key="collection.id" :collection="collection"
       :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
     <CollectionDialogEdit v-model="isEditCollectionModalOpen" :collection="collection" />

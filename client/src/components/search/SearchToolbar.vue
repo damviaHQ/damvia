@@ -15,15 +15,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import DisplayPreferences from "@/components/DisplayPreferences.vue"
+import FilterChipList from "@/components/FilterChipList.vue"
 import SearchFormatPicker, { type FormatOption } from "@/components/search/SearchFormatPicker.vue"
 import SearchSizeRange from "@/components/search/SearchSizeRange.vue"
 import type { DisplayFile } from "@/utils/displayPreferences"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FILE_TYPE_OPTIONS, type SearchSort } from "@/utils/searchQuery"
-import { ArrowDownWideNarrow, Files, X } from "@lucide/vue"
+import { ArrowDownWideNarrow, Files } from "@lucide/vue"
 import { computed } from "vue"
 
-export type FilterChip = { key: string, value: string, label: string, category?: string, displayValue?: string }
+// The chip shape is shared with the page filter, which draws the same pills.
+export type { FilterChip } from "@/utils/pageFilter"
+import type { FilterChip } from "@/utils/pageFilter"
 
 const props = defineProps<{
   files?: DisplayFile[]
@@ -66,21 +69,6 @@ const sortOptions = computed(() => [
 ])
 const fileTypeValue = computed(() => props.fileTypes.length === 1 ? props.fileTypes[0] : "all")
 const fileTypeLabel = computed(() => segments.value.find((segment) => (segment.id || "all") === fileTypeValue.value)?.label ?? "All files")
-
-// One pill per filter category: the name is stated once and each value is removed on its own.
-const chipGroups = computed(() => {
-  const groups = new Map<string, { key: string, category?: string, chips: FilterChip[] }>()
-  for (const chip of props.chips) {
-    const key = `${chip.key}::${chip.category ?? ""}`
-    const group = groups.get(key)
-    if (group) {
-      group.chips.push(chip)
-    } else {
-      groups.set(key, { key, category: chip.category, chips: [chip] })
-    }
-  }
-  return Array.from(groups.values())
-})
 
 const currentSort = computed(() => props.sort ?? (props.hasQuery ? "relevance" : "name"))
 </script>
@@ -144,38 +132,8 @@ const currentSort = computed(() => props.sort ?? (props.hasQuery ? "relevance" :
       </div>
       <SearchFormatPicker :options="formats" :selected="selectedFormats" @toggle="emit('toggleFormat', $event)" @clear="emit('clearFormats')" />
       <SearchSizeRange :min-size="minSize" :max-size="maxSize" @apply="emit('applySize', $event)" />
-      <ul v-if="chips.length" class="flex min-w-0 flex-wrap items-center gap-1.5" aria-label="Active filters">
-        <li v-for="group in chipGroups" :key="group.key" class="max-w-full">
-          <div class="filter-pill">
-            <span v-if="group.category" class="filter-category">{{ group.category }}</span>
-            <span v-for="chip in group.chips" :key="chip.value" class="filter-chip">
-              <span class="filter-value">{{ chip.displayValue ?? chip.label }}</span>
-              <button type="button" class="filter-remove" :aria-label="`Remove filter ${chip.label}`" @click="emit('removeChip', chip)">
-                <X class="size-3.5" aria-hidden="true" />
-              </button>
-            </span>
-          </div>
-        </li>
-        <li v-if="chips.length > 1">
-          <button type="button" class="h-7 cursor-pointer px-2 text-caption font-medium text-neutral-600 hover:text-neutral-950" @click="emit('clearFilters')">Clear all</button>
-        </li>
-      </ul>
+      <FilterChipList :chips="chips" @remove="emit('removeChip', $event)" @clear="emit('clearFilters')" />
     </div>
   </div>
 </template>
 
-<style>
-.search-toolbar .filter-pill:hover { border-color: #a3a3a3; background: #fafafa; }
-.search-toolbar .filter-pill:focus-within { border-color: #a3a3a3; }
-.search-toolbar .sort-pill { display: flex; align-items: center; width: auto; height: 29px; min-height: 29px; gap: 7px; padding: 0 10px; border: 1px solid #e5e5e5; border-radius: 999px; background: white; box-shadow: none; font-size: 12px; }
-.search-toolbar .filter-pill { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 7px; min-height: 29px; max-width: 100%; padding: 3px 6px 3px 11px; border: 1px solid #d4d4d4; border-radius: 999px; background: #fafafa; font-size: 12px; line-height: 18px; }
-.search-toolbar .filter-category { padding-right: 7px; border-right: 1px solid #d4d4d4; color: #737373; white-space: nowrap; }
-.search-toolbar .filter-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 1px 0 6px; border-radius: 999px; }
-.search-toolbar .filter-chip:first-of-type { padding-left: 0; }
-.search-toolbar .filter-chip:hover { background: #ededed; }
-.search-toolbar .filter-value { color: #404040; font-weight: 500; overflow-wrap: anywhere; }
-.search-toolbar .filter-remove { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 999px; color: #737373; cursor: pointer; }
-.search-toolbar .filter-remove:hover { background: #d4d4d4; color: #171717; }
-.search-toolbar .filter-remove:focus-visible { outline: 2px solid #525252; outline-offset: 1px; }
-.search-toolbar .filter-pill svg { flex-shrink: 0; }
-</style>

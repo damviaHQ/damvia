@@ -53,7 +53,7 @@ A picture block has its own height: drag the handle on the bottom edge of the pi
 
 A listing block can leave its display to the reader's own preference, or fix it. Collection listings offer grid and list; file listings — Files and Latest files — also offer masonry, with a Picture size slider whose value everyone then sees. A block that fixes its display overrules the reader's choice, and the reader's display menu says so.
 
-Readers can narrow a page the way they narrow a collection: the funnel button shows a filter bar that matches names and offers the asset types, file types, formats and product attributes present on the page. It applies to every listing block at once, in grid, masonry and list alike, and a block whose every item is filtered out disappears with its title. The bar never appears while the page is being edited, so an author always sees the blocks as they are. See [Collections and sharing](./collections-and-sharing.md#narrow-what-is-on-screen).
+Readers can narrow a page the way they narrow a collection: the funnel button lists the filters the page can offer — name, asset type, file type, format and each product attribute present — and the reader ticks the ones they want. Whatever they tick applies to every listing block at once, in grid, masonry and list alike, and a block whose every item is filtered out disappears with its title. No filter ever applies while the page is being edited, so an author always sees the blocks as they are. See [Collections and sharing](./collections-and-sharing.md#narrow-what-is-on-screen).
 
 Page layouts do not have a history or draft state. Saving publishes the new layout immediately to everyone who can reach it.
 

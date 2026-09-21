@@ -66,3 +66,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
 /* Empty content for existing navigation connector pseudo-elements. */
 .dv-theme { --dv-empty-content: ""; }
+
+/* The pill that carries a filter or a sort control, in the search toolbar and in
+   the filter bar of a collection or a page. */
+.sort-pill { display: flex; align-items: center; width: auto; height: 29px; min-height: 29px; gap: 7px; padding: 0 10px; border: 1px solid #e5e5e5; border-radius: 999px; background: white; box-shadow: none; font-size: 12px; cursor: pointer; }
+.sort-pill:hover { border-color: #a3a3a3; }

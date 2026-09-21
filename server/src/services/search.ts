@@ -59,6 +59,8 @@ const documentMimeTypes = [
 	'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
 ]
 
+// Paired with fileTypeOf in client/src/utils/fileType.ts, which buckets a file
+// the same way for the page filter; keep the two in step.
 export const fileTypeConditions: Record<string, string> = {
 	document: `asset_file.mime_type IN (${documentMimeTypes.map((type) => `'${type}'`).join(', ')})`,
 	video: "(asset_file.mime_type ILIKE 'video/%' OR asset_file.mime_type = 'application/mp4')",

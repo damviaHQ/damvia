@@ -16,7 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import CollectionRender from "@/components/collection/CollectionRender.vue"
 import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
 import PageRenderer from "@/components/page-renderer/PageRenderer.vue"
+import { usePageFilter } from "@/composables/usePageFilter"
 import { RouterOutput } from "@/services/server.ts"
+import { matchesCollection, matchesFile } from "@/utils/pageFilter"
 import { computed } from "vue"
 import { RouteLocationRaw } from "vue-router"
 
@@ -29,6 +31,14 @@ const props = defineProps<{
 }>()
 
 const childrenCollections = computed<Collection[]>(() => props.collection.children)
+
+// A section whose every item is filtered out goes away, heading included, so the
+// page does not keep a title over nothing.
+const pageFilter = usePageFilter()
+const showCollections = computed(() => !!childrenCollections.value?.length &&
+  (!pageFilter.isActive.value || childrenCollections.value.some(collection => matchesCollection(collection, pageFilter.state.value))))
+const showFiles = computed(() => !!props.collection?.files &&
+  (!pageFilter.isActive.value || props.collection.files.some((file: File) => matchesFile(file, pageFilter.state.value))))
 
 const getGlobalAssetType = computed(() => {
   if (!props.collection.files?.length) return null
@@ -46,11 +56,11 @@ const getGlobalAssetType = computed(() => {
   <PageRenderer v-if="collection.page" :blocks="collection.page.blocks ?? []" :assets="collection.page.assets"
     :collection="collection" :generate-route="generateRoute" />
   <div v-else class="collection-layout-renderer__container flex flex-col gap-8 mb-6">
-    <div v-if="childrenCollections?.length">
+    <div v-if="showCollections">
       <div class="mb-4 text-[12px] font-semibold text-neutral-500">Collections</div>
       <CollectionRender :collections="childrenCollections" :generate-route="generateRoute" />
     </div>
-    <div v-if="collection?.files">
+    <div v-if="showFiles">
       <div class="mb-4 text-[12px] font-semibold text-neutral-500">
         {{ getGlobalAssetType?.name ?? "Files" }}
       </div>
