@@ -36,7 +36,7 @@ After the last source of the cycle, the enrichment pass runs once (`services/enr
 3. `enrichment.metadata`: refreshes how many files carry each metadata field.
 4. `enrichment.variants`: groups the [variants](../administration/variants.md) of the asset types that ask for it, keeping group ids stable.
 
-Each pass leaves a row in `enrichment_runs` (trigger, start, end, the counts of every stage or the error), shown on **Data enrichment → Start here**; the last 50 are kept. A failed stage logs `failed to run enrichment pass` and the next sync retries. One pass runs at a time, through a Postgres advisory lock; a save, attach or re-apply from the admin waits for a running pass. Every stage writes only what changed, so a pass on unchanged data writes nothing. The pass reads the database only and never calls a provider.
+Each pass leaves a row in `enrichment_runs` (trigger, start, end, the counts of every stage or the error), shown on **Enrichment Setup → Setup guide**; the last 50 are kept. A failed stage logs `failed to run enrichment pass` and the next sync retries. One pass runs at a time, through a Postgres advisory lock; a save, attach or re-apply from the admin waits for a running pass. Every stage writes only what changed, so a pass on unchanged data writes nothing. The pass reads the database only and never calls a provider.
 
 Step 3 is why every driver stops before it on an empty listing, and when any item failed to upsert: either would delete part or all of the library.
 

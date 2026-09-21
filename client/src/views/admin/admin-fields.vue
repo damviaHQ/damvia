@@ -114,7 +114,7 @@ const linkMeaning = (field: Field) => !field.canLink ? "—" : field.linkTarget 
 <template>
   <div class="admin-page admin-resource-page">
     <AdminPageHeader :description="`Choose what readers see and can search: the columns of your ${label.lowerPlural.value}, and the metadata read from the photos themselves (camera, date, keywords).`">
-      <template #lead><span class="admin-step">Step 3 of 6</span></template>
+      <template #lead><span class="admin-step">Setup · step 3 of 4</span></template>
     </AdminPageHeader>
     <Tabs :model-value="tab" @update:model-value="onTab">
       <TabsList>

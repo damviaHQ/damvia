@@ -10,25 +10,23 @@ The Data enrichment area adds context to mirrored assets. Damvia keeps a flat ca
 
 A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), section **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
 
-## Start here: the six steps
+## Daily work and setup
 
-Data enrichment is six steps, and the menu lists them in the order they depend on each other. Each screen names its step at the top.
+The menu splits data enrichment in two. **Data Enrichment** holds the screens used every day: **Products** (your record label), the catalogue that some teams run as their PIM, and **To review**, where the files no step could link arrive after each sync. **Enrichment Setup** holds four settings, made once in order and adjusted when the folders or the catalogue change. Each setup screen names its step at the top.
 
 | Step | Screen | Question it answers |
 |---|---|---|
-| 1 | **Asset types**, with the **Folder rules** tab | What kind of file is this? Everything after is set per type. |
-| 2 | **Products** (your record label) | What is the catalogue? |
+| 1 | **Asset types**, with the **Folder rules** tab | What kind of file is this? The other settings are made per type. |
+| 2 | **Link to products** | How does a file of each type find its record? Needs records to link to. |
 | 3 | **Fields**, optional | What do readers see and search: record columns and photo metadata? |
-| 4 | **Link to products** | How does a file of each type find its record? |
-| 5 | **To review** | Which files could not be linked, and what was linked by hand? |
-| 6 | **Variants**, optional | Which files are versions of one creative? |
+| 4 | **Variants**, optional | Which files are versions of one creative? |
 
-**Data enrichment → Start here** (`/admin/data-enrichment`) lists the six steps with where each stands: types defined and folders still without one, records imported, photo metadata fields shown, types with matching steps, files linked, not linked or in conflict, types grouping variants and axes waiting for a name. A step is ticked when it is done, and its button opens its screen. The page also shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
+**Enrichment Setup → Setup guide** (`/admin/data-enrichment`) lists the four steps with where each stands: types defined and folders still without one, types with matching steps (or that no record exists yet), photo metadata fields shown, types grouping variants and axes waiting for a name. A step is ticked when it is done, and its button opens its screen. Under **Every day** it counts the records and the files linked, not linked or in conflict. It also shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
 
 ## Two questions, two tools
 
-- **Folder rules** (step 1) answer "what kind of file is this?": they give an [asset type](./asset-types.md) from the folder path (packshot, video, logo).
-- **Link to products** (step 4) answers "which record is this file about?": it finds a record key in the file name or the folder path (product `WX5678-100`, event `EVT-25028`).
+- **Folder rules** (setup step 1) answer "what kind of file is this?": they give an [asset type](./asset-types.md) from the folder path (packshot, video, logo).
+- **Link to products** (setup step 2) answers "which record is this file about?": it finds a record key in the file name or the folder path (product `WX5678-100`, event `EVT-25028`).
 
 Matching only runs on files whose asset type is marked **Related to records**. Files of other types, such as logos or fonts, are left out and never appear in **To review**.
 

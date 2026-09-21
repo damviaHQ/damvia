@@ -161,9 +161,7 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
 <template>
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else class="admin-page admin-resource-page">
-    <AdminPageHeader :description="`Files no step could link, files where steps disagree, links to a ${label.lower.value} that does not exist, and everything linked by hand.`">
-      <template #lead><span class="admin-step">Step 5 of 6</span></template>
-    </AdminPageHeader>
+    <AdminPageHeader :description="`Files no step could link, files where steps disagree, links to a ${label.lower.value} that does not exist, and everything linked by hand. New ones arrive with every sync.`" />
     <Tabs v-model="tab">
       <TabsList>
         <TabsTrigger value="folders">Folders <Badge variant="secondary" class="ml-2">{{ counts?.folders ?? 0 }}</Badge></TabsTrigger>

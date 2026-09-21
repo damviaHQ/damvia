@@ -300,8 +300,7 @@ watch(() => data.value?.total, (count) => {
 
 <template>
   <div class="admin-page admin-resource-page admin-records">
-    <AdminPageHeader :title="recordLabel.plural.value" :description="`Your catalogue: import it by CSV or edit it here. Files are linked to your ${recordLabel.lowerPlural.value} in step 4. Changes save as you go and are kept in each ${recordLabel.lower.value}'s history.`">
-      <template #lead><span class="admin-step">Step 2 of 6</span></template>
+    <AdminPageHeader :title="recordLabel.plural.value" :description="`Create, correct and complete your ${recordLabel.lowerPlural.value}. Changes save as you go and are kept in each ${recordLabel.lower.value}'s history.`">
       <Button as-child variant="outline"><router-link :to="{ name: 'admin-record-import' }"><FileUp class="size-4" />Import CSV</router-link></Button>
       <Button class="dv-button dv-button--primary" @click="grid?.focusNewRow()"><Plus class="size-4" />Add {{ recordLabel.lower.value }}</Button>
       <DropdownMenu>

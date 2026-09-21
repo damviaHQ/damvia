@@ -121,7 +121,7 @@ function addWord() {
   <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
   <div v-else class="admin-page admin-resource-page">
     <AdminPageHeader description="Show the formats, languages and durations of one creative as a single card. Switch it on per asset type with Group variants, then name what changes between the files of a group.">
-      <template #lead><span class="admin-step">Step 6 of 6</span></template>
+      <template #lead><span class="admin-step">Setup · step 4 of 4</span></template>
     </AdminPageHeader>
     <Tabs default-value="axes">
       <TabsList>

@@ -233,8 +233,8 @@ async function save() {
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
   <div v-else-if="data" class="admin-page admin-resource-page">
-    <AdminPageHeader :title="`Link to ${label.lowerPlural.value}`" :description="`For each asset type, say how a file finds its ${label.lower.value}: from its name, its folder or its metadata. The files no step can link wait in step 5.`">
-      <template #lead><span class="admin-step">Step 4 of 6</span></template>
+    <AdminPageHeader :title="`Link to ${label.lowerPlural.value}`" :description="`For each asset type, say how a file finds its ${label.lower.value}: from its name, its folder or its metadata. The files no step can link wait in To review.`">
+      <template #lead><span class="admin-step">Setup · step 2 of 4</span></template>
     </AdminPageHeader>
     <p v-if="data.legacyEnabled && data.legacyPattern" class="admin-form-note mb-4">
       The old job still applies <code>PRODUCT_MATCHING_REGEX</code> every 5 minutes to files of types without steps. Once every type related to {{ label.lowerPlural.value }} has steps, set <code>ENABLE_LEGACY_PRODUCT_MATCHING=false</code> on the server.

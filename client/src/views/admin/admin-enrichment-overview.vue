@@ -52,8 +52,9 @@ const stageLines = computed(() => {
   ]
 })
 
-// The six steps in the order they depend on each other, each with where it
-// stands and where to go. Fields and variants are optional.
+// The setup, in the order its steps depend on each other, each with where it
+// stands and where to go. Fields and variants are optional. Products and the
+// review queue are daily work, not steps, and are shown apart.
 const steps = computed(() => {
   const overview = data.value
   if (!overview) return []
@@ -62,7 +63,7 @@ const steps = computed(() => {
   return [
     {
       title: "Asset types",
-      what: "Say what kind of file each folder holds. Everything after is set per type.",
+      what: "Say what kind of file each folder holds. The other settings are made per type.",
       status: `${types.total} ${types.total === 1 ? "type" : "types"}, ${overview.folders.untyped} ${overview.folders.untyped === 1 ? "folder" : "folders"} without a type`,
       done: types.total > 0 && overview.folders.untyped === 0,
       optional: false,
@@ -70,13 +71,13 @@ const steps = computed(() => {
       action: "Open asset types",
     },
     {
-      title: label.plural.value,
-      what: `Your catalogue, imported by CSV. Files are linked to it in step 4.`,
-      status: `${overview.records} ${overview.records === 1 ? label.lower.value : plural}`,
-      done: overview.records > 0,
+      title: `Link to ${plural}`,
+      what: `For each type related to ${plural}, say how a file finds its ${label.lower.value}: name, folder or metadata.`,
+      status: !overview.records ? `No ${label.lower.value} yet: import your ${plural} first` : types.relatedToRecords ? `${types.withSteps} of ${types.relatedToRecords} ${types.relatedToRecords === 1 ? "type has" : "types have"} steps` : `No asset type is related to ${plural} yet: tick it in step 1`,
+      done: overview.records > 0 && types.relatedToRecords > 0 && types.withSteps === types.relatedToRecords,
       optional: false,
-      to: { name: overview.records ? "admin-records" : "admin-record-import" },
-      action: overview.records ? `Open ${plural}` : "Import a CSV",
+      to: overview.records ? { name: "admin-matching" } : { name: "admin-record-import" },
+      action: overview.records ? "Set the steps" : `Import ${plural}`,
     },
     {
       title: "Fields",
@@ -86,24 +87,6 @@ const steps = computed(() => {
       optional: true,
       to: { name: "admin-fields" },
       action: "Open fields",
-    },
-    {
-      title: `Link to ${plural}`,
-      what: `For each type related to ${plural}, say how a file finds its ${label.lower.value}: name, folder or metadata.`,
-      status: types.relatedToRecords ? `${types.withSteps} of ${types.relatedToRecords} ${types.relatedToRecords === 1 ? "type has" : "types have"} steps` : `No asset type is related to ${plural} yet: tick it in step 1`,
-      done: types.relatedToRecords > 0 && types.withSteps === types.relatedToRecords,
-      optional: false,
-      to: { name: "admin-matching" },
-      action: "Set the steps",
-    },
-    {
-      title: "To review",
-      what: "The files no step could link, and the ones where steps disagree.",
-      status: `${overview.files.matched} linked, ${overview.files.unmatched} not linked, ${overview.files.conflicts} in conflict`,
-      done: overview.files.matched > 0 && overview.files.unmatched + overview.files.conflicts === 0,
-      optional: false,
-      to: { name: "admin-unmatched" },
-      action: "Review files",
     },
     {
       title: "Variants",
@@ -136,7 +119,7 @@ async function runNow() {
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
   <div v-else-if="data" class="admin-page admin-resource-page">
-    <AdminPageHeader :description="`Six steps give every file its type, its ${label.lower.value} and its variants. Follow them in order. Once set, they run by themselves after every sync, every 5 minutes. Nothing is ever written to the cloud storage.`">
+    <AdminPageHeader :description="`Four settings give every file its type, its ${label.lower.value} and its variants. Make them once, in order, and adjust them when your folders or catalogue change; they then run by themselves after every sync, every 5 minutes. Nothing is ever written to the cloud storage.`">
       <Button class="dv-button dv-button--primary" :disabled="starting || !!data.running" :title="runningReason || undefined" @click="runNow">Run enrichment now</Button>
     </AdminPageHeader>
     <p v-if="data.running" role="status" class="admin-form-note mb-4">{{ runningReason }}.</p>
@@ -153,6 +136,25 @@ async function runNow() {
           <router-link :to="step.to" class="dv-button">{{ step.action }}</router-link>
         </li>
       </ol>
+      <h2 class="daily-heading">Every day</h2>
+      <div class="daily-cards">
+        <section class="dv-panel setup-step" aria-labelledby="daily-records">
+          <div class="setup-step__body">
+            <h2 id="daily-records">{{ label.plural.value }}</h2>
+            <p>Your catalogue: create, correct and complete it, or import a CSV.</p>
+            <p class="setup-step__status">{{ data.records }} {{ data.records === 1 ? label.lower.value : label.lowerPlural.value }}</p>
+          </div>
+          <router-link :to="{ name: 'admin-records' }" class="dv-button">Open {{ label.lowerPlural.value }}</router-link>
+        </section>
+        <section class="dv-panel setup-step" aria-labelledby="daily-review">
+          <div class="setup-step__body">
+            <h2 id="daily-review">To review</h2>
+            <p>Files no step could link and files where steps disagree. New ones arrive with every sync.</p>
+            <p class="setup-step__status">{{ data.files.matched }} linked, {{ data.files.unmatched }} not linked, {{ data.files.conflicts }} in conflict</p>
+          </div>
+          <router-link :to="{ name: 'admin-unmatched' }" class="dv-button">Review files</router-link>
+        </section>
+      </div>
       <section class="dv-panel overview-card mt-6" aria-labelledby="overview-last-pass">
         <h2 id="overview-last-pass">Last pass</h2>
         <p v-if="!data.lastRun" class="admin-text-secondary">No pass has finished yet.</p>
@@ -178,6 +180,8 @@ async function runNow() {
 .setup-step__body p { color:var(--dv-text-secondary); }
 .setup-step__status { font-variant-numeric:tabular-nums; }
 .setup-step__optional { color:var(--dv-text-secondary); font-size:var(--dv-size-caption); font-weight:500; }
+.daily-heading { margin:28px 0 12px; font-size:var(--dv-size-section); }
+.daily-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:12px; }
 @media(max-width:640px) { .setup-step { flex-wrap:wrap; } }
 .overview-card { display:grid; gap:12px; align-content:start; padding:20px 24px; }
 .overview-card h2 { font-size:var(--dv-size-section); }

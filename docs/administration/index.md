@@ -48,7 +48,7 @@ Collections organise references to assets. Copying a file into another collectio
 ## Data enrichment and reporting
 
 - [Variants](./variants.md): show the versions of one creative as one card and name what differs between them.
-- [Records](./records.md): the six steps of data enrichment and where to start; create and edit products, events or anything files are about in a spreadsheet grid or as a card with their files and history, import them by CSV, type their fields, say how files find their record and fix the unmatched ones.
+- [Records](./records.md): the daily screens and the four setup steps of data enrichment; create and edit products, events or anything files are about in a spreadsheet grid or as a card with their files and history, import them by CSV, type their fields, say how files find their record and fix the unmatched ones.
 - [Insights](./analytics.md): interpret recorded activity and retention.
 - [Dashboard](./dashboard.md): storage usage, source state and items needing attention.
 
@@ -66,6 +66,6 @@ Collections organise references to assets. Copying a file into another collectio
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
 | Records, fields and metadata | `/admin/data-enrichment/records`, `/admin/data-enrichment/records/import`, `/admin/data-enrichment/fields` | admin |
 | Link to records and To review | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
-| Data enrichment Start here and variants | `/admin/data-enrichment`, `/admin/data-enrichment/variants` | admin |
+| Setup guide and variants | `/admin/data-enrichment`, `/admin/data-enrichment/variants` | admin |
 
 The labels and exact layout may evolve; the permission and data consequences documented on each linked page are the durable contract.
