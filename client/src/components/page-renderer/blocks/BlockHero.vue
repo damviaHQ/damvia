@@ -31,23 +31,30 @@ const focus = computed(() => {
 </script>
 
 <template>
-  <section v-if="!isEmpty || editing"
-    class="page-hero relative flex min-h-[220px] flex-col justify-end overflow-hidden rounded-md bg-neutral-100 p-6 md:min-h-[320px] md:p-10">
-    <img v-if="media" :src="media.displayURL" alt="" class="absolute inset-0 h-full w-full object-cover"
-      :style="focus" />
-    <div v-if="media" aria-hidden="true" class="absolute inset-0 bg-linear-to-t from-black/70 to-black/10" />
-    <div class="relative" :class="media ? 'text-white' : 'text-neutral-900'">
-      <template v-if="!textHidden">
-        <h2 v-if="data.title" class="text-3xl font-semibold text-balance md:text-4xl">{{ data.title }}</h2>
-        <p v-if="data.subtitle" class="mt-2 max-w-2xl text-base md:text-lg">{{ data.subtitle }}</p>
-        <p v-if="editing && !data.title && !data.subtitle" class="text-sm italic opacity-80">
-          Add a picture and a title to this banner.
-        </p>
-      </template>
-      <BlockLink v-if="data.button?.label" :link="data.button.link" :assets="assets" :disabled="editing"
-        class="mt-4 inline-block w-max">
-        <Button type="button" tabindex="-1">{{ data.button.label }}</Button>
-      </BlockLink>
-    </div>
-  </section>
+  <BlockLink v-if="!isEmpty || editing" :link="data.link" :assets="assets" :disabled="editing">
+    <section
+      class="page-hero relative flex min-h-[220px] flex-col justify-end overflow-hidden rounded-md bg-neutral-100 p-6 md:min-h-[320px] md:p-10">
+      <img v-if="media" :src="media.displayURL" alt="" class="absolute inset-0 h-full w-full object-cover"
+        :style="focus" />
+      <div v-if="media" aria-hidden="true" class="absolute inset-0 bg-linear-to-t from-black/70 to-black/10" />
+      <div class="relative" :class="media ? 'text-white' : 'text-neutral-900'">
+        <template v-if="!textHidden">
+          <h2 v-if="data.title" class="text-3xl font-semibold text-balance md:text-4xl">{{ data.title }}</h2>
+          <p v-if="data.subtitle" class="mt-2 max-w-2xl text-base md:text-lg">{{ data.subtitle }}</p>
+          <p v-if="editing && !data.title && !data.subtitle" class="text-sm italic opacity-80">
+            Add a picture and a title to this banner.
+          </p>
+        </template>
+        <!-- A link cannot sit inside another, so on a linked banner the button
+             is only drawn and the banner itself takes the click. -->
+        <span v-if="data.button?.label && data.link" class="mt-4 inline-block w-max">
+          <Button as="span">{{ data.button.label }}</Button>
+        </span>
+        <BlockLink v-else-if="data.button?.label" :link="data.button.link" :assets="assets" :disabled="editing"
+          class="mt-4 inline-block w-max">
+          <Button type="button" tabindex="-1">{{ data.button.label }}</Button>
+        </BlockLink>
+      </div>
+    </section>
+  </BlockLink>
 </template>

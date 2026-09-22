@@ -96,7 +96,10 @@ export const blockDataSchemas = {
 		focus,
 		title: z.string().max(200).default(''),
 		subtitle: z.string().max(500).default(''),
-		button: z.object({ label: z.string().max(80), link: linkSchema }).nullish().default(null),
+		// A link on the whole banner makes the button, if any, a visual cue that
+		// follows it, so the button then carries no link of its own.
+		link: linkSchema.nullish().default(null),
+		button: z.object({ label: z.string().max(80), link: linkSchema.nullish() }).nullish().default(null),
 	}),
 	text: z.object({ html: z.string().max(50_000).default('') }),
 	image: z.object({

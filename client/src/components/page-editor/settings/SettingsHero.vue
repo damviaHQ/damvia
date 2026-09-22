@@ -27,19 +27,23 @@ function patch(values: Record<string, unknown>) {
   emit("update", { ...props.data, ...values })
 }
 
+// With the whole banner linked, the button is only a cue and follows that link.
 function setLabel(label: string) {
-  patch({ button: label ? { label, link: props.data.button?.link ?? { kind: "url", url: "", external: true } } : null })
+  const link = props.data.link ? null : props.data.button?.link ?? { kind: "url", url: "", external: true }
+  patch({ button: label ? { label, link } : null })
 }
 </script>
 
 <template>
   <div class="grid gap-3">
+    <LinkField :model-value="data.link ?? null" label="Whole banner links to"
+      @update:model-value="patch({ link: $event })" />
     <FieldGroup>
       <Label :for="`${fieldId}-button`">Button text (optional)</Label>
       <Input :id="`${fieldId}-button`" type="text" :model-value="data.button?.label ?? ''"
         @update:model-value="setLabel($event as string)" />
     </FieldGroup>
-    <LinkField v-if="data.button?.label" :model-value="data.button.link"
+    <LinkField v-if="data.button?.label && !data.link" :model-value="data.button.link ?? null"
       label="Button links to"
       @update:model-value="patch({ button: { ...data.button, link: $event } })" />
   </div>

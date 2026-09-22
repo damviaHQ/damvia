@@ -43,6 +43,13 @@ test('links reject anything that is not http, https or a known target', () => {
         assert.throws(() => schema.parseBlockData('image', { link: { kind: 'url', url } }), `${url} was accepted`)
     }
     assert.doesNotThrow(() => schema.parseBlockData('hero', { title: 'Hi', button: { label: 'Go', link: { kind: 'collection', collectionId: FILE_ID } } }))
+    assert.throws(() => schema.parseBlockData('hero', { link: { kind: 'url', url: 'javascript:alert(1)' } }))
+})
+
+test('a banner can link as a whole, its button then carrying no link', () => {
+    const data = schema.parseBlockData('hero', { link: { kind: 'page', pageId: PAGE_ID }, button: { label: 'Go', link: null } })
+    assert.equal(data.button.link, null)
+    assert.deepEqual(schema.pageIdsOf(data), [PAGE_ID])
 })
 
 test('a picture height is a number of pixels, and the old words still read', () => {

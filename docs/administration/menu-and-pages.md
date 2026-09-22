@@ -3,7 +3,7 @@ title: Menu and pages
 description: Arrange the reader navigation and build editorial pages without changing the assets or collections they display.
 sidebar:
   order: 9
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 The menu controls how readers reach content. Pages combine text and media with live collection or file listings. A page presents existing content; it does not move assets, add files to collections or change their permissions.
@@ -39,7 +39,7 @@ Blocks are ordered and use one of three widths: full, half or third. Consecutive
 
 | Block | Displays |
 |---|---|
-| Banner | A focused picture, title, subtitle and optional button. |
+| Banner | A focused picture, title, subtitle and optional button. The whole banner can also be a link. |
 | Text | Rich text with headings, emphasis, lists, quotes and links. |
 | Picture | One uploaded picture or one accessible library image. |
 | Video | An upload, an accessible library video, or a YouTube/Vimeo embed. |
@@ -85,7 +85,7 @@ A page upload is protected only by access to the page. Damvia cannot infer or pr
 
 Collection and file blocks resolve their content for the current reader. A collection or asset they cannot access is omitted rather than exposed through the page. A page cannot use its own collection as a collection card because that would link back to itself.
 
-Banner buttons can point to a collection, page or web address. Standalone page targets are available to admins. Links in rich text are sanitised and limited to `http`, `https` and `mailto`; scripts, styles and unsupported markup are removed.
+A banner, its button, or a picture can point to a collection, page or web address. When the whole banner links somewhere, its button is only a visual cue and follows the same link. Standalone page targets are available to admins. Links in rich text are sanitised and limited to `http`, `https` and `mailto`; scripts, styles and unsupported markup are removed.
 
 ## Uploaded-file limits and cleanup
 
