@@ -14,10 +14,12 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { rm } from "node:fs/promises"
 import sharp from "sharp"
+import { IsNull } from "typeorm"
 import { z } from "zod"
 import { adminClientLogoEnabled, createLogoUpload, getClientLogo, removeClientLogo, LOGO_MIME_TYPES, processClientLogo } from "../../services/branding"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
-import { rerunEntityStage } from "../../services/enrichment"
+import { ReadinessDefinition } from "../../entity/readiness-definition"
+import { rerunEntityStage, rerunFamilyStage, rerunReadinessStage } from "../../services/enrichment"
 import { dataSource, logger, mainS3, mainS3Bucket } from "../../env"
 import { tmpFile } from "../../services/asset"
 import { authMiddleware, publicProcedure, router, userAdmin, userManagerOrAdmin } from "../index"
@@ -38,7 +40,38 @@ export default router({
         viewSeparator: settings.viewSeparator,
         viewDigits: settings.viewDigits,
         thumbnailView: settings.thumbnailView,
+        hideRecordsWithoutMedia: settings.hideRecordsWithoutMedia,
+        familyAttributeName: settings.familyAttributeName,
+        familyAxisAttributeNames: settings.familyAxisAttributeNames,
       }
+    }),
+  // What a product must carry to read as ready in the catalogue.
+  getReadiness: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .query(async () => {
+      const definition = await dataSource.getRepository(ReadinessDefinition).findOneBy({ tableId: IsNull() })
+      return {
+        requiredAttributeIds: definition?.requiredAttributeIds ?? [],
+        requiredViews: definition?.requiredViews ?? [],
+        readyLabel: definition?.readyLabel ?? 'Ready to use',
+        incompleteLabel: definition?.incompleteLabel ?? 'To complete',
+      }
+    }),
+  saveReadiness: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({
+      requiredAttributeIds: z.uuid().array().max(50),
+      requiredViews: z.string().trim().min(1).max(10).array().max(20),
+      readyLabel: z.string().trim().min(1).max(40),
+      incompleteLabel: z.string().trim().min(1).max(40),
+    }))
+    .mutation(async ({ input }) => {
+      const repository = dataSource.getRepository(ReadinessDefinition)
+      const existing = await repository.findOneBy({ tableId: IsNull() })
+      await repository.save({ ...(existing ?? { tableId: null }), ...input })
+      // Every product is scored again against the new definition.
+      await rerunReadinessStage()
+      return input
     }),
   updateEnrichment: publicProcedure
     .use(authMiddleware(userAdmin))
@@ -49,6 +82,9 @@ export default router({
       viewSeparator: z.string().length(1).optional(),
       viewDigits: z.number().int().min(1).max(4).optional(),
       thumbnailView: z.string().trim().min(1).max(10).optional(),
+      hideRecordsWithoutMedia: z.boolean().optional(),
+      familyAttributeName: z.string().trim().min(1).max(100).nullable().optional(),
+      familyAxisAttributeNames: z.string().trim().min(1).max(100).array().max(2).optional(),
     }))
     .mutation(async ({ input }) => {
       const before = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })
@@ -56,6 +92,10 @@ export default router({
       // The view part is added to file name steps, so changing it re-runs matching.
       if ((input.viewsEnabled ?? before.viewsEnabled) !== before.viewsEnabled || (input.viewSeparator ?? before.viewSeparator) !== before.viewSeparator || (input.viewDigits ?? before.viewDigits) !== before.viewDigits) {
         await rerunEntityStage()
+      }
+      // Changing the field that holds the model regroups the whole catalogue.
+      if (input.familyAttributeName !== undefined && input.familyAttributeName !== before.familyAttributeName) {
+        await rerunFamilyStage()
       }
       return input
     }),

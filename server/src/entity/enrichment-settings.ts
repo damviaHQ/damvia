@@ -37,6 +37,18 @@ export class EnrichmentSettings {
 	@Column({ default: '00' })
 	thumbnailView: string
 
+	// A product with no media the reader can open stays out of the catalogue.
+	@Column({ default: false })
+	hideRecordsWithoutMedia: boolean
+
+	// The field holding the model a product belongs to, and the fields telling
+	// the members of that family apart.
+	@Column({ type: 'varchar', nullable: true })
+	familyAttributeName: string | null
+
+	@Column({ type: 'text', array: true, default: '{}' })
+	familyAxisAttributeNames: string[]
+
 	@UpdateDateColumn()
 	updatedAt: Date
 }

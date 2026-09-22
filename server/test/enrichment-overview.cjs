@@ -46,7 +46,7 @@ test('before any sync the overview says so, and a pass is recorded with the coun
     assert.equal((await admin.enrichment.overview()).assetTypes.withSteps - empty.assetTypes.withSteps, 1)
     assert.equal(overview.lastRun.trigger, 'sync')
     assert.ok(overview.lastRun.durationMs >= 0)
-    assert.deepEqual(Object.keys(overview.lastRun.stats).sort(), ['assetTypes', 'entities', 'metadata', 'variants'])
+    assert.deepEqual(Object.keys(overview.lastRun.stats).sort(), ['assetTypes', 'entities', 'families', 'metadata', 'productRules', 'readiness', 'variants'])
     assert.deepEqual(await admin.enrichment.badges(), { unmatched: 1, unnamedAxes: 0 })
 })
 

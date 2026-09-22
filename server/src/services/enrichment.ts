@@ -18,6 +18,9 @@ import { applyFolderAssetTypes, ENRICHMENT_LOCK, refreshFolderPaths, resolveAllF
 import { EntityStageResult, runEntityStage } from "./entity-resolution"
 import { refreshMetadataFieldCounts } from "./file-metadata"
 import { runVariantStage, VariantStageResult } from "./variant-grouping"
+import { refreshAllDynamicCollections } from "./product-collections"
+import { runFamilyStage, FamilyStageResult } from "./record-families"
+import { runReadinessStage, ReadinessStageResult } from "./record-readiness"
 
 export type EnrichmentPassResult = {
 	assetTypes: { paths: number, folders: number, files: number }
@@ -59,7 +62,10 @@ export async function runEnrichmentPass(trigger: 'sync' | 'admin' = 'sync', star
 		const entities = await stage('entities', (em) => runEntityStage(em))
 		const metadata = await stage('metadata', (em) => refreshMetadataFieldCounts(em))
 		const variants = await stage('variants', (em) => runVariantStage(em))
-		const result = { assetTypes, entities, metadata, variants }
+		const families = await stage('families', (em) => runFamilyStage(em))
+		const readiness = await stage('readiness', (em) => runReadinessStage(em))
+		const productRules = await stage('product-rules', (em) => refreshAllDynamicCollections(em))
+		const result = { assetTypes, entities, metadata, variants, families, readiness, productRules }
 		await runner.query('UPDATE enrichment_runs SET finished_at = now(), stats = $2 WHERE id = $1', [runId, JSON.stringify(result)])
 		await runner.query('DELETE FROM enrichment_runs WHERE id NOT IN (SELECT id FROM enrichment_runs ORDER BY started_at DESC LIMIT 50)')
 		return result
@@ -70,6 +76,32 @@ export async function runEnrichmentPass(trigger: 'sync' | 'admin' = 'sync', star
 		await runner.query('SELECT pg_advisory_unlock($1)', [ENRICHMENT_LOCK]).catch(() => {})
 		await runner.release()
 	}
+}
+
+// The family field changed, or records were written: the grouping is redone.
+export async function rerunFamilyStage(changedFields?: string[]): Promise<FamilyStageResult> {
+	return dataSource.transaction(async (em) => {
+		await em.query('SELECT pg_advisory_xact_lock($1)', [ENRICHMENT_LOCK])
+		return runFamilyStage(em, changedFields)
+	})
+}
+
+// A readiness definition saved, or a record written, is scored at once rather
+// than waiting for the next pass.
+export async function rerunReadinessStage(recordIds?: string[]): Promise<ReadinessStageResult> {
+	return dataSource.transaction(async (em) => {
+		await em.query('SELECT pg_advisory_xact_lock($1)', [ENRICHMENT_LOCK])
+		return runReadinessStage(em, recordIds)
+	})
+}
+
+// Rules saved on a collection are applied at once; a record written elsewhere
+// reaches its dynamic collections at the next pass.
+export async function rerunProductRules() {
+	return dataSource.transaction(async (em) => {
+		await em.query('SELECT pg_advisory_xact_lock($1)', [ENRICHMENT_LOCK])
+		return refreshAllDynamicCollections(em)
+	})
 }
 
 // A pass holds the lock for its whole length; trying it tells whether one is
