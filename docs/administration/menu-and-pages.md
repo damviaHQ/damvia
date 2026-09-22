@@ -10,14 +10,17 @@ The menu controls how readers reach content. Pages combine text and media with l
 
 ## Build the navigation menu
 
-Open `/admin/menu-items` to add one of four entries:
+Open `/admin/menu-items` to add one of five entries:
 
 | Type | Use it for |
 |---|---|
+| Section | Group the entries below a heading in the sidebar, for example **Library** or **Catalogue**. |
 | Collection | Open a public collection. It can optionally keep descendant collection entries in sync. |
 | Page | Open a standalone editorial page. |
 | Text/Link | Add a label or link to an internal/external address. |
 | Divider | Separate menu groups with optional spacing and a line. |
+
+Removing an entry removes everything under it, so a section holding entries is refused: move them elsewhere first. A section is a heading, not a link. It lives at the top level of the menu and holds the entries dropped under it; it cannot be placed inside another entry. One section is marked as the default for collections: a new public root collection adds its entry there, which is why the upgrade turns the former **Library** heading into a section and moves every existing top-level entry under it. A reader is not shown a section whose entries they are all unable to see; an administrator keeps it, so a section created a moment ago can be filled.
 
 Entries may be nested and reordered among their siblings. A hand-placed menu entry cannot be moved to a different parent directly; recreate it under the intended parent. Moving a collection moves its synchronised menu entries. Collection and page entries can be set as Home. Damvia keeps only one Home entry; if none exists, the client falls back to the first accessible collection or its welcome state.
 

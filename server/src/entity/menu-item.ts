@@ -31,6 +31,7 @@ export enum MenuItemType {
 	PAGE = 'page',
 	TEXT = 'text',
 	DIVIDER = 'divider',
+	SECTION = 'section',
 }
 
 @Entity('menu_items')

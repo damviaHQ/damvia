@@ -34,6 +34,7 @@ import {
   FilePenLine,
   Folder,
   GripVertical,
+  Heading,
   Home,
   LetterText,
   Plus,
@@ -110,6 +111,7 @@ function openDialog(type: "add" | "edit") {
         <div class="items-tree__type-icon w-full">
           <BetweenHorizontalStart v-if="item.type === 'divider'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
           <FilePenLine v-if="item.type === 'page'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
+          <Heading v-if="item.type === 'section'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
           <LetterText v-if="item.type === 'text'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
           <Folder v-if="item.type === 'collection' && !item.synchronized" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] admin-text-secondary" />
           <IconCloudSync v-if="item.type === 'collection' && item.synchronized" class="!w-8 !h-8 text-[var(--dv-action-primary)]" />
@@ -125,6 +127,9 @@ function openDialog(type: "add" | "edit") {
         </template>
         <template v-if="props.item?.type === 'page'">
           {{ props.item.pageName }}
+        </template>
+        <template v-else-if="props.item?.type === 'section'">
+          {{ props.item.data?.label }}
         </template>
         <template v-else-if="props.item?.type === 'text'">
           {{ props.item.data.text }}
@@ -150,9 +155,9 @@ function openDialog(type: "add" | "edit") {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem v-if="item.type === 'collection'" @select="openDialog('add')">
+          <DropdownMenuItem v-if="['collection', 'section'].includes(item.type)" @select="openDialog('add')">
             <Plus />
-            <span>Add Item to Collection</span>
+            <span>{{ item.type === 'section' ? 'Add item to section' : 'Add Item to Collection' }}</span>
           </DropdownMenuItem>
           <DropdownMenuItem @select="openDialog('edit')">
             <Settings />
@@ -177,7 +182,7 @@ function openDialog(type: "add" | "edit") {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ItemDialog v-if="item.type === 'collection'" :parent="item" v-model:open="isAddDialogOpen" />
+      <ItemDialog v-if="['collection', 'section'].includes(item.type)" :parent="item" v-model:open="isAddDialogOpen" />
       <ItemDialog :item="editedItem" :parent="parent" v-model:open="isEditDialogOpen" />
     </div>
     <div v-if="item.children && isOpen" class="items-tree__children">

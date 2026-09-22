@@ -15,7 +15,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import MainLinkTree from "@/components/layout-main/MainLinkTree.vue"
 import MainMenuTree from "@/components/layout-main/MainMenuTree.vue"
-import { menuIconClasses, menuIconSlotClasses, sidebarSectionTitleClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "@/components/layout-main/navigationStyles"
+import { menuIconClasses, menuIconSlotClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "@/components/layout-main/navigationStyles"
 import SearchPanel from "@/components/search/SearchPanel.vue"
 import { useMyCollections } from "@/composables/useMyCollections"
 import MainTopbar from "@/components/layout-main/MainTopbar.vue"
@@ -284,7 +284,6 @@ const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/c
               </div>
             </div>
           </div>
-          <div v-if="globalStore.user?.role !== 'guest'" class="mb-2" :class="sidebarSectionTitleClasses">Library</div>
           <MainLinkTree v-if="globalStore.user?.role === 'guest'" v-for="collection in publicCollections" :key="collection.id" :item="collection" :open-items="openCollections ?? []" route-name="collection" />
           <MainMenuTree v-else-if="menuItems" v-for="item in sortBy(menuItems, 'position')" :key="item.id" :item="item" :open-items="openCollections ?? []" route-name="collection" />
         </nav>

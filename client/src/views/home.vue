@@ -34,8 +34,19 @@ const { status, data: collections, isFetching: isFetchingCollections } = useQuer
   queryFn: () => trpc.collection.tree.query()
 })
 
+// The home item can sit under a section heading, so the whole menu tree is
+// searched rather than its first level.
+function findHome(items: any[] | undefined): any {
+  for (const item of items ?? []) {
+    if (item.home) return item
+    const found = findHome(item.children)
+    if (found) return found
+  }
+  return null
+}
+
 watch([menuItems, () => globalStore.user, collections, status, isFetchingMenu, isFetchingCollections], () => {
-  const homeItem = menuItems.value?.find((item: any) => item.home)
+  const homeItem = findHome(menuItems.value)
   if (isFetchingMenu.value || isFetchingCollections.value || status.value !== 'success') {
     return
   }

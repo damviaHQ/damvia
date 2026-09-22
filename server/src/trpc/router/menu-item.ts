@@ -18,6 +18,7 @@ import { z } from "zod"
 import { Collection } from "../../entity/collection"
 import { MenuItem, MenuItemType } from "../../entity/menu-item"
 import { Page } from "../../entity/page"
+import { UserRole } from "../../entity/user"
 import { dataSource } from "../../env"
 import { userCollectionsQuery } from "../../services/collection"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
@@ -43,14 +44,19 @@ type BuildMenuItemTreeOptions = {
 	menuItems: MenuItem[]
 	userCollectionIds: string[]
 	parentId?: string | null
+	// An administrator keeps an empty section, which is the only way to fill a
+	// section that was just created. A reader is spared the heading.
+	keepEmptySections?: boolean
 }
 
-export function buildMenuItemTree({ menuItems, userCollectionIds, parentId = null }: BuildMenuItemTreeOptions) {
+export function buildMenuItemTree({ menuItems, userCollectionIds, parentId = null, keepEmptySections = false }: BuildMenuItemTreeOptions) {
 	return menuItems
 		.filter((current) => current.parentId === parentId)
 		.map((current) => {
-			const children = buildMenuItemTree({ menuItems, userCollectionIds, parentId: current.id })
-			const isCurrentVisible = current.type !== MenuItemType.COLLECTION || userCollectionIds.includes(current.collectionId ?? '')
+			const children = buildMenuItemTree({ menuItems, userCollectionIds, parentId: current.id, keepEmptySections })
+			const isCurrentVisible = current.type === MenuItemType.SECTION
+				? keepEmptySections || children.length > 0
+				: current.type !== MenuItemType.COLLECTION || userCollectionIds.includes(current.collectionId ?? '')
 			if (isCurrentVisible || children.length > 0) {
 				return {
 					...formatMenuItem(current),
@@ -77,7 +83,7 @@ export default router({
 			const userCollections = await userCollectionsQuery(ctx.user)
 				.select('collection.id').getMany()
 			const userCollectionIds = userCollections.map(row => row.id)
-			return buildMenuItemTree({ menuItems, userCollectionIds })
+			return buildMenuItemTree({ menuItems, userCollectionIds, keepEmptySections: ctx.user.role === UserRole.ADMIN })
 		}),
 	create: publicProcedure
 		.use(authMiddleware(userAdmin))
@@ -91,6 +97,11 @@ export default router({
 		.mutation(async ({ input }) => {
 			const menuItem = new MenuItem()
 			menuItem.type = input.type
+			// A section is a heading in the sidebar: it holds other items and
+			// never sits inside one.
+			if (input.type === MenuItemType.SECTION && input.parentId) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'A section cannot be placed inside another item.' })
+			}
 			if (input.parentId) {
 				const parent = await dataSource.getRepository(MenuItem).findOneBy({ id: input.parentId })
 				if (!parent) {
@@ -191,6 +202,14 @@ export default router({
 			const menuItem = await dataSource.getTreeRepository(MenuItem).findOneBy({ id: input.id })
 			if (!menuItem) {
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'Parent item not found.' })
+			}
+			// Everything under an item goes with it. A section holds the whole
+			// menu, so emptying it is asked for rather than done silently.
+			if (menuItem.type === MenuItemType.SECTION) {
+				const children = await dataSource.getRepository(MenuItem).countBy({ parentId: menuItem.id })
+				if (children > 0) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'Move the entries of this section elsewhere before removing it.' })
+				}
 			}
 
 			await dataSource.getRepository(MenuItem).remove(menuItem)

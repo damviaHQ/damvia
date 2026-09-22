@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { menuIconClasses, menuIconSlotClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "./navigationStyles"
+import { menuIconClasses, menuIconSlotClasses, sidebarSectionTitleClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "./navigationStyles"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsTruncated } from "@/composables/useIsTruncated"
@@ -26,6 +26,10 @@ type MenuItem = RouterOutput["menuItem"]["list"][number]
 
 const props = defineProps<{ routeName: string; item: MenuItem; openItems: string[] }>()
 const open = ref(props.openItems.includes(props.item.collectionId))
+
+// A section is a heading: it is never a link, and its items stay at the
+// level the section sits at rather than being indented under it.
+const isSection = computed(() => props.item.type === "section")
 
 const labelRef = ref<HTMLElement | null>(null)
 const { isTruncated, check } = useIsTruncated()
@@ -129,12 +133,13 @@ function handleLinkClick(event: MouseEvent) {
         {{ item.type === 'collection' ? item.collectionName : item.type === 'page' ? item.pageName : item.data?.text }}
       </TooltipContent>
     </Tooltip>
+    <div v-if="isSection" class="mt-4 mb-2" :class="sidebarSectionTitleClasses">{{ item.data?.label }}</div>
     <div v-if="item.type === 'divider'"
       :class="['h-px', item.data.border ? 'bg-neutral-400' : 'bg-transparent', 'divider self-center w-[90%]']" :style="{
         marginTop: item.data.spacingTop ? `${item.data.spacingTop}px` : '0px',
         marginBottom: item.data.spacingBottom ? `${item.data.spacingBottom}px` : '0px',
       }" />
-    <div v-if="open || !item.hasAccess" class="children-container relative" :class="item.hasAccess && 'pl-4'">
+    <div v-if="isSection || open || !item.hasAccess" class="children-container relative" :class="!isSection && item.hasAccess && 'pl-4'">
       <span v-if="hasActiveChild" aria-hidden="true" data-tree-connector :class="treeConnectorStartClasses" />
       <div v-for="(child, index) in sortedChildren" :key="child.id" class="relative">
         <span v-if="hasActiveChild && index <= activeChildIndex" aria-hidden="true" data-tree-connector

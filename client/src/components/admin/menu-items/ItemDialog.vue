@@ -54,6 +54,7 @@ const form = ref<{
     sync?: boolean
     border?: boolean
     text?: string
+    label?: string
     url?: string
     external?: boolean
   }
@@ -135,6 +136,10 @@ async function submitChanges() {
     error.value = 'Page is required.'
     return
   }
+  if (form.value.type === 'section' && !form.value.data.label?.trim()) {
+    error.value = 'Section title is required.'
+    return
+  }
 
   if (props.item) {
     await trpc.menuItem.update.mutate(form.value as any)
@@ -164,7 +169,7 @@ async function handleSubmit() {
           {{ item ? "Edit item" : "Add item to menu" }}
         </DialogTitle>
         <DialogDescription class="text-body admin-text-secondary mb-4">
-          Choose a collection, page, link or divider for your navigation.
+          Choose a section, collection, page, link or divider for your navigation.
         </DialogDescription>
 
       </DialogHeader>
@@ -179,6 +184,7 @@ async function handleSubmit() {
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem v-if="!parent" value="section">Section</SelectItem>
                 <SelectItem value="collection">Collection</SelectItem>
                 <SelectItem value="text">Text/Link</SelectItem>
                 <SelectItem value="divider">Divider</SelectItem>
@@ -235,6 +241,13 @@ async function handleSubmit() {
               </div>
             </div>
           </div>
+          <template v-if="form.type === 'section'">
+            <FieldGroup>
+              <Label class="form" for="label">Section title</Label>
+              <Input id="label" v-model="form.data.label" type="text" placeholder="Catalogue" />
+              <div class="form-field-description">A heading in the sidebar. Drag items under it to group them.</div>
+            </FieldGroup>
+          </template>
           <template v-if="form.type === 'text'">
             <FieldGroup >
               <Label class="form" for="text">Text</Label>
