@@ -263,7 +263,7 @@ async function onSubmit() {
         </FieldGroup>
       </section>
 
-      <CollectionProductSettings v-if="collection.canEdit" :number-of-records="collection.numberOfRecords ?? 0"
+      <CollectionProductSettings v-if="collection.canEdit" :collection-id="collection.id" :number-of-records="collection.numberOfRecords ?? 0"
         v-model:catalogue-mode="form.catalogueMode" v-model:includes-all-records="form.includesAllRecords"
         v-model:record-filters="form.recordFilters" />
 

@@ -15,7 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { EntityManager, IsNull, Not } from "typeorm"
 import { Collection } from "../entity/collection"
 import { CollectionRecord, CollectionRecordSource } from "../entity/collection-record"
-import { User } from "../entity/user"
+import { User, UserRole } from "../entity/user"
 import { dataSource, logger } from "../env"
 import { userCollectionsQuery } from "./collection"
 import { catalogueKeyColumnName, loadFields, RecordQuery, recordQuerySql } from "./records"
@@ -53,6 +53,23 @@ export function visibleRecordsCondition(user: User, alias: string, parameters: u
 			OR EXISTS (SELECT 1 FROM collection_records cr WHERE cr.collection_id = visible.id AND cr.record_id = ${alias}.id)
 		)
 	)`
+}
+
+// Picking products by hand reads the whole record database for an
+// administrator, who is the one building the catalogue in the first place, and
+// only what they can already see for anybody else. Matching is done on the
+// record key so a reference list pasted from a spreadsheet lands as it is.
+export async function pickableRecords(em: EntityManager, user: User, by: 'id' | 'key', values: string[]) {
+	if (!values.length) {
+		return []
+	}
+	const parameters: unknown[] = [values]
+	const column = by === 'id' ? 'r.id = ANY($1::uuid[])' : 'btrim(lower(r.record_key)) = ANY($1::text[])'
+	const visible = user.role === UserRole.ADMIN ? 'TRUE' : visibleRecordsCondition(user, 'r', parameters, em)
+	return await em.query(
+		`SELECT r.id, r.record_key AS "recordKey" FROM records r WHERE ${column} AND ${visible}`,
+		parameters,
+	) as { id: string, recordKey: string }[]
 }
 
 export async function addRecords(em: EntityManager, collectionId: string, recordIds: string[], source = CollectionRecordSource.MANUAL) {

@@ -27,10 +27,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Check, FolderPen, FolderSync } from "@lucide/vue"
+import { Check, FolderPen, FolderSync, PackageSearch } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
 
@@ -42,6 +43,10 @@ const emit = defineEmits<{
 const toast = useGlobalToast()
 const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
+const { plural, singular } = useRecordLabel()
+// A collection mirrors a folder, or is filled by hand with files, or holds
+// records and is browsed as a catalogue. See docs/administration/catalogue.md.
+const kind = ref<"custom" | "synchronized" | "products">("custom")
 const form = ref<{
   name?: string
   collectionId?: string
@@ -67,8 +72,13 @@ watch(
   () => props.modelValue,
   () => {
     form.value = {}
+    kind.value = "custom"
   }
 )
+watch(kind, (value) => {
+  form.value.synchronized = value === "synchronized"
+  form.value.assetFolderId = undefined
+})
 
 const collectionOptions = computed(() => {
   if (!collections.value) {
@@ -104,6 +114,7 @@ async function onSubmit() {
         parentId: form.value.collectionId,
         public: true,
         draft: form.value.collectionId ? undefined : form.value.draft ?? false,
+        ...(kind.value === "products" ? { catalogueMode: "products" as const } : {}),
       }))
 
     queryClient.invalidateQueries({ queryKey: ['collection'] })
@@ -130,29 +141,42 @@ async function onSubmit() {
 
         <div class="grid gap-6 py-4">
           <div v-if="globalStore.user?.role === 'admin'" class="create-collection-modal__type-container mb-075">
-            <button type="button" :aria-pressed="!form.synchronized" @click="form.synchronized = false" :class="[
+            <button type="button" :aria-pressed="kind === 'custom'" @click="kind = 'custom'" :class="[
               'create-collection-modal__type',
-              { 'create-collection-modal__type--active': !form.synchronized },
+              { 'create-collection-modal__type--active': kind === 'custom' },
             ]">
               <FolderPen class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
-              <div class="font-medium">Custom</div>
-              <Check v-if="!form.synchronized" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
+              <div class="font-medium">Files<span class="block text-caption font-normal text-neutral-500">Chosen by hand</span></div>
+              <Check v-if="kind === 'custom'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
             </button>
-            <button type="button" :aria-pressed="form.synchronized" @click="form.synchronized = true" :class="[
+            <button type="button" :aria-pressed="kind === 'synchronized'" @click="kind = 'synchronized'" :class="[
               'create-collection-modal__type',
-              { 'create-collection-modal__type--active': form.synchronized },
+              { 'create-collection-modal__type--active': kind === 'synchronized' },
             ]">
               <FolderSync class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
-              <div class="font-medium">Synchronized</div>
-              <Check v-if="form.synchronized" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
+              <div class="font-medium">Synchronized folder<span class="block text-caption font-normal text-neutral-500">Mirrors your cloud storage</span></div>
+              <Check v-if="kind === 'synchronized'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
+            </button>
+            <button type="button" :aria-pressed="kind === 'products'" @click="kind = 'products'" :class="[
+              'create-collection-modal__type',
+              { 'create-collection-modal__type--active': kind === 'products' },
+            ]">
+              <PackageSearch class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
+              <div class="font-medium">{{ plural }}<span class="block text-caption font-normal text-neutral-500">A list of references</span></div>
+              <Check v-if="kind === 'products'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
             </button>
           </div>
-          <FieldGroup v-if="form.synchronized" role="group" aria-labelledby="assetFolderId">
+          <p class="text-caption text-neutral-500">
+            <template v-if="kind === 'synchronized'">Every file of that folder, and of the folders under it, follows at each sync.</template>
+            <template v-else-if="kind === 'products'">Readers browse this collection as a catalogue. Once it exists, fill it with a list of references or with rules on the {{ singular.toLowerCase() }} fields.</template>
+            <template v-else>You add the files yourself, from the library or from a search.</template>
+          </p>
+          <FieldGroup v-if="kind === 'synchronized'" role="group" aria-labelledby="assetFolderId">
             <Label id="assetFolderId">Select a folder from your cloud storage *</Label>
             <treeselect v-model="form.assetFolderId" placeholder="Asset folder" :options="assetFolders"
               :normalizer="(node) => ({ id: node.id, label: node.name })" />
           </FieldGroup>
-          <FieldGroup v-if="!form.synchronized" >
+          <FieldGroup v-else>
             <Label for="name">Name *</Label>
             <Input id="name" type="text" v-model="form.name" placeholder="Name" class="form-input mb-075" />
           </FieldGroup>
@@ -173,7 +197,7 @@ async function onSubmit() {
           <Button type="button" variant="outline" @click="emit('update:modelValue', false)">
             Cancel
           </Button>
-          <Button v-if="!form.synchronized" type="submit" :disabled="!form.name">Create collection</Button>
+          <Button v-if="kind !== 'synchronized'" type="submit" :disabled="!form.name">Create collection</Button>
           <Button v-else type="submit" :disabled="!form.assetFolderId">Create collection</Button>
         </DialogFooter>
       </form>
@@ -182,16 +206,19 @@ async function onSubmit() {
 </template>
 
 <style scoped>
+/* Three choices, each with a line saying where its contents come from, read
+   better stacked than squeezed side by side. */
 .create-collection-modal__type-container {
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
 .create-collection-modal__type {
   display: flex;
   align-items: center;
-  flex: 1;
+  text-align: left;
   gap: 1rem;
   cursor: pointer;
   padding: 0.75rem;

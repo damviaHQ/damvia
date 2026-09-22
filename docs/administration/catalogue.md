@@ -18,7 +18,19 @@ The media of a product are not covered by that rule. Each file keeps the rights 
 
 A product no collection holds is invisible to everybody, administrators included. Opening `/products/<id>` for it answers "not found".
 
-## Turn a collection into a product collection
+## Create a product collection
+
+**Collections** → **New collection** asks what the collection is, and the three answers differ only in where its contents come from:
+
+| Type | What you give it |
+|---|---|
+| Files | A name. You fill it with files by hand. |
+| Synchronized | A folder of your cloud storage. It mirrors that folder at every sync. |
+| Products | A name. Readers browse it as a catalogue. |
+
+Naming the type here only sets a starting point. Every collection, a synchronized one included, can later hold products as well.
+
+## Turn an existing collection into a product collection
 
 Open a collection, then **Edit collection**. The Products section chooses what readers browse there:
 
@@ -28,10 +40,13 @@ Open a collection, then **Edit collection**. The Products section chooses what r
 | Products only | Opening the collection opens the catalogue filtered to its products. |
 | Files and products | The files stay in place, with a link to the products of the collection above them. |
 
-Membership is built in two ways, and they mix freely:
+Membership is built in three ways, and they mix freely:
 
+- **From a reference list.** **Add by reference** in that same section takes the product keys, pasted one per line or read from a CSV whose reference column you name. Matching ignores case and surrounding spaces. The references matching no product come back on screen so you can correct the list instead of discovering a short catalogue later. This is the static assortment: it holds the references you gave and changes only when you change it.
 - **By hand.** A reader or an editor adds products from the catalogue with **Add to collection**, the same action files already use.
-- **By rules.** The Rules block builds the membership from the record fields, using the conditions of the records grid: contains, is, is not, is empty, is not empty, is any of. Every product matching the rules joins the collection and leaves it when it stops matching. **Only an administrator writes rules**, including on a collection they own: a rule fills a collection from the whole record database without looking at what its author may see, so anyone else would read the catalogue through a collection of their own. The owner of a collection still chooses what readers browse there and adds products by hand, which is checked against their own visibility.
+- **By rules.** This is the dynamic assortment: a collection on `Season is Winter 2024` gains and loses products as the field changes. The Rules block builds the membership from the record fields, using the conditions of the records grid: contains, is, is not, is empty, is not empty, is any of. Every product matching the rules joins the collection and leaves it when it stops matching. **Only an administrator writes rules**, including on a collection they own: a rule fills a collection from the whole record database without looking at what its author may see, so anyone else would read the catalogue through a collection of their own. The owner of a collection still chooses what readers browse there and adds products by hand, which is checked against their own visibility.
+
+Whichever way a collection is built, it only ever stores a list of references. The field values, the visuals and the readiness of a product are read live, so a product corrected in the grid is corrected everywhere it appears.
 
 **Products added by hand are never removed by a rule.** A refresh only ever rewrites the rows it wrote itself, so an editor can pin a product into a seasonal collection without the next pass taking it away.
 
@@ -75,7 +90,7 @@ Changing the model field regroups the whole catalogue at once. Clearing it drops
 
 A reader creates product collections of their own under **My collections**, either from scratch or from one of yours:
 
-- **From scratch**: create a collection, then add products as they browse.
+- **From scratch**: create a collection under My collections, answer *Products* to what it holds, then add products as they browse. The question is only asked where that reader can already see a catalogue.
 - **From an existing catalogue**: add one of your product collections to their own. The copy freezes the membership as it stands, as hand-picked entries, even when the source was rule-driven. The copy never carries the rules or the "whole catalogue" flag, so it stays the assortment they chose on that day.
 
 Products they remove from their copy leave only that copy. The catalogue and the collections you publish are untouched.

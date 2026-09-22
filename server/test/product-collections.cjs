@@ -189,3 +189,71 @@ test('deleting a collection takes its membership with it', async () => {
     await admin.collection.remove(collection.id)
     assert.equal(await db.getRepository(CollectionRecord).countBy({ collectionId: collection.id }), 0)
 })
+
+test('a collection is created as a catalogue, by an administrator and by a reader', async () => {
+    const created = await admin.collection.create({ name: 'Born a catalogue', public: true, catalogueMode: 'products' })
+    assert.equal(created.catalogueMode, 'products')
+    assert.equal((await db.getRepository(Collection).findOneByOrFail({ id: created.id })).catalogueMode, 'products')
+
+    // A collection created without saying anything still holds files only.
+    const plain = await admin.collection.create({ name: 'Born a folder', public: true })
+    assert.equal(plain.catalogueMode, 'files')
+
+    // A reader builds an assortment of their own, and the mode is the only
+    // catalogue setting they may choose: the rules stay with the administrator.
+    const assortment = await caller(fixtures.member).collection.createUserCollection({ name: 'My assortment', catalogueMode: 'products' })
+    assert.equal(assortment.catalogueMode, 'products')
+    const stored = await db.getRepository(Collection).findOneByOrFail({ id: assortment.id })
+    assert.equal(stored.includesAllRecords, false)
+    assert.equal(stored.recordFilters, null)
+    assert.equal(stored.public, false)
+})
+
+test('a reference list fills a collection, matched on the key and reporting what missed', async () => {
+    const collection = await makeCollection({ name: 'Winter sheet' })
+    // Case and stray spaces are what a spreadsheet column actually contains.
+    const result = await admin.collection.addRecordsByKey({ id: collection.id, keys: [' pc-1 ', 'PC-2', 'PC-404'] })
+    assert.equal(result.matched, 2)
+    assert.equal(result.added, 2)
+    assert.deepEqual(result.unmatched, ['pc-404'])
+    assert.deepEqual(await membersOf(collection.id), [await recordId('PC-1'), await recordId('PC-2')].sort())
+    // The collection starts holding products the moment it holds one.
+    assert.equal((await db.getRepository(Collection).findOneByOrFail({ id: collection.id })).catalogueMode, 'products')
+
+    // Adding the same references again changes nothing.
+    const again = await admin.collection.addRecordsByKey({ id: collection.id, keys: ['PC-1'] })
+    assert.equal(again.matched, 1)
+    assert.equal(again.added, 0)
+    assert.equal(await numberOfRecords(collection.id), 2)
+})
+
+test('an administrator builds the first catalogue, a reader only pins what they already see', async () => {
+    // Nothing is in any collection yet for this key, so the visibility loop
+    // would leave an administrator unable to start a catalogue at all.
+    const fresh = await admin.record.create({ recordKey: 'PC-FRESH', values: { season: 'Unlisted' } })
+    const adminCollection = await makeCollection({ name: 'Bootstrap', draft: true })
+    assert.equal((await admin.collection.addRecordsByKey({ id: adminCollection.id, keys: ['PC-FRESH'] })).added, 1)
+
+    const own = await caller(fixtures.member).collection.createUserCollection({ name: 'Reader sheet', catalogueMode: 'products' })
+    // Another test of this file left a collection standing for the whole
+    // catalogue, which would hand this product to everybody.
+    const openToAll = await db.getRepository(Collection).findBy({ includesAllRecords: true })
+    await db.getRepository(Collection).update(openToAll.map(row => row.id), { includesAllRecords: false })
+    const blocked = await caller(fixtures.member).collection.addRecordsByKey({ id: own.id, keys: ['PC-FRESH'] })
+    assert.equal(blocked.matched, 0)
+    assert.deepEqual(blocked.unmatched, ['pc-fresh'])
+    assert.deepEqual(await membersOf(own.id), [])
+
+    // Once it is published to them, the very same list works.
+    const published = await makeCollection({ name: 'Published' })
+    await admin.collection.addRecordsByKey({ id: published.id, keys: ['PC-FRESH'] })
+    assert.equal((await caller(fixtures.member).collection.addRecordsByKey({ id: own.id, keys: ['PC-FRESH'] })).added, 1)
+    assert.deepEqual(await membersOf(own.id), [fresh.id])
+
+    // A collection a reader cannot open is not there to be filled either.
+    await assert.rejects(
+        caller(fixtures.member).collection.addRecordsByKey({ id: adminCollection.id, keys: ['PC-1'] }),
+        error => error.code === 'NOT_FOUND',
+    )
+    await db.getRepository(Collection).update(openToAll.map(row => row.id), { includesAllRecords: true })
+})

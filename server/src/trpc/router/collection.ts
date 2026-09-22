@@ -32,7 +32,7 @@ import {
 	userCollectionsQuery
 } from "../../services/collection"
 import { formatActionBar, resetDescendantActionBars } from "../../services/collection-action-bar"
-import { addRecords, refreshDynamicCollection, removeRecords, visibleRecordsCondition } from "../../services/product-collections"
+import { addRecords, pickableRecords, refreshDynamicCollection, removeRecords } from "../../services/product-collections"
 import { loadViewableMetadata, ViewableMetadata } from "../../services/file-metadata"
 import { loadVariantGroups, VariantGroupSummary } from "../../services/variant-grouping"
 import { applySearchOrder, buildRangeQuery, buildSearchQuery, loadSearchContext, onePerFile, searchFacets } from "../../services/search"
@@ -438,12 +438,14 @@ export default router({
 				public: z.boolean().optional(),
 				draft: z.boolean().optional(),
 				parentId: z.uuid().optional(),
+				catalogueMode: z.enum(CATALOGUE_MODES).optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
 			const collection = new Collection()
 			collection.name = input.name
 			collection.description = input.description ?? null
+			collection.catalogueMode = input.catalogueMode ?? 'files'
 			if (input.parentId) {
 				collection.parent = await dataSource.getRepository(Collection).findOneBy(
 					ctx.user.role !== UserRole.ADMIN ? { id: input.parentId, ownerId: ctx.user.id } : { id: input.parentId },
@@ -539,14 +541,8 @@ export default router({
 				// already see it somewhere else.
 				const recordIds = input.items.filter(v => v.type === 'record').map(v => v.id)
 				if (recordIds.length) {
-					const parameters: unknown[] = []
-					const visible = visibleRecordsCondition(ctx.user, 'r', parameters, em)
-					parameters.push(recordIds)
-					const rows = await em.query(
-						`SELECT r.id FROM records r WHERE r.id = ANY($${parameters.length}::uuid[]) AND ${visible}`,
-						parameters,
-					)
-					await addRecords(em, collection.id, rows.map((row: { id: string }) => row.id))
+					const rows = await pickableRecords(em, ctx.user, 'id', recordIds)
+					await addRecords(em, collection.id, rows.map((row) => row.id))
 					if (collection.catalogueMode === 'files') {
 						await em.getRepository(Collection).update(collection.id, {
 							catalogueMode: collection.numberOfFiles > 0 ? 'both' : 'products',
@@ -692,6 +688,32 @@ export default router({
 				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
 			}
 			return dataSource.transaction((em) => removeRecords(em, collection.id, input.recordIds))
+		}),
+	// A catalogue is usually assembled from a reference list held somewhere
+	// else, a buying sheet or an export. The keys that match nothing come back
+	// so the list can be corrected rather than silently shortened.
+	addRecordsByKey: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({ id: z.uuid(), keys: z.string().min(1).max(200).array().min(1).max(5000) }))
+		.mutation(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			}
+			const wanted = [...new Set(input.keys.map((key) => key.trim().toLowerCase()).filter(Boolean))]
+			return await dataSource.transaction(async (em) => {
+				const found = await pickableRecords(em, ctx.user, 'key', wanted)
+				const added = await addRecords(em, collection.id, found.map((row) => row.id))
+				if (found.length && collection.catalogueMode === 'files') {
+					await em.getRepository(Collection).update(collection.id, {
+						catalogueMode: collection.numberOfFiles > 0 ? 'both' : 'products',
+					})
+				}
+				const matched = new Set(found.map((row) => row.recordKey.trim().toLowerCase()))
+				return { added, matched: found.length, unmatched: wanted.filter((key) => !matched.has(key)) }
+			})
 		}),
 	// The rules of a collection driven by filters. Saving them rewrites the
 	// membership straight away; products picked by hand are left alone.
@@ -888,12 +910,14 @@ export default router({
 				name: z.string().min(1).max(80),
 				description: z.string().max(255).optional(),
 				parentId: z.uuid().optional(),
+				catalogueMode: z.enum(CATALOGUE_MODES).optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
 			const collection = new Collection()
 			collection.name = input.name
 			collection.description = input.description ?? null
+			collection.catalogueMode = input.catalogueMode ?? 'files'
 			if (input.parentId) {
 				collection.parent = await dataSource.getRepository(Collection).findOneBy({
 					id: input.parentId,
