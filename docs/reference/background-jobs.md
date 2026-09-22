@@ -3,7 +3,7 @@ title: Background jobs
 description: Every queue and cron the worker runs, what triggers it, and what it does.
 sidebar:
   order: 3
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. Every API process connects pg-boss and can queue jobs; jobs are processed inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
@@ -54,3 +54,21 @@ An export denied by the access check is handled separately: the archive transact
 :::tip
 pg-boss keeps its tables in the `pgboss` schema of `DATABASE_URL`. `SELECT name, state, count(*) FROM pgboss.job GROUP BY 1, 2;` is the quickest way to see what is queued, active or failed. Only the process started with `ENABLE_WORKER=true` supervises the queues and fires the cron schedules; API-only processes and the CLI just send jobs. An instance upgraded from pg-boss 10 keeps its old tables in `pgboss_legacy_v10` until you drop them; see [Upgrading](../deployment/upgrading.md#pg-boss-12-in-this-upgrade).
 :::
+
+## Stages of the enrichment pass
+
+`runEnrichmentPass()` runs after each sync and on demand from the administration. It holds one advisory lock and commits one transaction per stage, in this order:
+
+| Stage | What it writes |
+|---|---|
+| `asset-types` | Folder paths, the resolution of folder asset types, and the types files inherit |
+| `entities` | Links between files and records, their primary link and the conflicts |
+| `metadata` | The counts of file metadata fields |
+| `variants` | Variant groups, their members and their axes |
+| `families` | `records.family_key` and `records.family_label` from the model field |
+| `readiness` | `records.readiness_filled`, `readiness_total` and `readiness_ready` against the readiness definition |
+| `product-rules` | The membership of every collection driven by rules, rows with `source = 'rule'` only |
+
+Measured on a catalogue of 20,000 products and 60,000 files: a rule writing the whole membership takes about 0.13 s, the first page of the catalogue about 80 ms, its facets about 50 ms, and a product page about 80 ms.
+
+A record edited in the administration is scored and regrouped straight away; its dynamic collections are refreshed at the next pass, so allow up to five minutes. A collection's own rules are applied the moment they are saved. See [Product catalogue](../administration/catalogue.md).

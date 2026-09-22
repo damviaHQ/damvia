@@ -3,7 +3,7 @@ title: Contributing
 description: Set up a development environment, know the scripts and checks that exist, and submit a change with its license header and its documentation.
 sidebar:
   order: 1
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 This page is the entry point for developers who want to change or extend Damvia. It covers the application packages, their scripts and checks, and what a pull request must contain. The other pages of this group describe the code itself: [Architecture](./architecture.md), [Data model](./data-model.md), [tRPC API](./api.md), [Writing a background job](./background-jobs.md) [Storage drivers](./storage-drivers.md) and the proposed [Design system](./design-system.md).
@@ -37,6 +37,7 @@ The two application packages have their own `package.json` and `node_modules`. A
 | `server/` | `npm run typeorm` | `typeorm-ts-node-commonjs`, the TypeORM CLI running on the TypeScript sources |
 | `client/` | `npm run dev` | `vite`, on port 5173 |
 | `client/` | `npm run build` | `vite build` into `client/dist/` |
+| `server/` | `node test/bench/catalogue.cjs` | Seeds a catalogue of `RECORDS` products with three files each and reports the timing of every reader-facing query. Not part of `npm test`; recreate the `_test` database first |
 | `client/` | `npm run typecheck` | `vue-tsc --noEmit` over `src/` and `test/unit/`; needs `npm run build` in `server/` first |
 | `client/` | `npm test` | Vitest over `client/test/unit/**/*.test.ts`; `npm run test:watch` keeps it running |
 | `client/` | `npm run preview` | `vite preview` of the built bundle |
@@ -87,7 +88,9 @@ Run the same commands before opening a pull request. There is no ESLint or Prett
 
 ### Client suites
 
-`client/test/unit/**/*.test.ts` run with Vitest in a Node environment; files under `client/test/unit/dom/` run in happy-dom for the Pinia store and the composables. They cover the pure helpers in `client/src/utils/` and `client/src/lib/`, `extractErrors`, the navigation guard in `client/src/router/guard.ts`, the global store and the toast composable. Playwright specs in `client/test/ui/` (`npm run test:ui`) exercise the isolated design preview and are not part of CI.
+`client/test/unit/**/*.test.ts` run with Vitest in a Node environment; files under `client/test/unit/dom/` run in happy-dom for the Pinia store and the composables. They cover the pure helpers in `client/src/utils/` and `client/src/lib/`, `extractErrors`, the navigation guard in `client/src/router/guard.ts`, the global store and the toast composable. Playwright specs in `client/test/ui/` (`npm run test:ui`) exercise the isolated design preview and are not part of CI. They fake the whole backend by intercepting `**/trpc/**` and fulfilling `{ result: { data } }`, so a new reader-facing page needs its procedures added to the interception, not a running server.
+
+`server/test/bench/catalogue.cjs` is a measurement rather than a suite: it seeds a catalogue at a realistic size and prints the median timing of each reader-facing query, which is how the shape of the catalogue queries and the cost of the membership triggers were settled. On 20,000 products and 60,000 files, the first page, its facets and a product page each measure under 100 ms, and writing the whole membership of a rule-driven collection measures around 0.13 s.
 
 ## Submitting a change
 

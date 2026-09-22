@@ -28,12 +28,14 @@ import { trpc } from "@/services/server.ts"
 import { providePageFilter } from "@/composables/usePageFilter"
 import { providePageListings } from "@/composables/usePageListings"
 import { useGlobalStore } from "@/stores/globalStore"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { isRestricted, type ActionBarAction } from "@/utils/actionBar"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   ChevronRight,
   FilePenLine,
   Link,
+  Package,
   Search,
   Settings,
   Trash2,
@@ -43,6 +45,7 @@ import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 const router = useRouter()
+const { lowerPlural } = useRecordLabel()
 const route = useRoute()
 const globalStore = useGlobalStore()
 const storeRefs = storeToRefs(globalStore)
@@ -65,6 +68,14 @@ const { status, data: collection, error } = useQuery({
     }
   }
 })
+
+// A collection an administrator turned into a product collection is browsed in
+// the catalogue; one holding both keeps its files here and offers a way over.
+watch(collection, (current) => {
+  if (current?.catalogueMode === "products") {
+    router.replace({ name: "catalogue", query: { collection: current.id } })
+  }
+}, { immediate: true })
 
 const maxSelectableItems = computed(() => {
   if (!collection.value) {
@@ -201,6 +212,10 @@ function removeSelectedFiles() {
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="collection__container">
+    <router-link v-if="collection.catalogueMode === 'both'" :to="{ name: 'catalogue', query: { collection: collection.id } }"
+      class="mb-4 inline-flex items-center gap-2 text-body text-neutral-600">
+      <Package class="size-4" aria-hidden="true" />{{ collection.numberOfRecords }} {{ lowerPlural }} in this collection
+    </router-link>
     <div class="collection__header mb-6 flex flex-wrap items-center justify-between gap-4">
       <div class="flex min-w-0 flex-1 items-center">
         <div v-if="selection.length > 0" class="collection__selection-container flex items-center text-neutral-500" @mouseenter="isHovered = true"

@@ -21,6 +21,8 @@ import { RouterOutput, trpc } from "../services/server.ts"
 import { readDisplayDetails, type DisplayDetails, type DisplayView } from "../utils/displayPreferences"
 import { clearRecentSearches } from "../utils/recentSearches"
 
+export type SelectionItem = { type: 'collection' | 'file' | 'record', id: string }
+
 export const useGlobalStore = defineStore('global', () => {
 	const router = useRouter()
 	const searchParamsToken = new URLSearchParams(window.location.search).get('dam_token')
@@ -32,7 +34,9 @@ export const useGlobalStore = defineStore('global', () => {
 	const user = ref<RouterOutput['user']['me']>()
 	const env = ref<RouterOutput['env']>()
 	const isAuthenticated = computed(() => authToken.value !== undefined)
-	const selection = ref<{ type: 'collection' | 'file', id: string }[]>([])
+	// A selection holds whatever the reader is about to act on: collections,
+	// files, or products from the catalogue.
+	const selection = ref<SelectionItem[]>([])
 	const displayPreferences = ref<{ [assetTypeId: string]: DisplayView }>(
 		JSON.parse(localStorage.getItem('dam_display_preferences') || '{}')
 	)
@@ -145,13 +149,13 @@ export const useGlobalStore = defineStore('global', () => {
 		setDisplayPreferences,
 		fetchEnv,
 		selection,
-		setSelection(items: { type: 'collection' | 'file', id: string }[]) {
+		setSelection(items: SelectionItem[]) {
 			selection.value = items
 		},
-		addToSelection(item: { type: 'collection' | 'file', id: string }) {
+		addToSelection(item: SelectionItem) {
 			selection.value = [...selection.value, item]
 		},
-		removeFromSelection(item: { type: 'collection' | 'file', id: string }) {
+		removeFromSelection(item: SelectionItem) {
 			selection.value = selection.value.filter(
 				(selection) => !(selection.type === item.type && selection.id === item.id)
 			)

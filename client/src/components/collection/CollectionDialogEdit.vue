@@ -29,7 +29,11 @@ import { useRouter } from "vue-router"
 import Treeselect from "vue3-treeselect-ts"
 import SelectGroupInput from "@/components/SelectGroupInput.vue";
 import CollectionActionBarSettings from "@/components/collection/CollectionActionBarSettings.vue"
+import CollectionProductSettings from "@/components/collection/CollectionProductSettings.vue"
+import type { RecordFilter } from "@/utils/recordFilters"
 import { editableSettings, type ActionBarAction, type ActionBarRule } from "@/utils/actionBar"
+import { filterIsComplete } from "@/utils/recordFilters"
+import { useGlobalStore } from "@/stores/globalStore.ts"
 
 const props = defineProps<{
   collection: RouterOutput["collection"]["findById"] | RouterOutput["collection"]["treeAdmin"][number];
@@ -42,6 +46,7 @@ const emit = defineEmits<{
 const { collection, modelValue } = toRefs(props)
 const toast = useGlobalToast()
 const router = useRouter()
+const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
 const upload = ref<HTMLInputElement | null>(null)
 const form = ref<{
@@ -55,7 +60,17 @@ const form = ref<{
   actionBarCustom: boolean;
   actionBarRules: Record<ActionBarAction, ActionBarRule>;
   resetDescendantActionBars: boolean;
-}>({ actionBarCustom: false, actionBarRules: editableSettings(null), resetDescendantActionBars: false })
+  catalogueMode: "files" | "products" | "both";
+  includesAllRecords: boolean;
+  recordFilters: RecordFilter[];
+}>({
+  actionBarCustom: false,
+  actionBarRules: editableSettings(null),
+  resetDescendantActionBars: false,
+  catalogueMode: "files",
+  includesAllRecords: false,
+  recordFilters: [],
+})
 // Only the collection page asks for the rules; the admin list does not.
 const actionBar = computed(() => "actionBar" in collection.value ? collection.value.actionBar : null)
 function updateForm() {
@@ -69,6 +84,9 @@ function updateForm() {
     actionBarCustom: !!actionBar.value?.own,
     actionBarRules: editableSettings(actionBar.value?.own ?? actionBar.value?.inherited),
     resetDescendantActionBars: false,
+    catalogueMode: collection.value.catalogueMode ?? "files",
+    includesAllRecords: collection.value.includesAllRecords ?? false,
+    recordFilters: collection.value.recordFilters ?? [],
   }
 }
 
@@ -132,6 +150,15 @@ async function deleteCollection() {
   }
 }
 
+// Only an administrator may open a collection on the whole catalogue, so the
+// flag is left out of the call for everybody else.
+const canSetAllRecords = computed(() => globalStore.user?.role === "admin")
+function productSettingsChanged() {
+  return form.value.catalogueMode !== (collection.value.catalogueMode ?? "files")
+    || form.value.includesAllRecords !== (collection.value.includesAllRecords ?? false)
+    || JSON.stringify(form.value.recordFilters.filter(filterIsComplete)) !== JSON.stringify(collection.value.recordFilters ?? [])
+}
+
 async function onSubmit() {
   try {
     if (form.value.thumbnailURL && form.value.thumbnailFile) {
@@ -165,6 +192,14 @@ async function onSubmit() {
       updateData.name = form.value.name
     }
     const collection = await trpc.collection.update.mutate(updateData)
+    if (productSettingsChanged()) {
+      await trpc.collection.setRecordRules.mutate({
+        id: props.collection.id,
+        catalogueMode: form.value.catalogueMode,
+        recordFilters: form.value.recordFilters.filter(filterIsComplete),
+        ...(canSetAllRecords.value ? { includesAllRecords: form.value.includesAllRecords } : {}),
+      })
+    }
     if (canMove.value && (form.value.parentId ?? null) !== (props.collection.parentId ?? null)) {
       await trpc.collection.move.mutate({ id: props.collection.id, parentId: form.value.parentId ?? null })
     }
@@ -227,6 +262,10 @@ async function onSubmit() {
           <SelectGroupInput v-model="form.limitedToGroupIds" id="limitedToGroupIds" placeholder="Select groups..." />
         </FieldGroup>
       </section>
+
+      <CollectionProductSettings v-if="collection.canEdit" :number-of-records="collection.numberOfRecords ?? 0"
+        v-model:catalogue-mode="form.catalogueMode" v-model:includes-all-records="form.includesAllRecords"
+        v-model:record-filters="form.recordFilters" />
 
       <CollectionActionBarSettings v-if="actionBar" :collection-id="collection.id"
         :inherited="actionBar.inherited" :inherited-from="actionBar.inheritedFrom" :descendant-overrides="actionBar.descendantOverrides"
