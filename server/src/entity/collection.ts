@@ -27,8 +27,10 @@ import {
 	TreeParent,
 	UpdateDateColumn
 } from "typeorm"
+import type { RecordFilter } from "../services/records"
 import { AssetFolder } from "./asset-folder"
 import { CollectionFile } from "./collection-file"
+import { CollectionRecord } from "./collection-record"
 import { CollectionInvitation } from "./collection-invitation"
 import { Page } from "./page"
 import { User, UserRole } from "./user"
@@ -43,6 +45,11 @@ export type ActionBarRule = {
 }
 // An action left out is shown to everyone.
 export type ActionBarSettings = Partial<Record<ActionBarAction, ActionBarRule>>
+
+// What a reader browses in the collection: its files, the records it holds, or
+// both behind two tabs.
+export const CATALOGUE_MODES = ['files', 'products', 'both'] as const
+export type CatalogueMode = typeof CATALOGUE_MODES[number]
 
 @Entity('collections')
 @Tree('materialized-path')
@@ -89,6 +96,27 @@ export class Collection {
 
 	@OneToMany(() => CollectionFile, (file) => file.collection)
 	files: CollectionFile[]
+
+	@OneToMany(() => CollectionRecord, (record) => record.collection)
+	records: CollectionRecord[]
+
+	// Null means the membership is chosen by hand. A list of rules makes the
+	// collection dynamic: the enrichment pass writes its members.
+	@Column({ type: 'jsonb', nullable: true })
+	recordFilters: RecordFilter[] | null
+
+	@Column({ type: 'uuid', nullable: true })
+	recordTableId: string | null
+
+	// The whole catalogue in one entry, without a membership row per record.
+	@Column({ default: false })
+	includesAllRecords: boolean
+
+	@Column({ default: 0, update: false, insert: false })
+	numberOfRecords: number
+
+	@Column({ type: 'varchar', default: 'files' })
+	catalogueMode: CatalogueMode
 
 	@OneToMany(() => CollectionInvitation, (invitation) => invitation.collection)
 	invitations: CollectionInvitation[]

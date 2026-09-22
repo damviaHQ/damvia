@@ -47,6 +47,21 @@ test('record changes require an approved and verified admin', async () => {
     assert.deepEqual((await caller(admin).record.patch(input)).metaData, input.values)
 })
 
+test('product membership and rules are refused to anyone who cannot edit the collection', async () => {
+    const record = await save(DataRecord, { recordKey: randomUUID(), keyColumnName: 'SKU', metaData: {} })
+    const collection = await makeCollection({})
+    const rules = { id: collection.id, recordFilters: [] }
+    for (const user of [null, member, { ...admin, approved: false }]) {
+        await forbidden(caller(user).collection.setRecordRules(rules))
+        await forbidden(caller(user).collection.removeRecords({ id: collection.id, recordIds: [record.id] }))
+    }
+    // Standing for the whole catalogue is an administrator's decision, even for
+    // the owner of the collection.
+    const owned = await makeCollection({ public: false, ownerId: member.id })
+    await forbidden(caller(member).collection.setRecordRules({ id: owned.id, includesAllRecords: true }))
+    await caller(member).collection.setRecordRules({ id: owned.id, catalogueMode: 'products' })
+})
+
 test('verification resend is self-only and never returns credentials', async () => {
     const unverified = await makeUser('member', { emailVerified: false })
     await forbidden(caller(null).user.resendVerificationEmail(unverified.id))
@@ -188,15 +203,16 @@ test('licence dates and regions apply to owners, group members and invitees, wit
 
 test('failed HTTP requests do not log submitted credentials or database error details', async () => {
     const logs = []
-    const previous = env.logger.error
+    const previous = { error: env.logger.error, warn: env.logger.warn }
     env.logger.error = (...args) => logs.push(args)
+    env.logger.warn = (...args) => logs.push(args)
     try {
         const response = await server.inject({ method: 'POST', url: '/trpc/user.login', payload: { email: 'absent@example.test', password: 'distinctive-secret-not-for-logs' } })
         assert(response.statusCode >= 400)
         assert(logs.length > 0)
         assert(!JSON.stringify(logs).includes('distinctive-secret-not-for-logs'))
         assert(!JSON.stringify(logs).includes('input'))
-    } finally { env.logger.error = previous }
+    } finally { Object.assign(env.logger, previous) }
 })
 
 // Keep both transactions open deliberately: restrictions must survive either lock order.

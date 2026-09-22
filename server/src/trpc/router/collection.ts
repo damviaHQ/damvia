@@ -16,7 +16,7 @@ import { TRPCError } from "@trpc/server"
 import { Brackets, ILike, In, IsNull, Not } from "typeorm"
 import { z } from "zod"
 import { AssetFolder } from "../../entity/asset-folder"
-import { ACTION_BAR_ACTIONS, Collection } from "../../entity/collection"
+import { ACTION_BAR_ACTIONS, CATALOGUE_MODES, Collection } from "../../entity/collection"
 import { Group } from "../../entity/group"
 import { CollectionFile } from "../../entity/collection-file"
 import { RecordAttribute } from "../../entity/record-attribute"
@@ -32,6 +32,7 @@ import {
 	userCollectionsQuery
 } from "../../services/collection"
 import { formatActionBar, resetDescendantActionBars } from "../../services/collection-action-bar"
+import { addRecords, refreshDynamicCollection, removeRecords, visibleRecordsCondition } from "../../services/product-collections"
 import { loadViewableMetadata, ViewableMetadata } from "../../services/file-metadata"
 import { loadVariantGroups, VariantGroupSummary } from "../../services/variant-grouping"
 import { applySearchOrder, buildRangeQuery, buildSearchQuery, loadSearchContext, onePerFile, searchFacets } from "../../services/search"
@@ -62,6 +63,13 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		draft: collection.draft,
 		description: collection.description,
 		numberOfFiles: collection.numberOfFiles,
+		numberOfRecords: collection.numberOfRecords,
+		catalogueMode: collection.catalogueMode,
+		includesAllRecords: collection.includesAllRecords,
+		// The rules belong to whoever may edit the collection; a reader only
+		// ever sees their outcome.
+		recordFilters: opts.user && collection.canEdit(opts.user) ? collection.recordFilters : undefined,
+		recordTableId: opts.user && collection.canEdit(opts.user) ? collection.recordTableId : undefined,
 		synchronized: collection.synchronized,
 		ownerId: collection.ownerId,
 		children: collection.children?.length
@@ -500,7 +508,7 @@ export default router({
 				id: z.uuid(),
 				items: z.array(z.object({
 					id: z.uuid(),
-					type: z.union([z.literal('collection'), z.literal('file')]),
+					type: z.union([z.literal('collection'), z.literal('file'), z.literal('record')]),
 				}))
 			}),
 		)
@@ -526,6 +534,25 @@ export default router({
 					.andWhereInIds(input.items.filter(v => v.type === 'file').map(v => v.id))
 					.getMany()
 				await duplicateFiles({ em, files: filesToDuplicate, destination: collection })
+
+				// A product joins the collection only when the reader can
+				// already see it somewhere else.
+				const recordIds = input.items.filter(v => v.type === 'record').map(v => v.id)
+				if (recordIds.length) {
+					const parameters: unknown[] = []
+					const visible = visibleRecordsCondition(ctx.user, 'r', parameters, em)
+					parameters.push(recordIds)
+					const rows = await em.query(
+						`SELECT r.id FROM records r WHERE r.id = ANY($${parameters.length}::uuid[]) AND ${visible}`,
+						parameters,
+					)
+					await addRecords(em, collection.id, rows.map((row: { id: string }) => row.id))
+					if (collection.catalogueMode === 'files') {
+						await em.getRepository(Collection).update(collection.id, {
+							catalogueMode: collection.numberOfFiles > 0 ? 'both' : 'products',
+						})
+					}
+				}
 			})
 		}),
 	rename: publicProcedure
@@ -654,6 +681,65 @@ export default router({
 			}
 			return mainS3().presignedPutObject(mainS3Bucket(), collection.thumbnailStorageKey, 24 * 60 * 60)
 		}),
+	removeRecords: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({ id: z.uuid(), recordIds: z.uuid().array().min(1).max(500) }))
+		.mutation(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			}
+			return dataSource.transaction((em) => removeRecords(em, collection.id, input.recordIds))
+		}),
+	// The rules of a collection driven by filters. Saving them rewrites the
+	// membership straight away; products picked by hand are left alone.
+	setRecordRules: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({
+			id: z.uuid(),
+			catalogueMode: z.enum(CATALOGUE_MODES).optional(),
+			recordTableId: z.uuid().nullable().optional(),
+			recordFilters: z.array(z.object({
+				column: z.string().min(1),
+				op: z.enum(['contains', 'is', 'is_not', 'is_empty', 'is_not_empty', 'has_any']),
+				value: z.string().optional(),
+				values: z.string().array().optional(),
+			})).max(10).nullable().optional(),
+			includesAllRecords: z.boolean().optional(),
+		}))
+		.mutation(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			}
+			// Rules and the whole-catalogue switch are administrator matters:
+			// both fill a collection without looking at what the caller may
+			// see, so anyone else would read the catalogue through their own
+			// collection. Everybody else picks products by hand, which is
+			// checked against their own visibility in addItems.
+			const writesMembership = input.includesAllRecords !== undefined
+				|| input.recordFilters !== undefined
+				|| input.recordTableId !== undefined
+			if (writesMembership && ctx.user.role !== UserRole.ADMIN) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'Only an administrator sets the rules of a collection.' })
+			}
+			await dataSource.transaction(async (em) => {
+				await em.getRepository(Collection).update(collection.id, {
+					...(input.catalogueMode !== undefined ? { catalogueMode: input.catalogueMode } : {}),
+					...(input.recordTableId !== undefined ? { recordTableId: input.recordTableId } : {}),
+					...(input.recordFilters !== undefined ? { recordFilters: input.recordFilters } : {}),
+					...(input.includesAllRecords !== undefined ? { includesAllRecords: input.includesAllRecords } : {}),
+				})
+				const updated = await em.getRepository(Collection).findOneByOrFail({ id: collection.id })
+				await refreshDynamicCollection(em, updated)
+			})
+			const saved = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOneOrFail()
+			return formatCollection({ collection: saved, user: ctx.user })
+		}),
 	removeFiles: publicProcedure
 		.use(authMiddleware(userApproved))
 		.input(z.uuid().array())
@@ -751,7 +837,7 @@ export default router({
 			z.object({
 				items: z.array(z.object({
 					id: z.uuid(),
-					type: z.union([z.literal('collection'), z.literal('file')]),
+					type: z.union([z.literal('collection'), z.literal('file'), z.literal('record')]),
 				}))
 			}),
 		)

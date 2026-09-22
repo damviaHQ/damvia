@@ -22,6 +22,7 @@ import { dataSource, logger, mainS3, mainS3Bucket } from "../env"
 import { collectionSynchronizationQueue } from "../worker"
 
 import { removePageObjects } from "./page-storage"
+import { visibleRecordsCondition } from "./product-collections"
 
 export function userCollectionsQuery(user: User, em: EntityManager = dataSource.manager): SelectQueryBuilder<Collection> {
 	let query = em.getRepository(Collection)
@@ -111,6 +112,16 @@ export function userCollectionFilesQuery(user: User, em: EntityManager = dataSou
 	return query
 }
 
+// The sidebar groups its items under section headings. Items created by the
+// synchronization land in the section flagged as the default one, so a new
+// public collection keeps showing up where readers expect the library to be.
+export async function defaultMenuSection(em: EntityManager) {
+	const sections = await em.getRepository(MenuItem).findBy({ type: MenuItemType.SECTION })
+	return sections
+		.sort((a, b) => a.position - b.position)
+		.find((section) => section.data?.defaultForCollections) ?? null
+}
+
 export async function syncCollectionMenuItems(em: EntityManager, collection: Collection, recursive = false) {
 	if (!collection.children) {
 		collection.children = await em.getRepository(Collection).findBy({ parentId: collection.id })
@@ -121,8 +132,12 @@ export async function syncCollectionMenuItems(em: EntityManager, collection: Col
 		return []
 	}
 
+	const section = collection.parentId ? null : await defaultMenuSection(em)
 	if (!collection.parentId) {
-		const count = await em.getRepository(MenuItem).countBy({ collectionId: collection.id, parentId: IsNull() })
+		const count = await em.getRepository(MenuItem).countBy({
+			collectionId: collection.id,
+			parentId: section ? section.id : IsNull(),
+		})
 		if (count > 0) {
 			return []
 		}
@@ -147,7 +162,8 @@ export async function syncCollectionMenuItems(em: EntityManager, collection: Col
 		.map((item) => newMenuItem(item, item.children.length))
 
 	if (!collection.parentId) {
-		menuItemsToCreate.push(newMenuItem(null, menuItems.length))
+		const siblings = await em.getRepository(MenuItem).countBy({ parentId: section ? section.id : IsNull() })
+		menuItemsToCreate.push(newMenuItem(section, siblings))
 	}
 
 	if (menuItemsToCreate.length) {
@@ -227,7 +243,17 @@ export async function recomputeCollectionRollups(em: EntityManager, collectionId
 	// nightly unscoped call cannot afford.
 	await em.query(`
 		UPDATE collections c
-		SET number_of_files = coalesce((
+		SET number_of_records = coalesce((
+				SELECT counts.n FROM (
+					SELECT ancestor.id::uuid AS id, count(*) AS n
+					FROM collection_records
+					INNER JOIN collections d ON d.id = collection_records.collection_id
+					CROSS JOIN unnest(string_to_array(d.mpath, '.')) AS ancestor(id)
+					WHERE ancestor.id <> ''
+					GROUP BY 1
+				) counts WHERE counts.id = c.id
+			), 0),
+			number_of_files = coalesce((
 				SELECT counts.n FROM (
 					SELECT ancestor.id::uuid AS id, count(*) AS n
 					FROM collection_files
@@ -512,7 +538,13 @@ export async function removeCollections(em: EntityManager, collectionIds: string
 	const collections = await em.getRepository(Collection).findBy({ id: In(collectionIds) })
 	// The collection page cascades in the database; its uploads do not.
 	const pages = await em.getRepository(Page).findBy({ collectionId: In(collectionIds) })
+	// The rows a collection holds die with it in the database, and the counts
+	// kept on its ancestors cannot be adjusted by then: the collection they
+	// hang from is already gone. They are recounted instead.
+	const ancestors = [...new Set(collections.flatMap((collection) => pathIds(collection.path)))]
+		.filter((id) => !collectionIds.includes(id))
 	await em.getRepository(Collection).delete({ id: In(collectionIds) })
+	await recomputeCollectionRollups(em, ancestors)
 	const thumbnailKeys = collections.filter((collection) => collection.hasThumbnail).map((collection) => collection.thumbnailStorageKey)
 	return async () => {
 		if (thumbnailKeys.length) {
@@ -544,10 +576,25 @@ export async function duplicateCollection({ em, source, destination, user }: Dup
 			duplicate.public = destination.public
 			duplicate.draft = destination.draft
 			duplicate.ownerId = destination.ownerId
+			duplicate.catalogueMode = source.catalogueMode
 			await em.getRepository(Collection).save(duplicate)
 
 			const files = await userCollectionFilesQuery(user, em).andWhere('collection.id = :sourceId', { sourceId: source.id }).getMany()
 			await duplicateFiles({ em, files, destination: duplicate })
+
+			// The products of the copy are frozen: whatever the rules of the
+			// source matched at this moment becomes a hand-picked membership,
+			// and a source standing for the whole catalogue copies nothing.
+			const parameters: unknown[] = [duplicate.id, source.id]
+			const visible = visibleRecordsCondition(user, 'r', parameters, em)
+			await em.query(`
+				INSERT INTO collection_records (collection_id, record_id, source)
+				SELECT $1::uuid, cr.record_id, 'manual'
+				FROM collection_records cr
+				WHERE cr.collection_id = $2::uuid
+				AND EXISTS (SELECT 1 FROM records r WHERE r.id = cr.record_id AND ${visible})
+				ON CONFLICT (collection_id, record_id) DO NOTHING
+			`, parameters)
 
 			const children = await userCollectionsQuery(user, em).andWhere('collection.parent_id = :sourceId', { sourceId: source.id }).getMany()
 			for (const current of children) {

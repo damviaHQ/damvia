@@ -3,7 +3,7 @@ title: Collections and sharing
 description: Choose manual or synchronised collections, control access, and understand what source changes do to their contents.
 sidebar:
   order: 8
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 A collection is the unit people browse and share. Public collections make up the common catalogue; private collections belong to one user. A collection can follow a source folder or be assembled from selected files.
@@ -153,3 +153,9 @@ When an asset type groups its variants, search shows the formats, languages and 
 - Already issued signed storage URLs have their own lifetime and are not revoked with the invitation.
 
 The complete current list, including file-move data loss, is in [Known limitations](../reference/known-limitations.md).
+
+## A collection can hold products as well as files
+
+A collection holds files, child collections, and records. Edit collection → Products chooses what readers browse there: files only, products only, or both. Membership is either chosen by hand, through the same Add to collection action files use, or built from rules on the record fields; a product added by hand is never removed by a rule. One collection can stand for the whole catalogue instead of listing its members, which only an administrator may set.
+
+A product is visible to a reader when a collection they can open holds it, so drafts and group restrictions hide products exactly as they hide files. The media of a product keep their own licence and collection rights. Copying a collection copies its products as hand-picked entries and never copies its rules. See [Product catalogue](./catalogue.md).
