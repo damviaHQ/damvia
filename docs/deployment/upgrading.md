@@ -3,7 +3,7 @@ title: Upgrading
 description: Pull, build, restart; migrations run on their own at startup.
 sidebar:
   order: 6
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 To upgrade an instance, rebuild the server image and client files, then deploy them together. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
@@ -131,6 +131,22 @@ Back up first and apply the migration with application writers stopped. Validate
 - A synchronization no longer deletes child collections. Removal happens only when a folder leaves the cloud storage and the `asset/process-deletion` job runs. If you relied on a synchronization to prune collections whose folder still exists, delete them from the admin screen.
 - Rolling this migration back re-adds the name constraint; siblings sharing a name are renamed with a ` (2)`, ` (3)` suffix first.
 
+## Menu sections in this upgrade
+
+The sidebar heading **Library** used to be fixed in the client. It becomes a menu entry of type `section`, so an administrator can add other headings, for example **Catalogue**. The migration creates a Library section, marks it as the default one for collections and moves every existing top-level entry under it, which leaves the sidebar looking exactly as before. New public root collections join that section from now on. Rolling back puts the entries back at the top level and deletes the sections. See [Menu and pages](../administration/menu-and-pages.md#build-the-navigation-menu).
+
+## Product catalogue in this upgrade
+
+Three migrations open the record database to readers.
+
+- `collection_records` holds the records a collection carries, with `source` telling a row chosen by hand from one written by the collection's rules. `collections` gains `record_filters`, `record_table_id`, `includes_all_records`, `number_of_records` and `catalogue_mode`; every existing collection stays on files only. Two triggers keep the count for a collection and its ancestors, as the file count already does. A GIN index is added on `records.meta_data` for the catalogue filters.
+- `readiness_definitions` says what a product must carry to read as ready, and `records` gains `readiness_filled`, `readiness_total` and `readiness_ready`. No definition exists after the upgrade, so every record reads as ready until an administrator fills one in. `enrichment_settings` gains `hide_records_without_media`, off.
+- `records` gains `family_key` and `family_label`, filled from the field named in `enrichment_settings.family_attribute_name`, which starts empty. The immutable function `damvia_family_key(text)` normalises Latin text without needing the `unaccent` extension, which a self-host may not have.
+
+The count of products on a collection is kept by two triggers that run once per statement, so a rule matching a large catalogue writes its membership in one pass rather than one update per row. Deleting a collection recounts its ancestors, which also repairs the same drift that existed on the file count.
+
+Two stages join the enrichment pass, `families` and `readiness`, plus `product-rules`. Rolling any of these back drops the tables and columns; the collections and records themselves are untouched, their product membership and scores are lost. See [Product catalogue](../administration/catalogue.md).
+
 ## Migrations that exist
 
 | Migration | What it did |
@@ -154,6 +170,11 @@ Back up first and apply the migration with application writers stopped. Validate
 | `1790121600000-asset-sources` | `source_key` on `asset_folders` and `asset_files` (empty for existing rows, adopted at the next start), unique index on (`source_key`, `external_id`) replacing the unique `external_id`, and the `asset_sources` table holding each configured source's last run |
 | `1791072000000-collection-action-bar` | `action_bar` (`jsonb`, null) on `collections`. Null follows the parent, so every existing collection keeps showing every tool. Rolling back drops the column and the rules set since |
 | `1791158400000-page-action-bar` | `show_action_bar` (`boolean`, default `true`) on `pages`. Every existing page keeps its action bar. Rolling back drops the column and the pages hidden since show it again |
+| `1791676800000-collection-records-rollup` | Replaces the two `number_of_records` triggers with one per statement over the rows written, instead of one per row. Writing twenty thousand memberships measured 5.1 s before and 0.13 s after. Rolling back restores the per-row triggers |
+| `1791590400000-record-families` | `family_key` and `family_label` on `records`, `family_attribute_name` and `family_axis_attribute_names` on `enrichment_settings`, and the immutable `damvia_family_key(text)`. No field is named, so nothing is grouped until an administrator picks one. Rolling back drops them |
+| `1791504000000-record-readiness` | `readiness_definitions`, the three `readiness_*` columns on `records` and `hide_records_without_media` on `enrichment_settings`. With no definition every record reads as ready. Rolling back drops them and the scores are lost |
+| `1791417600000-product-collections` | `collection_records` with its two rollup triggers, five columns on `collections` (`record_filters`, `record_table_id`, `includes_all_records`, `number_of_records`, `catalogue_mode`) and a GIN index on `records.meta_data`. Existing collections keep holding files only. Rolling back drops the table and the columns: the product membership is lost, files and records are untouched |
+| `1791331200000-menu-sections` | The `section` menu entry type: a Library section is created, flagged as the default for collections, and every entry that was at the top level moves under it. Rolling back lifts those entries back to the top level and drops the sections |
 | `1790985600000-record-fields` | `value_type` (default `text`), `options` and `position` on `record_attributes`; a `text` row for every `hstore` key of the catalogue but the key column, positioned by first appearance; the `record_changes` table, empty. Rolling back drops the table and the three columns and keeps the added attribute rows |
 | `1790899200000-enrichment-runs` | `enrichment_runs`, empty; filled by each pass. Rolling back drops it |
 | `1790812800000-variant-groups` | `group_variants` on `asset_types` (false), `variant_groups`, `variant_group_members`, `variant_axes`, `variant_group_axes`, `variant_group_overrides` and the single-row `variant_grouping_settings`. Rolling back drops them and the column |

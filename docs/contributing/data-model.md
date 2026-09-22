@@ -3,7 +3,7 @@ title: Data model
 description: Every TypeORM entity with its table, key columns, relations and enums, the three materialized-path trees, the database triggers, and how to write a migration.
 sidebar:
   order: 3
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 This page maps the code in `server/src/entity/` and `server/src/migrations/` so you can add a column, a table or a trigger without surprises. What each object means for an administrator is in [Core concepts](../introduction/concepts.md).
@@ -32,7 +32,9 @@ This page maps the code in `server/src/entity/` and `server/src/migrations/` so 
 | `CollectionInvitation` (`collection-invitation.ts`) | `collection_invitations` | `collectionId`, `email`, `userId`, `invitedById`, `expiresAt` (`date`) | `collection` and invited `user` cascade on delete; deleting the creator sets `invitedById` to null; getter `hasExpired` |
 | `Page` (`page.ts`) | `pages` | `name`, `collectionId`, `showActionBar` | Partial unique index on `collectionId` where not null; `collection` one-to-one, cascade; `blocks`. Method `canEdit(user)` |
 | `PageBlock` (`page-block.ts`) | `page_blocks` | `pageId`, `type`, `position` (integer), `size` (`full`, `half` or `third`), `data` (`jsonb`, not null) | `page` cascades on delete; index on (`pageId`, `position`). Enum `PageBlockType`: `hero`, `collections`, `files`, `last_files`, `text`, `image`, `video`. Each type's `data` is defined by a zod schema in `server/src/page-blocks/schema.ts`, which the client imports so both sides validate the same shape |
-| `MenuItem` (`menu-item.ts`) | `menu_items` | `type`, `position`, `data` (`simple-json`), `collectionId`, `pageId`, `parentId`, `home` | Tree; `collection`, `page` and `parent` cascade on delete. Enum `MenuItemType`: `collection`, `page`, `text`, `divider` |
+| `CollectionRecord` (`collection-record.ts`) | `collection_records` | `collectionId`, `recordId`, `source`, `position` | Composite primary key; both sides cascade on delete. `source` is `manual` or `rule`: a refresh of the rules only ever rewrites its own rows. Two statement-level triggers keep `collections.number_of_records` for the collection and its ancestors, aggregating the rows each statement wrote; a bulk membership write costs one update, not one per row. A collection being deleted takes its rows with it before the trigger could adjust the ancestors, so `removeCollections` recounts them |
+| `ReadinessDefinition` (`readiness-definition.ts`) | `readiness_definitions` | `tableId` (unique, nullable), `requiredAttributeIds`, `requiredViews`, `readyLabel`, `incompleteLabel` | One per record table, plus a catalogue-wide one when `tableId` is null |
+| `MenuItem` (`menu-item.ts`) | `menu_items` | `type`, `position`, `data` (`simple-json`), `collectionId`, `pageId`, `parentId`, `home` | Tree; `collection`, `page` and `parent` cascade on delete. Enum `MenuItemType`: `collection`, `page`, `text`, `divider`, `section`. A `section` is a top-level heading whose `data` holds `label` and, for one of them, `defaultForCollections` |
 | `DataRecord` (`data-record.ts`) | `records` | `recordKey` (unique), `keyColumnName`, `metaData` (`hstore`, mapped to an object) | `assetFiles`. Named `DataRecord` because `Record` would shadow the TypeScript utility type |
 | `EnrichmentSettings` (`enrichment-settings.ts`) | `enrichment_settings` | Single row, `id` = 1: `recordLabelSingular`, `recordLabelPlural`, `viewsEnabled`, `viewSeparator`, `viewDigits`, `thumbnailView` | No relations; the label is read by the public `env` query, the view settings by `services/entity-resolution.ts` and the record list |
 | `AssetTypeResolverStep` (`asset-type-resolver-step.ts`) | `asset_type_resolver_steps` | `assetTypeId`, `position`, `strategy` (`filename_regex`, `folder_regex`, later `metadata`), `config` (`jsonb`: `pattern`, `keyGroup`, `viewGroup`, `target`, `attributeName`, `valueGroup`), `enabled`, `lastError` | `assetType` (cascade on delete) |

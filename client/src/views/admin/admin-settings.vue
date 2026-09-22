@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
@@ -67,7 +68,7 @@ async function removeLogo() {
 const toast = useGlobalToast()
 const store = useGlobalStore()
 const { data: enrichment, status: enrichmentStatus, refetch: refetchEnrichment } = useQuery({ queryKey: ['enrichment-settings'], queryFn: () => trpc.settings.getEnrichment.query() })
-const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '', viewsEnabled: false, viewSeparator: '.', viewDigits: 2, thumbnailView: '00' })
+const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '', viewsEnabled: false, viewSeparator: '.', viewDigits: 2, thumbnailView: '00', hideRecordsWithoutMedia: false, familyAttributeName: null as string | null })
 const viewExample = computed(() => {
   const separator = recordLabel.value.viewSeparator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return `(key)(?:${separator}(\\d{${recordLabel.value.viewDigits}}))?`
@@ -75,6 +76,42 @@ const viewExample = computed(() => {
 const viewNumber = (view: number) => String(view).padStart(Math.max(1, recordLabel.value.viewDigits), '0')
 const viewFile = (view: number) => `ABC123-001${recordLabel.value.viewSeparator}${viewNumber(view)}.jpg`
 const recordLabelErrors = ref<Record<string, string>>({})
+const { data: fields } = useQuery({ queryKey: ['record-attributes'], queryFn: () => trpc.recordAttribute.list.query() })
+const { data: savedReadiness } = useQuery({ queryKey: ['readiness-definition'], queryFn: () => trpc.settings.getReadiness.query() })
+const readiness = ref({ requiredAttributeIds: [] as string[], requiredViews: [] as string[], readyLabel: 'Ready to use', incompleteLabel: 'To complete' })
+const requiredViewsText = ref('')
+const isSavingReadiness = ref(false)
+watch(savedReadiness, () => {
+  if (!savedReadiness.value) return
+  readiness.value = { ...savedReadiness.value }
+  requiredViewsText.value = savedReadiness.value.requiredViews.join(', ')
+}, { immediate: true })
+
+function toggleRequiredField(id: string, checked: boolean) {
+  const ids = readiness.value.requiredAttributeIds
+  readiness.value.requiredAttributeIds = checked ? [...ids, id] : ids.filter((current) => current !== id)
+}
+
+// The catalogue reads the setting that hides empty products, so both are saved
+// together from this one form.
+async function saveReadiness() {
+  if (isSavingReadiness.value) return
+  isSavingReadiness.value = true
+  try {
+    await trpc.settings.saveReadiness.mutate({
+      ...readiness.value,
+      requiredViews: requiredViewsText.value.split(',').map((view) => view.trim()).filter(Boolean),
+    })
+    await trpc.settings.updateEnrichment.mutate(recordLabel.value)
+    await queryClient.invalidateQueries({ queryKey: ['readiness-definition'] })
+    await queryClient.invalidateQueries({ queryKey: ['enrichment-settings'] })
+    toast.success('Readiness saved')
+  } catch (error) {
+    toast.error((error as Error).message)
+  } finally {
+    isSavingReadiness.value = false
+  }
+}
 const isSavingRecordLabel = ref(false)
 watch(enrichment, () => { if (enrichment.value) recordLabel.value = { ...enrichment.value } }, { immediate: true })
 async function saveRecordLabel() {
@@ -247,6 +284,53 @@ const removeBackgroundImage = async () => {
             <p v-else class="branding-note">Views are off: file names are read as the key only and the view filter is hidden from search.</p>
             <div class="flex flex-wrap gap-3">
               <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || (recordLabel.viewsEnabled && recordLabel.viewSeparator.length !== 1)">{{ isSavingRecordLabel ? 'Saving…' : 'Save views' }}</Button>
+            </div>
+          </form>
+        </template>
+
+        <template v-if="enrichmentStatus === 'success'">
+          <h3 id="readiness-heading" class="views-heading">Ready to use</h3>
+          <p>Say what a {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} must carry to count as ready. The catalogue then shows how far each one is, and readers can keep only the ones that are ready. Requiring nothing leaves every {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} ready.</p>
+          <div class="record-label-field">
+            <Label for="familyAttributeName">Model field</Label>
+            <select id="familyAttributeName" v-model="recordLabel.familyAttributeName" class="record-native-select">
+              <option :value="null">No model grouping</option>
+              <option v-for="field in fields ?? []" :key="field.id" :value="field.name">{{ field.displayName ?? field.name }}</option>
+            </select>
+            <p class="admin-text-secondary">
+              {{ recordLabel.recordLabelPlural.toLowerCase() || 'products' }} sharing this value are one model, whatever the case, accents or spacing.
+              The catalogue can then be read model by model, and each {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} page lists the others of its model.
+            </p>
+          </div>
+          <form class="record-label-form" aria-labelledby="readiness-heading" :aria-busy="isSavingReadiness" @submit.prevent="saveReadiness">
+            <div class="record-label-field">
+              <Label for="requiredFields">Required fields</Label>
+              <div id="requiredFields" role="group" aria-labelledby="readiness-heading" class="flex flex-wrap gap-3">
+                <label v-for="field in fields ?? []" :key="field.id" class="flex items-center gap-2 text-body">
+                  <Checkbox :model-value="readiness.requiredAttributeIds.includes(field.id)"
+                    @update:model-value="toggleRequiredField(field.id, !!$event)" />
+                  {{ field.displayName ?? field.name }}
+                </label>
+              </div>
+            </div>
+            <div class="record-label-fields">
+              <div class="record-label-field">
+                <Label for="requiredViews">Required views</Label>
+                <Input id="requiredViews" v-model="requiredViewsText" placeholder="00, 01" />
+                <p class="admin-text-secondary">View numbers separated by commas. A {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} needs one file per view listed here.</p>
+              </div>
+              <div class="record-label-field">
+                <Label for="readyLabel">Ready label</Label>
+                <Input id="readyLabel" v-model="readiness.readyLabel" placeholder="Ready to use" />
+              </div>
+              <div class="record-label-field">
+                <Label for="incompleteLabel">Incomplete label</Label>
+                <Input id="incompleteLabel" v-model="readiness.incompleteLabel" placeholder="To complete" />
+              </div>
+            </div>
+            <label class="views-switch"><Switch v-model="recordLabel.hideRecordsWithoutMedia" />Keep {{ recordLabel.recordLabelPlural.toLowerCase() || 'products' }} with no visible file out of the catalogue</label>
+            <div class="flex flex-wrap gap-3">
+              <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingReadiness">{{ isSavingReadiness ? 'Saving…' : 'Save readiness' }}</Button>
             </div>
           </form>
         </template>

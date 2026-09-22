@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -97,6 +97,22 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `region.moveUsers` | mutation | `userAdmin` | Moves every user of one region to another |
 | `authorizedDomain.list` | query | `userAdmin` | Domains allowed to sign up |
 | `authorizedDomain.create`, `authorizedDomain.remove` | mutation | `userAdmin` | CRUD |
+
+### `catalogue`
+
+The reader side of the record database. Every procedure is `approved` and returns only records the caller can reach through a collection, and only fields marked viewable.
+
+| Procedure | Kind | Auth | Purpose |
+|---|---|---|---|
+| `list` | query | approved | A page of product cards: key, visible values, main visual, up to four visuals with an overflow count, visible file count, readiness and model. Takes `collectionId`, `search`, `filters`, `sort`, `readiness` and `familyKey` |
+| `get` | query | approved | One product with all its visuals, its visible values, the files the caller may open and the other entries of its model |
+| `families` | query | approved | One row per model, with how many products it holds |
+| `facets` | query | approved | The values of the filterable fields, counted over what the caller can see |
+| `collections` | query | approved | The product collections the caller may open |
+
+The filter model is the one of the records grid: conditions are combined with AND across fields, and `has_any` holds the OR inside a field. That is what a facet sidebar needs; there is no OR across fields and no numeric or date range.
+
+Two restrictions separate this router from `record.list`, which is admin only. Filters and sorts are checked against the viewable fields, so a hidden field is a `BAD_REQUEST` rather than a silent match. Free text reaches the record key and the fields marked `searchable`, never every stored value, since probing would otherwise confirm what a hidden field holds. `collection.setRecordRules` is an administrator matter for the same reason: rules fill a collection without regard for what their author may see.
 
 ### `collection` and `collection.invitation`
 

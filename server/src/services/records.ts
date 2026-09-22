@@ -205,7 +205,7 @@ export async function removeRecords(em: EntityManager, ids: string[] | null, act
 	return count ?? 0
 }
 
-function likePattern(value: string): string {
+export function likePattern(value: string): string {
 	return `%${value.replace(/[\\%_]/g, '\\$&')}%`
 }
 

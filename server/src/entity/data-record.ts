@@ -41,6 +41,25 @@ export class DataRecord {
     @OneToMany(() => AssetFile, (assetFile) => assetFile.record)
     assetFiles: AssetFile[]
 
+    // Written by the catalogue stage: how much of what an administrator
+    // requires this record carries. Nothing required reads as ready.
+    @Column({ default: 0, update: false, insert: false })
+    readinessFilled: number
+
+    @Column({ default: 0, update: false, insert: false })
+    readinessTotal: number
+
+    @Column({ default: true, update: false, insert: false })
+    readinessReady: boolean
+
+    // The model this product belongs to, normalised for grouping, and the
+    // value as an administrator typed it.
+    @Column({ type: 'text', nullable: true, update: false, insert: false })
+    familyKey: string | null
+
+    @Column({ type: 'text', nullable: true, update: false, insert: false })
+    familyLabel: string | null
+
     @CreateDateColumn()
     createdAt: Date
 

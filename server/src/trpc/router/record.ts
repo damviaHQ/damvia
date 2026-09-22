@@ -17,7 +17,7 @@ import { z } from "zod"
 import { DataRecord } from "../../entity/data-record"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
-import { rerunEntityStage } from "../../services/enrichment"
+import { rerunEntityStage, rerunFamilyStage, rerunReadinessStage } from "../../services/enrichment"
 import { linkedFilesOf } from "../../services/record-files"
 import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, locateRecord, patchEach, patchRecords, removeRecords, RecordRow } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
@@ -107,6 +107,7 @@ export default router({
       const id = await dataSource.transaction((em) => createRecord(em, input, { userId: ctx.user.id, source: 'grid' }))
       // Files that already carry the key attach now.
       await rerunEntityStage()
+      await rerunReadinessStage([id])
       return getRecord(id)
     }),
   patch: publicProcedure
@@ -118,6 +119,8 @@ export default router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Record not found.' })
       }
       if (result.updated.length && await fieldIsLinked(dataSource.manager, Object.keys(input.values))) await rerunEntityStage()
+      if (result.updated.length) await rerunReadinessStage([input.id])
+      if (result.updated.length) await rerunFamilyStage(Object.keys(input.values))
       const [row] = await dataSource.query('SELECT hstore_to_json(meta_data) AS meta_data, updated_at FROM records WHERE id = $1', [input.id])
       return { id: input.id, metaData: (row?.meta_data ?? {}) as Record<string, string>, updatedAt: row?.updated_at as Date }
     }),
@@ -140,6 +143,8 @@ export default router({
       })
       const names = [...new Set(input.changes.flatMap((change) => Object.keys(change.values)))]
       if (result.updated.length && await fieldIsLinked(dataSource.manager, names)) await rerunEntityStage()
+      if (result.updated.length) await rerunReadinessStage(input.changes.map((change) => change.id))
+      if (result.updated.length) await rerunFamilyStage(names)
       return { updated: result.updated.length }
     }),
   bulkPatch: publicProcedure
@@ -148,6 +153,8 @@ export default router({
     .mutation(async ({ input, ctx }) => {
       const result = await dataSource.transaction((em) => patchRecords(em, input.ids, input.values, { userId: ctx.user.id, source: 'bulk' }))
       if (result.updated.length && await fieldIsLinked(dataSource.manager, Object.keys(input.values))) await rerunEntityStage()
+      if (result.updated.length) await rerunReadinessStage(input.ids)
+      if (result.updated.length) await rerunFamilyStage(Object.keys(input.values))
       return { updated: result.updated.length }
     }),
   remove: publicProcedure
@@ -243,6 +250,8 @@ export default router({
         return importCsv(em, await analyseCsv(em, input.keyColumnName, input.data), ctx.user.id)
       })
       await rerunEntityStage()
+      await rerunReadinessStage()
+      await rerunFamilyStage()
       return result
     }),
 })

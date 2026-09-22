@@ -3,7 +3,7 @@ title: Records
 description: Create, edit and import a catalogue of records (products, events, venues), type their fields, see the files matched to each one and its history, and choose which fields power search and display.
 sidebar:
   order: 10
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 The Data enrichment area adds context to mirrored assets. Damvia keeps a flat catalogue of **records**, created on screen or imported by CSV, extracts a record key and optional view from each filename, and uses selected record fields for search, filters and display.
@@ -219,3 +219,13 @@ On a small fixture:
 5. Confirm the intended type is related to records, the attribute filters appear, and the representative view is used.
 
 If matching fails, check the exact filename, captured key, scheduled job, record key and asset type in that order. The [Environment variables](../reference/environment-variables.md) page contains the exact configuration names; [Background jobs](../reference/background-jobs.md) contains the schedule.
+
+## Readiness, models and the reader-facing catalogue
+
+Settings holds three decisions that turn records into a catalogue readers can browse:
+
+- **Ready to use**: the fields and the views a record must carry to count as complete, plus the labels shown for a complete and an incomplete record. Requiring nothing leaves every record ready. The score is recomputed on every edit, import and sync.
+- **Model field**: the field grouping several keys under one model, matched on a key that ignores case, accents and stray spaces.
+- **Keep records with no visible file out of the catalogue**: hides from listings records whose files the reader may not open. A direct link still opens the record.
+
+Readers never reach a record through these screens. They reach it through a collection holding it; see [Product catalogue](./catalogue.md).

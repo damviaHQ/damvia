@@ -3,7 +3,7 @@ title: Core concepts
 description: Understand sources, assets, collections, pages, records and access rules before configuring an instance.
 sidebar:
   order: 2
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 Damvia separates the files it discovers from the ways those files are organised and presented. That distinction explains most administrative decisions and prevents accidental assumptions about licences, copies and deletion.
@@ -64,3 +64,7 @@ Invitations can extend through descendant collections. Moving a collection withi
 ## Downloads create temporary deliverables
 
 A download packages the files the requester can still access, optionally converting supported images or videos. Links expire after seven days. Revoking access prevents a queued archive from being prepared, but does not revoke an already issued signed storage URL immediately. See [Downloads](../administration/downloads.md) and [Accounts and links](../administration/accounts-and-links.md).
+
+## Product collection
+
+A collection whose members are records rather than files. Readers browse it as a catalogue of cards, each showing a record's main visual, the visuals linked to it and the field values an administrator made visible. Membership is chosen by hand or built from rules on the record fields, and a reader sees a record when a collection they can open holds it. The media of a record keep their own licence and collection rights. See [Product catalogue](../administration/catalogue.md).

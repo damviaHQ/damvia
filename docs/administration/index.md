@@ -3,7 +3,7 @@ title: Administration
 description: Choose the administrative guide for access, assets, collections, pages, records or workspace health.
 sidebar:
   order: 1
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 The administration area controls who can enter the library, how source files are classified, what readers see, and whether the instance is healthy. These guides describe administrative decisions and their consequences. Everyday reader workflows belong in the separate website knowledge base and onboarding.
@@ -50,6 +50,7 @@ Collections organise references to assets. Copying a file into another collectio
 ## Data enrichment and reporting
 
 - [Variants](./variants.md): show the versions of one creative as one card and name what differs between them.
+- [Product catalogue](./catalogue.md): open the record database to readers, with product collections built by hand or by rules, a readiness score, models and reader assortments.
 - [Records](./records.md): the daily screens and the four setup steps of data enrichment; create and edit products, events or anything files are about in a spreadsheet grid or as a card with their files and history, import them by CSV, type their fields, say how files find their record and fix the unmatched ones.
 - [Insights](./analytics.md): interpret recorded activity and retention.
 - [Dashboard](./dashboard.md): storage usage, source state and items needing attention.
@@ -67,6 +68,8 @@ Collections organise references to assets. Copying a file into another collectio
 | Users | `/admin/users` | admin or manager for their region |
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
 | Records and their fields, file metadata | `/admin/data-enrichment/records` (fields under ⋮ → Manage fields, `?fields=1`), `/admin/data-enrichment/records/import`, `/admin/data-enrichment/file-metadata`; `/admin/data-enrichment/fields` redirects | admin |
+| Product collections, on the collection itself | Edit collection → Products | admin or the owner; the whole-catalogue switch is admin only |
+| Readiness and model field | `/admin/settings` | admin |
 | Link to records and To review | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
 | Setup guide and variants | `/admin/data-enrichment`, `/admin/data-enrichment/variants` | admin |
 
