@@ -28,8 +28,8 @@ process.env.APP_SECRET = 'security-tests-only-random-fixture-secret-20260916'
 process.env.ENABLE_PASSWORD_LESS_AUTH = 'false'
 const env = require('../../dist/env')
 const { dataSource: db } = env
-const LATEST_MIGRATION = 'PageActionBar1791158400000'
-const UPGRADE_MIGRATIONS = 20
+const LATEST_MIGRATION = 'CollectionRecordsRollup1791676800000'
+const UPGRADE_MIGRATIONS = 26
 const state = {
     disk: { totalBytes: 10000, freeBytes: 9000 },
     bucketObjects: [],
@@ -70,6 +70,7 @@ const entities = {
     UserGroup: require('../../dist/entity/user-group').UserGroup,
     Collection: require('../../dist/entity/collection').Collection,
     CollectionFile: require('../../dist/entity/collection-file').CollectionFile,
+    CollectionRecord: require('../../dist/entity/collection-record').CollectionRecord,
     CollectionInvitation: require('../../dist/entity/collection-invitation').CollectionInvitation,
     AssetFolder: require('../../dist/entity/asset-folder').AssetFolder,
     AssetFile: require('../../dist/entity/asset-file').AssetFile,
@@ -80,6 +81,7 @@ const entities = {
     DataRecord: require('../../dist/entity/data-record').DataRecord,
     RecordAttribute: require('../../dist/entity/record-attribute').RecordAttribute,
     RecordChange: require('../../dist/entity/record-change').RecordChange,
+    RecordTable: require('../../dist/entity/record-table').RecordTable,
     Download: require('../../dist/entity/download').Download,
 }
 const services = {
@@ -89,6 +91,8 @@ const services = {
     assets: require('../../dist/services/asset'),
     assetTypeRules: require('../../dist/services/asset-type-rules'),
     enrichment: require('../../dist/services/enrichment'),
+    productCollections: require('../../dist/services/product-collections'),
+    readiness: require('../../dist/services/record-readiness'),
     entityResolution: require('../../dist/services/entity-resolution'),
     download: require('../../dist/services/download'),
 }
