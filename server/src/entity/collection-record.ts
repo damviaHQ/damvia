@@ -52,6 +52,10 @@ export class CollectionRecord {
 	@Column({ default: 0 })
 	position: number
 
+	// Kept in the collection but taken out of what readers get.
+	@Column({ default: false })
+	excluded: boolean
+
 	@CreateDateColumn()
 	createdAt: Date
 }

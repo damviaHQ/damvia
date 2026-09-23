@@ -19,7 +19,7 @@ const assert = require('node:assert/strict')
 const harness = require('./lib/helpers.cjs')
 const { db, caller, makeCollection, makeUser, forbidden } = harness
 const { Collection, CollectionRecord } = harness.entities
-const { addRecords, refreshDynamicCollection, refreshAllDynamicCollections } = harness.services.productCollections
+const { addRecords, createCataloguePage, refreshDynamicCollection, refreshAllDynamicCollections } = harness.services.productCollections
 let fixtures, admin
 
 const recordId = async recordKey => (await db.query('SELECT id FROM records WHERE record_key = $1', [recordKey]))[0].id
@@ -256,4 +256,120 @@ test('an administrator builds the first catalogue, a reader only pins what they 
         error => error.code === 'NOT_FOUND',
     )
     await db.getRepository(Collection).update(openToAll.map(row => row.id), { includesAllRecords: true })
+})
+
+test('a catalogue collection is born with the page that draws its products', async () => {
+    const { Page } = require('../dist/entity/page')
+    const { PageBlock } = require('../dist/entity/page-block')
+    const blocksOf = async collectionId => {
+        const page = await db.getRepository(Page).findOneByOrFail({ collectionId })
+        return (await db.getRepository(PageBlock).findBy({ pageId: page.id }))
+            .sort((a, b) => a.position - b.position)
+            .map(block => block.type)
+    }
+
+    const catalogue = await admin.collection.create({ name: 'Shelf', public: true, catalogueMode: 'products' })
+    assert.deepEqual(await blocksOf(catalogue.id), ['products'])
+
+    // A collection holding both keeps the layout a reader already knows.
+    const mixed = await admin.collection.create({ name: 'Shelf and files', public: true, catalogueMode: 'both' })
+    assert.deepEqual(await blocksOf(mixed.id), ['products', 'collections', 'files'])
+
+    // A plain collection is left alone, and gets its page only when an
+    // administrator turns it into a catalogue.
+    const plain = await admin.collection.create({ name: 'Just files', public: true })
+    assert.equal(await db.getRepository(Page).countBy({ collectionId: plain.id }), 0)
+    await admin.collection.setRecordRules({ id: plain.id, catalogueMode: 'products' })
+    assert.deepEqual(await blocksOf(plain.id), ['products'])
+
+    // Turning it again does not add a second page or a second block.
+    await admin.collection.setRecordRules({ id: plain.id, catalogueMode: 'products' })
+    assert.deepEqual(await blocksOf(plain.id), ['products'])
+})
+
+test('turning the same collection into a catalogue twice at once does not race', async () => {
+    const { Page } = require('../dist/entity/page')
+    const { PageBlock } = require('../dist/entity/page-block')
+    const collection = await makeCollection({ name: 'Raced', catalogueMode: 'products' })
+    const [a, b] = await Promise.all([
+        db.transaction(em => createCataloguePage(em, collection)),
+        db.transaction(em => createCataloguePage(em, collection)),
+    ])
+    assert.equal(a.id, b.id)
+    assert.equal(await db.getRepository(Page).countBy({ collectionId: collection.id }), 1)
+    assert.equal(await db.getRepository(PageBlock).countBy({ pageId: a.id }), 1)
+})
+
+test('a product taken out of a catalogue keeps its row, leaves the count and survives a rule pass', async () => {
+    const collection = await makeCollection({ name: 'Excludable' })
+    await admin.collection.setRecordRules({
+        id: collection.id,
+        catalogueMode: 'products',
+        recordFilters: [{ column: 'season', op: 'is', value: 'Spring' }],
+    })
+    const spring = await membersOf(collection.id)
+    assert.equal(spring.length, 3)
+    assert.equal(await numberOfRecords(collection.id), 3)
+
+    const dropped = await recordId('PC-3')
+    assert.equal(await admin.collection.setRecordsExcluded({ id: collection.id, recordIds: [dropped], excluded: true }), 1)
+    // The row stays, the reader count does not.
+    assert.deepEqual(await membersOf(collection.id), spring)
+    assert.equal(await numberOfRecords(collection.id), 2)
+
+    // A rule pass matches it again and must not undo the decision.
+    await refresh(collection.id)
+    assert.equal(await numberOfRecords(collection.id), 2)
+    const preview = await admin.collection.recordPreview({ id: collection.id, offset: 0, limit: 50 })
+    assert.equal(preview.total, 3)
+    assert.equal(preview.rows.filter(row => row.excluded).length, 1)
+
+    // Putting it back restores the count.
+    assert.equal(await admin.collection.setRecordsExcluded({ id: collection.id, recordIds: [dropped], excluded: false }), 1)
+    assert.equal(await numberOfRecords(collection.id), 3)
+    // Setting the same value again changes nothing.
+    assert.equal(await admin.collection.setRecordsExcluded({ id: collection.id, recordIds: [dropped], excluded: false }), 0)
+    assert.equal(await numberOfRecords(collection.id), 3)
+})
+
+test('an excluded product is out of reach of a reader and is never copied', async () => {
+    const member = await makeUser()
+    // A product of its own: exclusion is per collection, so one kept elsewhere
+    // would rightly stay visible and prove nothing here.
+    await admin.record.create({ recordKey: 'PC-EXCL', values: { season: 'Unlisted' } })
+    const openToAll = await db.getRepository(Collection).findBy({ includesAllRecords: true })
+    await db.getRepository(Collection).update(openToAll.map(row => row.id), { includesAllRecords: false })
+    const published = await makeCollection({ name: 'Published shelf' })
+    const shown = await recordId('PC-1')
+    const hidden = await recordId('PC-EXCL')
+    await db.transaction(em => addRecords(em, published.id, [shown, hidden]))
+    await admin.collection.setRecordsExcluded({ id: published.id, recordIds: [hidden], excluded: true })
+
+    const mine = await makeCollection({ name: 'Reader copy', public: false, ownerId: member.id })
+    await caller(member).collection.addItems({ id: mine.id, items: [{ id: hidden, type: 'record' }] })
+    assert.deepEqual(await membersOf(mine.id), [], 'an excluded product is not visible to pick')
+
+    // Duplicating the collection freezes what readers actually get.
+    await caller(member).collection.addItems({ id: mine.id, items: [{ id: published.id, type: 'collection' }] })
+    const copy = (await db.getRepository(Collection).findOneByOrFail({ parentId: mine.id }))
+    assert.deepEqual(await membersOf(copy.id), [shown])
+
+    // The preview an administrator reads still shows it, greyed rather than gone.
+    const preview = await admin.collection.recordPreview({ id: published.id, offset: 0, limit: 50 })
+    assert.deepEqual(preview.rows.map(row => row.excluded).sort(), [false, true])
+    await forbidden(caller(member).collection.recordPreview({ id: published.id, offset: 0, limit: 50 }))
+    await db.getRepository(Collection).update(openToAll.map(row => row.id), { includesAllRecords: true })
+})
+
+test('everything short of ready leaves the catalogue in one move', async () => {
+    const collection = await makeCollection({ name: 'Ready only' })
+    const all = [await recordId('PC-1'), await recordId('PC-2'), await recordId('PC-3')]
+    await db.transaction(em => addRecords(em, collection.id, all))
+    await db.query(`UPDATE records SET readiness_ready = false WHERE record_key = ANY($1::text[])`, [['PC-2', 'PC-3']])
+
+    assert.equal(await admin.collection.excludeNotReadyRecords({ id: collection.id }), 2)
+    assert.equal(await numberOfRecords(collection.id), 1)
+    // Running it again has nothing left to take out.
+    assert.equal(await admin.collection.excludeNotReadyRecords({ id: collection.id }), 0)
+    await db.query(`UPDATE records SET readiness_ready = true WHERE record_key = ANY($1::text[])`, [['PC-2', 'PC-3']])
 })

@@ -32,7 +32,7 @@ import {
 	userCollectionsQuery
 } from "../../services/collection"
 import { formatActionBar, resetDescendantActionBars } from "../../services/collection-action-bar"
-import { addRecords, pickableRecords, refreshDynamicCollection, removeRecords } from "../../services/product-collections"
+import { addRecords, collectionRecordPreview, createCataloguePage, excludeNotReadyRecords, pickableRecords, refreshDynamicCollection, removeRecords, setRecordsExcluded } from "../../services/product-collections"
 import { loadViewableMetadata, ViewableMetadata } from "../../services/file-metadata"
 import { loadVariantGroups, VariantGroupSummary } from "../../services/variant-grouping"
 import { applySearchOrder, buildRangeQuery, buildSearchQuery, loadSearchContext, onePerFile, searchFacets } from "../../services/search"
@@ -462,6 +462,9 @@ export default router({
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
 				await syncCollectionMenuItems(em, collection)
+				if (collection.catalogueMode !== 'files') {
+					await createCataloguePage(em, collection)
+				}
 			})
 			return formatCollection({ collection, user: ctx.user })
 		}),
@@ -715,6 +718,47 @@ export default router({
 				return { added, matched: found.length, unmatched: wanted.filter((key) => !matched.has(key)) }
 			})
 		}),
+	// The membership as its builder sees it, the products taken out of the
+	// catalogue included. Only whoever may edit the collection reads this: it
+	// carries the score, which is production information, not reader material.
+	recordPreview: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({ id: z.uuid(), offset: z.number().int().min(0), limit: z.number().int().min(1).max(200) }))
+		.query(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			}
+			return collectionRecordPreview(dataSource.manager, collection.id, { offset: input.offset, limit: input.limit })
+		}),
+	// Taking a product out of the catalogue keeps its row: a rule would put it
+	// back at the next pass, and the builder would lose the decision.
+	setRecordsExcluded: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({ id: z.uuid(), recordIds: z.uuid().array().min(1).max(500), excluded: z.boolean() }))
+		.mutation(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			}
+			return dataSource.transaction((em) => setRecordsExcluded(em, collection.id, input.recordIds, input.excluded))
+		}),
+	excludeNotReadyRecords: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({ id: z.uuid() }))
+		.mutation(async ({ input, ctx }) => {
+			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
+			if (!collection) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+			} else if (!collection.canEdit(ctx.user)) {
+				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			}
+			return dataSource.transaction((em) => excludeNotReadyRecords(em, collection.id))
+		}),
 	// The rules of a collection driven by filters. Saving them rewrites the
 	// membership straight away; products picked by hand are left alone.
 	setRecordRules: publicProcedure
@@ -757,6 +801,11 @@ export default router({
 					...(input.includesAllRecords !== undefined ? { includesAllRecords: input.includesAllRecords } : {}),
 				})
 				const updated = await em.getRepository(Collection).findOneByOrFail({ id: collection.id })
+				// Turning a collection into a catalogue gives it the page that
+				// draws the products, so it stops opening on an empty layout.
+				if (updated.catalogueMode !== 'files') {
+					await createCataloguePage(em, updated)
+				}
 				await refreshDynamicCollection(em, updated)
 			})
 			const saved = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOneOrFail()
@@ -931,6 +980,9 @@ export default router({
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
 				await syncCollectionMenuItems(em, collection)
+				if (collection.catalogueMode !== 'files') {
+					await createCataloguePage(em, collection)
+				}
 			})
 			return formatCollection({ collection, user: ctx.user })
 		}),

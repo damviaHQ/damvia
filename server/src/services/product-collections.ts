@@ -14,6 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { EntityManager, IsNull, Not } from "typeorm"
 import { Collection } from "../entity/collection"
+import { Page } from "../entity/page"
+import { PageBlock, PageBlockType } from "../entity/page-block"
 import { CollectionRecord, CollectionRecordSource } from "../entity/collection-record"
 import { User, UserRole } from "../entity/user"
 import { dataSource, logger } from "../env"
@@ -50,7 +52,7 @@ export function visibleRecordsCondition(user: User, alias: string, parameters: u
 		WHERE visible.id IN (${collections})
 		AND (
 			visible.includes_all_records
-			OR EXISTS (SELECT 1 FROM collection_records cr WHERE cr.collection_id = visible.id AND cr.record_id = ${alias}.id)
+			OR EXISTS (SELECT 1 FROM collection_records cr WHERE cr.collection_id = visible.id AND cr.record_id = ${alias}.id AND NOT cr.excluded)
 		)
 	)`
 }
@@ -72,6 +74,42 @@ export async function pickableRecords(em: EntityManager, user: User, by: 'id' | 
 	) as { id: string, recordKey: string }[]
 }
 
+// A catalogue is read through the page of its collection, like everything
+// else a reader opens, so the page is born with the block that draws the
+// products. Without it the collection would open on the empty file layout.
+export async function createCataloguePage(em: EntityManager, collection: Collection) {
+	// A plain check-then-insert would race two requests turning the same
+	// collection into a catalogue at once, and the second would fail against
+	// the unique constraint on collection_id.
+	const inserted = await em.query(
+		`INSERT INTO pages (collection_id) VALUES ($1) ON CONFLICT (collection_id) DO NOTHING RETURNING id`,
+		[collection.id],
+	)
+	if (!inserted.length) {
+		return em.getRepository(Page).findOneByOrFail({ collectionId: collection.id })
+	}
+	const page = await em.getRepository(Page).findOneByOrFail({ id: inserted[0].id })
+	// A collection holding both keeps the layout a reader already knows, with
+	// the products above the files.
+	const types = collection.catalogueMode === 'both'
+		? [PageBlockType.PRODUCTS, PageBlockType.COLLECTIONS, PageBlockType.FILES]
+		: [PageBlockType.PRODUCTS]
+	await em.getRepository(PageBlock).save(types.map((type, position) => {
+		const block = new PageBlock()
+		block.pageId = page.id
+		block.type = type
+		block.position = position
+		block.size = 'full'
+		block.data = type === PageBlockType.COLLECTIONS
+			? { title: '', layout: null, collectionsId: null, layoutFilter: null }
+			: type === PageBlockType.FILES
+				? { title: '', layout: null, masonrySize: null, collectionId: null }
+				: { title: '', layout: null, collectionId: null }
+		return block
+	}))
+	return page
+}
+
 export async function addRecords(em: EntityManager, collectionId: string, recordIds: string[], source = CollectionRecordSource.MANUAL) {
 	if (!recordIds.length) {
 		return 0
@@ -83,6 +121,59 @@ export async function addRecords(em: EntityManager, collectionId: string, record
 		RETURNING record_id
 	`, [collectionId, recordIds, source])
 	return returnedRows(inserted).length
+}
+
+// The membership as whoever builds the collection sees it: every row, the ones
+// taken out of the catalogue included, with the score that says what is left to
+// produce. Readers never see this; it is the screen a catalogue is built on.
+export async function collectionRecordPreview(em: EntityManager, collectionId: string, page: { offset: number, limit: number }) {
+	const rows: {
+		id: string, record_key: string, meta_data: Record<string, string>, source: string, excluded: boolean,
+		readiness_filled: number, readiness_total: number, readiness_ready: boolean, total: string,
+	}[] = await em.query(`
+		SELECT r.id, r.record_key, hstore_to_json(r.meta_data) AS meta_data, cr.source, cr.excluded,
+			r.readiness_filled, r.readiness_total, r.readiness_ready,
+			count(*) OVER () AS total
+		FROM collection_records cr
+		INNER JOIN records r ON r.id = cr.record_id
+		WHERE cr.collection_id = $1::uuid
+		ORDER BY cr.excluded, r.record_key
+		LIMIT $2 OFFSET $3
+	`, [collectionId, page.limit, page.offset])
+	return {
+		rows: rows.map((row) => ({
+			id: row.id,
+			recordKey: row.record_key,
+			metaData: row.meta_data ?? {},
+			source: row.source,
+			excluded: row.excluded,
+			readiness: { filled: row.readiness_filled, total: row.readiness_total, ready: row.readiness_ready },
+		})),
+		total: rows.length ? Number(rows[0].total) : 0,
+	}
+}
+
+export async function setRecordsExcluded(em: EntityManager, collectionId: string, recordIds: string[], excluded: boolean) {
+	if (!recordIds.length) {
+		return 0
+	}
+	const changed = await em.query(
+		`UPDATE collection_records SET excluded = $3 WHERE collection_id = $1::uuid AND record_id = ANY($2::uuid[]) AND excluded <> $3 RETURNING record_id`,
+		[collectionId, recordIds, excluded],
+	)
+	return returnedRows(changed).length
+}
+
+// Taking out everything a readiness definition does not call ready, in one go,
+// which is the whole point of scoring a catalogue before publishing it.
+export async function excludeNotReadyRecords(em: EntityManager, collectionId: string) {
+	const changed = await em.query(`
+		UPDATE collection_records cr SET excluded = true
+		FROM records r
+		WHERE r.id = cr.record_id AND cr.collection_id = $1::uuid AND NOT cr.excluded AND NOT r.readiness_ready
+		RETURNING cr.record_id
+	`, [collectionId])
+	return returnedRows(changed).length
 }
 
 export async function removeRecords(em: EntityManager, collectionId: string, recordIds: string[]) {

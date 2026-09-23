@@ -591,7 +591,7 @@ export async function duplicateCollection({ em, source, destination, user }: Dup
 				INSERT INTO collection_records (collection_id, record_id, source)
 				SELECT $1::uuid, cr.record_id, 'manual'
 				FROM collection_records cr
-				WHERE cr.collection_id = $2::uuid
+				WHERE cr.collection_id = $2::uuid AND NOT cr.excluded
 				AND EXISTS (SELECT 1 FROM records r WHERE r.id = cr.record_id AND ${visible})
 				ON CONFLICT (collection_id, record_id) DO NOTHING
 			`, parameters)
