@@ -27,11 +27,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
-import { useRecordLabel } from "@/composables/useRecordLabel"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { Check, FolderPen, FolderSync, PackageSearch } from "@lucide/vue"
+import { Check, FolderPen, FolderSync } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
 
@@ -43,10 +42,7 @@ const emit = defineEmits<{
 const toast = useGlobalToast()
 const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
-const { plural, singular } = useRecordLabel()
-// A collection mirrors a folder, or is filled by hand with files, or holds
-// records and is browsed as a catalogue. See docs/administration/catalogue.md.
-const kind = ref<"custom" | "synchronized" | "products">("custom")
+const kind = ref<"custom" | "synchronized">("custom")
 const form = ref<{
   name?: string
   collectionId?: string
@@ -114,7 +110,6 @@ async function onSubmit() {
         parentId: form.value.collectionId,
         public: true,
         draft: form.value.collectionId ? undefined : form.value.draft ?? false,
-        ...(kind.value === "products" ? { catalogueMode: "products" as const } : {}),
       }))
 
     queryClient.invalidateQueries({ queryKey: ['collection'] })
@@ -157,18 +152,9 @@ async function onSubmit() {
               <div class="font-medium">Synchronized folder<span class="block text-caption font-normal text-neutral-500">Mirrors your cloud storage</span></div>
               <Check v-if="kind === 'synchronized'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
             </button>
-            <button type="button" :aria-pressed="kind === 'products'" @click="kind = 'products'" :class="[
-              'create-collection-modal__type',
-              { 'create-collection-modal__type--active': kind === 'products' },
-            ]">
-              <PackageSearch class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />
-              <div class="font-medium">{{ plural }}<span class="block text-caption font-normal text-neutral-500">A list of references</span></div>
-              <Check v-if="kind === 'products'" class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)] text-primary ml-auto" />
-            </button>
           </div>
           <p class="text-caption text-neutral-500">
             <template v-if="kind === 'synchronized'">Every file of that folder, and of the folders under it, follows at each sync.</template>
-            <template v-else-if="kind === 'products'">Readers browse this collection as a catalogue. Once it exists, fill it with a list of references or with rules on the {{ singular.toLowerCase() }} fields.</template>
             <template v-else>You add the files yourself, from the library or from a search.</template>
           </p>
           <FieldGroup v-if="kind === 'synchronized'" role="group" aria-labelledby="assetFolderId">

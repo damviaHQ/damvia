@@ -61,6 +61,8 @@ const router = createRouter({
 		{ path: '/admin/products/attributes', redirect: '/admin/data-enrichment/records/attributes' },
 		{ name: 'admin-menu-items', path: '/admin/menu-items', component: () => import('@/views/admin/admin-menu.vue'), meta: { layout: 'admin', title: 'Menu' } },
 		{ name: 'admin-collections', path: '/admin/collections', component: () => import('@/views/admin/admin-collections.vue'), meta: { layout: 'admin', title: 'Collections' } },
+		{ name: 'admin-product-collections', path: '/admin/product-collections', component: () => import('@/views/admin/admin-product-collections.vue'), meta: { layout: 'admin', title: 'Products' } },
+		{ name: 'admin-collection-products', path: '/admin/collections/:id/products', component: () => import('@/views/admin/admin-collection-products.vue'), meta: { layout: 'admin', title: 'Products' } },
 		{ name: 'admin-pages', path: '/admin/pages', component: () => import('@/views/admin/pages/index.vue'), meta: { layout: 'admin', title: 'Pages' } },
 		{ name: 'admin-page', path: '/admin/pages/:id', component: () => import('@/views/page-edit.vue'), meta: { layout: 'editor', title: 'Edit page' } },
 		{ name: 'privacy-policy', path: '/privacy-policy', component: () => import('@/views/public/public-privacy-policy.vue'), meta: { layout: 'public', title: 'Privacy Policy' } },
