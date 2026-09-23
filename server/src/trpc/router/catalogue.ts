@@ -16,13 +16,10 @@ import { z } from "zod"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import {
-	catalogueCollections,
-	catalogueFacets,
 	CATALOGUE_PAGE_MAX,
 	CatalogueCard,
 	getCatalogueRecord,
 	listCatalogue,
-	listFamilies,
 } from "../../services/catalogue"
 import { readinessFor } from "../../services/record-readiness"
 import { authMiddleware, publicProcedure, router, userApproved } from "../index"
@@ -92,8 +89,11 @@ export default router({
 			return {
 				products: await Promise.all(result.rows.map(formatCard)),
 				total: result.total,
-				keyColumnName: result.keyColumnName,
-				readinessLabels: await readinessLabels(),
+				// The one field a card shows under the reference, when the
+				// administrator named one and readers may see it.
+				cardTitleField: result.fields.some((field) => field.name === enrichment.cardTitleAttributeName)
+					? enrichment.cardTitleAttributeName
+					: null,
 				fields: result.fields.map((field) => ({
 					name: field.name,
 					displayName: field.displayName ?? field.name,
@@ -126,34 +126,5 @@ export default router({
 				readinessLabels: await readinessLabels(),
 				siblings: await Promise.all(siblings.map(formatCard)),
 			}
-		}),
-	// One entry per model rather than one per key.
-	families: publicProcedure
-		.use(authMiddleware(userApproved))
-		.input(z.object({
-			offset: z.number().int().min(0),
-			limit: z.number().int().min(1).max(CATALOGUE_PAGE_MAX),
-			...query,
-		}))
-		.query(async ({ input, ctx }) => {
-			const { offset, limit, ...rest } = input
-			return listFamilies(dataSource.manager, ctx.user, rest, { offset, limit })
-		}),
-	facets: publicProcedure
-		.use(authMiddleware(userApproved))
-		.input(z.object(query))
-		.query(({ input, ctx }) => catalogueFacets(dataSource.manager, ctx.user, input, null)),
-	collections: publicProcedure
-		.use(authMiddleware(userApproved))
-		.query(async ({ ctx }) => {
-			const rows = await catalogueCollections(dataSource.manager, ctx.user)
-			return rows.map((row) => ({
-				id: row.id,
-				name: row.name,
-				description: row.description,
-				numberOfRecords: row.number_of_records,
-				includesAllRecords: row.includes_all_records,
-				catalogueMode: row.catalogue_mode,
-			}))
 		}),
 })

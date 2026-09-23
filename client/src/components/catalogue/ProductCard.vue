@@ -20,25 +20,19 @@ import { ImageOff } from "@lucide/vue"
 import { computed } from "vue"
 
 type Product = RouterOutput["catalogue"]["list"]["products"][number]
-type Field = RouterOutput["catalogue"]["list"]["fields"][number]
 
 // One card for one product: its main visual, the visuals that come with it,
-// its key and the first fields an administrator made visible.
+// its reference and the one field an administrator chose as a title. Every
+// line is always drawn, so a product missing a value keeps the same height as
+// its neighbours and the grid stays a grid.
 const props = defineProps<{
   product: Product
-  fields: Field[]
-  keyLabel: string
-  labels: { ready: string, incomplete: string, defined: boolean }
+  cardTitleField: string | null
   selected: boolean
 }>()
 const emit = defineEmits<{ "update:selected": [boolean] }>()
 
-// The first two visible fields carry the card; the rest live on the product
-// page rather than crowding the grid.
-const summary = computed(() => props.fields
-  .slice(0, 2)
-  .map((field) => ({ label: field.displayName, value: props.product.metaData[field.name] }))
-  .filter((entry) => !!entry.value))
+const title = computed(() => (props.cardTitleField ? props.product.metaData[props.cardTitleField] : null) || null)
 const overflow = computed(() => Math.max(0, props.product.visualCount - props.product.visuals.length))
 </script>
 
@@ -50,24 +44,15 @@ const overflow = computed(() => Math.max(0, props.product.visualCount - props.pr
       <Checkbox :model-value="selected" class="absolute left-2 top-2 bg-white"
         :aria-label="`Select ${product.recordKey}`" @update:model-value="emit('update:selected', !!$event)" />
     </div>
-    <router-link :to="{ name: 'product', params: { id: product.id } }" class="mt-3 grid gap-1 no-underline">
-      <span class="text-caption uppercase tracking-[.08em] text-neutral-500">{{ keyLabel }} · {{ product.recordKey }}</span>
-      <span v-for="entry in summary" :key="entry.label" class="text-body text-neutral-900">{{ entry.value }}</span>
+    <router-link :to="{ name: 'product', params: { id: product.id } }" class="mt-3 grid gap-0.5 no-underline">
+      <span class="truncate text-body text-neutral-900">{{ product.recordKey }}</span>
+      <span v-if="cardTitleField" class="truncate text-caption text-neutral-500">{{ title ?? "&nbsp;" }}</span>
     </router-link>
-    <div v-if="product.visuals.length" class="mt-3 flex items-center gap-2">
+    <div class="mt-3 flex min-h-10 items-center gap-2">
       <span v-for="visual in product.visuals" :key="visual.id" class="size-10 overflow-hidden bg-neutral-100">
         <img :src="visual.thumbnailURL ?? ''" :alt="visual.view ?? product.recordKey" class="size-full object-contain" loading="lazy" />
       </span>
       <span v-if="overflow" class="grid size-10 place-items-center bg-neutral-100 text-caption text-neutral-600">+{{ overflow }}</span>
     </div>
-    <p class="mt-3 flex items-center gap-2 border-t border-neutral-200 pt-2 text-caption text-neutral-500">
-      <template v-if="labels.defined">
-        <span aria-hidden="true" class="size-1.5 rounded-full" :class="product.readiness.ready ? 'bg-green-600' : 'bg-amber-500'" />
-        <span :class="product.readiness.ready ? 'text-green-700' : 'text-amber-700'">
-          {{ product.readiness.ready ? labels.ready : `${labels.incomplete} · ${product.readiness.filled}/${product.readiness.total}` }}
-        </span>
-      </template>
-      <span class="ml-auto">{{ product.fileCount }} {{ product.fileCount === 1 ? 'file' : 'files' }}</span>
-    </p>
   </article>
 </template>

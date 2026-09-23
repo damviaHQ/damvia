@@ -68,7 +68,7 @@ async function removeLogo() {
 const toast = useGlobalToast()
 const store = useGlobalStore()
 const { data: enrichment, status: enrichmentStatus, refetch: refetchEnrichment } = useQuery({ queryKey: ['enrichment-settings'], queryFn: () => trpc.settings.getEnrichment.query() })
-const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '', viewsEnabled: false, viewSeparator: '.', viewDigits: 2, thumbnailView: '00', hideRecordsWithoutMedia: false, familyAttributeName: null as string | null })
+const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '', viewsEnabled: false, viewSeparator: '.', viewDigits: 2, thumbnailView: '00', hideRecordsWithoutMedia: false, familyAttributeName: null as string | null, cardTitleAttributeName: null as string | null })
 const viewExample = computed(() => {
   const separator = recordLabel.value.viewSeparator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return `(key)(?:${separator}(\\d{${recordLabel.value.viewDigits}}))?`
@@ -292,6 +292,17 @@ const removeBackgroundImage = async () => {
           <h3 id="readiness-heading" class="views-heading">Ready to use</h3>
           <p>Say what a {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} must carry to count as ready. The catalogue then shows how far each one is, and readers can keep only the ones that are ready. Requiring nothing leaves every {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} ready.</p>
           <div class="record-label-field">
+            <Label for="cardTitleAttributeName">Card title field</Label>
+            <select id="cardTitleAttributeName" v-model="recordLabel.cardTitleAttributeName" class="record-native-select">
+              <option :value="null">Reference only</option>
+              <option v-for="field in fields ?? []" :key="field.id" :value="field.name">{{ field.displayName ?? field.name }}</option>
+            </select>
+            <p class="admin-text-secondary">
+              The one field shown under the reference on a catalogue card, on a single line. Every other field is read on the
+              {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} page, so a long text cannot stretch one card past its neighbours.
+            </p>
+          </div>
+          <div class="record-label-field">
             <Label for="familyAttributeName">Model field</Label>
             <select id="familyAttributeName" v-model="recordLabel.familyAttributeName" class="record-native-select">
               <option :value="null">No model grouping</option>
@@ -342,7 +353,6 @@ const removeBackgroundImage = async () => {
 <style scoped>
 .branding-settings { padding:28px; max-width:780px; margin-top:0; }
 .settings-sections { display:grid; gap:24px; }
-.settings-sections > .admin-heading { margin-bottom:4px; }
 .branding-settings h2 { font-size:var(--dv-size-section); margin-bottom:12px; }
 .branding-settings p { color:var(--dv-text-secondary); font-size:var(--dv-size-body); margin-top:8px; }
 .logo-preview { display:flex; align-items:center; justify-content:center; height:110px; max-width:300px; margin:24px 0; background:white; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-graphic); }

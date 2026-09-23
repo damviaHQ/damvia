@@ -75,11 +75,7 @@ test('naming the field groups the products under one normalised key', async () =
     assert.ok(['Pampa', 'pampa', 'PAMPÁ'].includes(black.family_label))
 })
 
-test('a reader lists models, keeps one model and sees the other keys of it', async () => {
-    const families = await caller(fixtures.member).catalogue.families({ offset: 0, limit: 10 })
-    assert.equal(families.total, 2)
-    assert.deepEqual(families.rows.map(row => [row.key, row.count]).sort(), [['pampa', 3], ['sierra', 1]])
-
+test('a reader keeps one model and sees the other keys of it', async () => {
     const model = await caller(fixtures.member).catalogue.list({ offset: 0, limit: 10, familyKey: 'pampa' })
     assert.deepEqual(model.products.map(product => product.recordKey).sort(), ['FM-BEI', 'FM-BLK', 'FM-WHT'])
 
@@ -91,8 +87,8 @@ test('a reader lists models, keeps one model and sees the other keys of it', asy
 test('changing the value of a product moves it to another family', async () => {
     await admin.record.patch({ id: await productId('FM-WHT'), values: { style: 'Sierra' }, source: 'grid' })
     assert.equal((await familyOf('FM-WHT')).family_key, 'sierra')
-    const families = await caller(fixtures.member).catalogue.families({ offset: 0, limit: 10 })
-    assert.deepEqual(families.rows.map(row => [row.key, row.count]).sort(), [['pampa', 2], ['sierra', 2]])
+    const moved = await caller(fixtures.member).catalogue.list({ offset: 0, limit: 10, familyKey: 'sierra' })
+    assert.deepEqual(moved.products.map(product => product.recordKey).sort(), ['FM-OTHER', 'FM-WHT'])
 })
 
 test('editing another field does not regroup the whole catalogue', async () => {
@@ -107,5 +103,5 @@ test('editing another field does not regroup the whole catalogue', async () => {
 test('clearing the family field drops the grouping', async () => {
     await admin.settings.updateEnrichment({ recordLabelSingular: 'Product', recordLabelPlural: 'Products', familyAttributeName: null })
     assert.deepEqual(await familyOf('FM-BLK'), { family_key: null, family_label: null })
-    assert.equal((await caller(fixtures.member).catalogue.families({ offset: 0, limit: 10 })).total, 0)
+    assert.equal((await caller(fixtures.member).catalogue.get(await productId('FM-BLK'))).family, null)
 })

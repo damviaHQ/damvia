@@ -43,6 +43,7 @@ export default router({
         hideRecordsWithoutMedia: settings.hideRecordsWithoutMedia,
         familyAttributeName: settings.familyAttributeName,
         familyAxisAttributeNames: settings.familyAxisAttributeNames,
+        cardTitleAttributeName: settings.cardTitleAttributeName,
       }
     }),
   // What a product must carry to read as ready in the catalogue.
@@ -85,6 +86,7 @@ export default router({
       hideRecordsWithoutMedia: z.boolean().optional(),
       familyAttributeName: z.string().trim().min(1).max(100).nullable().optional(),
       familyAxisAttributeNames: z.string().trim().min(1).max(100).array().max(2).optional(),
+      cardTitleAttributeName: z.string().trim().min(1).max(100).nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const before = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })

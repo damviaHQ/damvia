@@ -48,11 +48,11 @@ export type CatalogueQuery = RecordQuery & {
 
 // The fields a reader may read. A field made filterable is viewable too, so
 // this one list covers cards, the product page and the facets.
-export async function readableFields(em: EntityManager) {
+async function readableFields(em: EntityManager) {
 	return (await loadFields(em)).filter((field) => field.viewable)
 }
 
-export function readableValues(metaData: Record<string, string>, fields: RecordAttribute[], keyColumnName: string | null) {
+function readableValues(metaData: Record<string, string>, fields: RecordAttribute[], keyColumnName: string | null) {
 	const values: Record<string, string> = {}
 	for (const field of fields) {
 		const value = metaData[field.name]
@@ -246,76 +246,4 @@ export async function getCatalogueRecord(em: EntityManager, user: User, id: stri
 			thumbnailStorageKey: file.has_thumbnail ? `asset-file/${file.id}-thumbnail` : null,
 		})),
 	}
-}
-
-// The values a reader can narrow the catalogue with, counted over what they
-// are allowed to see and over the filters already chosen.
-export async function catalogueFacets(em: EntityManager, user: User, query: CatalogueQuery, thumbnailView: string | null) {
-	const [fields, keyColumnName] = await Promise.all([readableFields(em), catalogueKeyColumnName(em)])
-	const facetable = fields.filter((field) => field.facetable)
-	if (!facetable.length) {
-		return []
-	}
-	const parameters: unknown[] = []
-	const scope = await scopeCondition(em, user, query.collectionId, parameters)
-	const search = searchCondition(query.search, fields, parameters)
-	const { where } = recordQuerySql({ ...query, search: undefined }, fields, keyColumnName, parameters)
-	parameters.push(facetable.map((field) => field.name))
-	const names = `$${parameters.length}`
-	parameters.push(facetable.filter((field) => field.valueType === 'multi_select').map((field) => field.name))
-	const multi = `$${parameters.length}`
-	const rows: { key: string, value: string, count: string }[] = await em.query(`
-		WITH scope AS (SELECT r.meta_data FROM records r WHERE ${scope} AND (${where}) AND ${search})
-		SELECT pair.key, value, count(*)::int AS count
-		FROM scope
-		CROSS JOIN LATERAL each(scope.meta_data) AS pair(key, raw)
-		CROSS JOIN LATERAL unnest(CASE WHEN pair.key = ANY(${multi}::text[]) THEN string_to_array(pair.raw, '|') ELSE ARRAY[pair.raw] END) AS value
-		WHERE pair.key = ANY(${names}::text[]) AND value <> ''
-		GROUP BY 1, 2
-		ORDER BY 3 DESC, 2 ASC
-	`, parameters)
-	return facetable.map((field) => ({
-		name: field.name,
-		displayName: field.displayName ?? field.name,
-		valueType: field.valueType,
-		values: rows
-			.filter((row) => row.key === field.name)
-			.slice(0, FACET_VALUES)
-			.map((row) => ({ value: row.value, count: Number(row.count) })),
-	})).filter((facet) => facet.values.length > 0)
-}
-
-// One row per model: its label, how many products it holds and the visual of
-// the first of them.
-export async function listFamilies(em: EntityManager, user: User, query: CatalogueQuery, page: { offset: number, limit: number }) {
-	const [fields, keyColumnName] = await Promise.all([readableFields(em), catalogueKeyColumnName(em)])
-	const parameters: unknown[] = []
-	const scope = await scopeCondition(em, user, query.collectionId, parameters)
-	const search = searchCondition(query.search, fields, parameters)
-	const { where } = recordQuerySql({ ...query, search: undefined }, fields, keyColumnName, parameters)
-	parameters.push(page.limit, page.offset)
-	const rows: { family_key: string, family_label: string, count: string, total: string }[] = await em.query(`
-		SELECT r.family_key, min(r.family_label) AS family_label, count(*)::int AS count, count(*) OVER () AS total
-		FROM records r
-		WHERE ${scope} AND (${where}) AND ${search} AND r.family_key IS NOT NULL
-		GROUP BY r.family_key
-		ORDER BY min(r.family_label)
-		LIMIT $${parameters.length - 1} OFFSET $${parameters.length}
-	`, parameters)
-	return {
-		rows: rows.map((row) => ({ key: row.family_key, label: row.family_label, count: Number(row.count) })),
-		total: rows.length ? Number(rows[0].total) : 0,
-	}
-}
-
-// The collections a reader browses products in, for the catalogue landing page.
-export async function catalogueCollections(em: EntityManager, user: User) {
-	const parameters: unknown[] = []
-	const visible = visibleCollectionIdsSql(user, parameters, em)
-	return em.query(`
-		SELECT c.id, c.name, c.description, c.number_of_records, c.includes_all_records, c.catalogue_mode
-		FROM collections c
-		WHERE c.id IN (${visible}) AND c.catalogue_mode <> 'files'
-		ORDER BY c.name
-	`, parameters) as Promise<{ id: string, name: string, description: string | null, number_of_records: number, includes_all_records: boolean, catalogue_mode: string }[]>
 }

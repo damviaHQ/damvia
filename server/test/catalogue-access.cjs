@@ -96,16 +96,6 @@ test('only the fields an administrator made visible reach a reader', async () =>
     )
 })
 
-test('facets count the products the reader can see and nothing else', async () => {
-    const readerFacets = await caller(fixtures.member).catalogue.facets({})
-    assert.deepEqual(readerFacets.map(facet => facet.name), ['season'])
-    assert.deepEqual(readerFacets[0].values, [{ value: 'Autumn', count: 1 }])
-    const insiderFacets = await caller(insider).catalogue.facets({})
-    assert.deepEqual(insiderFacets[0].values.map(value => value.value).sort(), ['Autumn', 'Spring'])
-    // A hidden field is never offered as a facet.
-    assert.equal(readerFacets.some(facet => facet.name === 'cost'), false)
-})
-
 test('media keep the rights of the library while the product stays visible', async () => {
     const other = await save(harness.entities.Region, { name: 'Elsewhere', defaultGroupId: fixtures.group.id })
     const license = await save(License, { name: 'Restricted', scopes: [], allowedRegionIds: [other.id] })
@@ -156,7 +146,6 @@ test('free text reaches the searchable fields and never a hidden value', async (
     assert.equal(await hits('CA-PUB'), 1, 'the key is reachable')
     // Probing a field kept out of sight must confirm nothing.
     assert.equal(await hits('12.00'), 0)
-    assert.deepEqual(await caller(fixtures.member).catalogue.facets({ search: '12.00' }), [])
 })
 
 test('a listing scoped to a collection the reader cannot open says not found', async () => {
@@ -171,15 +160,4 @@ test('a guest and a signed-out visitor get nothing', async () => {
         caller(null).catalogue.list({ offset: 0, limit: 10 }),
         error => ['UNAUTHORIZED', 'FORBIDDEN'].includes(error.code),
     )
-})
-
-test('the catalogue lists the product collections a reader may open', async () => {
-    const rows = await caller(fixtures.member).catalogue.collections()
-    const names = rows.map(row => row.name)
-    assert.ok(names.includes('Autumn catalogue') === false, 'a collection left on files only stays out')
-    const products = await makeCollection({ name: 'Season selection' })
-    await admin.collection.setRecordRules({ id: products.id, catalogueMode: 'products' })
-    const after = await caller(fixtures.member).catalogue.collections()
-    assert.ok(after.some(row => row.name === 'Season selection'))
-    assert.equal(after.some(row => row.name === 'Draft'), false)
 })

@@ -71,9 +71,10 @@ test('required fields and views are counted, and the score follows what changes'
     assert.deepEqual(await scoreOf('RD-EMPTY'), { readiness_filled: 2, readiness_total: 3, readiness_ready: false })
 })
 
-test('a reader sees the score, the labels and can keep only what is ready', async () => {
-    const response = await caller(fixtures.member).catalogue.list({ offset: 0, limit: 50 })
-    assert.deepEqual(response.readinessLabels, { ready: 'Prêt à utiliser', incomplete: 'À compléter', defined: true })
+test('the score and its labels reach the product page, and a listing can keep only what is ready', async () => {
+    const page = await caller(fixtures.member).catalogue.get(await productId('RD-FULL'))
+    assert.deepEqual(page.readinessLabels, { ready: 'Prêt à utiliser', incomplete: 'À compléter', defined: true })
+    assert.equal(page.readiness.ready, true)
     const ready = await caller(fixtures.member).catalogue.list({ offset: 0, limit: 50, readiness: 'ready' })
     assert.deepEqual(ready.products.map(product => product.recordKey), ['RD-FULL'])
     const incomplete = await caller(fixtures.member).catalogue.list({ offset: 0, limit: 50, readiness: 'incomplete' })

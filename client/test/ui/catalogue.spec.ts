@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { responses } from './client-fixtures'
 
-// The reader-facing catalogue: cards, facets, readiness and the jump to a
+// The reader-facing catalogue: cards, the search box and the jump to a
 // product page. See docs/administration/catalogue.md.
 const visual = (view: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#ddd"/><text x="4" y="24">${view}</text></svg>`)}`
 
@@ -25,14 +25,12 @@ const products = [
 const list = {
   products,
   total: 2,
-  keyColumnName: 'SKU',
-  readinessLabels: { ready: 'Ready to use', incomplete: 'To complete', defined: true },
+  cardTitleField: 'name',
   fields: [
     { name: 'name', displayName: 'Name', valueType: 'text', facetable: false, position: 0 },
     { name: 'format', displayName: 'Format', valueType: 'text', facetable: true, position: 1 },
   ],
 }
-const facets = [{ name: 'format', displayName: 'Format', valueType: 'text', values: [{ value: '250 ml', count: 2 }, { value: '4 × 250 ml', count: 1 }] }]
 
 type Call = { name: string, input: any }
 
@@ -47,8 +45,6 @@ async function fixture(page: import('@playwright/test').Page, overrides: Record<
     calls.push({ name, input: raw ? JSON.parse(raw) : undefined })
     const data = name in overrides ? overrides[name]
       : name === 'catalogue.list' ? list
-      : name === 'catalogue.facets' ? facets
-      : name === 'catalogue.families' ? { rows: [{ key: 'citron', label: 'Citron', count: 2 }], total: 1 }
       : responses[name] ?? []
     await route.fulfill({ json: { result: { data } } })
   })
@@ -56,37 +52,38 @@ async function fixture(page: import('@playwright/test').Page, overrides: Record<
   return { errors, calls }
 }
 
-test('the catalogue shows a card per product with its key, visuals, readiness and file count', async ({ page }) => {
+test('a card carries the reference, the title field and the visuals, and nothing else', async ({ page }) => {
   const { errors } = await fixture(page)
   await page.goto('/catalogue')
 
   const card = page.locator('article', { hasText: 'BOT-CIT-250' })
   await expect(card).toBeVisible()
-  await expect(card.getByText('SKU · BOT-CIT-250')).toBeVisible()
+  await expect(card.getByText('BOT-CIT-250', { exact: true })).toBeVisible()
   await expect(card.getByText('Citron & bergamote')).toBeVisible()
   // Four visuals are carried by a card, the rest are counted.
   await expect(card.getByText('+6')).toBeVisible()
-  await expect(card.getByText('8 files')).toBeVisible()
-  await expect(card.getByText('Ready to use', { exact: true })).toBeVisible()
 
-  const incomplete = page.locator('article', { hasText: 'BOT-GIN-250' })
-  await expect(incomplete.getByText('To complete · 1/3')).toBeVisible()
-  await expect(incomplete.getByText('0 files')).toBeVisible()
+  // Readiness, file counts and the key prefix belong to administration, not to
+  // a reader browsing a catalogue.
+  await expect(page.getByText('SKU ·')).toHaveCount(0)
+  await expect(page.getByText('Ready to use')).toHaveCount(0)
+  await expect(page.getByText('8 files')).toHaveCount(0)
+  await expect(page.getByRole('checkbox', { name: 'By model' })).toHaveCount(0)
   expect(errors).toEqual([])
 })
 
-test('choosing a facet narrows the list, and clearing it restores the whole catalogue', async ({ page }) => {
+test('a reader gets the list they were given, with a search box and no filter panel', async ({ page }) => {
   const { errors, calls } = await fixture(page)
   await page.goto('/catalogue')
   await expect(page.getByRole('heading', { name: 'Products', exact: true })).toBeVisible()
 
-  await page.getByLabel('250 ml', { exact: true }).check()
-  await expect.poll(() => calls.filter(call => call.name === 'catalogue.list' && call.input?.filters?.length).length).toBeGreaterThan(0)
-  const narrowed = calls.filter(call => call.name === 'catalogue.list' && call.input?.filters?.length).at(-1)
-  expect(narrowed?.input.filters).toEqual([{ column: 'format', op: 'has_any', values: ['250 ml'] }])
+  // The facets and the readiness filter were tools of whoever builds the list.
+  await expect(page.getByText('FILTERS')).toHaveCount(0)
+  await expect(page.getByLabel('Readiness')).toHaveCount(0)
+  expect(calls.some(call => call.name === 'catalogue.facets')).toBe(false)
 
-  await page.getByRole('button', { name: 'Clear', exact: true }).click()
-  await expect.poll(() => calls.filter(call => call.name === 'catalogue.list').at(-1)?.input?.filters).toBeUndefined()
+  await page.getByLabel('Search products').fill('citron')
+  await expect.poll(() => calls.filter(call => call.name === 'catalogue.list').at(-1)?.input?.search).toBe('citron')
   expect(errors).toEqual([])
 })
 
@@ -95,8 +92,8 @@ test('a card opens the product page, which lists the values and the files', asyn
     'catalogue.get': {
       ...products[0],
       fields: list.fields.map(({ name, displayName, valueType, position }) => ({ name, displayName, valueType, position })),
-      keyColumnName: 'SKU',
-      readinessLabels: list.readinessLabels,
+      readinessLabels: { ready: 'Ready to use', incomplete: 'To complete', defined: true },
+      cardTitleField: 'name',
       siblings: [{ ...products[1], recordKey: 'BOT-CIT-4PK' }],
       files: [
         { id: 'f1', name: 'BOT-CIT-250-00.jpg', path: '/Packshots', view: '00', mimeType: 'image/jpeg', size: '1', thumbnailURL: visual('00') },

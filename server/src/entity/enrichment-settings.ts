@@ -49,6 +49,11 @@ export class EnrichmentSettings {
 	@Column({ type: 'text', array: true, default: '{}' })
 	familyAxisAttributeNames: string[]
 
+	// The one field a catalogue card shows under the reference. Left empty, a
+	// card carries the reference alone.
+	@Column({ type: 'varchar', nullable: true })
+	cardTitleAttributeName: string | null
+
 	@UpdateDateColumn()
 	updatedAt: Date
 }
