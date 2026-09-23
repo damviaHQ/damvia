@@ -78,7 +78,7 @@ export async function createDownloadArchive({ em, download }: CreateDownloadArch
 			archive.pipe(archiveOutput)
 			await Throttle.all(collectionFiles.map((collectionFile) => async () => {
 				const outputFile = await transformFile({ workingDirectory, download, assetFile: collectionFile.assetFile })
-				await em.getTreeRepository(Collection).findAncestorsTree(collectionFile.collection)
+				if (collectionFile.collection) await em.getTreeRepository(Collection).findAncestorsTree(collectionFile.collection)
 				archive.file(outputFile, {
 					name: `export/${formatFileName(download, collectionFile.assetFile, collectionFile.collection)}`,
 				})

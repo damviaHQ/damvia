@@ -31,6 +31,9 @@ import { createDownloadArchive } from "../../services/download"
 import { downloadCreateArchiveQueue } from "../../worker"
 import { authMiddleware, publicProcedure, router, userApproved } from "../index"
 
+import { resolveDownloadSelection } from "../../services/download-selection"
+import { recordCsv, recordWorkbook } from "../../services/download-spreadsheet"
+
 export async function formatDownload(download: Download) {
 	let url: string | null = null
 	if (download.status === DownloadStatus.READY) {
@@ -52,6 +55,22 @@ export async function formatDownload(download: Download) {
 }
 
 export default router({
+  exportRecords: publicProcedure
+    .use(authMiddleware(userApproved))
+    .input(z.object({
+      items: z.array(z.object({ id: z.uuid(), type: z.enum(['collection', 'file', 'record']) })).min(1).max(10000),
+      columns: z.string().array().min(1).max(500),
+      format: z.enum(['csv', 'xlsx']),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const selection = await resolveDownloadSelection(dataSource.manager, ctx.user, input.items, false)
+      const indexes = [...new Set(input.columns)].map(id => selection.columns.findIndex(column => column.id === id))
+      if (indexes.includes(-1)) throw new TRPCError({ code: 'BAD_REQUEST', message: 'A selected column is no longer available. Reopen the download window.' })
+      if (!selection.rows.length) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No records are available to download.' })
+      const rows = [indexes.map(index => selection.columns[index].label), ...selection.rows.map(row => indexes.map(index => row[index]))]
+      const content = input.format === 'csv' ? Buffer.from(recordCsv(rows), 'utf8') : await recordWorkbook(rows)
+      return { filename: `records.${input.format}`, mimeType: input.format === 'csv' ? 'text/csv;charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', content: content.toString('base64') }
+    }),
 	list: publicProcedure
 		.use(authMiddleware(userApproved))
 		.query(async ({ ctx }) => {
@@ -78,7 +97,7 @@ export default router({
 		.use(authMiddleware(userApproved))
 		.input(
 			z.object({
-				collectionFileIds: z.uuid().array(),
+				collectionFileIds: z.uuid().array().min(1),
 				imageFormat: z.enum(DownloadImageFormat),
 				imageResolution: z.enum(DownloadImageResolution),
 				videoFormat: z.enum(DownloadVideoFormat),
@@ -91,6 +110,7 @@ export default router({
 				.andWhere({ id: In(input.collectionFileIds) })
 				.getMany()
 
+			if (!collectionFiles.length) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No files are available to download.' })
 			const totalSize = collectionFiles.reduce((total, file) => total + parseInt(file.assetFile.size, 10), 0)
 			if (totalSize >= 10_000_000_000) { // 10GB
 				throw new TRPCError({ code: 'FORBIDDEN', message: "You cannot download more than 10GB." })

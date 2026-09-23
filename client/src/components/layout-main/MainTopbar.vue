@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useGlobalStore } from "@/stores/globalStore"
+import { useGlobalStore, type SelectionItem } from "@/stores/globalStore"
 import {
   Combine,
   Download,
@@ -41,12 +41,19 @@ import { defineAsyncComponent, ref } from "vue"
 
 const globalStore = useGlobalStore()
 const isDownloadAssetModalOpen = ref<boolean>(false)
+const singleDownload = ref<SelectionItem | null>(null)
+function openDownload() {
+  const [item] = globalStore.selection
+  if (globalStore.selection.length === 1 && item.type !== 'collection') singleDownload.value = item
+  else isDownloadAssetModalOpen.value = true
+}
 const isCreateCollectionModalOpen = ref<boolean>(false)
 const isAddToCollectionModalOpen = ref<boolean>(false)
 const showMemberDialog = ref(false)
 const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-preferences">("downloads")
 const CollectionDialogAddToCollection = defineAsyncComponent(() => import("@/components/collection/CollectionDialogAddToCollection.vue"))
 const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/collection/CollectionDialogCreate.vue"))
+const CollectionModalDownloadUnique = defineAsyncComponent(() => import("@/components/collection/CollectionModalDownloadUnique.vue"))
 const CollectionModalDownloadMulti = defineAsyncComponent(() => import("@/components/collection/CollectionModalDownloadMulti.vue"))
 const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDialogMember.vue"))
 </script>
@@ -73,7 +80,7 @@ const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDi
           </div>
         </div>
         <div class="flex items-center gap-3.5">
-          <button class="text-neutral-500 hover:text-neutral-800" @click="isDownloadAssetModalOpen = true"
+          <button class="text-neutral-500 hover:text-neutral-800" @click="openDownload"
             title="Download selection" aria-label="Download selection">
             <Download class="size-6 shrink-0" />
           </button>
@@ -151,6 +158,9 @@ const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDi
       </DropdownMenu>
     </div>
   </header>
+  <CollectionModalDownloadUnique v-if="singleDownload" :model-value="singleDownload.id"
+    :record-id="singleDownload.type === 'record' ? singleDownload.id : undefined"
+    @update:model-value="singleDownload = null" />
   <CollectionModalDownloadMulti v-model="isDownloadAssetModalOpen" />
   <CollectionDialogCreate v-model="isCreateCollectionModalOpen" />
   <CollectionDialogAddToCollection v-model="isAddToCollectionModalOpen" />

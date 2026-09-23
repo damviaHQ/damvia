@@ -60,9 +60,13 @@ export function userCollectionsQuery(user: User, em: EntityManager = dataSource.
 }
 
 export function userCollectionFilesQuery(user: User, em: EntityManager = dataSource.manager): SelectQueryBuilder<CollectionFile> {
+	const pictureParameters: unknown[] = []
+	const pictureVisible = visibleRecordsCondition(user, 'picture_record', pictureParameters, em)
+		.replace(/\$(\d+)/g, (_, index) => `:pictureAccess${index}`)
+	const pictureBindings = Object.fromEntries(pictureParameters.map((value, index) => [`pictureAccess${index + 1}`, value]))
 	let query = em.getRepository(CollectionFile)
 		.createQueryBuilder('collection_file')
-		.innerJoinAndMapOne(
+		.leftJoinAndMapOne(
 			'collection_file.collection',
 			'collection_file.collection',
 			'collection',
@@ -92,21 +96,33 @@ export function userCollectionFilesQuery(user: User, em: EntityManager = dataSou
 			'record',
 			'record.id = asset_file.record_id',
 		)
-		.where(new Brackets((q) => {
-			q = q.where("collection.owner_id = :userId", { userId: user.id })
-			if (user.role === UserRole.ADMIN) {
-				q = q.orWhere("collection.public IS TRUE")
-			} else if (user.role !== UserRole.GUEST) {
-				q = q.orWhere(
-					"(collection.public IS TRUE AND collection.draft IS FALSE) AND (coalesce(array_length(collection.limited_to_group_ids, 1), 0) = 0)",
-				)
-			}
-			q.orWhere('((SELECT array_agg(group_id::text) FROM user_groups WHERE user_id = :userId) && "collection"."limited_to_group_ids")')
-			q.orWhere("(SELECT COUNT(*) FROM collection_invitations WHERE collection_invitations.user_id = :userId AND collection_invitations.collection_id::text = ANY(string_to_array(collection.mpath, '.')) AND collection_invitations.expires_at > now()) > 0")
-			return q
+		.where(new Brackets((access) => {
+			access.where(new Brackets((grant) => {
+				grant.where(new Brackets((q) => {
+					q.where("collection.owner_id = :userId", { userId: user.id })
+					if (user.role === UserRole.ADMIN) {
+						q.orWhere("collection.public IS TRUE")
+					} else if (user.role !== UserRole.GUEST) {
+						q.orWhere("(collection.public IS TRUE AND collection.draft IS FALSE) AND coalesce(array_length(collection.limited_to_group_ids, 1), 0) = 0")
+					}
+					q.orWhere('((SELECT array_agg(group_id::text) FROM user_groups WHERE user_id = :userId) && "collection"."limited_to_group_ids")')
+					q.orWhere("EXISTS (SELECT 1 FROM collection_invitations WHERE collection_invitations.user_id = :userId AND collection_invitations.collection_id::text = ANY(string_to_array(collection.mpath, '.')) AND collection_invitations.expires_at > now())")
+				}))
+				if (user.role !== UserRole.ADMIN) {
+					grant.andWhere("(collection.draft IS FALSE OR collection.owner_id = :userId)", { userId: user.id })
+				}
+			}))
+			// Identity rows grant nothing themselves. Check current membership,
+			// exclusions and invitations again when a queued download executes.
+			access.orWhere(`collection_file.collection_id IS NULL AND asset_file.mime_type LIKE 'image/%' AND EXISTS (
+				SELECT 1 FROM asset_files picture_file
+				LEFT JOIN asset_entity_links picture_link ON picture_link.asset_file_id = picture_file.id
+					AND picture_link.target_kind = 'record' AND picture_link.status = 'active'
+				INNER JOIN records picture_record ON picture_record.id = coalesce(picture_link.record_id, picture_file.record_id)
+				WHERE picture_file.id = asset_file.id AND ${pictureVisible}
+			)`, pictureBindings)
 		}))
 	if (user.role !== UserRole.ADMIN) {
-		query.andWhere("(collection.draft IS FALSE OR collection.owner_id = :userId)", { userId: user.id })
 		query.andWhere("(asset_file.license_id IS NULL OR (:regionId = ANY(license.allowed_region_ids) AND (license.usage_from IS NULL OR license.usage_from <= CURRENT_DATE) AND (license.usage_to IS NULL OR license.usage_to >= CURRENT_DATE)))", { regionId: user.regionId })
 	}
 	return query

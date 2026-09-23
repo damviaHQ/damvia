@@ -40,12 +40,14 @@ export class CollectionFile {
 	@JoinColumn()
 	assetFile: AssetFile
 
-	@Column()
-	collectionId: string
+	// A file identity without a collection is used for access through records.
+	// It grants nothing by itself; the reader query checks live membership.
+	@Column({ type: 'uuid', nullable: true })
+	collectionId: string | null
 
 	@ManyToOne(() => Collection, (r) => r.files, { onDelete: 'CASCADE' })
 	@JoinColumn()
-	collection: Collection
+	collection: Collection | null
 
 	@OneToMany(() => UserFavorite, (userFavorite) => userFavorite.collectionFile)
 	favorites: UserFavorite[]

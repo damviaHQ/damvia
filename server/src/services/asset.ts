@@ -567,7 +567,7 @@ export async function upsertFile(opts: UpsertFileOptions): Promise<AssetFile> {
 	const folderChanged = previousFolder?.id !== file.folder?.id
 	if (folderChanged || file.status === AssetFileStatus.CREATING) {
 		if (folderChanged) {
-			await dataSource.query(`DELETE FROM collection_files WHERE asset_file_id = $1`, [file.id])
+			await dataSource.query(`DELETE FROM collection_files WHERE asset_file_id = $1 AND collection_id IS NOT NULL`, [file.id])
 		}
 
 		await dataSource.query(`

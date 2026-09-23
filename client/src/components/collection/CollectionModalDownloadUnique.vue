@@ -17,9 +17,6 @@ import * as fileType from "@/utils/fileType.ts"
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Button } from "@/components/ui/button/index.js"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
   Tooltip,
   TooltipContent,
@@ -29,32 +26,32 @@ import {
 import { useFileFavorites } from "@/composables/useFileFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { useRecordLabel } from "@/composables/useRecordLabel"
-import { RouterOutput, trpc } from "@/services/server.ts"
+import { RouterInput, RouterOutput, trpc } from "@/services/server.ts"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   ChevronLeft,
   ChevronRight,
-  Copyright,
   SquareArrowLeft,
   SquareArrowRight,
   Star,
   StarOff,
   Trash2,
   X,
-  CircleHelpIcon,
 } from "@lucide/vue"
-import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from "vue"
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger} from "@/components/ui/dialog";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue"
+import CollectionDownloadFileOptions from './CollectionDownloadFileOptions.vue'
+import { useDownloadStore } from '@/stores/downloadStore'
 import { FocusScope } from "reka-ui"
 
-type File = RouterOutput["collection"]["findById"]["files"][number]
+type File = RouterOutput["collection"]["getFiles"]["files"][number]
 type Collection = RouterOutput["collection"]["findById"]
 
 type Props = {
   files?: File[]
   collection?: Collection
   modelValue: string | null
+  recordId?: string
 }
 
 const emit = defineEmits<{
@@ -65,7 +62,7 @@ const recordLabel = useRecordLabel()
 const props = defineProps<Props>()
 const viewedAt = new Map<string, number>()
 const queryClient = useQueryClient()
-const hasTermsError = ref(false)
+const downloads = useDownloadStore()
 const isLoading = ref(false)
 const form = ref<{
   imageFormat: "png" | "jpg" | "webp" | "original"
@@ -91,18 +88,62 @@ const {
 } = useFileFavorites()
 
 const removable = computed(() => props.collection?.canEdit && !props.collection.synchronized)
-const files = computed(() => props.files ?? props.collection?.files)
-const currentFile = computed<File>(() => files.value?.find((file: File) => file.id === props.modelValue))
-const hasCustomDownloadSettings = computed(() =>
-  (currentFile.value?.mimeType.startsWith("image/") && form.value.imageFormat !== "original") ||
-  (currentFile.value?.mimeType.startsWith("video/") && form.value.videoFormat !== "original")
-)
-const allowDirectDownload = computed(() => { return !currentFile.value || parseInt(currentFile.value.size, 10) <= 5_000_000_000 })
+const resolvesSelection = computed(() => !!props.recordId || (!props.files && !props.collection))
+const selection = ref<RouterOutput['collection']['getFiles'] | null>(null)
+const isResolving = ref(false)
+const loadError = ref('')
+const retry = ref(0)
+const previewId = ref<string | null>(null)
+const selectedViews = ref<string[]>([])
+const files = computed<File[]>(() => resolvesSelection.value ? selection.value?.files ?? [] : props.files ?? props.collection?.files ?? [])
+const currentFile = computed(() => files.value.find(file => file.id === (resolvesSelection.value ? previewId.value : props.modelValue)))
+const productTitle = computed(() => selection.value?.previewRows?.[0]?.[0] ?? recordLabel.singular.value)
+const title = computed(() => props.recordId ? productTitle.value : currentFile.value?.name ?? 'Download')
+const productFacts = computed(() => (selection.value?.columns ?? []).map((column, index) => ({ ...column, value: selection.value?.previewRows?.[0]?.[index] })).filter(column => column.value))
+const viewOptions = computed(() => [...new Set(files.value.map(file => file.recordView ?? ''))].sort())
+const showViews = computed(() => !!props.recordId && !!selection.value?.viewsEnabled && viewOptions.value.some(Boolean))
+const downloadFiles = computed(() => props.recordId
+  ? files.value.filter(file => !showViews.value || selectedViews.value.includes(file.recordView ?? ''))
+  : currentFile.value ? [currentFile.value] : [])
+const totalSize = computed(() => downloadFiles.value.reduce((total, file) => total + Number(file.size), 0))
+const hasLicense = computed(() => downloadFiles.value.some(file => !!file.license))
+const canDownload = computed(() => !isLoading.value && !isResolving.value && !!downloadFiles.value.length && totalSize.value < 10_000_000_000 && (!hasLicense.value || form.value.isAcceptingTerms))
+const hasCustomDownloadSettings = computed(() => downloadFiles.value.some(file =>
+  (file.mimeType.startsWith('image/') && form.value.imageFormat !== 'original') ||
+  (file.mimeType.startsWith('video/') && form.value.videoFormat !== 'original')
+))
+
+watch([() => props.modelValue, () => props.recordId, resolvesSelection, retry], async (_, __, onCleanup) => {
+  if (!resolvesSelection.value) return
+  let cancelled = false
+  onCleanup(() => { cancelled = true })
+  selection.value = null
+  loadError.value = ''
+  previewId.value = null
+  form.value.isAcceptingTerms = false
+  if (!props.modelValue) return
+  isResolving.value = true
+  try {
+    const result = await trpc.collection.getFiles.mutate({ items: [{ type: props.recordId ? 'record' : 'file', id: props.recordId ?? props.modelValue }] })
+    if (cancelled) return
+    selection.value = result
+    previewId.value = result.files[0]?.id ?? null
+    selectedViews.value = [...new Set(result.files.map(file => file.recordView ?? ''))]
+    form.value.imageFormat = 'original'
+    form.value.videoFormat = 'original'
+    form.value.downloadType = 'direct'
+  } catch (error) {
+    if (!cancelled) loadError.value = (error as Error).message
+  } finally {
+    if (!cancelled) isResolving.value = false
+  }
+}, { immediate: true })
+watch(downloadFiles, () => { form.value.isAcceptingTerms = false })
 
 const { data: fileCollection } = useQuery({
   queryKey: computed(() => ["file-collection", props.modelValue]),
   queryFn: () => currentFile.value?.collectionId ? trpc.collection.findById.query(currentFile.value.collectionId) : null,
-  enabled: computed(() => !!currentFile.value && !props.collection && !!currentFile.value.collectionId)
+  enabled: computed(() => !!currentFile.value && !props.recordId && !props.collection && !!currentFile.value.collectionId)
 })
 
 const collectionPath = computed<Collection[]>(() => {
@@ -143,30 +184,9 @@ const hasCollectionPath = computed(() => {
   return (props.collection || fileCollection.value) && path.length > 0
 })
 
-const hasLicense = computed(() => {
-  return !!currentFile.value?.license;
-})
-
-watch(
-  [allowDirectDownload],
-  () => {
-    if (!allowDirectDownload.value) {
-      form.value.downloadType = "email"
-    } else {
-      form.value.downloadType = "direct"
-    }
-  },
-  { immediate: true }
-)
-
-watchEffect(() => {
-  if (hasLicense.value) {
-    hasTermsError.value = false;
-  }
-})
 
 async function remove(file: File) {
-  if (!removable) {
+  if (!removable.value || !props.collection) {
     return
   }
 
@@ -195,23 +215,16 @@ async function remove(file: File) {
 }
 
 async function download() {
-  if (hasLicense.value && !form.value.isAcceptingTerms) {
-    toast.error("Please accept the terms and conditions to proceed with the download.")
-    isLoading.value = false
-    hasTermsError.value = true
-    return
-  }
-
+  if (!canDownload.value) return
   isLoading.value = true
-  hasTermsError.value = false
   try {
     const formData = {
       ...form.value,
       isAcceptingTerms: hasLicense.value ? form.value.isAcceptingTerms : true,
-      collectionFileIds: [currentFile.value.id],
+      collectionFileIds: downloadFiles.value.map(file => file.id),
     };
 
-    const downloadRes = await trpc.download.create.mutate(formData as any)
+    const downloadRes = await trpc.download.create.mutate(formData as RouterInput['download']['create'])
     await queryClient.invalidateQueries({ queryKey: ["downloads"] })
 
     form.value.isAcceptingTerms = false
@@ -222,6 +235,7 @@ async function download() {
       return
     }
     toast.success("You will receive a download link through email.")
+    downloads.startRefetch()
     emit("update:modelValue", null)
   } catch (error) {
     toast.error((error as Error).message)
@@ -231,6 +245,7 @@ async function download() {
 }
 
 function changeFile(addToIndex: number) {
+  if (!currentFile.value || !files.value.length) return
   const fileIndex = files.value.indexOf(currentFile.value)
   let newIndex = fileIndex + addToIndex
   if (newIndex < 0) {
@@ -238,7 +253,8 @@ function changeFile(addToIndex: number) {
   } else if (newIndex >= files.value.length) {
     newIndex = 0
   }
-  emit("update:modelValue", files.value[newIndex].id)
+  if (resolvesSelection.value) previewId.value = files.value[newIndex].id
+  else emit("update:modelValue", files.value[newIndex].id)
 }
 
 function truncateFileName(name: string, maxLength: number = 60) {
@@ -247,14 +263,14 @@ function truncateFileName(name: string, maxLength: number = 60) {
 }
 
 function handleKeyDown(event: KeyboardEvent) {
-  if (event.defaultPrevented || !currentFile.value) return
+  if (event.defaultPrevented || !props.modelValue) return
   const target = event.target as HTMLElement | null
   if (target?.closest('[role="dialog"]:not(.gallery-modal)')) return
   if (event.key === "Escape") {
     emit("update:modelValue", null)
     return
   }
-  if (target?.closest('input, textarea, select, [role="radio"], [contenteditable="true"]')) return
+  if (target?.closest('input, textarea, select, button, [role="radio"], [contenteditable="true"]')) return
   if (event.key === "ArrowLeft") {
     event.preventDefault()
     changeFile(-1)
@@ -294,11 +310,11 @@ watch(() => props.modelValue, (newValue) => {
 
 <template>
   <Teleport to="body">
-  <FocusScope v-if="currentFile" as="div" trapped loop tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="gallery-modal-title"
-    class="gallery-modal bg-white fixed top-0 left-0 w-full h-full z-40 py-5 px-7 text-neutral-800 outline-hidden" @mount-auto-focus="focusModal">
-    <div class="gallery-modal__header max-md:flex-col max-md:items-start max-md:[&>div:last-child]:w-full flex items-center justify-between mb-4 flex-wrap gap-3">
+  <FocusScope v-if="modelValue && (currentFile || resolvesSelection)" as="div" trapped loop tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="gallery-modal-title"
+    :class="{ 'is-product': !!recordId }" class="gallery-modal dv-theme dv-neutral dv-client bg-white fixed top-0 left-0 w-full h-full z-40 py-5 px-7 text-neutral-800 outline-hidden" @mount-auto-focus="focusModal">
+    <div class="gallery-modal__header flex items-center justify-between mb-4 flex-wrap gap-3">
       <div class="flex items-center gap-3">
-        <template v-if="haveAccessToFavorites">
+        <template v-if="currentFile && !recordId && haveAccessToFavorites">
           <button v-if="isFavorite(currentFile)" @click="toggleFavorite(currentFile)" :disabled="isSavingFavorite(currentFile.id) || !favoritesReady" type="button"
             aria-label="Remove from favorites" aria-pressed="true" class="group/favorite relative flex items-center shrink-0">
             <Star aria-hidden="true" class="w-5 h-5 text-neutral-800 fill-neutral-600 group-hover/favorite:opacity-0 group-focus-visible/favorite:opacity-0" />
@@ -314,16 +330,16 @@ watch(() => props.modelValue, (newValue) => {
             <Tooltip>
               <TooltipTrigger class="flex items-center">
                 <span class="block text-[17px] font-semibold leading-none truncate max-w-[300px] md:max-w-[400px]">
-                  {{ truncateFileName(currentFile.name) }}
+                  {{ truncateFileName(title) }}
                 </span>
               </TooltipTrigger>
               <TooltipContent>
-                <p>{{ currentFile.name }}</p>
+                <p>{{ title }}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </h2>
-        <button v-if="removable" @click="remove(currentFile)" type="button" aria-label="Remove from collection" class="flex items-center ml-3">
+        <button v-if="currentFile && !recordId && removable" @click="remove(currentFile)" type="button" aria-label="Remove from collection" class="flex items-center ml-3">
           <Trash2 class="w-5 h-5 text-neutral-800 hover:text-neutral-500" />
         </button>
       </div>
@@ -341,13 +357,14 @@ watch(() => props.modelValue, (newValue) => {
         </Button>
       </div>
     </div>
-    <div class="flex">
+    <div class="gallery-modal__body">
       <div class="gallery-modal__preview relative w-full">
+        <template v-if="currentFile">
         <div v-if="files.length > 1" class="gallery-modal__navigation absolute top-0 left-0 right-0 bottom-0 flex justify-between items-center pointer-events-none select-none [z-index:2] [&:hover_.gallery-modal\_\_key-info]:opacity-100 [&:focus-within_.gallery-modal\_\_key-info]:opacity-100">
-          <button type="button" aria-label="Previous file" aria-keyshortcuts="ArrowLeft" class="gallery-modal__previous-file pointer-events-auto cursor-pointer p-4 mr-auto" @click="changeFile(-1)">
+          <button type="button" :aria-label="recordId ? 'Previous view' : 'Previous file'" aria-keyshortcuts="ArrowLeft" class="gallery-modal__previous-file pointer-events-auto cursor-pointer p-4 mr-auto" @click="changeFile(-1)">
             <ChevronLeft strokeWidth="3" class="w-10 h-10" />
           </button>
-          <button type="button" aria-label="Next file" aria-keyshortcuts="ArrowRight" class="gallery-modal__next-file pointer-events-auto cursor-pointer p-4 ml-auto" @click="changeFile(1)">
+          <button type="button" :aria-label="recordId ? 'Next view' : 'Next file'" aria-keyshortcuts="ArrowRight" class="gallery-modal__next-file pointer-events-auto cursor-pointer p-4 ml-auto" @click="changeFile(1)">
             <ChevronRight strokeWidth="3" class="w-10 h-10" />
           </button>
           <div aria-hidden="true" class="gallery-modal__key-info absolute bottom-4 right-4 flex items-center [background-color:rgba(0,_0,_0,_0.5)] [color:rgba(255,_255,_255,_0.7)] [padding:0.5rem_1rem] [border-radius:9999px] [font-size:0.75rem] opacity-0 [transition:opacity_0.3s_ease] select-none [&_svg]:mr-1">
@@ -387,7 +404,7 @@ watch(() => props.modelValue, (newValue) => {
                           (isExcel && hasThumbnail) ||
                           (isTextFile && hasThumbnail) ||
                           (isFontFile && hasThumbnail))"
-               :src="currentFile.thumbnailURL"
+               :src="currentFile.thumbnailURL ?? undefined"
                :alt="currentFile.name"
                class="gallery-modal__preview-thumbnail [max-width:90%] [max-height:90%] object-contain" />
           <div v-else-if="isPowerPoint && !hasThumbnail" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
@@ -447,174 +464,90 @@ watch(() => props.modelValue, (newValue) => {
             <div class="gallery-modal__placeholder-filename text-neutral-500 [font-size:14px] font-semibold text-center [max-width:80%] [word-break:break-word]">No preview available</div>
           </div>
         </div>
+        </template>
+        <div v-else class="gallery-modal__empty" :role="loadError ? 'alert' : 'status'">
+          <p>{{ isResolving ? 'Loading…' : loadError || (recordId ? `No files for this ${recordLabel.lower.value}.` : 'This file is no longer available.') }}</p>
+          <Button v-if="loadError" variant="outline" @click="retry++">Try again</Button>
+        </div>
+        <div v-if="recordId && files.length" class="product-view-strip" aria-label="Product views">
+          <button v-for="file in files" :key="file.id" type="button" :aria-pressed="currentFile?.id === file.id"
+            :aria-label="`Preview ${showViews && file.recordView ? `view ${file.recordView}` : file.name}`" @click="previewId = file.id">
+            <img v-if="file.thumbnailURL" :src="file.thumbnailURL" alt="" />
+            <thumbnailPlaceholder v-else aria-hidden="true" />
+            <span>{{ showViews && file.recordView ? `View ${file.recordView}` : file.name }}</span>
+          </button>
+        </div>
       </div>
-      <div class="gallery-modal__download-container flex flex-col [height:calc(100vh_-_90px)] w-full gap-8 [max-width:320px] border-l border-neutral-200 [padding:0.5rem_1rem] ml-4">
-        <div v-if="currentFile.mimeType.startsWith('image/')">
-          <div class="mb-3 text-[13px] font-semibold">Choose an Image format</div>
-          <RadioGroup v-model="form.imageFormat">
-            <div class="flex flex-col space-y-2">
-              <div v-for="option in [
-                { name: 'Original (HD)', value: 'original' },
-                { name: 'PNG', value: 'png' },
-                { name: 'JPG', value: 'jpg' },
-                { name: 'WEBP', value: 'webp' },
-              ]" :key="option.value" class="flex items-center space-x-2">
-                <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`"
-                  class="border border-primary text-primary shrink-0" />
-                <Label :for="`image-format-${option.value}`">{{ option.name }}</Label>
-              </div>
-            </div>
-          </RadioGroup>
-        </div>
-        <div v-if="
-          currentFile.mimeType.startsWith('image/') && form.imageFormat !== 'original'
-        ">
-          <div class="mb-3 text-[13px] font-semibold">Image quality</div>
-          <RadioGroup v-model="form.imageResolution">
-            <div class="flex flex-col space-y-2">
-              <div v-for="option in [
-                {
-                  name: 'High Quality (best)',
-                  value: 'high',
-                  description: 'Recommended usage: Print',
-                },
-                {
-                  name: 'Medium Quality',
-                  value: 'medium',
-                  description: 'Recommended usage: Digital',
-                },
-                {
-                  name: 'Small Quality (smaller file)',
-                  value: 'low',
-                  description: 'Recommended usage: Digital',
-                },
-              ]" :key="option.value" class="flex items-center space-x-2">
-                <RadioGroupItem :value="option.value" :id="`image-quality-${option.value}`"
-                  class="border border-primary text-primary shrink-0" />
-                <div>
-                  <Label :for="`image-quality-${option.value}`">{{ option.name }}</Label>
-                  <p class="text-sm text-neutral-500">{{ option.description }}</p>
-                </div>
-              </div>
-            </div>
-          </RadioGroup>
-        </div>
-        <div>
-          <div class="mb-3 text-[13px] font-semibold">Download type</div>
-          <RadioGroup v-model="form.downloadType">
-            <div class="flex flex-col space-y-2">
-              <div v-for="option in [
-                {
-                  name: 'Direct download',
-                  value: 'direct',
-                  description: 'Download directly on your computer.',
-                  disabled: !allowDirectDownload,
-                },
-                {
-                  name: 'Create a link',
-                  value: 'email',
-                  description:
-                    'A link to the file is sent to your email and saved in My Downloads for 7 days.',
-                  disabled: false,
-                },
-              ]" :key="option.value" class="flex items-center space-x-2">
-                <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"
-                  class="border border-primary text-primary shrink-0" />
-                <div>
-                  <Label :for="`download-type-${option.value}`">{{ option.name }}</Label>
-                  <p class="text-sm text-neutral-500">{{ option.description }}</p>
-                </div>
-              </div>
-            </div>
-          </RadioGroup>
-        </div>
-        <div v-if="currentFile.record?.attributes?.length || currentFile.metadata?.length" class="grid gap-4">
-          <div v-if="currentFile.record?.attributes?.length">
-            <div class="mb-2 text-[13px] font-semibold">{{ recordLabel.singular.value }}</div>
-            <dl class="file-facts">
-              <template v-for="attribute in currentFile.record.attributes" :key="attribute?.id">
-                <dt>{{ attribute?.displayName || attribute?.name }}</dt>
-                <dd>{{ attribute?.value }}</dd>
-              </template>
-            </dl>
+      <aside class="gallery-modal__download-container" aria-label="Download options">
+        <template v-if="!isResolving && !loadError">
+          <div v-if="recordId && productFacts.length">
+            <h3 class="mb-3 text-[13px] font-semibold">{{ recordLabel.singular.value }}</h3>
+            <dl class="file-facts"><template v-for="fact in productFacts" :key="fact.id"><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></template></dl>
           </div>
-          <div v-if="currentFile.metadata?.length">
-            <div class="mb-2 text-[13px] font-semibold">From the file</div>
-            <dl class="file-facts">
-              <template v-for="field in currentFile.metadata" :key="field.id">
-                <dt>{{ field.displayName || field.name }}</dt>
-                <dd>{{ field.value }}</dd>
-              </template>
-            </dl>
-          </div>
-        </div>
-        <div v-if="hasLicense">
-          <div class="mb-3 text-[13px] font-semibold">Usage Licensing Agreement</div>
-          <div class="flex-col gap-1">
-            <div v-if="currentFile.license" class="flex items-center text-neutral-600">
-              <Copyright class="w-4 h-4 mr-4 text-neutral-600" />
-              <div>
-                <Dialog v-if="currentFile.license.details">
-                  <DialogTrigger as-child>
-                    <button class="flex items-center text-sm mb-1 text-neutral-800">
-                      {{ currentFile.license.name }}
-                      <CircleHelpIcon class="ml-2 h-4 w-4" />
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent class="sm:max-w-[640px] gap-5">
-                      <DialogHeader><DialogTitle>{{ currentFile.license.name }}</DialogTitle><DialogDescription>Usage terms</DialogDescription></DialogHeader>
-                    <div class="text-sm leading-relaxed [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5" v-html="currentFile.license.details" />
-                  </DialogContent>
-                </Dialog>
-                <div v-else class="flex items-center text-sm mb-1 text-neutral-800">
-                  {{ currentFile.license.name }}
-                </div>
-                <div class="text-neutral-600 text-xs">
-                  {{
-                    currentFile.license.scopes
-                      .map((scope: string) => scope.toUpperCase())
-                      .join(", ")
-                  }}
-                </div>
-              </div>
+          <fieldset v-if="showViews" class="product-views">
+            <legend>Views to download</legend>
+            <button type="button" class="select-all-views" @click="selectedViews = [...viewOptions]">Select all</button>
+            <div class="view-options"><label v-for="view in viewOptions" :key="view"><input v-model="selectedViews" type="checkbox" :value="view" />{{ view ? `View ${view}` : 'Unnumbered' }}</label></div>
+          </fieldset>
+          <CollectionDownloadFileOptions :files="downloadFiles" :direct-limit="recordId ? 2_000_000_000 : 5_000_000_000"
+            v-model:image-format="form.imageFormat" v-model:image-resolution="form.imageResolution"
+            v-model:video-format="form.videoFormat" v-model:video-resolution="form.videoResolution"
+            v-model:delivery="form.downloadType" v-model:accepted="form.isAcceptingTerms" />
+          <div v-if="!recordId && (currentFile?.record?.attributes?.length || currentFile?.metadata?.length)" class="grid gap-4">
+            <div v-if="currentFile?.record?.attributes?.length"><h3 class="mb-2 text-[13px] font-semibold">{{ recordLabel.singular.value }}</h3>
+              <dl class="file-facts"><template v-for="attribute in currentFile.record.attributes" :key="attribute?.id"><dt>{{ attribute?.displayName || attribute?.name }}</dt><dd>{{ attribute?.value }}</dd></template></dl>
             </div>
-            <div class="flex items-center py-6 gap-4">
-              <Checkbox id="terms" v-model="form.isAcceptingTerms"
-                class="border-brand-text [&>*]:bg-brand [&>*]:text-brand-foreground"
-                :class="{ 'border-red-500': hasTermsError }" />
-              <Label for="terms" class="leading-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                :class="{
-                  'text-red-500': hasTermsError,
-                  'text-brand-text': !hasTermsError && form.isAcceptingTerms,
-                }">
-                By downloading this asset, I hereby agree to respect the Asset Usage
-                Licensing Agreement.
-              </Label>
+            <div v-if="currentFile?.metadata?.length"><h3 class="mb-2 text-[13px] font-semibold">From the file</h3>
+              <dl class="file-facts"><template v-for="field in currentFile.metadata" :key="field.id"><dt>{{ field.displayName || field.name }}</dt><dd>{{ field.value }}</dd></template></dl>
             </div>
           </div>
-        </div>
-        <div>
-          <Button @click="download"
-            class="w-full bg-primary text-primary-foreground hover:bg-[var(--dv-action-hover)]"
-            :class="{
-              'ring ring-neutral-200 bg-white text-neutral-800 hover:ring-brand-text hover:text-brand-text hover:bg-white': hasLicense && !form.isAcceptingTerms,
-            }" :disabled="isLoading">
-            {{ isLoading ? "Preparing files..." : "Download" }}
+        </template>
+        <div class="gallery-modal__download-action">
+          <Button @click="download" class="w-full" :disabled="!canDownload">
+            {{ isLoading ? 'Preparing files…' : recordId ? (showViews && selectedViews.length === viewOptions.length ? 'Download all views' : `Download ${downloadFiles.length} ${downloadFiles.length === 1 ? 'file' : 'files'}`) : 'Download' }}
           </Button>
-          <div class="mt-2 text-sm text-neutral-600">
-            Original files: {{ formatFileSize(currentFile.size) }}
-          </div>
-          <p v-if="hasCustomDownloadSettings" class="mt-1 text-xs text-neutral-500">
-            Final size may vary.
-          </p>
+          <p class="mt-2 text-xs text-neutral-500" role="status">{{ recordId ? `${downloadFiles.length} files · ` : '' }}{{ formatFileSize(totalSize) }}</p>
+          <p v-if="hasCustomDownloadSettings" class="mt-1 text-xs text-neutral-500">Final size may vary.</p>
+          <p v-if="totalSize >= 10_000_000_000" class="mt-2 text-sm text-destructive" role="alert">Select fewer files to stay under 10 GB.</p>
         </div>
-      </div>
+      </aside>
     </div>
   </FocusScope>
   </Teleport>
 </template>
 
 <style scoped>
+.gallery-modal { display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+.gallery-modal__header { flex-shrink:0; }
+.gallery-modal__body { display:grid; grid-template-columns:minmax(0,1fr) 320px; flex:1; min-height:0; gap:24px; }
+.gallery-modal__preview { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.gallery-modal__preview-thumbnail-container { flex:1; height:auto; min-height:0; }
+.gallery-modal__download-container { display:flex; flex-direction:column; gap:24px; min-width:0; overflow-y:auto; border-left:1px solid #e5e5e5; padding:8px 0 0 24px; }
+.gallery-modal__download-action { margin-top:auto; position:sticky; bottom:0; padding:12px 0; background:white; }
+.gallery-modal__empty { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:16px; color:#737373; font-size:14px; }
+.is-product .gallery-modal__navigation { bottom:116px; }
+.product-view-strip { display:flex; flex-shrink:0; gap:12px; overflow-x:auto; padding:12px 4px; border-top:1px solid #e5e5e5; }
+.product-view-strip button { width:100px; flex-shrink:0; border:1px solid #e5e5e5; padding:6px; }
+.product-view-strip button[aria-pressed=true] { border-color:#262626; box-shadow:inset 0 0 0 1px #262626; }
+.product-view-strip img, .product-view-strip svg { width:100%; height:64px; object-fit:contain; }
+.product-view-strip span { display:block; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:4px; }
+.product-views { position:relative; }
+.product-views legend { font-size:13px; font-weight:600; margin-bottom:12px; }
+.select-all-views { display:block; margin-bottom:10px; font-size:12px; text-decoration:underline; text-underline-offset:3px; }
+.view-options { display:flex; flex-wrap:wrap; gap:8px; }
+.view-options label { display:flex; align-items:center; gap:6px; border:1px solid #e5e5e5; padding:8px; font-size:12px; cursor:pointer; }
+.view-options input { accent-color:#262626; width:16px; height:16px; }
+.gallery-modal button:focus-visible, .gallery-modal input:focus-visible { outline:2px solid #262626; outline-offset:3px; }
+@media(max-width:640px) {
+  .gallery-modal { padding:16px; overflow-y:auto; }
+  .gallery-modal__body { display:flex; flex-direction:column; flex:none; gap:20px; }
+  .gallery-modal__preview { flex:none; height:38dvh; }
+  .gallery-modal__download-container { flex:none; overflow:visible; border-left:0; border-top:1px solid #e5e5e5; padding:20px 0 0; }
+  .gallery-modal__download-action { position:static; }
+  .gallery-modal__previous-file, .gallery-modal__next-file { padding:4px; }
+  .gallery-modal__key-info { display:none; }
+}
+
 .file-facts { display:grid; grid-template-columns:minmax(0,max-content) minmax(0,1fr); gap:4px 16px; font-size:var(--dv-size-caption); }
 .file-facts dt { color:var(--dv-text-secondary); }
 .file-facts dd { overflow-wrap:anywhere; }

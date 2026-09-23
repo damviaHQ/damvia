@@ -42,6 +42,7 @@ import invitationRouter, { formatInvitation } from "./collection/invitation"
 import { formatLicense } from "./license"
 import { formatPage } from "./page"
 import { splitMulti } from "../../services/record-values"
+import { resolveDownloadSelection } from "../../services/download-selection"
 
 export type FormatCollectionOptions = {
 	collection: Collection,
@@ -913,19 +914,8 @@ export default router({
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
-			const collections: Collection[] = []
-			for (const value of input.items.filter((v) => v.type === 'collection')) {
-				const found = await userCollectionsQuery(ctx.user)
-					.andWhere({ path: ILike(`%${value.id}.%`) })
-					.getMany()
-				collections.push(...found)
-			}
-			const collectionFiles = await userCollectionFilesQuery(ctx.user)
-				.andWhere(new Brackets((q) => q
-					.where({ id: In(input.items.filter((v) => v.type === 'file').map((v) => v.id)) })
-					.orWhere({ collectionId: In(collections.map((c) => c.id)) })
-				))
-				.getMany()
+			const selection = await resolveDownloadSelection(dataSource.manager, ctx.user, input.items)
+			const collectionFiles = selection.files
 			const licenses = Object.values(
 				collectionFiles.reduce((licenses, file) => {
 					if (file.assetFile.license) {
@@ -937,6 +927,10 @@ export default router({
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 
 			return {
+				recordCount: selection.rows.length,
+				columns: selection.columns,
+				previewRows: selection.rows.slice(0, 5),
+				viewsEnabled: selection.viewsEnabled,
 				files: await Promise.all(collectionFiles.map(file => formatCollectionFile({ file, recordAttributes }))),
 				licenses: await Promise.all(licenses.map(formatLicense)),
 				allowDirectDownload:

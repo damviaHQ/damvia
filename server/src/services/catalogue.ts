@@ -90,24 +90,29 @@ function visibleFileIdsSql(user: User, parameters: unknown[], em: EntityManager)
 
 // The scope of a listing: everything the reader may see, narrowed to one
 // collection and its descendants when the reader opened one.
-async function scopeCondition(em: EntityManager, user: User, collectionId: string | undefined, parameters: unknown[]) {
-	const visible = visibleRecordsCondition(user, 'r', parameters, em)
-	if (!collectionId) {
-		return visible
-	}
-	const collection = await userCollectionsQuery(user, em).andWhere('collection.id = :id', { id: collectionId }).getOne()
-	if (!collection) {
-		throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
-	}
-	if (collection.includesAllRecords) {
-		return visible
-	}
-	parameters.push(collection.path ?? '')
-	return `${visible} AND EXISTS (
-		SELECT 1 FROM collection_records cr
-		INNER JOIN collections holder ON holder.id = cr.collection_id
-		WHERE cr.record_id = r.id AND holder.mpath LIKE $${parameters.length} || '%'
-	)`
+export async function scopeCondition(em: EntityManager, user: User, collectionId: string | undefined, parameters: unknown[], hideWithoutMedia = false) {
+    let visible = visibleRecordsCondition(user, 'r', parameters, em)
+    if (hideWithoutMedia) {
+        const files = visibleFileIdsSql(user, parameters, em)
+        visible += ` AND EXISTS (
+            SELECT 1 FROM asset_files a
+            LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
+            WHERE coalesce(l.record_id, a.record_id) = r.id AND a.id IN (${files})
+        )`
+    }
+    if (!collectionId) return visible
+    const collection = await userCollectionsQuery(user, em).andWhere('collection.id = :id', { id: collectionId }).getOne()
+    if (!collection) throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+    if (collection.includesAllRecords) return visible
+    parameters.push(collection.path ?? '')
+    const pathParameter = `$${parameters.length}`
+    return `${visible} AND EXISTS (
+        SELECT 1 FROM collection_records cr
+        INNER JOIN collections holder ON holder.id = cr.collection_id
+        WHERE cr.record_id = r.id AND NOT cr.excluded
+        AND holder.id IN (${visibleCollectionIdsSql(user, parameters, em)})
+        AND holder.mpath LIKE ${pathParameter} || '%'
+    )`
 }
 
 async function visualsOf(em: EntityManager, user: User, recordIds: string[], thumbnailView: string | null, perRecord: number) {

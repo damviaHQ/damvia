@@ -172,6 +172,7 @@ Two restrictions separate this router from `record.list`, which is admin only. F
 | `favorite.addCollection` | mutation | `userApproved`, `userMember` | Stars a collection; `NOT_FOUND` when the collection is not visible to the caller, idempotent when already starred. Unlike `favorite.add`, it records no activity event |
 | `favorite.removeCollection` | mutation | `userApproved`, `userMember` | Unstars a collection; a no-op when it was not starred |
 | `download.list` | query | `userApproved` | The caller's `ready`, `preparing` and `failed` downloads, plus those `expired` in the last month |
+| `download.exportRecords` | mutation | `userApproved` | Exports selected accessible records or collections as base64 CSV/XLSX with selected visible columns; up to 10,000 rows, access rechecked at export |
 | `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` at or above 10,000,000,000 bytes); `email` type pushes `download/create-archive` |
 
 ### `record` and `recordAttribute`

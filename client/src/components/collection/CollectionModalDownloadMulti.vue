@@ -13,387 +13,258 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
-import Loader from "@/components/Loader.vue"
-import { Button } from "@/components/ui/button/index.js"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { useGlobalToast } from "@/composables/useGlobalToast.ts"
-import { RouterOutput, trpc } from "@/services/server.ts"
-import { useDownloadStore } from "@/stores/downloadStore"
-import { useGlobalStore } from "@/stores/globalStore"
-import { getFileExtension } from "@/utils/fileExtention"
-import { formatFileSize } from "@/utils/fileSize"
-import { useQueryClient } from "@tanstack/vue-query"
-import {CircleHelpIcon, Copyright, FileStack, X} from "@lucide/vue"
-import { computed, ref, watch, watchEffect } from "vue"
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger} from "@/components/ui/dialog";
-import { FocusScope } from "reka-ui"
+import { computed, ref, watch, watchEffect } from 'vue'
+import { FileStack, Table2, Download } from '@lucide/vue'
+import { useQueryClient } from '@tanstack/vue-query'
+import CollectionDownloadFileOptions from './CollectionDownloadFileOptions.vue'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useGlobalToast } from '@/composables/useGlobalToast'
+import { useRecordLabel } from '@/composables/useRecordLabel'
+import { RouterInput, RouterOutput, trpc } from '@/services/server'
+import { useDownloadStore } from '@/stores/downloadStore'
+import { useGlobalStore } from '@/stores/globalStore'
+import { formatFileSize } from '@/utils/fileSize'
 
 const props = defineProps<{ modelValue: boolean }>()
-const emit = defineEmits<{ (e: "update:modelValue", isOpen: boolean): void }>()
-const { startRefetch } = useDownloadStore()
+const emit = defineEmits<{ (e: 'update:modelValue', open: boolean): void }>()
+const store = useGlobalStore()
+const labels = useRecordLabel()
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
-const globalStore = useGlobalStore()
-const hasTermsError = ref(false)
-const isLoading = ref(false)
-const res = ref<RouterOutput["collection"]["getFiles"] | null>(null)
-const form = ref<{
-  imageFormat: "png" | "jpg" | "webp" | "original"
-  imageResolution: "high" | "medium" | "low"
-  videoFormat: "mp4" | "webm" | "original"
-  videoResolution: "high" | "medium" | "low"
-  downloadType: "email" | "direct"
-  isAcceptingTerms: boolean
-}>({
-  imageFormat: "original",
-  imageResolution: "medium",
-  videoFormat: "original",
-  videoResolution: "medium",
-  downloadType: "direct",
-  isAcceptingTerms: false,
-})
+const downloads = useDownloadStore()
+const res = ref<RouterOutput['collection']['getFiles'] | null>(null)
+const error = ref('')
+const busy = ref(false)
+const mode = ref<'files' | 'list'>('files')
+const format = ref<'xlsx' | 'csv'>('xlsx')
+const columns = ref<string[]>([])
+const views = ref<string[]>([])
+const excluded = ref<string[]>([])
+const accepted = ref(false)
+const imageFormat = ref<'original' | 'jpg' | 'png' | 'webp'>('original')
+const imageResolution = ref<'high' | 'medium' | 'low'>('medium')
+const videoFormat = ref<'original' | 'mp4' | 'webm'>('original')
+const videoResolution = ref<'high' | 'medium' | 'low'>('medium')
+const delivery = ref<'direct' | 'email'>('direct')
+const reload = ref(0)
+const viewOptions = computed(() => [...new Set((res.value?.files ?? []).map(file => file.recordView ?? ''))].sort())
+const filterViews = computed(() => !!res.value?.viewsEnabled && viewOptions.value.some(Boolean))
+const displayedFiles = computed(() => (res.value?.files ?? []).filter(file => !filterViews.value || views.value.includes(file.recordView ?? '')))
+const files = computed(() => displayedFiles.value.filter(file => !excluded.value.includes(file.id)))
+function toggleFile(id: string) {
+  excluded.value = excluded.value.includes(id) ? excluded.value.filter(current => current !== id) : [...excluded.value, id]
+}
+const bytes = computed(() => files.value.reduce((sum, file) => sum + file.size, 0))
+const imageCount = computed(() => files.value.filter(file => file.mimeType.startsWith('image/')).length)
+const directAllowed = computed(() => bytes.value <= 2_000_000_000 && imageCount.value <= 300)
+const licenses = computed(() => [...new Map(files.value.flatMap(file => file.license ? [[file.license.id, file.license] as const] : [])).values()])
+const selectedColumns = computed(() => (res.value?.columns ?? []).filter(column => columns.value.includes(column.id)))
+const canDownload = computed(() => !!res.value && !busy.value && (mode.value === 'list'
+  ? !!res.value.recordCount && !!columns.value.length
+  : !!files.value.length && bytes.value < 10_000_000_000 && (!licenses.value.length || accepted.value)))
 
-const imageCount = computed(
-  () =>
-    (res.value?.files ?? []).filter((file) => file.mimeType.startsWith("image/")).length
-)
-const allowImageCompression = computed(() => imageCount.value <= 300)
-const disallowDirectDownload = computed(() => {
-  // Disallow direct download if the file size is greater than 5GB or if the file count exceeds 300
-  const FIVE_GB_IN_BYTES = 5 * 1024 * 1024 * 1024
-  const sizeInBytes =
-    res.value?.files.reduce((total, file) => total + Number(file.size), 0) || 0
-  return imageCount.value > 300 || sizeInBytes > FIVE_GB_IN_BYTES
-})
-const totalSize = computed(() => {
-  const sizeInBytes =
-    res.value?.files.reduce((total, file) => total + Number(file.size), 0) || 0
-  return formatFileSize(sizeInBytes)
-})
-const hasCustomDownloadSettings = computed(() =>
-  (res.value?.files ?? []).some((file) =>
-    (file.mimeType.startsWith("image/") && form.value.imageFormat !== "original") ||
-    (file.mimeType.startsWith("video/") && form.value.videoFormat !== "original")
-  )
-)
-
-const hasLicenses = computed(() => {
-  return res.value?.licenses && res.value.licenses.length > 0;
-})
-
-watch([() => globalStore.selection, () => props.modelValue], () => {
-  if (!props.modelValue) {
-    res.value = null
-
-    form.value.isAcceptingTerms = false
-    return
+watch([() => props.modelValue, () => store.selection, reload], async (_, __, onCleanup) => {
+  let cancelled = false
+  onCleanup(() => { cancelled = true })
+  res.value = null
+  error.value = ''
+  accepted.value = false
+  if (!props.modelValue) return
+  try {
+    const data = await trpc.collection.getFiles.mutate({ items: store.selection })
+    if (cancelled) return
+    res.value = data
+    columns.value = (data.columns ?? []).map(column => column.id)
+    views.value = [...new Set(data.files.map(file => file.recordView ?? ''))]
+    excluded.value = []
+    imageFormat.value = 'original'
+    videoFormat.value = 'original'
+    mode.value = data.files.length || !data.recordCount ? 'files' : 'list'
+    delivery.value = directAllowed.value ? 'direct' : 'email'
+  } catch (cause) {
+    if (!cancelled) error.value = (cause as Error).message
   }
-
-  trpc.collection.getFiles
-    .mutate({ items: globalStore.selection })
-    .then((data) => {
-      res.value = data
-      form.value.downloadType = data.allowDirectDownload ? "direct" : "email"
-      form.value.isAcceptingTerms = false
-    })
-    .catch((error) => toast.error((error as Error).message))
-})
-
+}, { immediate: true })
 watchEffect(() => {
-  if (!allowImageCompression.value && form.value.imageFormat !== "original") {
-    form.value.imageFormat = "original"
-  }
-  if (disallowDirectDownload.value) {
-    form.value.downloadType = "email"
-  }
+  if (!directAllowed.value) delivery.value = 'email'
+  if (imageCount.value > 300) imageFormat.value = 'original'
 })
+watch(files, () => { accepted.value = false })
 
-watchEffect(() => {
-  if (disallowDirectDownload.value) {
-    form.value.downloadType = "email"
-  }
-})
-
-watchEffect(() => {
-  if (hasLicenses.value) {
-    hasTermsError.value = false;
-  }
-})
-
-function download() {
-  if (hasLicenses.value && !form.value.isAcceptingTerms) {
-    toast.error("Please accept the terms and conditions to proceed with the download.")
-    isLoading.value = false
-    hasTermsError.value = true
-    return
-  }
-
-  isLoading.value = true
-  hasTermsError.value = false
-
-  const formData = {
-    ...form.value,
-    isAcceptingTerms: hasLicenses.value ? form.value.isAcceptingTerms : true,
-    collectionFileIds: res.value?.files.map((file) => file.id),
-  };
-
-  trpc.download.create
-    .mutate(formData as any)
-    .then((res) => {
-      queryClient.invalidateQueries({ queryKey: ["downloads"] })
-
-      form.value.isAcceptingTerms = false
-
-      emit("update:modelValue", false)
-      if (res.url) {
-        window.open(res.url, "_blank")
-        return
+async function download() {
+  if (!canDownload.value) return
+  busy.value = true
+  try {
+    if (mode.value === 'list') {
+      const result = await trpc.download.exportRecords.mutate({ items: store.selection, columns: selectedColumns.value.map(column => column.id), format: format.value })
+      const content = Uint8Array.from(atob(result.content), char => char.charCodeAt(0))
+      const url = URL.createObjectURL(new Blob([content], { type: result.mimeType }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${labels.lowerPlural.value}.${format.value}`
+      document.body.append(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } else {
+      const result = await trpc.download.create.mutate({ collectionFileIds: files.value.map(file => file.id), imageFormat: imageFormat.value, imageResolution: imageResolution.value, videoFormat: videoFormat.value, videoResolution: videoResolution.value, downloadType: delivery.value } as RouterInput['download']['create'])
+      queryClient.invalidateQueries({ queryKey: ['downloads'] })
+      if (result.url) {
+        const link = document.createElement('a')
+        link.href = result.url
+        document.body.append(link)
+        link.click()
+        link.remove()
+      } else {
+        toast.success('We’ll email your download link when it’s ready.')
+        downloads.startRefetch()
       }
-      toast.success(
-        "You will receive a download link by email when your download is ready."
-      )
-      startRefetch()
-    })
-    .catch((error) => toast.error((error as Error).message))
-    .finally(() => {
-      isLoading.value = false
-    })
-}
-
-function onImageLoad(event: Event) {
-  if (
-    event.target &&
-    event.target instanceof HTMLImageElement &&
-    event.target.parentElement
-  ) {
-    event.target.parentElement.style.maxWidth = `${event.target.clientWidth}px`
+    }
+    emit('update:modelValue', false)
+  } catch (cause) {
+    toast.error((cause as Error).message)
+  } finally {
+    busy.value = false
   }
-}
-
-function removeFromSelection(file: { id: string }) {
-  if (!res.value) {
-    return
-  }
-
-  globalStore.setSelection(
-    res.value.files
-      .filter((current) => current.id !== file.id)
-      .map((file) => ({ type: "file", id: file.id }))
-  )
 }
 </script>
 
 <template>
-  <FocusScope v-if="modelValue" as="div" trapped loop role="dialog" aria-modal="true" aria-labelledby="selected-files-title"
-    class="bg-white fixed top-0 left-0 w-full h-full z-30 py-5 px-7 text-neutral-800" @keydown.esc="$emit('update:modelValue', false)">
-    <div class="modal__header flex justify-between items-center mb-4">
-      <div class="flex items-center gap-2">
-        <FileStack aria-hidden="true" />
-        <h2 id="selected-files-title" class="text-[17px] font-semibold">Selected files</h2>
+  <Dialog :open="modelValue" @update:open="emit('update:modelValue', $event)">
+    <DialogContent class="download-dialog" :aria-describedby="undefined">
+      <DialogHeader>
+        <DialogTitle>{{ res?.recordCount ? `Download ${labels.lowerPlural.value}` : 'Selected files' }}</DialogTitle>
+      </DialogHeader>
+      <div v-if="error" class="download-state" role="alert">
+        <p>{{ error }}</p>
+        <Button variant="outline" @click="reload++">Try again</Button>
       </div>
-      <Button aria-label="Close selected files" variant="ghost" size="icon" type="button"
-        class="text-neutral-800 hover:text-neutral-600 bg-transparent hover:bg-neutral-100"
-        @click="$emit('update:modelValue', false)">
-        <X strokeWidth="3" />
-      </Button>
-    </div>
-    <div v-if="res" class="modal__content flex flex-wrap overflow-x-hidden">
-      <div class="modal__content-left flex-1 pr-4 items-start overflow-y-auto h-[calc(100vh-90px)]">
-        <div class="file-grid grid [grid-template-columns:repeat(auto-fill,_minmax(190px,_1fr))] gap-2">
-          <div v-for="file in res.files" :key="file.id" class="file-item w-full min-w-0">
-            <div class="relative flex flex-col items-center max-w-[20%] min-w-[190px] p-1 border border-neutral-200 bg-neutral-50">
-              <button type="button" :aria-label="`Remove ${file.name}`" @click="removeFromSelection(file)" class="download-assets-modal__unselect-item cursor-pointer flex absolute top-2 left-2 p-0">
-                <X class="w-4 h-4" />
-              </button>
-              <img v-if="file.thumbnailURL" v-lazy="file.thumbnailURL" alt=""
-                class="w-full h-[150px] object-contain justify-self-start items-start p-2" @load="onImageLoad" />
-              <thumbnailPlaceholder v-else aria-hidden="true" @load="onImageLoad" class="fill-neutral-600 h-[150px]" />
-            </div>
-            <div class="w-full flex flex-col gap-1 max-w-full p-1 overflow-hidden text-ellipsis whitespace-nowrap">
-              <div class="w-full text-sm text-neutral-800 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
-                {{ file.name }}
-              </div>
-              <div class="text-xs text-neutral-500">
-                {{ getFileExtension(file.name) }} - {{ formatFileSize(file.size) }}
-              </div>
-            </div>
-          </div>
+      <div v-else-if="!res" class="download-state" role="status">Loading selection…</div>
+      <template v-else>
+        <div v-if="res.recordCount" class="download-modes" role="group" aria-label="Download content">
+          <button type="button" :aria-pressed="mode === 'files'" @click="mode = 'files'"><FileStack :size="18" />Files <span>{{ res.files.length }}</span></button>
+          <button type="button" :aria-pressed="mode === 'list'" @click="mode = 'list'"><Table2 :size="18" />{{ labels.singular.value }} list <span>{{ res.recordCount }}</span></button>
         </div>
-      </div>
-      <div
-        class="modal__content-right flex flex-col gap-5 px-4 pl-6 flex-[0_0_340px] h-[calc(100vh-90px)] w-full border-l border-neutral-200 overflow-y-auto">
-        <div v-if="imageCount && allowImageCompression">
-          <div class="mb-3 text-[13px] font-semibold">Choose an Image format</div>
-          <RadioGroup v-model="form.imageFormat">
-            <div class="flex flex-col space-y-2">
-              <div v-for="option in [
-                { name: 'Original (HD)', value: 'original', disabled: false, tooltip: null },
-                { name: 'PNG', value: 'png' },
-                { name: 'JPG', value: 'jpg' },
-                { name: 'WEBP', value: 'webp' },
-              ]" :key="option.value" class="flex items-center space-x-2">
-                <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`"
-                  class="border border-primary text-primary shrink-0" />
-                <Label :for="`image-format-${option.value}`">{{ option.name }}</Label>
-              </div>
-            </div>
-          </RadioGroup>
-        </div>
-        <div v-else-if="imageCount">
-          <div class="mb-3 text-[13px] font-semibold">Choose Image format</div>
-          <RadioGroup v-model="form.imageFormat">
-            <div class="flex flex-col space-y-2">
-              <div v-for="option in [
-                { name: 'Original (HD)', value: 'original', disabled: false, tooltip: null },
-                { name: 'PNG', value: 'png', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
-                { name: 'JPG', value: 'jpg', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
-                { name: 'WEBP', value: 'webp', disabled: true, tooltip: 'Compression is disabled for downloads with over 300 images' },
-              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible [&:focus-within_.tooltip]:opacity-100 [&:focus-within_.tooltip]:visible': option.disabled }">
-                <RadioGroupItem :value="option.value" :id="`image-format-${option.value}`" :disabled="option.disabled"
-                  :aria-describedby="option.disabled && option.tooltip ? `image-format-${option.value}-reason` : undefined"
-                  class="border border-primary text-primary shrink-0" />
-                <Label :for="`image-format-${option.value}`" :class="{ 'text-neutral-500': option.disabled }">
-                  {{ option.name }}
-                </Label>
-                <div v-if="option.disabled && option.tooltip" :id="`image-format-${option.value}-reason`" class="tooltip absolute [background-color:#4b5563] [color:#e5e7eb] p-2 rounded-none [font-size:0.75rem] [max-width:250px] [z-index:50] [margin-top:-2.5rem] ml-6 [box-shadow:0_4px_6px_-1px_rgba(0,_0,_0,_0.1),_0_2px_4px_-1px_rgba(0,_0,_0,_0.06)]">{{ option.tooltip }}</div>
-              </div>
-            </div>
-          </RadioGroup>
-        </div>
-        <div v-if="imageCount && form.imageFormat !== 'original'">
-          <div class="mb-3 text-[13px] font-semibold">Image quality</div>
-          <RadioGroup v-model="form.imageResolution">
-            <div class="flex flex-col space-y-2">
-              <div v-for="option in [
-                {
-                  name: 'High Quality (best)',
-                  value: 'high',
-                  description: 'Recommended usage: Print',
-                },
-                {
-                  name: 'Medium Quality',
-                  value: 'medium',
-                  description: 'Recommended usage: Digital',
-                },
-                {
-                  name: 'Small Quality (smaller file)',
-                  value: 'low',
-                  description: 'Recommended usage: Digital',
-                },
-              ]" :key="option.value" class="flex items-center space-x-2">
-                <RadioGroupItem :value="option.value" :id="`image-quality-${option.value}`"
-                  class="border border-primary text-primary shrink-0" />
-                <div>
-                  <Label :for="`image-quality-${option.value}`">{{ option.name }}</Label>
-                  <p class="text-sm text-neutral-500">{{ option.description }}</p>
+        <div class="download-body" :data-mode="mode">
+          <div class="download-preview">
+            <template v-if="mode === 'files'">
+              <div v-if="filterViews" class="download-views">
+                <div class="section-heading"><h3>Views</h3><button type="button" class="text-action" @click="views = [...viewOptions]">Select all</button></div>
+                <div class="view-options">
+                  <label v-for="view in viewOptions" :key="view" :class="{ chosen: views.includes(view) }">
+                    <input v-model="views" type="checkbox" :value="view" />{{ view ? `View ${view}` : 'Unnumbered' }}
+                  </label>
                 </div>
               </div>
-            </div>
-          </RadioGroup>
-        </div>
-        <div>
-          <div class="mb-3 text-[13px] font-semibold">Download type</div>
-          <RadioGroup v-model="form.downloadType">
-            <div class="flex flex-col space-y-2">
-              <div v-for="option in [
-                {
-                  name: 'Direct download',
-                  value: 'direct',
-                  description: 'Download starts right after the zip is ready.',
-                  disabled: !res.allowDirectDownload || disallowDirectDownload,
-                  tooltip: disallowDirectDownload ? 'Direct download is disabled for files larger than 5GB or if the file count exceeds 300.' : null
-                },
-                {
-                  name: 'Create a link',
-                  value: 'email',
-                  description:
-                    'A zip is saved for 7 days in My Downloads. You will receive an email with the link when ready.',
-                  disabled: false,
-                  tooltip: null,
-                },
-              ]" :key="option.value" class="flex items-center space-x-2 relative" :class="{ 'disabled-option opacity-50 cursor-not-allowed [&_>_*]:cursor-not-allowed [&_.tooltip]:block [&_.tooltip]:opacity-0 [&_.tooltip]:invisible [&_.tooltip]:[transition:opacity_0.3s,_visibility_0.3s] [&_.tooltip]:[transition-delay:0.5s] [&:hover_.tooltip]:opacity-100 [&:hover_.tooltip]:visible [&:focus-within_.tooltip]:opacity-100 [&:focus-within_.tooltip]:visible': option.disabled }">
-                <RadioGroupItem :value="option.value" :id="`download-type-${option.value}`" :disabled="option.disabled"
-                  :aria-describedby="option.disabled && option.tooltip ? `download-type-${option.value}-reason` : undefined"
-                  class="border border-primary text-primary shrink-0" />
-                <div>
-                  <Label :for="`download-type-${option.value}`" :class="{ 'text-neutral-500': option.disabled }">
-                    {{ option.name }}
-                  </Label>
-                  <p class="text-sm" :class="option.disabled ? 'text-neutral-500' : 'text-neutral-500'">
-                    {{ option.description }}
-                  </p>
-                </div>
-                <div v-if="option.disabled && option.tooltip" :id="`download-type-${option.value}-reason`" class="tooltip absolute [background-color:#4b5563] [color:#e5e7eb] p-2 rounded-none [font-size:0.75rem] [max-width:250px] [z-index:50] [margin-top:-2.5rem] ml-6 [box-shadow:0_4px_6px_-1px_rgba(0,_0,_0,_0.1),_0_2px_4px_-1px_rgba(0,_0,_0,_0.06)]">{{ option.tooltip }}</div>
+              <div class="section-heading"><h3>{{ files.length }} {{ files.length === 1 ? 'file' : 'files' }}</h3></div>
+              <div v-if="displayedFiles.length" class="download-file-grid">
+                <label v-for="file in displayedFiles" :key="file.id" class="download-file" :class="{ 'is-excluded': excluded.includes(file.id) }">
+                  <span class="file-picture">
+                    <input type="checkbox" :checked="!excluded.includes(file.id)" :aria-label="`Include ${file.name}`" @change="toggleFile(file.id)" />
+                    <img v-if="file.thumbnailURL" :src="file.thumbnailURL" alt="" loading="lazy" />
+                    <FileStack v-else :size="32" class="file-placeholder" />
+                    <span v-if="filterViews && file.recordView" class="view-badge">{{ file.recordView }}</span>
+                  </span>
+                  <span class="file-name" :title="file.name">{{ file.name }}</span>
+                  <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                </label>
               </div>
-            </div>
-          </RadioGroup>
-        </div>
-        <div v-if="hasLicenses">
-          <div>
-            <div class="mb-3 text-[13px] font-semibold">Usage Licensing Agreement</div>
-            <div class="flex-col gap-1">
-              <div v-if="res.licenses.length > 0" class="flex-col gap-1"></div>
-              <div v-for="license in res.licenses" :key="license.id" class="flex items-center text-neutral-600">
-                <Copyright class="w-4 h-4 mr-4 text-neutral-600" />
-                <div class="flex flex-col">
-                  <Dialog v-if="license.details">
-                    <DialogTrigger as-child>
-                      <button class="flex items-center text-sm mb-1 text-neutral-800">
-                        {{ license.name }}
-                        <CircleHelpIcon class="ml-2 h-4 w-4" />
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent class="sm:max-w-[640px] gap-5">
-                      <DialogHeader><DialogTitle>{{ license.name }}</DialogTitle><DialogDescription>Usage terms</DialogDescription></DialogHeader>
-                      <div class="text-sm leading-relaxed [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5" v-html="license.details" />
-                    </DialogContent>
-                  </Dialog>
-                  <div v-else class="text-sm mb-1 text-neutral-800">
-                    {{ license.name }}
-                  </div>
-                  <div class="text-neutral-600 text-xs">
-                    {{ license.scopes.map((scope) => scope.toUpperCase()).join(", ") }}
-                  </div>
-                </div>
+              <p v-else class="download-state">{{ res.files.length ? 'Select a view to continue.' : 'No files in this selection.' }}</p>
+            </template>
+            <template v-else>
+              <div class="section-heading"><h3>Preview</h3><span>{{ res.recordCount }} {{ labels.lowerPlural.value }}</span></div>
+              <div v-if="selectedColumns.length" class="list-preview" tabindex="0" aria-label="List preview">
+                <table><thead><tr><th v-for="column in selectedColumns" :key="column.id">{{ column.label }}</th></tr></thead>
+                  <tbody><tr v-for="(row, index) in res.previewRows" :key="index"><td v-for="column in selectedColumns" :key="column.id">{{ row[res.columns.findIndex(item => item.id === column.id)] || '—' }}</td></tr></tbody>
+                </table>
               </div>
-              <div class="flex items-center py-6 gap-4">
-                <Checkbox id="terms" v-model="form.isAcceptingTerms"
-                  class="border-brand-text [&>*]:bg-brand [&>*]:text-brand-foreground"
-                  :class="{ 'border-red-500': hasTermsError }" />
-                <Label for="terms" class="leading-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  :class="{
-                    'text-red-500': hasTermsError,
-                    'text-brand-text': !hasTermsError && form.isAcceptingTerms,
-                  }">
-                  By downloading these assets, I hereby agree to respect the Asset Usage
-                  Licensing Agreement.
-                </Label>
-              </div>
-            </div>
+              <p v-else class="download-state">Select at least one column.</p>
+              <p v-if="res.recordCount > 5 && selectedColumns.length" class="preview-caption">First 5 of {{ res.recordCount }} {{ labels.lowerPlural.value }}</p>
+            </template>
           </div>
+          <aside class="download-options" aria-label="Download options">
+            <template v-if="mode === 'list'">
+              <fieldset><legend>Format</legend><div class="format-options">
+                <label :class="{ chosen: format === 'xlsx' }"><input v-model="format" type="radio" value="xlsx" name="list-format" />Excel <span>.xlsx</span></label>
+                <label :class="{ chosen: format === 'csv' }"><input v-model="format" type="radio" value="csv" name="list-format" />CSV <span>.csv</span></label>
+              </div></fieldset>
+              <fieldset class="columns-fieldset"><legend>Columns <span>{{ columns.length }} / {{ res.columns.length }}</span></legend>
+                <div class="column-actions"><button type="button" class="text-action" @click="columns = res.columns.map(column => column.id)">Select all</button><button type="button" class="text-action" @click="columns = []">Clear</button></div>
+                <div class="column-list"><label v-for="column in res.columns" :key="column.id"><input v-model="columns" type="checkbox" :value="column.id" />{{ column.label }}</label></div>
+              </fieldset>
+            </template>
+            <CollectionDownloadFileOptions v-else :files="files"
+              v-model:image-format="imageFormat" v-model:image-resolution="imageResolution"
+              v-model:video-format="videoFormat" v-model:video-resolution="videoResolution"
+              v-model:delivery="delivery" v-model:accepted="accepted" />
+          </aside>
         </div>
-        <div>
-          <Button @click="download" :disabled="isLoading"
-            class="w-full bg-primary text-primary-foreground hover:bg-[var(--dv-action-hover)]"
-            :class="{
-              'ring ring-neutral-200 bg-white text-neutral-800 hover:ring-brand-text hover:text-brand-text hover:bg-white': hasLicenses && !form.isAcceptingTerms,
-            }">
-            {{ isLoading ? "Preparing files..." : "Download" }}
-          </Button>
-          <div class="mt-2 text-sm text-neutral-600">
-            Original files: {{ totalSize }}
-          </div>
-          <p v-if="hasCustomDownloadSettings" class="mt-1 text-xs text-neutral-500">
-            Final size may vary.
-          </p>
+        <div class="download-footer">
+          <span role="status">{{ mode === 'list' ? `${res.recordCount} ${labels.lowerPlural.value} · ${columns.length} columns` : `${files.length} files · ${formatFileSize(bytes)}` }}</span>
+          <div><Button variant="outline" :disabled="busy" @click="emit('update:modelValue', false)">Cancel</Button><Button :disabled="!canDownload" @click="download"><Download :size="16" />{{ busy ? 'Preparing…' : mode === 'list' ? `Download ${format === 'xlsx' ? 'Excel' : 'CSV'}` : delivery === 'email' ? 'Email download link' : 'Download' }}</Button></div>
         </div>
-      </div>
-    </div>
-    <div v-else>
-      <Loader :text="true" />
-    </div>
-  </FocusScope>
+        <p v-if="mode === 'files' && bytes >= 10_000_000_000" class="text-sm text-destructive" role="alert">Select fewer files to stay under 10 GB.</p>
+      </template>
+    </DialogContent>
+  </Dialog>
 </template>
+
+<style scoped>
+:global(.download-dialog) { display:flex; flex-direction:column; gap:20px; width:100vw; height:100dvh; max-width:none; max-height:none; border:0; border-radius:0; padding:20px 28px; overflow:hidden; }
+.download-dialog h3, .download-dialog legend { font-size:13px; font-weight:600; }
+.download-modes { display:flex; gap:8px; }
+.download-modes button { display:flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid hsl(var(--border)); font-size:14px; }
+.download-modes button[aria-pressed=true] { background:hsl(var(--primary)); color:hsl(var(--primary-foreground)); border-color:hsl(var(--primary)); }
+.download-modes span { font-size:12px; opacity:.8; }
+.download-body { display:grid; grid-template-columns:minmax(0,1fr) 320px; flex:1; min-height:0; }
+.download-preview { min-width:0; padding-right:24px; max-height:100%; overflow-y:auto; }
+.download-options { display:flex; flex-direction:column; gap:22px; border-left:1px solid hsl(var(--border)); padding-left:24px; min-width:0; max-height:100%; overflow-y:auto; }
+.section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; font-size:12px; color:hsl(var(--muted-foreground)); }
+.section-heading h3 { color:hsl(var(--foreground)); }
+.text-action { font-size:12px; text-decoration:underline; text-underline-offset:3px; }
+.download-views { margin-bottom:22px; }
+.view-options { display:flex; flex-wrap:wrap; gap:8px; }
+.view-options label { display:flex; align-items:center; gap:7px; padding:7px 9px; border:1px solid hsl(var(--border)); font-size:12px; cursor:pointer; }
+.chosen { border-color:hsl(var(--primary)) !important; }
+.download-dialog input { width:16px; height:16px; accent-color:hsl(var(--primary)); flex-shrink:0; }
+.download-dialog button:focus-visible, .download-dialog input:focus-visible, .download-dialog select:focus-visible, .list-preview:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:3px; }
+.download-file-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:18px 12px; }
+.download-file { min-width:0; cursor:pointer; }
+.download-file.is-excluded .file-picture img { filter:grayscale(1); opacity:.35; }
+.download-file.is-excluded .file-placeholder, .download-file.is-excluded .view-badge { opacity:.4; }
+.download-file.is-excluded .file-name { color:hsl(var(--muted-foreground)); }
+.file-picture { position:relative; display:flex; align-items:center; justify-content:center; height:160px; background:hsl(var(--muted)); border:1px solid hsl(var(--border)); cursor:pointer; }
+.file-picture input { position:absolute; top:8px; left:8px; }
+.file-picture img { width:100%; height:100%; object-fit:contain; padding:18px; }
+.file-placeholder { color:hsl(var(--muted-foreground)); }
+.view-badge { position:absolute; bottom:6px; right:6px; padding:2px 5px; background:hsl(var(--background)); font-size:11px; }
+.file-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; margin-top:6px; }
+.file-size, .preview-caption { display:block; font-size:12px; color:hsl(var(--muted-foreground)); margin-top:4px; }
+.download-options legend { margin-bottom:10px; width:100%; }
+.download-options legend span { float:right; font-weight:400; color:hsl(var(--muted-foreground)); }
+.format-options, .delivery-options, .column-list { display:flex; flex-direction:column; gap:10px; }
+.format-options label, .delivery-options label, .column-list label, .accept-terms { display:flex; align-items:center; gap:9px; font-size:13px; cursor:pointer; overflow-wrap:anywhere; }
+.format-options label { border:1px solid hsl(var(--border)); padding:10px; }
+.format-options span { margin-left:auto; font-size:12px; color:hsl(var(--muted-foreground)); }
+.column-actions { display:flex; justify-content:space-between; margin-bottom:12px; }
+.column-list label { padding:4px 0; }
+.list-preview { overflow-x:auto; border:1px solid hsl(var(--border)); }
+.list-preview table { width:100%; border-collapse:collapse; text-align:left; font-size:12px; white-space:nowrap; }
+.list-preview th { background:hsl(var(--muted)); font-weight:600; }
+.list-preview th, .list-preview td { padding:12px; border-bottom:1px solid hsl(var(--border)); max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+.list-preview tr:last-child td { border-bottom:0; }
+.download-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:18px; border-top:1px solid hsl(var(--border)); }
+.download-footer > span { color:hsl(var(--muted-foreground)); font-size:12px; }
+.download-footer > div { display:flex; gap:8px; }
+.download-state { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:40px 16px; font-size:14px; color:hsl(var(--muted-foreground)); }
+@media (max-width:640px) {
+  .download-body { display:flex; flex-direction:column; min-height:0; max-height:none; overflow-y:auto; }
+  .download-preview { flex-shrink:0; padding-right:0; max-height:none; overflow-y:visible; }
+  .download-options { flex-shrink:0; border-left:0; border-top:1px solid hsl(var(--border)); padding:20px 0 0; margin-top:20px; max-height:none; }
+  .download-body[data-mode="list"] .download-options { order:-1; border-top:0; border-bottom:1px solid hsl(var(--border)); padding:0 0 20px; margin:0 0 20px; }
+  .download-footer { align-items:stretch; flex-direction:column; }
+  .download-footer > div { justify-content:flex-end; }
+  .download-modes button { flex:1; justify-content:center; padding:10px; }
+}
+</style>
