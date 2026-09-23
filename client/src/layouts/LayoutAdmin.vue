@@ -35,7 +35,6 @@ import {
   LayoutDashboard,
   Menu,
   Package,
-  PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
@@ -149,10 +148,6 @@ const storageLevel = computed(() => {
               <FilePenLine class="w-4 h-4 mr-2" />
               Collections
               <span v-if="orphans?.length" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums" :title="`${orphans.length} orphaned collection${orphans.length === 1 ? '' : 's'}`">{{ orphans.length }}</span>
-            </router-link>
-            <router-link :to="{ name: 'admin-product-collections' }" class="menu-item">
-              <PackageSearch class="w-4 h-4 mr-2" />
-              {{ recordLabel.plural.value }} collections
             </router-link>
             <router-link :to="{ name: 'admin-pages' }" class="menu-item">
               <FilePenLine class="w-4 h-4 mr-2" />
