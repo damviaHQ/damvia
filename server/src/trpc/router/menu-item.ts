@@ -20,7 +20,7 @@ import { MenuItem, MenuItemType } from "../../entity/menu-item"
 import { Page } from "../../entity/page"
 import { UserRole } from "../../entity/user"
 import { dataSource } from "../../env"
-import { userCollectionsQuery } from "../../services/collection"
+import { reparentSubtree, userCollectionsQuery } from "../../services/collection"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
 export function formatMenuItem(menuItem: MenuItem) {
@@ -38,6 +38,12 @@ export function formatMenuItem(menuItem: MenuItem) {
 		home: menuItem.home,
 		synchronized: menuItem.collection?.synchronized ?? false,
 	}
+}
+
+// This is the same relationship used when collection moves relocate synced entries.
+function followsCollectionParent(item: MenuItem, parent?: MenuItem | null) {
+	return !!(item.data?.sync && parent?.data?.sync && parent.collectionId
+		&& item.collection?.parentId === parent.collectionId)
 }
 
 type BuildMenuItemTreeOptions = {
@@ -60,6 +66,7 @@ export function buildMenuItemTree({ menuItems, userCollectionIds, parentId = nul
 			if (isCurrentVisible || children.length > 0) {
 				return {
 					...formatMenuItem(current),
+					followsCollectionParent: followsCollectionParent(current, menuItems.find(item => item.id === current.parentId)),
 					children: children.length ? children : undefined,
 					hasAccess: isCurrentVisible,
 				}
@@ -182,6 +189,37 @@ export default router({
 			await dataSource.getRepository(MenuItem).save(menuItem)
 			return formatMenuItem(menuItem)
 		}),
+	move: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(z.object({ id: z.uuid(), parentId: z.uuid().nullable() }))
+		.mutation(async ({ input }) => {
+			await dataSource.transaction(async (em) => {
+				// Serialize moves so two concurrent requests cannot create a cycle.
+				await em.query('LOCK TABLE menu_items IN SHARE ROW EXCLUSIVE MODE')
+				const repository = em.getRepository(MenuItem)
+				const item = await repository.findOne({ where: { id: input.id }, relations: { parent: true, collection: true } })
+				if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Item not found.' })
+				if (item.parentId === input.parentId) return
+				if (item.type === MenuItemType.SECTION && input.parentId) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'A section must stay at the top level.' })
+				}
+				if (followsCollectionParent(item, item.parent)) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'This entry follows its parent collection. Move the collection in Collection settings, or add a separate menu link.' })
+				}
+				const parent = input.parentId ? await repository.findOneBy({ id: input.parentId }) : null
+				if (input.parentId && !parent) throw new TRPCError({ code: 'NOT_FOUND', message: 'Destination item not found.' })
+				if (parent && ![MenuItemType.SECTION, MenuItemType.COLLECTION].includes(parent.type)) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'Choose a section or collection as the menu parent.' })
+				}
+				if (parent && (!item.path || parent.path?.startsWith(item.path))) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'An item cannot be moved inside itself or its descendants.' })
+				}
+				const siblings = await repository.findBy({ parentId: input.parentId ?? IsNull() })
+				await reparentSubtree(em, { table: 'menu_items', nodeId: item.id, newParentId: input.parentId })
+				await repository.update(item.id, { position: Math.max(-1, ...siblings.map(sibling => sibling.position)) + 1 })
+			})
+		}),
+
 	setHome: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.input(z.object({

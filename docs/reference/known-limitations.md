@@ -3,7 +3,7 @@ title: Known limitations
 description: Operational limitations affecting synchronisation, recovery and deployment.
 sidebar:
   order: 7
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-23
 ---
 
 This page tracks operational limitations that remain in the application. For installation checks, see [Validation status](./validation-status.md) and [Acceptance checklist](../deployment/acceptance-checklist.md).
@@ -22,7 +22,6 @@ This page tracks operational limitations that remain in the application. For ins
 
 ## Collections
 
-- A hand-placed menu item cannot be re-parented on its own; it can only be reordered among siblings. Moving a collection moves its synchronized menu entries, but text, divider and other hand-placed entries must be recreated under a different parent when the collection-rescue rules do not move them automatically.
 - `number_of_files` counts `collection_files` rows below a collection rather than distinct files, so a file both mirrored in a sub-collection and copied into an ancestor by hand is counted twice.
 - No trigger refreshes `sample_file_ids` when a file leaves a collection, so a thumbnail mosaic can show a file the collection no longer holds until the nightly `system/integrity-check` recomputes it.
 - A licence restricts a file, never the collection that shows it, so a file copied into a restricted branch stays as visible as it was. See [Licenses](../administration/licenses.md).

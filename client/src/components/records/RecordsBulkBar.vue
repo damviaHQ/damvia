@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { fieldLabel } from "@/utils/recordValues"
-import { Download, PencilLine, Trash2, X } from "@lucide/vue"
+import { ArrowRightLeft, Download, PencilLine, Trash2, X } from "@lucide/vue"
 import { computed, ref } from "vue"
 import RecordFieldInput from "./RecordFieldInput.vue"
 import type { GridField } from "./RecordsGrid.vue"
@@ -31,6 +31,9 @@ const props = defineProps<{
   recordLabelPlural: string
   setField: (field: GridField, value: string) => Promise<void>
   remove: () => Promise<void>
+  // The other tables the selection can move to.
+  tables?: { id: string, name: string }[]
+  move?: (tableId: string) => Promise<void>
 }>()
 const emit = defineEmits<{ export: [], clear: [] }>()
 
@@ -40,8 +43,16 @@ const value = ref("")
 const busy = ref(false)
 const error = ref("")
 const confirmRemove = ref(false)
+const moving = ref(false)
+const moveTo = ref("")
 const field = computed(() => props.fields.find((item) => item.name === fieldName.value))
 const noun = computed(() => props.count === 1 ? props.recordLabel : props.recordLabelPlural)
+
+function openMove() {
+  moveTo.value = props.tables?.[0]?.id ?? ""
+  error.value = ""
+  moving.value = true
+}
 
 function openSet() {
   fieldName.value = props.fields[0]?.name ?? ""
@@ -68,6 +79,7 @@ async function run(action: () => Promise<void>, done: () => void) {
   <div class="records-bulk-bar" role="region" :aria-label="`${count} selected`">
     <strong>{{ count }} {{ noun }} selected</strong>
     <Button variant="outline" size="sm" :disabled="!fields.length" @click="openSet"><PencilLine class="size-4" />Set a field</Button>
+    <Button v-if="tables?.length && move" variant="outline" size="sm" @click="openMove"><ArrowRightLeft class="size-4" />Move to table</Button>
     <Button variant="outline" size="sm" @click="emit('export')"><Download class="size-4" />Export CSV</Button>
     <Button variant="outline" size="sm" class="text-destructive" @click="error = ''; confirmRemove = true"><Trash2 class="size-4" />Delete</Button>
     <Button variant="ghost" size="sm" @click="emit('clear')"><X class="size-4" />Clear selection</Button>
@@ -94,6 +106,27 @@ async function run(action: () => Promise<void>, done: () => void) {
         <DialogFooter>
           <Button type="button" variant="outline" :disabled="busy" @click="setting = false">Cancel</Button>
           <Button type="submit" :disabled="busy || !field">{{ busy ? "Saving…" : "Apply" }}</Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>
+  <Dialog :open="moving" @update:open="(open) => { if (!busy) moving = open }">
+    <DialogContent class="admin-dialog--compact">
+      <DialogHeader>
+        <DialogTitle>Move {{ count }} {{ noun }} to another table</DialogTitle>
+        <DialogDescription>Values, files and links stay as they are. Fields the other table does not show keep their values.</DialogDescription>
+      </DialogHeader>
+      <form class="flex flex-col gap-4" @submit.prevent="moveTo && run(() => move!(moveTo), () => moving = false)">
+        <div class="flex flex-col gap-2">
+          <Label for="bulk-table">Table</Label>
+          <select id="bulk-table" v-model="moveTo" class="record-native-select">
+            <option v-for="table in tables" :key="table.id" :value="table.id">{{ table.name }}</option>
+          </select>
+        </div>
+        <p v-if="error" role="alert" class="admin-form-error">{{ error }}</p>
+        <DialogFooter>
+          <Button type="button" variant="outline" :disabled="busy" @click="moving = false">Cancel</Button>
+          <Button type="submit" :disabled="busy || !moveTo">{{ busy ? "Moving…" : "Move" }}</Button>
         </DialogFooter>
       </form>
     </DialogContent>

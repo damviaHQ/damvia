@@ -30,7 +30,8 @@ type Field = RouterOutput["recordAttribute"]["list"][number]
 
 // Adds a field to every record, or changes how one reads: its label, type,
 // options and where it shows for readers.
-const props = defineProps<{ open: boolean, field: Field | null, suggestions?: string[] }>()
+// A field added from a table shows in that table.
+const props = defineProps<{ open: boolean, field: Field | null, suggestions?: string[], tableId?: string | null }>()
 const emit = defineEmits<{ "update:open": [open: boolean], saved: [field: Field] }>()
 
 const toast = useGlobalToast()
@@ -89,7 +90,7 @@ async function submit() {
   try {
     const saved = props.field
       ? await trpc.recordAttribute.update.mutate({ id: props.field.id, ...common })
-      : await trpc.recordAttribute.create.mutate({ name: form.value.name.trim(), ...common })
+      : await trpc.recordAttribute.create.mutate({ name: form.value.name.trim(), ...common, tableId: props.tableId ?? undefined })
     await queryClient.invalidateQueries({ queryKey: ["records"] })
     if (saved.invalidCount) toast.info(`${saved.invalidCount} stored ${saved.invalidCount === 1 ? "value does" : "values do"} not fit ${saved.displayName || saved.name} and ${saved.invalidCount === 1 ? "is" : "are"} marked in the grid.`)
     else toast.success(creating.value ? "Field added" : "Field saved")

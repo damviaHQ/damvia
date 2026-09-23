@@ -3,7 +3,7 @@ import { responses } from './client-fixtures'
 
 async function fixture(page: Page, mixed = false, varied = false) {
   const source = responses['collection.findById'] as any
-  const type = { ...source.files[0].assetType, productAttributes: [{ id: 'colour', name: 'colour', displayName: 'Colour' }, { id: 'season', name: 'season', displayName: 'Season' }] }
+  const type = { ...source.files[0].assetType, recordAttributes: [{ id: 'colour', name: 'colour', displayName: 'Colour' }, { id: 'season', name: 'season', displayName: 'Season' }] }
   const shapes = [{ width: 800, height: 600 }, { width: 600, height: 900 }, { width: 1200, height: 400 }]
   // A thumbnail of the shape the file claims, so a cropped tile is detectable.
   const shaped = ({ width, height }: { width: number, height: number }, index: number) => 'data:image/svg+xml,' + encodeURIComponent(
@@ -11,13 +11,13 @@ async function fixture(page: Page, mixed = false, varied = false) {
   const files = source.files.map((file: any, index: number) => ({ ...file, assetType: mixed && index === 0 ? null : type, assetTypeId: mixed && index === 0 ? null : type.id,
     dimensions: varied ? shapes[index % shapes.length] : file.dimensions,
     ...(varied ? { thumbnailURL: shaped(shapes[index % shapes.length], index) } : {}),
-    product: { attributes: [{ id: 'colour', name: 'colour', displayName: 'Colour', value: index % 2 ? 'Black' : 'Sand' }] }, productView: 'Front' }))
+    record: { attributes: [{ id: 'colour', name: 'colour', displayName: 'Colour', value: index % 2 ? 'Black' : 'Sand' }] }, recordView: 'Front' }))
   await page.route('**/trpc/**', async route => {
     const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
     const data = name === 'collection.findById' ? { ...source, files, children: [{ ...source, id: 'child', name: 'Summer', numberOfFiles: 8, files: [], children: [] }] }
-      : name === 'collection.search' ? { total: files.length, page: 1, totalPages: 1, results: files, facets: { fileTypes: { image: files.length }, assetTypes: { photo: files.length }, productViews: {}, attributes: { colour: { Sand: 4 } } } }
+      : name === 'collection.search' ? { total: files.length, page: 1, totalPages: 1, results: files, facets: { fileTypes: { image: files.length }, assetTypes: { photo: files.length }, recordViews: {}, attributes: { colour: { Sand: 4 } } } }
       : name === 'assetType.list' ? [type]
-      : name === 'productAttribute.listFacets' ? [{ id: 'colour', name: 'colour', displayName: 'Colour', values: ['Sand', 'Black'] }]
+      : name === 'recordAttribute.listFacets' ? [{ id: 'colour', name: 'colour', displayName: 'Colour', values: ['Sand', 'Black'] }]
       : responses[name] ?? []
     await route.fulfill({ json: { result: { data } } })
   })

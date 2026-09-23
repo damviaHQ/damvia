@@ -335,7 +335,7 @@ async function onModalSubmit(event: Event) {
               <Checkbox id="isRelatedToRecords" v-model="form.isRelatedToRecords" />
               <Label for="isRelatedToRecords">Related to {{ recordLabel.lowerPlural.value }}</Label>
             </div>
-            <p class="text-body admin-text-secondary -mt-3">Files of this type can be linked to a {{ recordLabel.lower.value }}. Matching rules are set on the Matching screen.</p>
+            <p class="text-body admin-text-secondary -mt-3">Enable automatic matching to {{ recordLabel.lowerPlural.value }}, then configure the rules in Link to {{ recordLabel.lowerPlural.value }}. Collections containing those {{ recordLabel.lowerPlural.value }} also give readers access to their linked pictures.</p>
             <div class="flex items-center space-x-2">
               <Checkbox id="groupVariants" v-model="form.groupVariants" />
               <Label for="groupVariants">Group variants</Label>

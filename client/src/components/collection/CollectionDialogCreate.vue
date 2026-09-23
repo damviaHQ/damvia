@@ -26,7 +26,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
-import { useRecordLabel } from "@/composables/useRecordLabel"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { computed, ref, watch } from "vue"
@@ -41,29 +40,16 @@ const emit = defineEmits<{
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
 
-const { plural } = useRecordLabel()
-const form = ref<{
-  name: string
-  collectionId?: string
-  catalogueMode: "files" | "products"
-}>({ name: '', catalogueMode: 'files' })
-
-// An assortment is only worth offering where the reader can browse a
-// catalogue at all. See docs/administration/catalogue.md.
-const { data: catalogue } = useQuery({
-  queryKey: ["catalogue", "any"],
-  queryFn: () => trpc.catalogue.list.query({ offset: 0, limit: 1 }),
-})
-const hasCatalogue = computed(() => (catalogue.value?.total ?? 0) > 0)
+const form = ref<{ name: string, collectionId?: string }>({ name: '' })
 
 const { isPending, mutate } = useMutation({
-  mutationFn: (data: { name: string; parentId?: string; catalogueMode: "files" | "products" }) =>
+  mutationFn: (data: { name: string; parentId?: string }) =>
     trpc.collection.createUserCollection.mutate(data),
   onSuccess: (collection) => {
     queryClient.invalidateQueries({ queryKey: ["collection", "tree"] })
     queryClient.invalidateQueries({ queryKey: ["menu-items"] })
     queryClient.invalidateQueries({ queryKey: ["collection", "ListPrivateCollections"] })
-    toast.success("Your collection is created. You can now add files to it.")
+    toast.success("Your collection is created.")
     emit("update:modelValue", false)
     emit("created", collection)
   },
@@ -80,7 +66,7 @@ const { data: privateCollections } = useQuery({
 watch(
   () => props.modelValue,
   () => {
-    form.value = { name: '', catalogueMode: 'files' }
+    form.value = { name: '' }
   }
 )
 
@@ -107,7 +93,6 @@ async function onSubmit() {
   await mutate({
     name: form.value.name,
     parentId: form.value.collectionId,
-    catalogueMode: form.value.catalogueMode,
   })
 }
 
@@ -134,13 +119,6 @@ function handleKeyDown(event: KeyboardEvent) {
         </DialogHeader>
 
         <div class="grid gap-4">
-          <FieldGroup v-if="hasCatalogue">
-            <Label for="create-collection-mode">What this collection holds</Label>
-            <select id="create-collection-mode" v-model="form.catalogueMode" class="record-native-select">
-              <option value="files">Files</option>
-              <option value="products">{{ plural }}</option>
-            </select>
-          </FieldGroup>
           <FieldGroup>
             <Label for="create-collection-name">Collection name</Label>
             <Input id="create-collection-name" v-model="form.name" type="text" placeholder="Name"  required />

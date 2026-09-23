@@ -3,7 +3,7 @@ title: Collections and sharing
 description: Choose manual or synchronised collections, control access, and understand what source changes do to their contents.
 sidebar:
   order: 8
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-23
 ---
 
 A collection is the unit people browse and share. Public collections make up the common catalogue; private collections belong to one user. A collection can follow a source folder or be assembled from selected files.
@@ -16,6 +16,8 @@ A collection is the unit people browse and share. Public collections make up the
 | Manual | You need a curated selection from one or more folders | It stores references to existing assets. An owner or admin can add and remove them. |
 | Public | The collection belongs to the shared catalogue | Admins manage it. It may be a draft or restricted to groups. |
 | Private | One person needs their own selection | The owner manages it under My collections. |
+
+In **My collections**, a collection can contain files, products or both. Creation asks for a name and optional parent, never a content type. Its contents appear automatically in the shared file and product sections. The Files/Products display choices for published catalogues are not restrictions on which items a collection can hold.
 
 An admin can create a manual collection at the root or under another collection, including a synchronised one. A synchronised collection may be created at the root or under a manual collection. Under a synchronised parent, source subfolders create their own synchronised children automatically.
 
@@ -100,6 +102,14 @@ Files cannot be removed from a synchronised collection. A generated synchronised
 
 Deleting a collection removes its descendants, links, invitations, menu entries, page and Damvia-hosted thumbnail/page media. It does not delete any connected cloud file. Before deletion, check for custom descendants and active invitations.
 
+## Use the page tools
+
+The DAM fills the browser window. The sidebar keeps the account menu at its bottom; navigation and the main content scroll independently. Search sits on the left of the fixed tools area above the content. Favorites, filters and display preferences stay directly accessible on a collection, subject to its existing tool visibility settings.
+
+Search uses the same fixed tools area: display preferences and global selection actions at the top, then the local selection beside **Search results**, with file type, sort, format and size filters to its right. Select-all applies to results on the current page and preserves selections elsewhere. Its hover labels match collection pages. Advanced search criteria remain in the sidebar; result counts and the search scope appear above the results. Product search uses the same selection and display controls.
+
+Open the gear menu (**Collection actions**) for **Share collection**, **Collection settings**, **Edit page**, and **Search in this collection**. Only authorized actions appear. Removing selected assets or products is also available there when permitted. The global selection count, Download and Add to collection sit to the right of search. The local checkbox reads “Select All in” or, for example, “2 items selected in” followed by the collection path. Hovering a partial selection offers “Select All in”; hovering a complete selection offers “Remove Selection in”, which clears that local selection without deleting any content. The chosen filters sit to its right, without a separate visible item count. Filters stay on a single horizontally scrollable row. Arrow controls indicate more filters to the left or right and let you scroll through them; touch and trackpad scrolling also work. On narrow screens, the filter row sits below the selection. Banners and custom page content scroll below this tools area.
+
 ## Narrow what is on screen
 
 The funnel button in a collection's action bar, beside the display preferences, lists the filters that collection can be narrowed by. Nothing is on at first: tick a filter and it appears in a bar above the content. Only what is ticked is drawn, so the page carries the two or three controls that matter there rather than every facet at once.
@@ -122,7 +132,7 @@ The chosen filters stay across navigation and reloads until they are unticked; t
 
 In list view, the column headers sort the rows. Clicking a header sorts ascending, clicking it again descending. **Size** sorts by the real byte count and **Updated at** by the real date, not by the text in the cell. Sorting lasts as long as the view; it is not saved.
 
-This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, use the magnifier in the same action bar, which opens the search scoped to that collection. The search has its own facets, counted across the whole library — see [Products and PIM](./records.md#configure-record-fields).
+This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, choose **Search in this collection** in the gear menu, which opens the search scoped to that collection. The search has its own facets, counted across the whole library — see [Products and PIM](./records.md#configure-record-fields).
 
 ## Choose who sees the action bar tools
 
@@ -139,7 +149,7 @@ Admins and the collection's owner always see every tool, so the people who set t
 
 A sub-collection starts on **Same as parent** and follows the nearest collection above it that has its own setting. It keeps following when it is moved, or when the synchronisation creates new sub-collections. Choose **Custom** to give one collection its own setting; the sub-collections under it then follow that one. When some sub-collections already have their own setting, **Apply to all sub-collections** puts them back on **Same as parent** when you save.
 
-Hiding a tool changes what the page shows, not what people can reach. A hidden **Filter** stops narrowing the page. The search behind the magnifier still opens from its address, and it only ever returns what that person can already see. **Share collection** is not in the list: only admins and the owner can share, and they always see it.
+Hiding a tool changes what the page shows, not what people can reach. A hidden **Filter** stops narrowing the page. The scoped search still opens from its address, and it only ever returns what that person can already see. **Share collection** is not in the list: only admins and the owner can share, and they always see it.
 
 ## Variants show as one card in search
 
@@ -158,4 +168,4 @@ The complete current list, including file-move data loss, is in [Known limitatio
 
 A collection holds files, child collections, and records. Edit collection → Products chooses what readers browse there: files only, products only, or both. Membership is either chosen by hand, through the same Add to collection action files use, or built from rules on the record fields; a product added by hand is never removed by a rule. One collection can stand for the whole catalogue instead of listing its members, which only an administrator may set.
 
-A product is visible to a reader when a collection they can open holds it, so drafts and group restrictions hide products exactly as they hide files. The media of a product keep their own licence and collection rights. Copying a collection copies its products as hand-picked entries and never copies its rules. See [Product catalogue](./catalogue.md).
+A product is visible to a reader when a collection they can open holds it, so drafts and group restrictions hide products exactly as they hide files. The same collection grants access to linked pictures without a separate file collection. Licence dates and regional restrictions still apply; other file types retain their file-collection access requirements. Copying a collection copies its products as hand-picked entries and never copies its rules. See [Product catalogue](./catalogue.md).

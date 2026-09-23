@@ -3,14 +3,14 @@ title: Menu and pages
 description: Arrange the reader navigation and build editorial pages without changing the assets or collections they display.
 sidebar:
   order: 9
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-23
 ---
 
 The menu controls how readers reach content. Pages combine text and media with live collection or file listings. A page presents existing content; it does not move assets, add files to collections or change their permissions.
 
 ## Build the navigation menu
 
-Open `/admin/menu-items` to add one of five entries:
+Open `/admin/menu-items` to add one of five entries. Product lists use collection entries here, at the position you choose; the reader menu does not add a separate Products shortcut automatically:
 
 | Type | Use it for |
 |---|---|
@@ -22,7 +22,9 @@ Open `/admin/menu-items` to add one of five entries:
 
 Removing an entry removes everything under it, so a section holding entries is refused: move them elsewhere first. A section is a heading, not a link. It lives at the top level of the menu and holds the entries dropped under it; it cannot be placed inside another entry. One section is marked as the default for collections: a new public root collection adds its entry there, which is why the upgrade turns the former **Library** heading into a section and moves every existing top-level entry under it. A reader is not shown a section whose entries they are all unable to see; an administrator keeps it, so a section created a moment ago can be filled.
 
-Entries may be nested and reordered among their siblings. A hand-placed menu entry cannot be moved to a different parent directly; recreate it under the intended parent. Moving a collection moves its synchronised menu entries. Collection and page entries can be set as Home. Damvia keeps only one Home entry; if none exists, the client falls back to the first accessible collection or its welcome state.
+Entries may be nested and reordered among their siblings. Use **Move to…** in an entry’s menu to move it, with its menu children, to the top level or under another section or collection. This changes navigation only; collection membership and access rules stay unchanged. An automatically mirrored child instead offers **About automatic placement**: move the actual collection in Collection settings, or add a separate menu link elsewhere. Sections stay at the top level. Moving a collection moves its synchronised menu entries. Collection and page entries can be set as Home. Damvia keeps only one Home entry; if none exists, the client falls back to the first accessible collection or its welcome state.
+
+Creating a collection with a parent makes it an actual child: it appears in that collection and inherits its visibility and access rules. Creating it at the top level and adding its link under another menu entry only changes navigation. The menu picker therefore offers all public collections, independently of their actual parent.
 
 A synchronised collection menu entry can generate and maintain entries for its descendant collections. A reader receives only the collection entries they are allowed to see. A parent menu label may remain visible as a container when one of its children is accessible.
 
@@ -49,6 +51,7 @@ Blocks are ordered and use one of three widths: full, half or third. Consecutive
 | Collections | The collection's children or a chosen selection. It can focus on custom page collections or plain sub-collections. |
 | Files | Files from a collection. |
 | Latest files | Recently added files, optionally scoped to a collection. |
+| Products | The products of a collection, in the shared grid or list with field filters and display preferences. Its source selector only accepts collections containing products or configured as product/mixed catalogues, including empty catalogues; file-only collections cannot be selected. Use a separate titled section when placing products alongside files. See [Product catalogue](./catalogue.md). |
 
 Drag a block into the page or add it at the end. Each block can be resized, reordered, duplicated, configured or deleted. Text is edited in place. **Save** writes the full page; **Discard** returns to the last saved version. Leaving with unsaved changes asks for confirmation.
 
@@ -57,6 +60,8 @@ A picture block has its own height: drag the handle on the bottom edge of the pi
 A listing block can leave its display to the reader's own preference, or fix it. Collection listings offer grid and list; file listings — Files and Latest files — also offer masonry, with a Picture size slider whose value everyone then sees. A block that fixes its display overrules the reader's choice, and the reader's display menu says so.
 
 Readers can narrow a page the way they narrow a collection: the funnel button lists the filters the page can offer — name, asset type, file type, format and each record attribute present — and the reader ticks the ones they want. Whatever they tick applies to every listing block at once, in grid, masonry and list alike, and a block whose every item is filtered out disappears with its title. No filter ever applies while the page is being edited, so an author always sees the blocks as they are. See [Collections and sharing](./collections-and-sharing.md#narrow-what-is-on-screen).
+
+Home, standalone pages and collection layouts share the same selection controls: **Select all in**, **Select all** for a partial selection, and **Clear selection** when everything shown is selected. Selection follows the filtered listings, including content drawn from other collections, and clearing it keeps selections made elsewhere.
 
 A page shows this action bar by default. To take it off a page, open **Admin → Pages**, choose **Settings** on the page and turn off **Show the action bar**. The choice applies to every reader, admins included: with the bar off, the funnel button and the filter chips are gone and nothing narrows the page.
 
@@ -107,3 +112,9 @@ Before leaving the editor:
 5. Verify the intended menu entry and Home setting.
 
 For current layout and upload limitations, see [Known limitations](../reference/known-limitations.md). For main-bucket recovery, see [Backups](../deployment/backups.md).
+
+## Page tools stay outside the editorial layout
+
+Standalone pages and collection pages place their tools in the fixed workspace header, outside the scrolling blocks. A hero or introduction remains the first editorial content; authors do not place filters in the page editor. Existing action-bar visibility settings still apply. On a standalone page, administrators can open **Page actions** (the gear) to edit the page or manage pages. The account menu is at the bottom of the sidebar.
+
+The search field retains its existing DAM search and scope choices; page filters narrow the content rendered on the current page. Moving the controls does not change access permissions or search scope.

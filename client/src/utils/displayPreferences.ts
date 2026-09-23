@@ -12,6 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import type { FilterableFile } from '@/utils/pageFilter'
 import type { RouterOutput } from '@/services/server'
 
 export type DisplayFile = RouterOutput['collection']['findById']['files'][number]
@@ -75,6 +76,22 @@ export function fileDisplayGroup(files: DisplayFile[]): DisplayGroup {
     defaultDisplay: type?.defaultDisplay ?? 'grid',
     defaultColumns: type?.listDisplayItems ?? ['size', 'dimensions', 'format', 'updated_at'],
     properties: [...fileProperties, ...attributes.values()],
+  }
+}
+
+export type DisplayProduct = FilterableFile & { id: string, collectionId?: string, titleField?: string | null }
+
+export function productDisplayGroup(products: DisplayProduct[], name: string): DisplayGroup {
+  const properties = new Map<string, DisplayProperty>()
+  for (const product of products) {
+    for (const field of product.record?.attributes ?? []) {
+      if (field && field.name !== product.titleField) properties.set(field.name, { id: field.name, label: field.displayName || field.name })
+    }
+  }
+  return {
+    id: 'record', name, defaultDisplay: 'grid',
+    defaultColumns: [],
+    properties: [...properties.values()],
   }
 }
 

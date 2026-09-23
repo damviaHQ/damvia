@@ -13,64 +13,40 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import Logo from "@/components/ClientLogo.vue"
+import MainFilterRail from "@/components/layout-main/MainFilterRail.vue"
 import MainSearchBar from "@/components/layout-main/MainSearchBar.vue"
 import MainTopbarDownloadNotification from "@/components/layout-main/MainTopbarDownloadNotification.vue"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { useGlobalStore, type SelectionItem } from "@/stores/globalStore"
-import {
-  Combine,
-  Download,
-  LayoutDashboard,
-  Link,
-  LogOut,
-  Settings,
-  SquareX,
-  User,
-  Users
-} from "@lucide/vue"
+import { Combine, Download, SquareX } from "@lucide/vue"
 import { defineAsyncComponent, ref } from "vue"
-
 const globalStore = useGlobalStore()
-const isDownloadAssetModalOpen = ref<boolean>(false)
+const isDownloadAssetModalOpen = ref(false)
+const isAddToCollectionModalOpen = ref(false)
 const singleDownload = ref<SelectionItem | null>(null)
+const selectionButtonClasses = "inline-flex min-h-9 items-center gap-2 px-2 text-body font-medium leading-5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 function openDownload() {
   const [item] = globalStore.selection
   if (globalStore.selection.length === 1 && item.type !== 'collection') singleDownload.value = item
   else isDownloadAssetModalOpen.value = true
 }
-const isCreateCollectionModalOpen = ref<boolean>(false)
-const isAddToCollectionModalOpen = ref<boolean>(false)
-const showMemberDialog = ref(false)
-const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-preferences">("downloads")
+function updateSingleDownload(id: string | null) {
+  singleDownload.value = id && singleDownload.value ? { ...singleDownload.value, id } : null
+}
 const CollectionDialogAddToCollection = defineAsyncComponent(() => import("@/components/collection/CollectionDialogAddToCollection.vue"))
-const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/collection/CollectionDialogCreate.vue"))
 const CollectionModalDownloadUnique = defineAsyncComponent(() => import("@/components/collection/CollectionModalDownloadUnique.vue"))
 const CollectionModalDownloadMulti = defineAsyncComponent(() => import("@/components/collection/CollectionModalDownloadMulti.vue"))
-const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDialogMember.vue"))
 </script>
-
 <template>
-  <header class="client-topbar fixed inset-x-0 top-0 z-10 flex h-[88px] items-center justify-between gap-6 border-b border-neutral-200 bg-white px-6 max-md:pl-16 md:h-[72px]">
-    <div class="dashboard-layout-topbar__left flex min-w-0 flex-1 items-center gap-8">
-      <router-link :to="{ name: 'home' }">
-        <Logo class="w-[124px] shrink-0 max-md:w-[88px]" />
-      </router-link>
-      <MainSearchBar />
+  <header class="client-topbar z-10 shrink-0 border-b border-neutral-200 bg-white" aria-label="Page tools">
+    <div class="flex min-h-[72px] flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 max-md:pl-16">
+      <MainSearchBar class="min-w-[min(100%,240px)] basis-[240px]" />
+      <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-x-4 gap-y-2">
       <div v-if="globalStore.selection.length > 0"
-        class="dashboard-layout-topbar__selector flex items-center gap-4 border-l border-neutral-200 pl-6 text-body max-md:hidden">
-        <div class="flex items-center gap-1.5 font-medium text-neutral-500 mr-2">
-          <button class="text-neutral-500 hover:text-neutral-800" @click="globalStore.clearSelection()"
+        class="dashboard-layout-topbar__selector flex flex-wrap items-center gap-x-3 gap-y-1 text-body">
+        <div class="flex items-center gap-1 font-medium text-neutral-500">
+          <button type="button" class="grid size-9 shrink-0 place-items-center text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" @click="globalStore.clearSelection()"
             title="Clear selection" aria-label="Clear selection">
-            <SquareX class="size-6 shrink-0" />
+            <SquareX class="size-5 shrink-0 stroke-[1.75]" aria-hidden="true" />
           </button>
           <div class="whitespace-nowrap">
             {{ globalStore.selection.length }} item{{
@@ -79,90 +55,40 @@ const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDi
             selected
           </div>
         </div>
-        <div class="flex items-center gap-3.5">
-          <button class="text-neutral-500 hover:text-neutral-800" @click="openDownload"
+        <div class="flex flex-wrap items-center gap-1">
+          <button type="button" :class="selectionButtonClasses" @click="openDownload"
             title="Download selection" aria-label="Download selection">
-            <Download class="size-6 shrink-0" />
+            <Download class="size-5 shrink-0 stroke-[1.75]" aria-hidden="true" />Download
           </button>
-          <button v-if="globalStore.user?.role !== 'guest'" @click="isAddToCollectionModalOpen = true"
-            title="Add selection to your collection" aria-label="Add selection to your collection" class="text-neutral-500 hover:text-neutral-800">
-            <Combine class="size-6 shrink-0" />
+          <button v-if="globalStore.user?.role !== 'guest'" type="button" @click="isAddToCollectionModalOpen = true"
+            title="Add selection to your collection" aria-label="Add selection to your collection" :class="selectionButtonClasses">
+            <Combine class="size-5 shrink-0 stroke-[1.75]" aria-hidden="true" />Add to collection
           </button>
         </div>
       </div>
+        <div id="client-page-actions" class="flex flex-wrap items-center gap-1 empty:hidden" />
+        <MainTopbarDownloadNotification />
+      </div>
     </div>
-    <div class="topbar__right flex items-center gap-2">
-      <MainTopbarDownloadNotification />
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" type="button" class="p-0" aria-label="My account">
-            <User class="h-6 w-6" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent :collision-padding="16" align="end" class="w-60 p-1 [&_[role=menuitem]]:min-h-9 [&_[role=menuitem]]:gap-2 [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-body [&_[role=menuitem]]:whitespace-nowrap">
-          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground">My Account</DropdownMenuLabel>
-          <DropdownMenuItem class="cursor-pointer" @click="
-            showMemberDialog = true
-          memberDialogInitialTab = 'profile';
-          ">
-            <User />
-            <span>Profile</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem class="cursor-pointer" @click="
-            showMemberDialog = true
-          memberDialogInitialTab = 'downloads';
-          ">
-            <Download />
-            <span>My Downloads</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem class="cursor-pointer" @click="
-            showMemberDialog = true
-          memberDialogInitialTab = 'links';
-          ">
-            <Link />
-            <span>My Links</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem class="cursor-pointer" @click="
-            showMemberDialog = true
-          memberDialogInitialTab = 'display-preferences';
-          ">
-            <LayoutDashboard />
-            <span>Display Preferences</span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground" v-if="globalStore.user?.role === 'manager'">
-            Manage
-          </DropdownMenuLabel>
-          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground" v-if="globalStore.user?.role === 'admin'">
-            Administrate
-          </DropdownMenuLabel>
-          <DropdownMenuItem v-if="['admin'].includes(globalStore.user?.role ?? '')">
-            <router-link :to="{ name: 'admin-dashboard' }" class="flex w-full items-center gap-2">
-              <Settings />
-              <span>Administration</span>
-            </router-link>
-          </DropdownMenuItem>
-          <DropdownMenuItem v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')">
-            <router-link :to="{ name: 'admin-users' }" class="flex w-full items-center gap-2">
-              <Users />
-              <span>Manage Users</span>
-            </router-link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')"
-            class="my-1" />
-          <DropdownMenuItem @click="globalStore.logout()" class="cursor-pointer">
-            <LogOut />
-            <span>Log out</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <div class="flex flex-wrap items-center gap-x-4 px-5">
+    <div id="client-page-context" class="min-w-0 max-w-full pb-3 empty:hidden" />
+      <MainFilterRail />
     </div>
   </header>
   <CollectionModalDownloadUnique v-if="singleDownload" :model-value="singleDownload.id"
     :record-id="singleDownload.type === 'record' ? singleDownload.id : undefined"
-    @update:model-value="singleDownload = null" />
+    :product-ids="globalStore.productNavigationIds" @update:model-value="updateSingleDownload" />
   <CollectionModalDownloadMulti v-model="isDownloadAssetModalOpen" />
-  <CollectionDialogCreate v-model="isCreateCollectionModalOpen" />
   <CollectionDialogAddToCollection v-model="isAddToCollectionModalOpen" />
-  <LayoutDialogMember v-model:open="showMemberDialog" :initial-tab="memberDialogInitialTab" />
 </template>
+
+<style scoped>
+.dashboard-layout-topbar__selector + #client-page-actions:not(:empty)::before {
+  content: "";
+  width: 1px;
+  height: 20px;
+  flex: none;
+  margin-inline: 4px 8px;
+  background: var(--color-neutral-300);
+}
+</style>

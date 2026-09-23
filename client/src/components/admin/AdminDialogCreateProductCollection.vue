@@ -89,8 +89,8 @@ async function onSubmit() {
         <DialogHeader>
           <DialogTitle>New {{ lowerPlural }} collection</DialogTitle>
           <DialogDescription>
-            Readers browse it as a catalogue. Once it exists, fill it with a list of references or with rules on the
-            {{ lowerPlural }} fields.
+            Share {{ lowerPlural }} and their linked pictures in one place. Add references or automatic rules after creating it.
+            Readers with access can view and download the pictures, subject to licence dates and regional restrictions.
           </DialogDescription>
         </DialogHeader>
 
@@ -100,9 +100,10 @@ async function onSubmit() {
             <Input id="name" type="text" v-model="form.name" placeholder="Name" class="form-input mb-075" />
           </FieldGroup>
           <FieldGroup v-if="collectionOptions?.length" role="group" aria-labelledby="collectionId">
-            <Label id="collectionId">Select a parent collection</Label>
-            <treeselect v-model="form.collectionId" class="mb-075" placeholder="Parent collection"
+            <Label id="collectionId">Parent collection (optional)</Label>
+            <treeselect v-model="form.collectionId" class="mb-075" placeholder="Top level (no parent)"
               :options="collectionOptions" :clearable="true" />
+            <p class="admin-form-note">Leave empty for an independent collection. Choosing a parent places it inside that collection and inherits its visibility and access rules. To organize only its menu link, use Menu.</p>
           </FieldGroup>
           <div>
             <div class="flex items-center gap-2">

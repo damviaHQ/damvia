@@ -51,7 +51,7 @@ A block that points to a library file displays that asset with its existing acce
 
 ## Records enrich assets
 
-Records describe what files are about: products, events, venues. They are imported from CSV and named by an administrator. Damvia applies `PRODUCT_MATCHING_REGEX` to filenames, links a matching file to its record key and can record an optional view such as front, side or detail.
+Records describe what files are about: products, events, venues. They are imported from CSV or Excel files, organised in tables such as one per product line, and named by an administrator. Damvia applies `PRODUCT_MATCHING_REGEX` to filenames, links a matching file to its record key and can record an optional view such as front, side or detail.
 
 Selected record columns become searchable text, filters or displayed metadata. This enriches the asset; it does not move or rename the source file. See [Records](../administration/records.md).
 
@@ -67,4 +67,4 @@ A download packages the files the requester can still access, optionally convert
 
 ## Product collection
 
-A collection whose members are records rather than files. Readers browse it as a catalogue of cards, each showing a record's main visual, the visuals linked to it and the field values an administrator made visible. Membership is chosen by hand or built from rules on the record fields, and a reader sees a record when a collection they can open holds it. The media of a record keep their own licence and collection rights. See [Product catalogue](../administration/catalogue.md).
+A collection whose members are records rather than files. Readers browse it as a catalogue of cards, each showing a record's main visual, the visuals linked to it and the field values an administrator made visible. Membership is chosen by hand or built from rules on the record fields, and a reader sees a record when a collection they can open holds it. The collection also grants access to the record’s linked pictures, so a separate file collection is optional for pictures. Licence dates and regional restrictions still apply. Other file types need access through a file collection. See [Product catalogue](../administration/catalogue.md).

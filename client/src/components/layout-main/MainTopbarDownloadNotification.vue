@@ -13,40 +13,56 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { Button } from "@/components/ui/button"
 import LayoutDialogMember from "@/layouts/LayoutDialogMember.vue"
 import { useDownloadStore } from "@/stores/downloadStore"
-import { FolderDown } from "@lucide/vue"
+import { ArrowDown, File, FileDown } from "@lucide/vue"
 import { storeToRefs } from "pinia"
-import { onMounted, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
 
-const { status, hasPreparingDownloads, newDownloads } = storeToRefs(useDownloadStore())
 const downloadStore = useDownloadStore()
+const { activeDownloadRequests, downloads, hasPreparingDownloads, newDownloads } = storeToRefs(downloadStore)
+const preparing = computed(() => activeDownloadRequests.value > 0 || hasPreparingDownloads.value)
+const ready = computed(() => !!downloads.value?.some(download => download.status === 'ready'))
 const showMemberDialog = ref(false)
 
-function toggleMemberDialog() {
-  showMemberDialog.value = !showMemberDialog.value
+function openDownloads() {
+  showMemberDialog.value = true
+  if (ready.value) downloadStore.markDownloadsAsSeen()
 }
 
-onMounted(async () => {
-  await downloadStore.fetchInitialDownloads()
+onMounted(() => {
+  void downloadStore.fetchInitialDownloads()
 })
 </script>
 
 <template>
   <span class="sr-only" role="status" aria-live="polite">
-    {{ status !== 'success' ? '' : hasPreparingDownloads ? 'Preparing files' : newDownloads?.length ? 'Download ready' : '' }}
+    {{ preparing ? 'Preparing download' : ready ? 'Download ready' : '' }}
   </span>
-  <div v-if="status === 'success'">
-    <Button variant="ghost" disabled class="flex items-center gap-2" v-if="hasPreparingDownloads">
-      Preparing files
-      <span class="loader-animation w-5 h-5 border-2 border-dashed rounded-[50%] border-neutral-500 inline-block relative box-border animate-spin"></span>
-    </Button>
-    <Button variant="ghost" v-else-if="newDownloads && newDownloads.length > 0" @click="toggleMemberDialog"
-      class="flex items-center gap-2 text-neutral-500 hover:text-neutral-800">
-      Download ready
-      <FolderDown class="w-6 h-6" />
-    </Button>
-    <LayoutDialogMember v-model:open="showMemberDialog" initial-tab="downloads" />
-  </div>
+  <button v-if="preparing || ready" type="button" class="download-status"
+    :class="{ 'is-ready': !preparing && ready }"
+    :aria-label="preparing ? 'Preparing download — open downloads' : 'Download ready — open downloads'"
+    :title="preparing ? 'Preparing download' : 'Download ready'" @click="openDownloads">
+    <span class="download-status__icon" aria-hidden="true">
+      <template v-if="preparing">
+        <File class="size-5 stroke-[1.75]" />
+        <ArrowDown class="download-status__arrow size-3.5 stroke-[2.25]" />
+      </template>
+      <FileDown v-else class="size-5 stroke-[1.75]" />
+    </span>
+    <span v-if="!preparing && newDownloads?.length" class="download-status__dot" aria-hidden="true" />
+  </button>
+  <LayoutDialogMember v-model:open="showMemberDialog" initial-tab="downloads" />
 </template>
+
+<style scoped>
+.download-status { position:relative; display:grid; flex:none; place-items:center; width:36px; height:36px; color:#525252; }
+.download-status:hover { background:#f5f5f5; color:#171717; }
+.download-status:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.download-status.is-ready { color:#166534; }
+.download-status__icon { position:relative; display:grid; place-items:center; }
+.download-status__arrow { position:absolute; right:-5px; bottom:-3px; background:white; animation:download-arrow 1.25s ease-in-out infinite; }
+.download-status__dot { position:absolute; right:3px; top:3px; width:6px; height:6px; border-radius:50%; background:#16a34a; }
+@keyframes download-arrow { 0%, 100% { transform:translateY(-3px); opacity:.55; } 55% { transform:translateY(2px); opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .download-status__arrow { animation:none; } }
+</style>

@@ -44,12 +44,18 @@ const { data: collections } = useQuery({
 
 const collectionOptions = computed(() => {
   function format(items: any[]): any[] {
-    return items.map((item) => ({
-      id: item.id,
-      label: item.name,
-      isDisabled: item.id === currentCollectionId.value,
-      children: item.children ? format(item.children) : undefined,
-    }))
+    return items.flatMap((item) => {
+      const children = item.children ? format(item.children) : []
+      const eligible = props.type !== "products" || item.catalogueMode === "products" || item.catalogueMode === "both"
+        || item.includesAllRecords || item.numberOfRecords > 0
+      if (!eligible && !children.length) return []
+      return [{
+        id: item.id,
+        label: item.name,
+        isDisabled: !eligible || item.id === currentCollectionId.value,
+        children: children.length ? children : undefined,
+      }]
+    })
   }
   return collections.value ? format(collections.value) : []
 })

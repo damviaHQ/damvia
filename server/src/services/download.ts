@@ -13,7 +13,10 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { userCollectionFilesQuery } from './collection'
+import { resolveDownloadSelection } from './download-selection'
+import { buildRecordExport, recordExportColumns } from './download-record-export'
 import { User } from '../entity/user'
+import { TRPCError } from '@trpc/server'
 import { ZipArchive } from 'archiver'
 import ffmpeg from "fluent-ffmpeg"
 import { randomUUID } from "node:crypto"
@@ -61,10 +64,27 @@ export async function createDownloadArchive({ em, download }: CreateDownloadArch
 	if (collectionFiles.length !== new Set(download.collectionFileIds).size) {
 		throw new DownloadAccessError()
 	}
+	let recordList: Buffer | null = null
+	if (download.recordExport) {
+		const saved = download.recordExport
+		let selection: Awaited<ReturnType<typeof resolveDownloadSelection>>
+		try {
+			selection = await resolveDownloadSelection(em, user, saved.items, false)
+			recordExportColumns(selection, saved.columns, saved.format)
+		} catch (error) {
+			if (error instanceof TRPCError && ['BAD_REQUEST', 'FORBIDDEN', 'NOT_FOUND'].includes(error.code)) throw new DownloadAccessError()
+			throw error
+		}
+		const positions = new Map(selection.recordIds.map((id, index) => [id, index]))
+		if (saved.recordIds.some(id => !positions.has(id))) throw new DownloadAccessError()
+		selection.rows = saved.recordIds.map(id => selection.rows[positions.get(id)!])
+		selection.recordIds = saved.recordIds
+		recordList = await buildRecordExport(selection, saved.columns, saved.format)
+	}
 
 	const workingDirectory = await mkdtemp(join(tmpdir(), `dam-asset-${randomUUID()}`))
 	try {
-		if (collectionFiles.length === 1) {
+		if (collectionFiles.length === 1 && !recordList) {
 			const collectionFile = collectionFiles[0]
 			const outputFile = await transformFile({ workingDirectory, download, assetFile: collectionFile.assetFile })
 			await assetsS3().fPutObject(assetsS3Bucket(), download.storageKey, outputFile, {
@@ -83,9 +103,13 @@ export async function createDownloadArchive({ em, download }: CreateDownloadArch
 					name: `export/${formatFileName(download, collectionFile.assetFile, collectionFile.collection)}`,
 				})
 			}), { maxInProgress: 25 })
+			if (recordList && download.recordExport) archive.append(recordList, { name: `record-list.${download.recordExport.format}` })
 			await archive.finalize()
 			await archiveWritten
-			await assetsS3().fPutObject(assetsS3Bucket(), download.storageKey, archiveFile)
+			await assetsS3().fPutObject(assetsS3Bucket(), download.storageKey, archiveFile, {
+				'Content-Type': 'application/zip',
+				'Content-Disposition': 'attachment; filename="download.zip"',
+			})
 		}
 	} finally {
 		rm(workingDirectory, { recursive: true, force: true })

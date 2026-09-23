@@ -27,6 +27,7 @@ import {
 	TreeParent,
 	UpdateDateColumn
 } from "typeorm"
+import type { RelatedRecordsSettings } from "../services/catalogue"
 import type { RecordFilter } from "../services/records"
 import { AssetFolder } from "./asset-folder"
 import { CollectionFile } from "./collection-file"
@@ -158,6 +159,9 @@ export class Collection {
 
 	@Column({ type: 'varchar', nullable: true })
 	orphanedReason: string | null
+
+	@Column({ type: 'jsonb', nullable: true })
+	relatedRecords: RelatedRecordsSettings | null
 
 	@CreateDateColumn()
 	createdAt: Date

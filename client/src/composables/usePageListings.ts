@@ -12,14 +12,14 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. */
-import type { DisplayCollection, DisplayFile } from '@/utils/displayPreferences'
-import type { FilterableFile } from '@/utils/pageFilter'
+import type { DisplayCollection, DisplayFile, DisplayProduct } from '@/utils/displayPreferences'
 import { computed, inject, onScopeDispose, provide, ref, watch, type InjectionKey, type Ref } from 'vue'
 
 // Products are announced apart from files: they narrow with the same field
 // facets, but the display preferences group files by asset type and a product
 // has none.
-export type PageListing = { files?: DisplayFile[], collections?: DisplayCollection[], products?: FilterableFile[] }
+type ListedCollection = DisplayCollection & { id: string; name: string }
+export type PageListing = { files?: DisplayFile[], collections?: ListedCollection[], products?: DisplayProduct[] }
 
 type Registry = { add: (source: Ref<PageListing>) => void }
 const key = Symbol('page-listings') as InjectionKey<Registry>
@@ -29,7 +29,7 @@ const key = Symbol('page-listings') as InjectionKey<Registry>
 // what the collection being browsed holds. The renderers announce what they
 // draw, and the display preferences describe that rather than guessing.
 export function providePageListings() {
-	const entries = ref<{ id: number, files: DisplayFile[], collections: DisplayCollection[], products: FilterableFile[] }[]>([])
+	const entries = ref<{ id: number, files: DisplayFile[], collections: ListedCollection[], products: DisplayProduct[] }[]>([])
 	let nextId = 0
 
 	provide(key, {

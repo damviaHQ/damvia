@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Column, Entity, PrimaryColumn, PrimaryGeneratedColumn } from "typeorm"
 
-export type RecordChangeAction = 'create' | 'update' | 'delete'
+export type RecordChangeAction = 'create' | 'update' | 'delete' | 'move'
 export type RecordChangeSource = 'grid' | 'panel' | 'bulk' | 'csv' | 'unmatched' | 'attribute'
 export type RecordChanges = Record<string, { old: string | null, new: string | null }>
 

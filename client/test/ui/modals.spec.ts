@@ -14,7 +14,8 @@ test('account panels keep aligned controls, visible headings and contained navig
   })
   await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
   await page.goto('/collections/campaign')
-  await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
+  await page.getByRole('button', { name: 'My account', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Display preferences', exact: true }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Display preferences', exact: true })).toBeVisible()
   await expect(dialog.locator('[data-display-row]')).toHaveCount(5)
@@ -26,10 +27,10 @@ test('account panels keep aligned controls, visible headings and contained navig
   expect(await dialog.locator('aside').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   await page.screenshot({ path: '/tmp/damvia-account-display.png' })
   for (const panel of ['Profile', 'Downloads', 'Links']) {
-    await dialog.getByRole('button', { name: panel, exact: true }).click()
+    await dialog.getByRole('tab', { name: panel, exact: true }).click()
     await expect(dialog.getByRole('heading', { name: panel, exact: true })).toBeVisible()
-    const active = dialog.getByRole('button', { name: panel, exact: true })
-    await expect(active).toHaveAttribute('aria-current', 'page')
+    const active = dialog.getByRole('tab', { name: panel, exact: true })
+    await expect(active).toHaveAttribute('aria-selected', 'true')
     const hovered = await active.evaluate(element => getComputedStyle(element).backgroundColor)
     await page.mouse.move(0, 0)
     await expect(active).toHaveCSS('background-color', hovered)
@@ -58,7 +59,7 @@ test('client dialogs and nested content have readable headings and contained lay
     const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
     const data = name === 'collection.findById' ? { ...collection, files, canEdit: true, limitedToGroupIds: [], invitations: [], page: editor ? { id: 'page', blocks: [] } : null }
       : name === 'user.me' ? { ...(responses[name] as object), role: 'admin', company: 'Studio' }
-      : name === 'collection.getFiles' ? { files, licenses: [license] }
+      : name === 'collection.getFiles' ? { files, licenses: [license], recordCount: 0, columns: [], previewRows: [], previewPictures: [], viewsEnabled: false }
       : responses[name] ?? []
     await route.fulfill({ json: { result: { data } } })
   })
@@ -80,7 +81,10 @@ test('client dialogs and nested content have readable headings and contained lay
     }
   }
   for (const [button, screenshot] of [['Collection settings', 'edit'], ['Share collection', 'share'], ['Create collection', 'create']]) {
-    await page.getByRole('button', { name: button, exact: true }).click()
+    if (button !== 'Create collection') {
+      await page.getByRole('button', { name: 'Collection actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: button, exact: true }).click()
+    } else await page.getByRole('button', { name: button, exact: true }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await capture(screenshot)
     await page.keyboard.press('Escape')
@@ -92,7 +96,7 @@ test('client dialogs and nested content have readable headings and contained lay
   await capture('license')
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Close preview' }).click()
-  await page.getByRole('button', { name: 'Select all in', exact: true }).click()
+  await page.getByRole('button', { name: 'Select All in', exact: true }).click()
   await page.getByTitle('Add selection to your collection', { exact: true }).click()
   await capture('add-selection')
   await page.getByRole('tab', { name: 'Public Collections', exact: true }).click()
@@ -111,7 +115,8 @@ test('client dialogs and nested content have readable headings and contained lay
   await page.reload()
   // The editor is reached from the collection itself, and its library is the
   // screen's left sidebar rather than a dialog.
-  await page.getByRole('link', { name: 'Edit page', exact: true }).click()
+  await page.getByRole('button', { name: 'Collection actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Edit page', exact: true }).click()
   await capture('editor')
   for (const block of ['Collections', 'Files', 'Latest files', 'Text', 'Picture', 'Video']) {
     await page.getByRole('button', { name: new RegExp(`^${block} `) }).click()

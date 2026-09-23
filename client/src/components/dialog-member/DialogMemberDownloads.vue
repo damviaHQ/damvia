@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useGlobalToast } from "@/composables/useGlobalToast"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { trpc } from "@/services/server.ts"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { useQuery } from "@tanstack/vue-query"
@@ -32,6 +33,7 @@ import dayjs from "dayjs"
 import { Download, Link } from "@lucide/vue"
 
 const toast = useGlobalToast()
+const recordLabel = useRecordLabel()
 const downloadStore = useDownloadStore()
 const { status, data: downloads, error } = useQuery({
   queryKey: ["downloads"],
@@ -65,7 +67,7 @@ async function copyUrlToClipboard(url: string) {
           <TableHead>Created</TableHead>
           <TableHead>Expires</TableHead>
           <TableHead>Status</TableHead>
-          <TableHead>Files</TableHead>
+          <TableHead>Contents</TableHead>
           <TableHead></TableHead>
         </TableRow>
       </TableHeader>
@@ -78,7 +80,7 @@ async function copyUrlToClipboard(url: string) {
             <Badge v-if="download.status === 'failed'" variant="destructive">Failed</Badge>
             <span v-else>{{ download.status }}</span>
           </TableCell>
-          <TableCell>{{ download.fileCount }}</TableCell>
+          <TableCell>{{ download.fileCount }} {{ download.fileCount === 1 ? 'file' : 'files' }}<span v-if="download.recordCount"> · {{ download.recordCount }} {{ download.recordCount === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value }}</span></TableCell>
           <TableCell>
             <div class="flex flex-wrap gap-1 items-center">
               <Button v-if="download.url" variant="ghost" size="sm" as-child>

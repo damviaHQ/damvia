@@ -26,6 +26,7 @@ export class CollectionNesting1790294400000 implements MigrationInterface {
                 ADD COLUMN orphaned_from_name varchar,
                 ADD COLUMN orphaned_reason varchar;
             CREATE INDEX idx_collections_orphaned_at ON collections (orphaned_at) WHERE orphaned_at IS NOT NULL;
+            ALTER TABLE collections DROP CONSTRAINT idx_parent_id_name;
         `)
         await queryRunner.query(`
             WITH RECURSIVE tree AS (
@@ -40,7 +41,9 @@ export class CollectionNesting1790294400000 implements MigrationInterface {
         // synchronized rows under them (the next synchronization recreates
         // them under the kept one). Custom collections found anywhere under a
         // retired row move under the kept one: direct children silently, deeper
-        // ones flagged, since their exact place is gone.
+        // ones flagged, since their exact place is gone. The unique (parent_id,
+        // name) constraint is already gone above: the kept row may hold a
+        // custom collection with the same name as one that moves under it.
         await queryRunner.query(`
             CREATE TEMP TABLE duplicate_mirrors AS
             SELECT ranked.id, ranked.kept_id, c.mpath FROM (
@@ -89,7 +92,6 @@ export class CollectionNesting1790294400000 implements MigrationInterface {
             WHERE c.id = all_ids.id AND c.number_of_files <> coalesce(counts.n, 0);
         `)
         await queryRunner.query(`
-            ALTER TABLE collections DROP CONSTRAINT idx_parent_id_name;
             CREATE UNIQUE INDEX idx_collections_parent_asset_folder ON collections (parent_id, asset_folder_id) WHERE asset_folder_id IS NOT NULL;
             CREATE INDEX idx_collections_mpath_pattern ON collections (mpath text_pattern_ops);
             CREATE INDEX idx_menu_items_mpath_pattern ON menu_items (mpath text_pattern_ops);

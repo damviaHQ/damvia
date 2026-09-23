@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-23
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -105,12 +105,10 @@ The reader side of the record database. Every procedure is `approved` and return
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
 | `list` | query | approved | A page of product cards: key, visible values, main visual, up to four visuals with an overflow count, visible file count, readiness and model. Takes `collectionId`, `search`, `filters`, `sort`, `readiness` and `familyKey` |
-| `get` | query | approved | One product with all its visuals, its visible values, the files the caller may open and the other entries of its model |
-| `families` | query | approved | One row per model, with how many products it holds |
-| `facets` | query | approved | The values of the filterable fields, counted over what the caller can see |
-| `collections` | query | approved | The product collections the caller may open |
+| `get` | query | approved | One product with its visuals, visible values, configured `cardTitleField` and sibling products. `collectionFiles` uses the standard collection-file formatter and identities for previews, downloads and favourites; the existing `files` summary is retained |
+| `facets` | query | approved | Filterable field options and counts over the full visible scope, independent of pagination; each facet ignores its own selection and honours the other filters. Returns the unfiltered scope total and the shared page-facet shape |
 
-The filter model is the one of the records grid: conditions are combined with AND across fields, and `has_any` holds the OR inside a field. That is what a facet sidebar needs; there is no OR across fields and no numeric or date range.
+The filter model is the one of the records grid: conditions are combined with AND across fields, and `has_any` holds the OR inside a field. Field names and record-attribute IDs are accepted for filter columns; there is no OR across fields and no numeric or date range.
 
 Two restrictions separate this router from `record.list`, which is admin only. Filters and sorts are checked against the viewable fields, so a hidden field is a `BAD_REQUEST` rather than a silent match. Free text reaches the record key and the fields marked `searchable`, never every stored value, since probing would otherwise confirm what a hidden field holds. `collection.setRecordRules` is an administrator matter for the same reason: rules fill a collection without regard for what their author may see.
 
@@ -132,7 +130,11 @@ Two restrictions separate this router from `record.list`, which is admin only. F
 | `create` | mutation | `userApproved` | New collection, under any parent including a synchronized one; `catalogueMode` sets what readers browse there from the start, defaulting to `files`; `public` is forced to `false` for non-admins, so only admins create public ones. `BAD_REQUEST` when a sibling already has that name |
 | `createFromAsset` | mutation | `userAdmin` | Synchronised collection from an asset folder, at the root or under a custom collection (`BAD_REQUEST` under a synchronized parent, whose sub-folders the sync links itself); pushes `collection/synchronization` |
 | `addRecordsByKey` | mutation | `userApproved` | Adds products to a collection by record key, for the editor of that collection. An administrator matches the whole record database, anyone else only what they can already see. Returns what was added, what matched and the keys that matched nothing |
-| `createUserCollection` | mutation | `userApproved` | Private collection owned by the caller, optionally as a catalogue through `catalogueMode`. The rules and the whole-catalogue flag stay out of reach; see `setRecordRules` |
+| `create` also gives a collection born as a catalogue (`catalogueMode` other than `files`) a page carrying a `products` block, and `setRecordRules` does the same when a collection becomes one. |
+| `recordPreview` | query | `userApproved` | The membership of a collection as its editor sees it, excluded rows included, with each product's readiness, ordered by reference. `total`, `included` and `notReady` cover all membership rows, not just the requested page. `FORBIDDEN` for anyone who cannot edit the collection |
+| `setRecordsExcluded` | mutation | `userApproved` | Takes products out of what readers get, or puts them back, without touching the membership rows. The reader count follows |
+| `excludeNotReadyRecords` | mutation | `userApproved` | Excludes every product of the collection the readiness definition does not call ready; returns how many moved |
+| `createUserCollection` | mutation | `userApproved` | Private collection owned by the caller. The personal creation UI sends a name and optional parent, without `catalogueMode`; the optional API field remains for compatibility. Adding records to a personal collection does not generate a page: the standard renderer displays its files and products automatically. The rules and the whole-catalogue flag stay out of reach; see `setRecordRules` |
 | `ListPrivateCollections` | query | `userApproved` | The caller's private collections |
 | `addItems` | mutation | `userApproved` | Duplicates selected files or whole collections into a collection the caller can edit (`duplicateCollection`, `duplicateFiles`) |
 | `rename` | mutation | `userApproved` | Name only, refused on synchronized collections and when a sibling already has that name |
@@ -173,35 +175,43 @@ Two restrictions separate this router from `record.list`, which is admin only. F
 | `favorite.removeCollection` | mutation | `userApproved`, `userMember` | Unstars a collection; a no-op when it was not starred |
 | `download.list` | query | `userApproved` | The caller's `ready`, `preparing` and `failed` downloads, plus those `expired` in the last month |
 | `download.exportRecords` | mutation | `userApproved` | Exports selected accessible records or collections as base64 CSV/XLSX with selected visible columns; up to 10,000 rows, access rechecked at export |
-| `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` at or above 10,000,000,000 bytes); `email` type pushes `download/create-archive` |
+| `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` at or above 10,000,000,000 bytes); optional `recordExport` adds an access-checked CSV/XLSX list to the file ZIP; `email` type pushes `download/create-archive` |
 
-### `record` and `recordAttribute`
+### `record`, `recordAttribute` and `recordTable`
 
 Records were called products until the 2026-09-21 rename; the tables, columns, procedures and response fields all carry the record name now. The admin-chosen label (`enrichment_settings`) only changes what people read on screen.
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `record.list` | query | `userAdmin` | Records by `page` and `size` (at most 500), with optional `search` (the key or any value, `ILIKE`), `filters` (at most 10; `column` is `recordKey` or a field name, `op` is `contains`, `is`, `is_not`, `is_empty`, `is_not_empty` or `has_any` with `values`) and `sort` (`recordKey`, `createdAt`, `updatedAt`, `fileCount` or a field; numbers and dates sort by value, values that do not fit last). Each row carries `thumbnailURL` (a file at the thumbnail view first, else any linked file with a thumbnail), `fileCount`, `filledCount` and `updatedAt`; the result carries `total` and `keyColumnName`. An unknown column is `BAD_REQUEST` |
+| `record.list` | query | `userAdmin` | Records from `offset`, at most `limit` (1 to 500), so the grid can load any block of the list; optional `tableId` keeps the records of one table. With optional `search` (the key or any value, `ILIKE`), `filters` (at most 10; `column` is `recordKey` or a field name, `op` is `contains`, `is`, `is_not`, `is_empty`, `is_not_empty` or `has_any` with `values`) and `sort` (`recordKey`, `createdAt`, `updatedAt`, `fileCount` or a field; numbers and dates sort by value, values that do not fit last). Each row carries `tableId`, `thumbnailURL` (a file at the thumbnail view first, else any linked file with a thumbnail), `fileCount`, `filledCount` (over the fields of the table when `tableId` is given, else every field) and `updatedAt`; the result carries `total` and `keyColumnName`. An unknown column is `BAD_REQUEST` |
 | `record.get` | query | `userAdmin` | One record as a list row, plus `files.direct` (links with strategy, status, `isPrimary`, source folder, step pattern, author and thumbnail; files whose `record_id` only the old job set come as `strategy: 'legacy'`) and `files.range` (files linked through a value the record has). 500 rows each at most |
-| `record.locate` | query | `userAdmin` | The `id` of the record with `recordKey` and its 0-based `position` under the same `search`, `filters` and `sort` as `record.list`, or `position: null` when they leave it out. An unknown key is `NOT_FOUND` |
-| `record.create` | mutation | `userAdmin` | `recordKey` (trimmed, 1 to 200 characters) and optional `values`. `CONFLICT` when the key exists, `NOT_FOUND` for an unknown field, `BAD_REQUEST` for a value its type refuses. Re-runs the entity stage |
+| `record.locate` | query | `userAdmin` | The `id` and `tableId` of the record with `recordKey` and its 0-based `position` in its own table under the same `search`, `filters` and `sort` as `record.list`, or `position: null` when they leave it out. A `tableId` given is ignored for the position. An unknown key is `NOT_FOUND` |
+| `record.create` | mutation | `userAdmin` | `recordKey` (trimmed, 1 to 200 characters), optional `values` and optional `tableId` (the first table without one). `CONFLICT` when the key exists, `NOT_FOUND` for an unknown field, `BAD_REQUEST` for a value its type refuses. Re-runs the entity stage |
 | `record.patch` | mutation | `userAdmin` | Sets 1 to 50 fields of one record (`values`) and leaves the others; `source` is `grid` or `panel`. The key column is `BAD_REQUEST`. Writes a history row only when a value changes. Re-runs the entity stage only when a changed field is used by a range link, a folder attachment or the CSV mapping |
 | `record.patchMany` | mutation | `userAdmin` | A pasted, filled or cleared range of grid cells: `changes` of `{ id, values }`, up to 500 records and 5,000 cells. Every value is checked first, then all are written in one transaction or none; one history row per changed record, source `grid`; returns `updated` |
 | `record.bulkPatch` | mutation | `userAdmin` | Sets 1 to 10 fields on up to 500 records; one history row per changed record; returns `updated` |
 | `record.remove` | mutation | `userAdmin` | Deletes up to 500 records, their last values kept in the history, then re-runs the entity stage so links to their keys turn dangling |
-| `record.removeAll` | mutation | `userAdmin` | Same for every record |
+| `record.moveToTable` | mutation | `userAdmin` | Moves up to 500 records (`ids`) to `tableId`, with a history row per record moved (`action: 'move'`, `changes.table` old and new table names); records already there are left alone. Returns `moved`. An unknown table is `NOT_FOUND` |
+| `record.removeAll` | mutation | `userAdmin` | Same for every record of `tableId`, or of the catalogue without it |
 | `record.history` | query | `userAdmin` | Changes of a record, newest first, including those made under the same key before it was deleted; `before` (the id of the last item) and `limit` (1 to 100) page through them |
-| `record.exportRows` | mutation | `userAdmin` | `columns` (key first, then fields by position) and `rows` for the `ids` given, or for the `search`, `filters` and `sort`; more than 10,000 rows is `BAD_REQUEST` |
-| `record.compareCsv` | mutation | `userAdmin` | `rows` with their `key`, a `status` `new`, `changed`, `unchanged`, `duplicate`, `missing_key` or `invalid`, the `differences` (old and new per column) and the `invalid` message per column, plus `newColumns` (created as text on import) and `newOptions` per select field. Writes nothing |
-| `record.importCsv` | mutation | `userAdmin` | In one transaction: creates the new columns as text fields, adds the new options, creates and updates rows, skips a row with an invalid value whole, and writes one history row per record with the same `importBatchId`. Returns `newRecords`, `updatedRecords` and `skipped`. Missing columns are not written as empty strings on other records |
+| `record.exportRows` | mutation | `userAdmin` | `columns` (key first, then the fields of `tableId` in table order, or every field by position) and `rows` for the `ids` given, or for the `tableId`, `search`, `filters` and `sort`; more than 10,000 rows is `BAD_REQUEST` |
+| `record.compareCsv` | mutation | `userAdmin` | `rows` with their `key`, a `status` `new`, `changed`, `unchanged`, `duplicate`, `missing_key` or `invalid`, the `differences` (old and new per column) and the `invalid` message per column, plus `newColumns` (created as text on import) and `newOptions` per select field. Each row carries `otherTable`, the name of the table holding its key when that is not the optional `tableId` (any table when it is left out). Writes nothing |
+| `record.importCsv` | mutation | `userAdmin` | Takes `tableId`. In one transaction: creates the new columns as text fields, shows every imported column in the table, adds the new options, creates rows in the table and updates rows where they are, skips a row with an invalid value whole, and writes one history row per record with the same `importBatchId`. Returns `newRecords`, `updatedRecords` and `skipped`. Missing columns are not written as empty strings on other records |
 | `recordAttribute.listAvailable` | query | `userAdmin` | Distinct `hstore` keys found in records |
 | `recordAttribute.list` | query | `userAdmin` | Fields in `position` order, with `valueType` and `options` |
 | `recordAttribute.listFacets` | query | login | Facetable fields with their distinct values; each option of a multiple select is a value of its own |
-| `recordAttribute.create` | mutation | `userAdmin` | `name` (1 to 100 characters, not the key column; `CONFLICT` when taken), `valueType`, `options`, switches. Placed last. A select without options takes them from the stored values. Returns `invalidCount` |
+| `recordAttribute.create` | mutation | `userAdmin` | `name` (1 to 100 characters, not the key column; `CONFLICT` when taken), `valueType`, `options`, switches and optional `tableId`: the field shows in that table, or in every table without it. Placed last. A select without options takes them from the stored values. Returns `invalidCount` |
 | `recordAttribute.update` | mutation | `userAdmin` | Any of display name, `valueType`, `options` (no `\|`, at most 200) and switches. Stored values are never rewritten; `invalidCount` says how many no longer fit |
 | `recordAttribute.reorder` | mutation | `userAdmin` | `ids` in their new order |
 | `recordAttribute.usage` | query | `userAdmin` | `filled` and `invalid` value counts of a field |
-| `recordAttribute.remove` | mutation | `userAdmin` | Removes the field and its value from every record, with a history row per record that held one (`source: 'attribute'`); returns `cleared` |
+| `recordAttribute.remove` | mutation | `userAdmin` | Removes the field and its value from every record, and from every table, with a history row per record that held one (`source: 'attribute'`); returns `cleared` |
+| `recordTable.list` | query | `userAdmin` | Tables in `position` order with `recordCount` and `fieldIds`, the fields each shows in order |
+| `recordTable.create` | mutation | `userAdmin` | `name` (1 to 100 characters) and optional `fieldIds`. A taken name, case aside, gets a number: `Shoes (1)`. Returns the table |
+| `recordTable.rename` | mutation | `userAdmin` | `id` and `name`; `CONFLICT` when another table has it |
+| `recordTable.reorder` | mutation | `userAdmin` | `ids` in their new order |
+| `recordTable.setFields` | mutation | `userAdmin` | The fields a table shows, in order (`fieldIds`) |
+| `recordTable.setFieldTables` | mutation | `userAdmin` | The tables that show one field (`fieldId`, `tableIds`); a table added puts it last |
+| `recordTable.remove` | mutation | `userAdmin` | Deletes a table. One holding records needs `moveTo`, where they move with a history row each; the last table is `BAD_REQUEST` |
 | `settings.getEnrichment` | query | `userAdmin` | `recordLabelSingular` and `recordLabelPlural` |
 | `settings.updateEnrichment` | mutation | `userAdmin` | Sets both labels (1 to 30 characters each); `env` returns them as `recordLabel` |
 
@@ -322,3 +332,10 @@ The five queries take `{ from, to }` (dates, `to` excluded) and read `activity_e
 Uncaught database, storage or service exceptions can also surface as `INTERNAL_SERVER_ERROR`.
 
 `searches` includes totals, daily zero-result counts, previous-period term counts and demand signals. A spike exceeds the preceding seven-day daily average by at least 5 searches and is at least 3× that average. Signals are evaluated before the 50-row display limit. `searchTerm({ from, to, term })` is also admin-only: it returns the exact term’s daily series and up to 200 approved, verified, non-guest users with their search counts and emails, plus the total contactable count. Neither endpoint sends messages. All analytics ranges require `to > from` and a duration no greater than 366 days.
+
+
+### Related records on a product page
+
+`catalogue.get` accepts its existing UUID string or `{ id, collectionId?, relatedOffset? }`. The collection context selects that collection's `relatedRecords` override, otherwise `settings.getEnrichment.relatedRecords`. `relatedOffset` defaults to zero. `siblings` now contains the matching related records (24 per page), with `relatedTotal` for pagination. The source record is excluded before counting; overlapping groups produce no duplicates. Inaccessible collection contexts return `NOT_FOUND`, and current-list groups without a context return no results. Product `collectionFiles` carry the current product's visible attributes and their `facetable` flag, including when the asset is attached through an active entity link.
+
+`settings.updateEnrichment` accepts optional `relatedRecords`; `collection.setRecordRules` accepts nullable `relatedRecords` (null restores inheritance). Both require an administrator for this setting. The payload is `{ enabled, groups: [{ scope: "current" | "all", matchField: string | null, hasPhoto, filters, excludeFilters }] }`; `$family` means the model key. The server validates up to five groups and ten complete filters per inclusion/exclusion array. Inclusion filters are ANDed, exclusion matches are ORed, and groups are ORed. Only visible fields can contribute; a group referencing a removed or private field returns no matches. See [Catalogue](../administration/catalogue.md) for the effect of collection context and photo access.

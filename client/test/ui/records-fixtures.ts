@@ -12,9 +12,13 @@ const fields = [
   { id: 'f-story', name: 'story', displayName: 'Story', valueType: 'long_text', options: [], position: 5, facetable: false, viewable: true, searchable: true },
 ]
 export const records = [
-  { id: '00000000-0000-4000-8000-000000000001', recordKey: 'WX5678-100', keyColumnName: 'SKU', metaData: { SKU: 'WX5678-100', name: 'Canvas tote', colour: 'Sand', tags: 'Eco|New', price: '49', launch: '2026-10-01', story: 'Cut from heavy organic canvas with reinforced handles, it carries a laptop, a day of groceries and a rolled towel without losing its shape.\nMade in Porto.' }, thumbnailURL: picture('#c29570'), fileCount: 4, filledCount: 5, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
-  { id: '00000000-0000-4000-8000-000000000002', recordKey: 'WX5678-200', keyColumnName: 'SKU', metaData: { SKU: 'WX5678-200', name: 'Wool scarf', colour: 'Forest', tags: 'Sale', price: 'n/a' }, thumbnailURL: picture('#354d45'), fileCount: 1, filledCount: 4, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
-  { id: '00000000-0000-4000-8000-000000000003', recordKey: 'WX5678-300', keyColumnName: 'SKU', metaData: { SKU: 'WX5678-300', name: 'Leather belt' }, thumbnailURL: null, fileCount: 0, filledCount: 1, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
+  { id: '00000000-0000-4000-8000-000000000001', recordKey: 'WX5678-100', keyColumnName: 'SKU', tableId: '00000000-0000-4000-8000-0000000000a1', metaData: { SKU: 'WX5678-100', name: 'Canvas tote', colour: 'Sand', tags: 'Eco|New', price: '49', launch: '2026-10-01', story: 'Cut from heavy organic canvas with reinforced handles, it carries a laptop, a day of groceries and a rolled towel without losing its shape.\nMade in Porto.' }, thumbnailURL: picture('#c29570'), fileCount: 4, filledCount: 5, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
+  { id: '00000000-0000-4000-8000-000000000002', recordKey: 'WX5678-200', keyColumnName: 'SKU', tableId: '00000000-0000-4000-8000-0000000000a1', metaData: { SKU: 'WX5678-200', name: 'Wool scarf', colour: 'Forest', tags: 'Sale', price: 'n/a' }, thumbnailURL: picture('#354d45'), fileCount: 1, filledCount: 4, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
+  { id: '00000000-0000-4000-8000-000000000003', recordKey: 'WX5678-300', keyColumnName: 'SKU', tableId: '00000000-0000-4000-8000-0000000000a1', metaData: { SKU: 'WX5678-300', name: 'Leather belt' }, thumbnailURL: null, fileCount: 0, filledCount: 1, createdAt: '2026-09-01T10:00:00Z', updatedAt: '2026-09-20T10:00:00Z' },
+]
+export const tables = [
+  { id: '00000000-0000-4000-8000-0000000000a1', name: 'Products', position: 0, recordCount: 3, fieldIds: fields.map(field => field.id) },
+  { id: '00000000-0000-4000-8000-0000000000a2', name: 'Apparel', position: 1, recordCount: 0, fieldIds: ['f-name', 'f-colour'] },
 ]
 const detail = {
   ...records[0],
@@ -51,6 +55,12 @@ const comparison = {
   ],
 }
 
+// Rows by block, as the grid asks for them; the second table is empty.
+function listFor(input: { offset?: number, tableId?: string }) {
+  const rows = input.tableId === tables[1].id ? [] : records
+  return { records: (input.offset ?? 0) === 0 ? rows : [], total: rows.length, keyColumnName: 'SKU' }
+}
+
 export async function fixture(page: Page) {
   const errors: string[] = []
   const calls: { name: string, input: unknown }[] = []
@@ -62,7 +72,10 @@ export async function fixture(page: Page) {
     calls.push({ name, input: raw ? JSON.parse(raw) : undefined })
     const data = name === 'user.me' ? { ...(responses[name] as object), role: 'admin' }
       : name === 'env' ? { ...(responses.env as object), recordLabel: { singular: 'Product', plural: 'Products' }, viewsEnabled: true }
-      : name === 'record.list' ? { records, total: records.length, keyColumnName: 'SKU' }
+      : name === 'record.list' ? listFor(raw ? JSON.parse(raw) : {})
+      : name === 'recordTable.list' ? tables
+      : name === 'recordTable.create' ? { id: '00000000-0000-4000-8000-0000000000a3', name: 'Shoes', position: 2, recordCount: 0, fieldIds: [] }
+      : name === 'record.moveToTable' ? { moved: 1 }
       : name === 'recordAttribute.list' ? fields
       : name === 'record.get' ? detail
       : name === 'record.history' ? history

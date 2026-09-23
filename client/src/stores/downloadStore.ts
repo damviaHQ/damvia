@@ -33,6 +33,8 @@ interface Download {
 export const useDownloadStore = defineStore("download", () => {
   const refetchInterval = ref<number | false>(false)
   const seenDownloads = ref<string[]>([])
+  const activeDownloadRequests = ref(0)
+  let initialDownloadsFetched = false
 
   const { status, data: downloads, refetch } = useQuery<Download[]>({
     queryKey: ["downloads"],
@@ -47,7 +49,6 @@ export const useDownloadStore = defineStore("download", () => {
     return downloads?.value?.filter(
       (download) =>
         !seenDownloads.value.includes(download.id) &&
-        download.downloadType === "email" &&
         download.status === "ready"
     )
   })
@@ -59,8 +60,10 @@ export const useDownloadStore = defineStore("download", () => {
   })
 
   async function fetchInitialDownloads() {
+    if (initialDownloadsFetched) return
     const result = await trpc.download.list.query()
     seenDownloads.value = result.map((download) => download.id)
+    initialDownloadsFetched = true
   }
 
   function startRefetch() {
@@ -70,6 +73,14 @@ export const useDownloadStore = defineStore("download", () => {
 
   function stopRefetch() {
     refetchInterval.value = false
+  }
+
+  function startPreparing() {
+    activeDownloadRequests.value += 1
+  }
+
+  function finishPreparing() {
+    activeDownloadRequests.value = Math.max(0, activeDownloadRequests.value - 1)
   }
 
   function markDownloadsAsSeen() {
@@ -85,6 +96,9 @@ export const useDownloadStore = defineStore("download", () => {
   return {
     startRefetch,
     stopRefetch,
+    startPreparing,
+    finishPreparing,
+    activeDownloadRequests,
     markDownloadsAsSeen,
     fetchInitialDownloads,
     downloads,

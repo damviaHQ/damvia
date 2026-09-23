@@ -20,6 +20,8 @@ interface GlobalToast {
   success: (message: string) => void
   error: (message: string) => void
   info: (message: string) => void
+  loading: (message: string) => string | number
+  dismiss: (id: string | number) => void
 }
 
 const toastSymbol: InjectionKey<GlobalToast> = Symbol()
@@ -30,7 +32,8 @@ export function provideGlobalToast() {
     success: (message: string) => sonnerToast.success(message),
     error: (message: string) => sonnerToast.error(message),
     info: (message: string) => sonnerToast.info(message),
-
+    loading: (message: string) => sonnerToast.loading(message),
+    dismiss: (id: string | number) => { sonnerToast.dismiss(id) },
   }
 
   provide(toastSymbol, toast)

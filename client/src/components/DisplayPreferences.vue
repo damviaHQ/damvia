@@ -18,23 +18,26 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useRecordLabel } from '@/composables/useRecordLabel'
 import { useGlobalStore } from '@/stores/globalStore'
-import { collectionDisplayGroup, DEFAULT_MASONRY_SIZE, fileDisplayGroup, MASONRY_SIZES, type DisplayCollection, type DisplayFile, type DisplayGroup, type DisplayView, type MasonrySize } from '@/utils/displayPreferences'
+import { collectionDisplayGroup, DEFAULT_MASONRY_SIZE, fileDisplayGroup, productDisplayGroup, MASONRY_SIZES, type DisplayCollection, type DisplayFile, type DisplayGroup, type DisplayProduct, type DisplayView, type MasonrySize } from '@/utils/displayPreferences'
 import { Check, LayoutDashboard, LayoutGrid, LockKeyhole, RotateCcw, Rows3, SlidersHorizontal } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
 const props = withDefaults(defineProps<{
   files?: DisplayFile[]
   collections?: DisplayCollection[]
+  products?: DisplayProduct[]
   grouped?: boolean
   layoutLocked?: boolean
   restricted?: boolean
 }>(), { files: () => [], collections: () => [], grouped: false, layoutLocked: false, restricted: false })
 const store = useGlobalStore()
+const { plural } = useRecordLabel()
 const selectedId = ref('')
 const groups = computed(() => {
   const items: DisplayGroup[] = []
-  if (props.files.length || !props.collections.length) {
+  if (props.files.length || (!props.collections.length && !props.products)) {
     if (props.grouped && props.files.length) {
       const filesByType = new Map<string, DisplayFile[]>()
       props.files.forEach(file => {
@@ -45,22 +48,21 @@ const groups = computed(() => {
     } else items.push(fileDisplayGroup(props.files))
   }
   if (props.collections.length) items.push(collectionDisplayGroup(props.collections))
+  if (props.products) items.push(productDisplayGroup(props.products, plural.value))
   return items
 })
 const group = computed(() => groups.value.find(item => item.id === selectedId.value) ?? groups.value[0])
 const display = computed(() => store.displayPreferences[group.value.id] ?? group.value.defaultDisplay)
 const selectedColumns = computed(() => store.displayDetails[group.value.id]?.columns ?? group.value.defaultColumns)
-const views = computed<DisplayView[]>(() => group.value.id === 'asset_folder' ? ['grid', 'list'] : ['grid', 'list', 'masonry'])
+const views = computed<DisplayView[]>(() => ['asset_folder', 'record'].includes(group.value.id) ? ['grid', 'list'] : ['grid', 'list', 'masonry'])
 const viewIcons = { grid: LayoutGrid, list: Rows3, masonry: LayoutDashboard }
 const viewLabels = { grid: 'Grid', list: 'List', masonry: 'Masonry' }
 const masonrySize = computed(() => store.displayDetails[group.value.id]?.masonrySize ?? DEFAULT_MASONRY_SIZE)
 const masonrySizeLabel = computed(() => MASONRY_SIZES.find(size => size.id === masonrySize.value)?.label ?? '')
-// The trigger wears the current view, and admits it when the groups disagree.
 const displays = computed(() => groups.value.map(item => store.displayPreferences[item.id] ?? item.defaultDisplay))
 const sharedDisplay = computed(() => displays.value.every(value => value === displays.value[0]) ? displays.value[0] : null)
-const triggerIcon = computed(() => sharedDisplay.value ? viewIcons[sharedDisplay.value] : SlidersHorizontal)
 const triggerTitle = computed(() => `Display preferences — ${sharedDisplay.value ? viewLabels[sharedDisplay.value] : 'mixed'}${props.restricted ? ' · Hidden for some people' : ''}`)
-const customized = computed(() => groups.value.some(item => store.displayPreferences[item.id] !== undefined || store.displayDetails[item.id] !== undefined))
+
 
 function toggleColumn(id: string) {
   store.setDisplayDetails(group.value.id, {
@@ -73,14 +75,12 @@ function toggleColumn(id: string) {
   <Popover>
     <PopoverTrigger as-child>
       <Button type="button" variant="ghost" size="icon-sm" aria-label="Display preferences" :title="triggerTitle" class="relative text-neutral-500 data-[state=open]:bg-neutral-100 data-[state=open]:text-neutral-950">
-        <component :is="triggerIcon" aria-hidden="true" />
-        <span v-if="customized" class="absolute right-1 top-1 size-1 rounded-full bg-neutral-700 ring-2 ring-white" aria-hidden="true" />
+        <SlidersHorizontal aria-hidden="true" />
       </Button>
     </PopoverTrigger>
     <PopoverContent align="end" :side-offset="8" :collision-padding="12" class="display-preferences" aria-label="Display preferences">
       <div class="flex items-center justify-between gap-3 px-4 pt-4 pb-3">
         <h2 class="text-[13px] font-semibold text-neutral-900">Display preferences</h2>
-        <span class="text-[11px] text-neutral-500">Only for you</span>
       </div>
       <div v-if="groups.length > 1" class="flex items-center justify-between gap-3 px-4 pb-3">
         <span class="text-xs text-neutral-500">Content</span>
@@ -111,7 +111,7 @@ function toggleColumn(id: string) {
           <p class="mt-3 text-[11px] leading-4 text-neutral-500">Choose the attributes shown as columns.</p>
         </TabsContent>
         <TabsContent value="grid" class="m-0 p-4">
-          <p class="text-xs leading-5 text-neutral-500">{{ group.id === 'asset_folder' ? 'Preview collections as visual cards. Switch to List to choose their displayed properties.' : 'Every thumbnail gets the same size. Switch to Masonry to keep each file\'s own proportions.' }}</p>
+          <p class="text-xs leading-5 text-neutral-500">{{ ['asset_folder', 'record'].includes(group.id) ? 'Preview entries as visual cards. Switch to List to choose their displayed properties.' : 'Every thumbnail gets the same size. Switch to Masonry to keep each file\'s own proportions.' }}</p>
         </TabsContent>
         <TabsContent value="masonry" class="m-0 p-4">
           <div class="mb-3 flex items-center justify-between gap-3">

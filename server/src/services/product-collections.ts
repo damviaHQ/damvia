@@ -44,7 +44,7 @@ export function visibleCollectionIdsSql(user: User, parameters: unknown[], em: E
 }
 
 // A reader sees a product when a collection they may open holds it, or stands
-// for the whole catalogue. The media of that product keep their own rights.
+// for the whole catalogue. Linked pictures inherit this access, subject to licences.
 export function visibleRecordsCondition(user: User, alias: string, parameters: unknown[], em: EntityManager = dataSource.manager) {
 	const collections = visibleCollectionIdsSql(user, parameters, em)
 	return `EXISTS (
@@ -82,11 +82,22 @@ export async function createCataloguePage(em: EntityManager, collection: Collect
 	// collection into a catalogue at once, and the second would fail against
 	// the unique constraint on collection_id.
 	const inserted = await em.query(
-		`INSERT INTO pages (collection_id) VALUES ($1) ON CONFLICT (collection_id) DO NOTHING RETURNING id`,
+		`INSERT INTO pages (collection_id) VALUES ($1) ON CONFLICT DO NOTHING RETURNING id`,
 		[collection.id],
 	)
 	if (!inserted.length) {
-		return em.getRepository(Page).findOneByOrFail({ collectionId: collection.id })
+		const page = await em.getRepository(Page).findOneOrFail({ where: { collectionId: collection.id }, lock: { mode: 'pessimistic_write' } })
+		const blocks = await em.getRepository(PageBlock).findBy({ pageId: page.id })
+		if (!blocks.some(block => block.type === PageBlockType.PRODUCTS && (!('collectionId' in block.data) || !block.data.collectionId || block.data.collectionId === collection.id))) {
+			const block = new PageBlock()
+			block.pageId = page.id
+			block.type = PageBlockType.PRODUCTS
+			block.position = Math.max(-1, ...blocks.map(block => block.position)) + 1
+			block.size = 'full'
+			block.data = { title: '', layout: null, collectionId: null }
+			await em.getRepository(PageBlock).save(block)
+		}
+		return page
 	}
 	const page = await em.getRepository(Page).findOneByOrFail({ id: inserted[0].id })
 	// A collection holding both keeps the layout a reader already knows, with
@@ -127,17 +138,24 @@ export async function addRecords(em: EntityManager, collectionId: string, record
 // taken out of the catalogue included, with the score that says what is left to
 // produce. Readers never see this; it is the screen a catalogue is built on.
 export async function collectionRecordPreview(em: EntityManager, collectionId: string, page: { offset: number, limit: number }) {
-	const rows: {
-		id: string, record_key: string, meta_data: Record<string, string>, source: string, excluded: boolean,
-		readiness_filled: number, readiness_total: number, readiness_ready: boolean, total: string,
-	}[] = await em.query(`
-		SELECT r.id, r.record_key, hstore_to_json(r.meta_data) AS meta_data, cr.source, cr.excluded,
-			r.readiness_filled, r.readiness_total, r.readiness_ready,
-			count(*) OVER () AS total
+	const [summary] = await em.query(`
+		SELECT count(*)::int AS total,
+			count(*) FILTER (WHERE NOT cr.excluded)::int AS included,
+			count(*) FILTER (WHERE NOT cr.excluded AND NOT r.readiness_ready)::int AS "notReady"
 		FROM collection_records cr
 		INNER JOIN records r ON r.id = cr.record_id
 		WHERE cr.collection_id = $1::uuid
-		ORDER BY cr.excluded, r.record_key
+	`, [collectionId])
+	const rows: {
+		id: string, record_key: string, meta_data: Record<string, string>, source: string, excluded: boolean,
+		readiness_filled: number, readiness_total: number, readiness_ready: boolean,
+	}[] = await em.query(`
+		SELECT r.id, r.record_key, hstore_to_json(r.meta_data) AS meta_data, cr.source, cr.excluded,
+			r.readiness_filled, r.readiness_total, r.readiness_ready
+		FROM collection_records cr
+		INNER JOIN records r ON r.id = cr.record_id
+		WHERE cr.collection_id = $1::uuid
+		ORDER BY r.record_key
 		LIMIT $2 OFFSET $3
 	`, [collectionId, page.limit, page.offset])
 	return {
@@ -149,7 +167,9 @@ export async function collectionRecordPreview(em: EntityManager, collectionId: s
 			excluded: row.excluded,
 			readiness: { filled: row.readiness_filled, total: row.readiness_total, ready: row.readiness_ready },
 		})),
-		total: rows.length ? Number(rows[0].total) : 0,
+		total: summary.total as number,
+		included: summary.included as number,
+		notReady: summary.notReady as number,
 	}
 }
 

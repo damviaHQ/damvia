@@ -19,7 +19,8 @@ import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { rerunEntityStage, rerunFamilyStage, rerunReadinessStage } from "../../services/enrichment"
 import { linkedFilesOf } from "../../services/record-files"
-import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, locateRecord, patchEach, patchRecords, removeRecords, RecordRow } from "../../services/records"
+import { tableExists, tableFieldNames } from "../../services/record-tables"
+import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, locateRecord, moveRecords, patchEach, patchRecords, removeRecords, RecordRow } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
 const filter = z.object({
@@ -29,6 +30,7 @@ const filter = z.object({
   values: z.array(z.string().max(500)).max(200).optional(),
 })
 const query = {
+  tableId: z.uuid().optional(),
   search: z.string().max(200).optional(),
   filters: z.array(filter).max(10).optional(),
   sort: z.object({ column: z.string().min(1).max(200), direction: z.enum(['asc', 'desc']) }).optional(),
@@ -36,9 +38,13 @@ const query = {
 const values = z.record(z.string().min(1).max(200), z.string().max(10000))
 const ids = z.array(z.uuid()).min(1).max(LIST_MAX)
 const csv = z.object({
+  tableId: z.uuid(),
   keyColumnName: z.string().min(1),
   data: z.array(z.record(z.string(), z.string())),
 })
+// A comparison for a table not created yet has no table: every known key is
+// then in another table.
+const csvToCompare = csv.extend({ tableId: z.uuid().optional() })
 
 async function thumbnailView(): Promise<string | null> {
   return (await dataSource.getRepository(EnrichmentSettings).findOneBy({ id: 1 }))?.thumbnailView ?? null
@@ -64,10 +70,10 @@ async function getRecord(id: string) {
 export default router({
   list: publicProcedure
     .use(authMiddleware(userAdmin))
-    .input(z.object({ page: z.number().int().min(1), size: z.number().int().min(1).max(LIST_MAX), ...query }))
+    .input(z.object({ offset: z.number().int().min(0), limit: z.number().int().min(1).max(LIST_MAX), ...query }))
     .query(async ({ input }) => {
-      const { page, size, ...rest } = input
-      const result = await listRecords(dataSource.manager, rest, { offset: (page - 1) * size, limit: size }, await thumbnailView())
+      const { offset, limit, ...rest } = input
+      const result = await listRecords(dataSource.manager, rest, { offset, limit }, await thumbnailView())
       return {
         records: await Promise.all(result.rows.map(formatRow)),
         total: result.total,
@@ -88,7 +94,7 @@ export default router({
         },
       }
     }),
-  // The page a record falls on, so the grid can jump to it.
+  // The table a record is in and its row there, so the grid can jump to it.
   locate: publicProcedure
     .use(authMiddleware(userAdmin))
     .input(z.object({ recordKey: z.string().trim().min(1).max(200), ...query }))
@@ -102,9 +108,12 @@ export default router({
     }),
   create: publicProcedure
     .use(authMiddleware(userAdmin))
-    .input(z.object({ recordKey: z.string().trim().min(1).max(200), values: values.optional() }))
+    .input(z.object({ recordKey: z.string().trim().min(1).max(200), values: values.optional(), tableId: z.uuid().optional() }))
     .mutation(async ({ input, ctx }) => {
-      const id = await dataSource.transaction((em) => createRecord(em, input, { userId: ctx.user.id, source: 'grid' }))
+      const id = await dataSource.transaction(async (em) => {
+        if (input.tableId) await tableExists(em, input.tableId)
+        return createRecord(em, input, { userId: ctx.user.id, source: 'grid' })
+      })
       // Files that already carry the key attach now.
       await rerunEntityStage()
       await rerunReadinessStage([id])
@@ -166,10 +175,22 @@ export default router({
       await rerunEntityStage()
       return { removed }
     }),
+  moveToTable: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ ids, tableId: z.uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const moved = await dataSource.transaction(async (em) => {
+        await tableExists(em, input.tableId)
+        return moveRecords(em, input.ids, input.tableId, { userId: ctx.user.id, source: input.ids.length > 1 ? 'bulk' : 'grid' })
+      })
+      return { moved }
+    }),
+  // Every record of the table, or of the catalogue without one.
   removeAll: publicProcedure
     .use(authMiddleware(userAdmin))
-    .mutation(async ({ ctx }) => {
-      const removed = await dataSource.transaction((em) => removeRecords(em, null, { userId: ctx.user.id, source: 'bulk' }))
+    .input(z.object({ tableId: z.uuid().optional() }).optional())
+    .mutation(async ({ input, ctx }) => {
+      const removed = await dataSource.transaction((em) => removeRecords(em, null, { userId: ctx.user.id, source: 'bulk' }, input?.tableId))
       await rerunEntityStage()
       return { removed }
     }),
@@ -192,7 +213,7 @@ export default router({
       return {
         items: rows.slice(0, input.limit).map((row) => ({
           id: row.id,
-          action: row.action as 'create' | 'update' | 'delete',
+          action: row.action as 'create' | 'update' | 'delete' | 'move',
           source: row.source,
           changes: row.changes,
           changedBy: row.changed_by_id ? { id: row.changed_by_id, name: row.changed_by_name } : null,
@@ -211,7 +232,9 @@ export default router({
         throw new TRPCError({ code: 'BAD_REQUEST', message: `More than ${EXPORT_MAX} records match. Narrow the filters or import-export in several parts.` })
       }
       const keyColumnName = result.keyColumnName ?? 'Key'
-      const columns = [keyColumnName, ...result.fields.map((field) => field.name).filter((name) => name !== keyColumnName)]
+      // A table exports the fields it shows.
+      const names = input.tableId ? await tableFieldNames(dataSource.manager, input.tableId) : result.fields.map((field) => field.name)
+      const columns = [keyColumnName, ...names.filter((name) => name !== keyColumnName)]
       return {
         columns,
         rows: result.rows.map((row) => [row.recordKey, ...columns.slice(1).map((name) => row.metaData[name] ?? '')]),
@@ -219,7 +242,7 @@ export default router({
     }),
   compareCsv: publicProcedure
     .use(authMiddleware(userAdmin))
-    .input(csv)
+    .input(csvToCompare)
     .mutation(async ({ input }) => {
       const analysis = await analyseCsv(dataSource.manager, input.keyColumnName, input.data)
       return {
@@ -229,6 +252,8 @@ export default router({
         rows: analysis.rows.map((row) => ({
           key: row.key,
           existing: row.existing ? { ...row.existing.metaData, [analysis.keyColumnName]: row.key } : {},
+          // A known key in another table is updated there and stays there.
+          otherTable: row.existing && row.existing.tableId !== input.tableId ? row.existing.tableName : null,
           new: row.row,
           differences: row.differences,
           invalid: row.invalid,
@@ -247,9 +272,11 @@ export default router({
     .mutation(async ({ input, ctx }) => {
       const result = await dataSource.transaction(async (em) => {
         await em.query('LOCK TABLE records IN SHARE ROW EXCLUSIVE MODE')
-        return importCsv(em, await analyseCsv(em, input.keyColumnName, input.data), ctx.user.id)
+        await tableExists(em, input.tableId)
+        return importCsv(em, await analyseCsv(em, input.keyColumnName, input.data), ctx.user.id, input.tableId)
       })
       await rerunEntityStage()
+      // A whole import can change any record, so the catalogue is scored again.
       await rerunReadinessStage()
       await rerunFamilyStage()
       return result

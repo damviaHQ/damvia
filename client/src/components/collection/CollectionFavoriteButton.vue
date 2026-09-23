@@ -43,8 +43,8 @@ const { canFavorite, isFavorite, toggle, isSaving, isSuccess } = useCollectionFa
       <StarOff v-if="isFavorite(collection.id)" aria-hidden="true" class="absolute inset-0 size-6 stroke-[2] fill-none text-neutral-500 opacity-0 group-hover/favorite:opacity-100 group-focus-visible/favorite:opacity-100" />
     </span>
     <span v-else aria-hidden="true" class="relative block" :class="toolbar ? 'size-5 text-neutral-500 group-hover/favorite:text-neutral-800' : 'size-6'">
-      <Star class="size-6" :class="isFavorite(collection.id) && 'fill-current group-hover/favorite:opacity-0 group-focus-visible/favorite:opacity-0'" />
-      <StarOff v-if="isFavorite(collection.id)" class="absolute inset-0 size-6 fill-none opacity-0 group-hover/favorite:opacity-100 group-focus-visible/favorite:opacity-100" />
+      <Star :class="[toolbar ? 'size-5 stroke-[1.75]' : 'size-6', isFavorite(collection.id) && 'fill-current group-hover/favorite:opacity-0 group-focus-visible/favorite:opacity-0']" />
+      <StarOff v-if="isFavorite(collection.id)" class="absolute inset-0 fill-none opacity-0 group-hover/favorite:opacity-100 group-focus-visible/favorite:opacity-100" :class="toolbar ? 'size-5 stroke-[1.75]' : 'size-6'" />
     </span>
   </component>
 </template>

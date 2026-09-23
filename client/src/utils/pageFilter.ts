@@ -24,24 +24,27 @@ export type FilterChip = { key: string, value: string, label: string, category?:
 // needs what a file and a collection already carry.
 export type FilterableFile = {
   name: string
+  recordKey?: string
   mimeType?: string | null
   assetType?: { id: string, name: string } | null
-  record?: { attributes?: ({ id: string, name: string, displayName?: string | null, value?: string | null } | null)[] | null } | null
+  dimensions?: { width?: number | null, height?: number | null } | null
+  record?: { attributes?: ({ id: string, name: string, displayName?: string | null, value?: string | null, facetable?: boolean } | null)[] | null } | null
 }
 export type FilterableCollection = { name: string }
 
-export type PageFilterDimension = 'assetTypes' | 'fileTypes' | 'extensions'
+export type PageFilterDimension = 'assetTypes' | 'fileTypes' | 'extensions' | 'orientations'
 
 export type PageFilterState = {
   name: string
   assetTypes: string[]
   fileTypes: string[]
   extensions: string[]
+  orientations: string[]
   attributes: Record<string, string[]>
 }
 
 export function emptyPageFilter(): PageFilterState {
-  return { name: '', assetTypes: [], fileTypes: [], extensions: [], attributes: {} }
+  return { name: '', assetTypes: [], fileTypes: [], extensions: [], orientations: [], attributes: {} }
 }
 
 export function isPageFilterActive(state: PageFilterState): boolean {
@@ -49,6 +52,7 @@ export function isPageFilterActive(state: PageFilterState): boolean {
     !!state.assetTypes.length ||
     !!state.fileTypes.length ||
     !!state.extensions.length ||
+    !!state.orientations.length ||
     Object.values(state.attributes).some(values => values.length > 0)
 }
 
@@ -58,6 +62,7 @@ export function pageFilterCount(state: PageFilterState): number {
     state.assetTypes.length +
     state.fileTypes.length +
     state.extensions.length +
+    state.orientations.length +
     Object.values(state.attributes).reduce((total, values) => total + values.length, 0)
 }
 
@@ -69,7 +74,13 @@ function matchesName(name: string, term: string): boolean {
 // A name with no dot has no extension. Without this a file called README, or
 // a product reference, becomes a format of its own on the filter bar.
 export function fileExtensionOf(file: FilterableFile): string {
-  return file.name.includes('.') ? getFileExtension(file.name) : ''
+  return !file.recordKey && file.name.includes('.') ? getFileExtension(file.name) : ''
+}
+
+export function orientationOf(file: FilterableFile): 'portrait' | 'landscape' | 'square' | null {
+  const { width, height } = file.dimensions ?? {}
+  if (!width || !height || width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) return null
+  return width < height ? 'portrait' : width > height ? 'landscape' : 'square'
 }
 
 function attributeValues(file: FilterableFile, attributeId: string): string[] {
@@ -88,6 +99,9 @@ function matchesDimensions(file: FilterableFile, state: PageFilterState, except?
     return false
   }
   if (except !== 'extensions' && state.extensions.length && !state.extensions.includes(fileExtensionOf(file))) {
+    return false
+  }
+  if (except !== 'orientations' && state.orientations.length && !state.orientations.includes(orientationOf(file) ?? '')) {
     return false
   }
   for (const [attributeId, values] of Object.entries(state.attributes)) {
@@ -123,6 +137,7 @@ export type PageFacets = {
   assetTypes: FacetOption[]
   fileTypes: FacetOption[]
   extensions: FacetOption[]
+  orientations?: FacetOption[]
   attributes: { id: string, label: string, options: FacetOption[] }[]
 }
 
@@ -138,15 +153,19 @@ export function fileFacets(files: FilterableFile[], state: PageFilterState): Pag
   for (const file of files) {
     if (file.assetType) assetTypeNames.set(file.assetType.id, file.assetType.name)
     for (const attribute of file.record?.attributes ?? []) {
-      if (attribute?.value) attributeLabels.set(attribute.id, attribute.displayName || attribute.name)
+      if (attribute?.value && attribute.facetable !== false) attributeLabels.set(attribute.id, attribute.displayName || attribute.name)
     }
   }
 
   const assetTypeCounts = countBy(within('assetTypes'), file => file.assetType ? [file.assetType.id] : [])
-  const fileTypeCounts = countBy(within('fileTypes'), file => [fileTypeOf(file)])
+  const fileTypeCounts = countBy(within('fileTypes'), file => file.recordKey ? [] : [fileTypeOf(file)])
   const extensionCounts = countBy(within('extensions'), file => {
     const extension = fileExtensionOf(file)
     return extension ? [extension] : []
+  })
+  const orientationCounts = countBy(within('orientations'), file => {
+    const orientation = orientationOf(file)
+    return orientation ? [orientation] : []
   })
 
   const byLabel = (a: FacetOption, b: FacetOption) => a.label.localeCompare(b.label)
@@ -159,6 +178,12 @@ export function fileFacets(files: FilterableFile[], state: PageFilterState): Pag
     extensions: Array.from(extensionCounts, ([id, count]) => ({ id, label: id, count }))
       .concat(state.extensions.filter(id => !extensionCounts.has(id)).map(id => ({ id, label: id, count: 0 })))
       .sort(byLabel),
+    orientations: [
+      { id: 'portrait', label: 'Portrait' },
+      { id: 'landscape', label: 'Landscape' },
+      { id: 'square', label: 'Square' },
+    ].map(option => ({ ...option, count: orientationCounts.get(option.id) ?? 0 }))
+      .filter(option => option.count > 0 || state.orientations.includes(option.id)),
     attributes: Array.from(attributeLabels, ([id, label]) => {
       const counts = countBy(within(id), file => attributeValues(file, id))
       return {
@@ -190,6 +215,9 @@ export function filterChipsOf(state: PageFilterState, facets: PageFacets): Filte
   for (const value of state.extensions) {
     chips.push({ key: 'extensions', value, label: value, category: 'Format' })
   }
+  for (const value of state.orientations) {
+    chips.push({ key: 'orientations', value, label: labelOf(facets.orientations ?? [], value), category: 'Orientation' })
+  }
   // Read from the state, not the facets: a value must stay removable even once
   // nothing left on the page carries its attribute.
   for (const [attributeId, values] of Object.entries(state.attributes)) {
@@ -215,18 +243,19 @@ export const NAME_FILTER_KEY = 'name'
 
 // A dimension holding a single value narrows nothing, so it is not offered —
 // unless it is already in use, which must stay visible to be taken back.
-export function availableGroups(state: PageFilterState, facets: PageFacets): PageFilterGroup[] {
+export function availableGroups(state: PageFilterState, facets: PageFacets, showSingleValues = false): PageFilterGroup[] {
   return [
     { key: 'assetTypes', title: 'Asset type', options: facets.assetTypes, selected: state.assetTypes },
     { key: 'fileTypes', title: 'File type', options: facets.fileTypes, selected: state.fileTypes },
     { key: 'extensions', title: 'Format', options: facets.extensions, selected: state.extensions },
+    { key: 'orientations', title: 'Orientation', options: facets.orientations ?? [], selected: state.orientations },
     ...facets.attributes.map(attribute => ({
       key: `attribute:${attribute.id}`,
       title: attribute.label,
       options: attribute.options,
       selected: state.attributes[attribute.id] ?? [],
     })),
-  ].filter(group => group.options.length > 1 || group.selected.length)
+  ].filter(group => group.options.length > (showSingleValues ? 0 : 1) || group.selected.length)
 }
 
 // How many values a dimension holds in the state, so the picker can say which
@@ -234,6 +263,6 @@ export function availableGroups(state: PageFilterState, facets: PageFacets): Pag
 export function groupValueCount(state: PageFilterState, key: string): number {
   if (key === NAME_FILTER_KEY) return state.name.trim() ? 1 : 0
   if (key.startsWith('attribute:')) return (state.attributes[key.slice('attribute:'.length)] ?? []).length
-  if (key === 'assetTypes' || key === 'fileTypes' || key === 'extensions') return state[key].length
+  if (key === 'assetTypes' || key === 'fileTypes' || key === 'extensions' || key === 'orientations') return state[key].length
   return 0
 }

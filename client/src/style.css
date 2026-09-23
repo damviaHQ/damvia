@@ -71,3 +71,4 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
    the filter bar of a collection or a page. */
 .sort-pill { display: flex; align-items: center; width: auto; height: 29px; min-height: 29px; gap: 7px; padding: 0 10px; border: 1px solid #e5e5e5; border-radius: 999px; background: white; box-shadow: none; font-size: 12px; cursor: pointer; }
 .sort-pill:hover { border-color: #a3a3a3; }
+.sort-pill:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }

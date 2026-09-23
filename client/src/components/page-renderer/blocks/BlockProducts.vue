@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import Loader from "@/components/Loader.vue"
 import CollectionRenderProducts from "@/components/collection/CollectionRenderProducts.vue"
 import { PackageSearch } from "@lucide/vue"
 import BlockPlaceholder from "./BlockPlaceholder.vue"
@@ -31,7 +32,7 @@ const props = defineProps<{ data: any; collection?: Collection; editing?: boolea
 const { plural, lowerPlural } = useRecordLabel()
 
 const collectionId = computed(() => props.data?.collectionId || props.collection?.id)
-const { data: catalogue } = useQuery({
+const { data: catalogue, isPending, error } = useQuery({
   queryKey: computed(() => ["catalogue", "list", collectionId.value]),
   queryFn: () => trpc.catalogue.list.query({ collectionId: collectionId.value as string, offset: 0, limit: BLOCK_PAGE_SIZE }),
   enabled: computed(() => !!collectionId.value),
@@ -44,16 +45,19 @@ const truncated = computed(() => (catalogue.value?.total ?? 0) > products.value.
 </script>
 
 <template>
-  <div v-if="editing || products.length">
+  <div v-if="editing || collectionId">
     <div v-if="data.title" class="mb-0.5 text-sm font-medium text-muted-foreground">{{ data.title }}</div>
     <BlockPlaceholder v-if="editing && !products.length" :icon="PackageSearch" :title="plural"
       :explanation="`The ${lowerPlural} of the collection appear here, each with its reference and its visuals.`"
       :reason="data.collectionId
         ? `The collection you chose holds no ${lowerPlural} yet.`
         : `This block shows the ${lowerPlural} of this collection, and there are none yet. Add them by reference or with rules.`" />
+    <Loader v-else-if="isPending" :text="true" />
+    <p v-else-if="error" role="alert" class="text-body text-red-700">{{ error.message }}</p>
     <template v-else>
-      <CollectionRenderProducts :products="products" :fields="fields" :card-title-field="cardTitleField"
+      <CollectionRenderProducts :collection-id="collectionId" :products="products" :fields="fields" :card-title-field="cardTitleField"
         :force-view="forceView" />
+      <router-link v-if="!products.length" :to="{ name: 'catalogue' }" class="block text-center text-body text-neutral-600 underline">Browse {{ lowerPlural }}</router-link>
       <router-link v-if="truncated" :to="{ name: 'catalogue', query: { collection: collectionId } }"
         class="mt-2 inline-block text-body text-neutral-600">
         Showing {{ products.length }} of {{ catalogue?.total }} {{ lowerPlural }}. See them all

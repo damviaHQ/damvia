@@ -28,18 +28,22 @@ import { RouterOutput, trpc } from "@/services/server"
 import { keepPreviousData, useQuery } from "@tanstack/vue-query"
 import { ArrowLeft, Copy, Trash2 } from "@lucide/vue"
 import { computed } from "vue"
+import { useRoute } from "vue-router"
 
 const { form, terms, hasQuery, filters, setTerms, setExactMatch, setScope, toggleValue, clearFilters, setMetadataRange } = useSearchState()
+const route = useRoute()
+const isProductSearch = computed(() => route.query.kind === "products")
 const globalStore = useGlobalStore()
 const viewsEnabled = computed(() => globalStore.env?.viewsEnabled !== false)
 const toast = useGlobalToast()
 const recordLabel = useRecordLabel()
 
-const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
-const { data: recordViews } = useQuery({ queryKey: ["record-views"], queryFn: () => trpc.asset.listRecordViews.query() })
-const { data: recordFacets } = useQuery({ queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
-const { data: metadataFacets } = useQuery({ queryKey: ["metadata-fields", "facets"], queryFn: () => trpc.metadataField.listFacets.query() })
-const { data: axisFacets } = useQuery({ queryKey: ["variant-axes", "facets"], queryFn: () => trpc.variantAxis.listFacets.query() })
+const filesEnabled = computed(() => !isProductSearch.value)
+const { data: assetTypes } = useQuery({ enabled: filesEnabled, queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
+const { data: recordViews } = useQuery({ enabled: filesEnabled, queryKey: ["record-views"], queryFn: () => trpc.asset.listRecordViews.query() })
+const { data: recordFacets } = useQuery({ enabled: filesEnabled, queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
+const { data: metadataFacets } = useQuery({ enabled: filesEnabled, queryKey: ["metadata-fields", "facets"], queryFn: () => trpc.metadataField.listFacets.query() })
+const { data: axisFacets } = useQuery({ enabled: filesEnabled, queryKey: ["variant-axes", "facets"], queryFn: () => trpc.variantAxis.listFacets.query() })
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
@@ -47,6 +51,7 @@ const { data: collection } = useQuery({
 })
 // Same key as the results view, so the counts come from the one request.
 const { data: search } = useQuery({
+  enabled: filesEnabled,
   queryKey: computed(() => ["search", form.value]),
   queryFn: () => trpc.collection.search.query({ ...form.value, collapseVariants: true }),
   // Keep the previous counts while the next results load, so the rows do not disappear.
@@ -61,7 +66,7 @@ const notFoundInput = computed(() => ({
   searchScope: form.value.searchScope,
 }))
 const { data: notFound } = useQuery({
-  enabled: computed(() => !form.value.exactMatch && terms.value.length > 0),
+  enabled: computed(() => filesEnabled.value && !form.value.exactMatch && terms.value.length > 0),
   queryKey: computed(() => ["search-not-found", notFoundInput.value]),
   queryFn: () => trpc.collection.searchNotFound.query(notFoundInput.value),
   placeholderData: keepPreviousData,
@@ -192,6 +197,35 @@ function removeMissing() {
 
 <template>
   <div class="flex h-full min-w-0 flex-col" data-search-panel>
+    <div v-if="isProductSearch" class="flex min-w-0 flex-col gap-3">
+      <router-link :to="backTarget" :class="sidebarRowClasses">
+        <span :class="menuIconSlotClasses"><ArrowLeft :class="menuIconClasses" aria-hidden="true" /></span>
+        <span>{{ form.collectionId ? `Back to ${collectionName}` : "Back to Library" }}</span>
+      </router-link>
+      <section aria-labelledby="product-search-terms-title" class="flex min-w-0 flex-col gap-1.5">
+        <div class="flex h-8 items-center justify-between">
+          <label id="product-search-terms-title" for="search-panel-terms" :class="sidebarSectionTitleClasses">Search terms</label>
+          <Button v-if="hasQuery" type="button" variant="ghost" class="h-7 px-2 text-caption text-neutral-600 hover:text-red-600" @click="setTerms([])">Clear</Button>
+        </div>
+        <SearchTermsEditor class="mx-3" :model-value="terms" :exact-match="form.exactMatch" @update:model-value="setTerms" />
+        <label class="flex cursor-pointer items-center gap-2 px-3 pb-1 text-body text-neutral-700">
+          <Switch id="product-search-mode-exact" aria-label="Exact phrase" :model-value="form.exactMatch" @update:model-value="setExactMatch($event as boolean)" />
+          <span>Exact phrase</span>
+          <span class="text-caption text-[color:var(--dv-text-secondary)]">{{ form.exactMatch ? "the words in this order" : "off, multiple references" }}</span>
+        </label>
+      </section>
+      <section v-if="form.collectionId" aria-labelledby="product-search-where-title" class="border-t border-neutral-200 pt-2">
+        <h2 id="product-search-where-title" :class="sidebarSectionTitleClasses" class="mb-2">Where to search</h2>
+        <p class="truncate px-3 pb-1 text-caption text-[color:var(--dv-text-secondary)]" :title="collectionName">{{ collectionName }}</p>
+        <RadioGroup :model-value="form.searchScope" class="flex min-w-0 flex-col" @update:model-value="setScope($event as SearchScope)">
+          <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem id="product-search-scope-all" value="all" /> All collections</label>
+          <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem id="product-search-scope-sub" value="current_with_sub" /> <span class="min-w-0 flex-1 truncate">This collection and its sub-collections</span></label>
+          <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem id="product-search-scope-current" value="current" /> <span class="min-w-0 flex-1 truncate">This collection only</span></label>
+        </RadioGroup>
+      </section>
+      <p v-else class="px-3 text-body text-neutral-500">Searching {{ recordLabel.lowerPlural.value }} in all collections.</p>
+    </div>
+    <template v-else>
     <!-- The filters scroll on their own so the footer never covers a value. -->
     <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto" data-search-panel-scroll>
     <router-link :to="backTarget" :class="sidebarRowClasses" class="-mx-0">
@@ -247,5 +281,6 @@ function removeMissing() {
     <div v-if="filters.length" class="-mx-3 shrink-0 border-t border-neutral-200 bg-neutral-50 px-3 pt-2">
       <Button type="button" variant="outline" class="w-full" @click="clearFilters">Clear all filters ({{ filters.length }})</Button>
     </div>
+    </template>
   </div>
 </template>

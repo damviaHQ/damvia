@@ -46,6 +46,9 @@ const props = defineProps<{
   recordId: string | null
   tab: PanelTab
   fields: GridField[]
+  // Every field of the catalogue: those the table does not show are listed
+  // when the record holds a value in them.
+  allFields?: GridField[]
   recordLabel: string
   save: (recordId: string, field: GridField, value: string) => Promise<void>
   addOption: (field: GridField, option: string) => Promise<void>
@@ -78,6 +81,7 @@ watch(() => [props.recordId, props.tab, record.value?.updatedAt], () => {
   if (props.recordId && props.tab === "history") loadHistory(true)
 }, { immediate: true })
 
+const hiddenFields = computed(() => (props.allFields ?? []).filter((field) => !props.fields.some((item) => item.id === field.id) && (record.value?.metaData[field.name] ?? "") !== ""))
 const filled = computed(() => props.fields.filter((field) => (record.value?.metaData[field.name] ?? "") !== "").length)
 const confirmRemove = ref(false)
 const removing = ref(false)
@@ -111,13 +115,14 @@ function provenance(file: DirectFile) {
 }
 
 const SOURCES: Record<string, string> = { grid: "in the grid", panel: "on the card", bulk: "in bulk", csv: "by CSV import", unmatched: "from Unmatched", attribute: "by removing a field" }
+const known = computed(() => props.allFields ?? props.fields)
 const labelOf = (name: string) => {
-  const field = props.fields.find((item) => item.name === name)
+  const field = known.value.find((item) => item.name === name)
   return field ? fieldLabel(field) : name
 }
-const fieldOf = (name: string) => props.fields.find((item) => item.name === name)
+const fieldOf = (name: string) => known.value.find((item) => item.name === name)
 function describe(item: HistoryItem) {
-  const verb = item.action === "create" ? "Created" : item.action === "delete" ? "Deleted" : "Changed"
+  const verb = item.action === "create" ? "Created" : item.action === "delete" ? "Deleted" : item.action === "move" ? "Moved to another table" : "Changed"
   return `${verb} ${SOURCES[item.source] ?? ""}`.trim()
 }
 function when(value: string | Date) {
@@ -163,6 +168,17 @@ function when(value: string | Date) {
               <RecordFieldInput :id="`panel-${field.id}`" :field="field" :model-value="record.metaData[field.name] ?? ''"
                 :save="(value) => save(record!.id, field, value)" :add-option="(option) => addOption(field, option)" />
             </div>
+            <template v-if="hiddenFields.length">
+              <p class="record-panel-hidden-heading admin-text-secondary">Not shown in this table</p>
+              <div v-for="field in hiddenFields" :key="field.id" class="record-panel-field">
+                <div class="record-panel-field-label">
+                  <component :is="TYPE_ICONS[field.valueType]" class="record-panel-field-type" aria-hidden="true" />
+                  <label :for="`panel-${field.id}`">{{ fieldLabel(field) }}</label>
+                </div>
+                <RecordFieldInput :id="`panel-${field.id}`" :field="field" :model-value="record.metaData[field.name] ?? ''"
+                  :save="(value) => save(record!.id, field, value)" :add-option="(option) => addOption(field, option)" />
+              </div>
+            </template>
             <div>
               <Button type="button" variant="outline" size="sm" @click="emit('addField')"><Plus class="size-4" />Add a field</Button>
             </div>
@@ -203,7 +219,13 @@ function when(value: string | Date) {
               <li v-for="item in history" :key="item.id">
                 <p><strong>{{ describe(item) }}</strong> <span class="admin-text-secondary">by {{ item.changedBy?.name ?? "a removed user" }} · {{ when(item.createdAt) }}</span></p>
                 <ul v-if="item.action !== 'delete'">
-                  <li v-for="(change, name) in item.changes" :key="name">
+                  <li v-if="item.action === 'move'">
+                    <span class="admin-text-secondary">Table</span>
+                    <span class="record-history-old">{{ item.changes.table?.old }}</span>
+                    <span aria-hidden="true">›</span><span class="sr-only">became</span>
+                    <span>{{ item.changes.table?.new }}</span>
+                  </li>
+                  <li v-for="(change, name) in item.action === 'move' ? {} : item.changes" :key="name">
                     <span class="admin-text-secondary">{{ labelOf(String(name)) }}</span>
                     <span v-if="change.old" class="record-history-old">{{ formatRecordValue(fieldOf(String(name)), change.old) }}</span>
                     <span v-if="change.old" aria-hidden="true">›</span><span v-if="change.old" class="sr-only">became</span>

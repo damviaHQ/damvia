@@ -131,6 +131,7 @@ const STATUS: Record<Row["status"], string> = {
               <span v-else-if="row.status === 'duplicate'" class="admin-text-secondary">This {{ keyLabel }} is on several rows of the file; none of them is imported.</span>
               <span v-else-if="row.status === 'missing_key'" class="admin-text-secondary">The row has no {{ keyLabel }}.</span>
               <span v-else class="admin-text-secondary">Already stored as in the file.</span>
+              <span v-if="row.otherTable && (row.status === 'changed' || row.status === 'unchanged')" class="import-other-table admin-text-secondary">In the {{ row.otherTable }} table, where it stays.</span>
             </td>
           </tr>
         </tbody>

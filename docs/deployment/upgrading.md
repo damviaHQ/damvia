@@ -3,7 +3,7 @@ title: Upgrading
 description: Pull, build, restart; migrations run on their own at startup.
 sidebar:
   order: 6
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-23
 ---
 
 To upgrade an instance, rebuild the server image and client files, then deploy them together. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
@@ -171,6 +171,9 @@ Two stages join the enrichment pass, `families` and `readiness`, plus `product-r
 | `1791072000000-collection-action-bar` | `action_bar` (`jsonb`, null) on `collections`. Null follows the parent, so every existing collection keeps showing every tool. Rolling back drops the column and the rules set since |
 | `1791158400000-page-action-bar` | `show_action_bar` (`boolean`, default `true`) on `pages`. Every existing page keeps its action bar. Rolling back drops the column and the pages hidden since show it again |
 | `1791676800000-collection-records-rollup` | Replaces the two `number_of_records` triggers with one per statement over the rows written, instead of one per row. Writing twenty thousand memberships measured 5.1 s before and 0.13 s after. Rolling back restores the per-row triggers |
+| `1791763200000-catalogue-card-title` | Adds `card_title_attribute_name` to `enrichment_settings`, the one field a catalogue card shows under the reference. Empty on upgrade, so cards carry the reference alone until you name a field |
+| `1791936000000-related-records` | Adds nullable `related_records` JSONB settings to `enrichment_settings` and `collections`. Null global settings preserve same-model related products; null collection settings inherit the global default. Rollback removes only these display rules, leaving records and membership intact |
+| `1791849600000-collection-record-exclusion` | Adds `excluded` to `collection_records` and teaches the `number_of_records` rollup to skip excluded rows, with a third statement trigger for the flag itself. Nothing is excluded on upgrade, so counts are unchanged. Rolling back recounts every membership row |
 | `1791590400000-record-families` | `family_key` and `family_label` on `records`, `family_attribute_name` and `family_axis_attribute_names` on `enrichment_settings`, and the immutable `damvia_family_key(text)`. No field is named, so nothing is grouped until an administrator picks one. Rolling back drops them |
 | `1791504000000-record-readiness` | `readiness_definitions`, the three `readiness_*` columns on `records` and `hide_records_without_media` on `enrichment_settings`. With no definition every record reads as ready. Rolling back drops them and the scores are lost |
 | `1791417600000-product-collections` | `collection_records` with its two rollup triggers, five columns on `collections` (`record_filters`, `record_table_id`, `includes_all_records`, `number_of_records`, `catalogue_mode`) and a GIN index on `records.meta_data`. Existing collections keep holding files only. Rolling back drops the table and the columns: the product membership is lost, files and records are untouched |
@@ -204,3 +207,9 @@ Stop all application writers, restore the coordinated recovery point and restart
 ## Version drift between client and server
 
 The client is built against the server package in the same checkout (`"server": "file:../server"`). Always build both from the same commit. A client from a newer commit can call a procedure the running server does not define and gets a `NOT_FOUND` error from tRPC.
+
+## Record collections publish linked pictures
+
+The record-picture-access migration lets readers view and download images linked to records in their accessible collections without a separate file collection. This applies to existing lists, including whole-catalogue lists. Licence dates and regions still apply. A private file collection does not prevent publication of the same picture through an accessible record collection. Other file types keep their file-collection access requirements.
+
+Asset types and automatic matching remain configured as before. The migration adds stable picture identities, without copying files or adding entries to collection file counts. Rolling it back removes those identities and their favourites; explicit file-collection memberships are preserved.

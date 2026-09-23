@@ -12,28 +12,42 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+<script lang="ts">
+import type { InjectionKey } from 'vue'
+
+export type AdminPageHeading = { owner?: symbol, title?: string, description?: string }
+export const adminPageHeadingKey: InjectionKey<AdminPageHeading> = Symbol('admin-page-heading')
+</script>
+
 <script setup lang="ts">
-import { computed, useSlots } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, inject, onBeforeUnmount, useSlots, watchEffect } from 'vue'
 
 const props = defineProps<{
   title?: string | null
   description?: string | null
 }>()
 
-const route = useRoute()
 const slots = useSlots()
-// A null title, from a page shown as a tab of another, leaves the heading out.
-const heading = computed(() => props.title === null ? '' : props.title ?? route.meta.title ?? '')
+// LayoutAdmin shows the title, description and actions in its top bar. A null title,
+// from a section shown as a tab of another page, keeps its description and actions in place.
+const heading = inject(adminPageHeadingKey, null)
+const inTopbar = computed(() => !!heading && props.title !== null)
+const owner = Symbol('admin-page-header')
+watchEffect(() => {
+  if (!heading || !inTopbar.value) return
+  Object.assign(heading, { owner, title: props.title ?? undefined, description: props.description ?? undefined })
+})
+onBeforeUnmount(() => {
+  if (heading?.owner === owner) Object.assign(heading, { owner: undefined, title: undefined, description: undefined })
+})
 </script>
 
 <template>
-  <header class="admin-heading">
-    <div>
-      <slot name="lead" />
-      <h1 v-if="heading">{{ heading }}</h1>
-      <p v-if="description">{{ description }}</p>
-    </div>
+  <Teleport v-if="inTopbar" defer to="#admin-topbar-actions">
+    <slot />
+  </Teleport>
+  <header v-else class="admin-heading">
+    <p v-if="description">{{ description }}</p>
     <div v-if="slots.default" class="admin-actions">
       <slot />
     </div>

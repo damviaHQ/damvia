@@ -25,14 +25,14 @@ import {
 	DownloadVideoFormat,
 	DownloadVideoResolution
 } from "../../entity/download"
-import {apiURL, assetsS3, assetsS3Bucket, dataSource} from "../../env"
+import {apiURL, dataSource} from "../../env"
 import { userCollectionFilesQuery } from "../../services/collection"
 import { createDownloadArchive } from "../../services/download"
 import { downloadCreateArchiveQueue } from "../../worker"
 import { authMiddleware, publicProcedure, router, userApproved } from "../index"
 
 import { resolveDownloadSelection } from "../../services/download-selection"
-import { recordCsv, recordWorkbook } from "../../services/download-spreadsheet"
+import { buildRecordExport, recordExportColumns } from "../../services/download-record-export"
 
 export async function formatDownload(download: Download) {
 	let url: string | null = null
@@ -46,6 +46,7 @@ export async function formatDownload(download: Download) {
 		id: download.id,
 		status: download.status,
 		fileCount: download.collectionFileIds.length,
+		recordCount: download.recordExport?.recordIds.length ?? 0,
 		downloadType: download.type,
 		url,
 		expiresAt: download.expiresAt,
@@ -64,11 +65,7 @@ export default router({
     }))
     .mutation(async ({ input, ctx }) => {
       const selection = await resolveDownloadSelection(dataSource.manager, ctx.user, input.items, false)
-      const indexes = [...new Set(input.columns)].map(id => selection.columns.findIndex(column => column.id === id))
-      if (indexes.includes(-1)) throw new TRPCError({ code: 'BAD_REQUEST', message: 'A selected column is no longer available. Reopen the download window.' })
-      if (!selection.rows.length) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No records are available to download.' })
-      const rows = [indexes.map(index => selection.columns[index].label), ...selection.rows.map(row => indexes.map(index => row[index]))]
-      const content = input.format === 'csv' ? Buffer.from(recordCsv(rows), 'utf8') : await recordWorkbook(rows)
+      const content = await buildRecordExport(selection, input.columns, input.format)
       return { filename: `records.${input.format}`, mimeType: input.format === 'csv' ? 'text/csv;charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', content: content.toString('base64') }
     }),
 	list: publicProcedure
@@ -98,6 +95,11 @@ export default router({
 		.input(
 			z.object({
 				collectionFileIds: z.uuid().array().min(1),
+				recordExport: z.object({
+					items: z.array(z.object({ id: z.uuid(), type: z.enum(['collection', 'file', 'record']) })).min(1).max(10000),
+					columns: z.string().array().min(1).max(500),
+					format: z.enum(['csv', 'xlsx']),
+				}).optional(),
 				imageFormat: z.enum(DownloadImageFormat),
 				imageResolution: z.enum(DownloadImageResolution),
 				videoFormat: z.enum(DownloadVideoFormat),
@@ -115,12 +117,22 @@ export default router({
 			if (totalSize >= 10_000_000_000) { // 10GB
 				throw new TRPCError({ code: 'FORBIDDEN', message: "You cannot download more than 10GB." })
 			}
+			const selectedRecords = input.recordExport
+				? await resolveDownloadSelection(dataSource.manager, ctx.user, input.recordExport.items, false)
+				: null
+			if (selectedRecords && input.recordExport) recordExportColumns(selectedRecords, input.recordExport.columns, input.recordExport.format)
 
 			const download = new Download()
 			download.status = DownloadStatus.PREPARING
 			download.user = ctx.user
 			download.type = input.downloadType
 			download.collectionFileIds = collectionFiles.map((file) => file.id)
+			download.recordExport = input.recordExport && selectedRecords ? {
+				items: input.recordExport.items,
+				columns: [...new Set(input.recordExport.columns)],
+				format: input.recordExport.format,
+				recordIds: selectedRecords.recordIds,
+			} : null
 			download.imageFormat = input.imageFormat
 			download.imageResolution = input.imageResolution
 			download.videoFormat = input.videoFormat

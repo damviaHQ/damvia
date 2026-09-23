@@ -35,6 +35,10 @@ export class DataRecord {
     @Column()
     keyColumnName: string // Stores the name of the column that is the primary key. Example "Product SKU"
 
+    // Set by the database to the first table when left out.
+    @Column({ type: 'uuid' })
+    tableId: string
+
     @Column('hstore', { hstoreType: 'object', nullable: true })
     metaData: Record<string, string>
 

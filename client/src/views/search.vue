@@ -15,6 +15,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionDisplayGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
 import CollectionDisplayListFiles from "@/components/collection/CollectionDisplayListFiles.vue"
+import CollectionRenderProducts from "@/components/collection/CollectionRenderProducts.vue"
+import MainPageTools from "@/components/layout-main/MainPageTools.vue"
+import PageSelectionContext from "@/components/PageSelectionContext.vue"
+import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import Loader from "@/components/Loader.vue"
 import SearchEmptyState from "@/components/search/SearchEmptyState.vue"
 import SearchToolbar, { type FilterChip } from "@/components/search/SearchToolbar.vue"
@@ -28,29 +32,55 @@ import {
 } from "@/components/ui/pagination"
 import { Button } from "@/components/ui/button"
 import { useSearchState } from "@/composables/useSearchState"
+import { providePageFilter } from "@/composables/usePageFilter"
+import { providePageListings } from "@/composables/usePageListings"
 import { trpc } from "@/services/server"
-import { useGlobalStore } from "@/stores/globalStore"
+import { useGlobalStore, type SelectionItem } from "@/stores/globalStore"
 import type { DisplayView } from "@/utils/displayPreferences"
 import { FILE_TYPE_OPTIONS } from "@/utils/searchQuery"
 import { keepPreviousData, useQuery } from "@tanstack/vue-query"
 import groupBy from "lodash/groupBy"
-import { storeToRefs } from "pinia"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { computed, ref, watch } from "vue"
+import { useRoute } from "vue-router"
 
 const PER_PAGE = 300
+const PRODUCT_PAGE_SIZE = 48
+const route = useRoute()
+const isProductSearch = computed(() => route.query.kind === "products")
 const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange, setMetadataRange } = useSearchState()
+providePageFilter()
+const { products: shownProducts } = providePageListings()
+const productSort = ref<{ column: string, direction: 'asc' | 'desc' }>({ column: 'recordKey', direction: 'asc' })
+const productInput = computed(() => ({
+  collectionId: form.value.searchScope === "all" ? undefined : form.value.collectionId,
+  collectionOnly: form.value.searchScope === "current",
+  search: form.value.exactMatch ? form.value.query?.trim() || undefined : undefined,
+  searchTerms: form.value.exactMatch ? undefined : terms.value,
+  sort: productSort.value,
+  offset: ((form.value.page ?? 1) - 1) * PRODUCT_PAGE_SIZE,
+  limit: PRODUCT_PAGE_SIZE,
+}))
+const { data: productSearch, status: productStatus, error: productError, isPlaceholderData: productPlaceholder } = useQuery({
+  enabled: isProductSearch,
+  queryKey: computed(() => ["search-products", productInput.value]),
+  queryFn: () => trpc.catalogue.list.query(productInput.value),
+  placeholderData: keepPreviousData,
+})
+const productPages = computed(() => Math.ceil((productSearch.value?.total ?? 0) / PRODUCT_PAGE_SIZE))
+const filesEnabled = computed(() => !isProductSearch.value)
 
-const { data: assetTypes } = useQuery({ queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
-const { data: recordFacets } = useQuery({ queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
-const { data: metadataFacets } = useQuery({ queryKey: ["metadata-fields", "facets"], queryFn: () => trpc.metadataField.listFacets.query() })
-const { data: axisFacets } = useQuery({ queryKey: ["variant-axes", "facets"], queryFn: () => trpc.variantAxis.listFacets.query() })
+const { data: assetTypes } = useQuery({ enabled: filesEnabled, queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
+const { data: recordFacets } = useQuery({ enabled: filesEnabled, queryKey: ["records", "attributes", "facets"], queryFn: () => trpc.recordAttribute.listFacets.query() })
+const { data: metadataFacets } = useQuery({ enabled: filesEnabled, queryKey: ["metadata-fields", "facets"], queryFn: () => trpc.metadataField.listFacets.query() })
+const { data: axisFacets } = useQuery({ enabled: filesEnabled, queryKey: ["variant-axes", "facets"], queryFn: () => trpc.variantAxis.listFacets.query() })
 const { data: collection } = useQuery({
   enabled: computed(() => !!form.value.collectionId),
   queryKey: computed(() => ["collection", form.value.collectionId]),
   queryFn: () => trpc.collection.findById.query(form.value.collectionId!),
 })
 const { status, data: search, error, isPlaceholderData } = useQuery({
+  enabled: filesEnabled,
   queryKey: computed(() => ["search", form.value]),
   queryFn: () => trpc.collection.search.query({ ...form.value, collapseVariants: true }),
   // Changing a filter refines the current results instead of blanking the page.
@@ -65,7 +95,7 @@ const notFoundInput = computed(() => ({
   searchScope: form.value.searchScope,
 }))
 const { data: notFound } = useQuery({
-  enabled: computed(() => !form.value.exactMatch && terms.value.length > 0),
+  enabled: computed(() => filesEnabled.value && !form.value.exactMatch && terms.value.length > 0),
   queryKey: computed(() => ["search-not-found", notFoundInput.value]),
   queryFn: () => trpc.collection.searchNotFound.query(notFoundInput.value),
   placeholderData: keepPreviousData,
@@ -79,7 +109,7 @@ const rangeTotal = computed(() => search.value?.rangeTotal ?? 0)
 const rangePage = ref(0)
 watch(() => form.value, () => { rangePage.value = 0 }, { deep: true })
 const { data: rangeAll, isFetching: rangeLoading } = useQuery({
-  enabled: computed(() => rangePage.value > 0 && !!form.value.query),
+  enabled: computed(() => filesEnabled.value && rangePage.value > 0 && !!form.value.query),
   queryKey: computed(() => ["search-range", form.value, rangePage.value]),
   queryFn: () => trpc.collection.rangeSearch.query({ ...form.value, query: form.value.query ?? "", page: rangePage.value }),
   placeholderData: keepPreviousData,
@@ -145,21 +175,22 @@ const chips = computed<FilterChip[]>(() =>
 )
 
 const globalStore = useGlobalStore()
-const storeRefs = storeToRefs(globalStore)
-const selection = computed(() => {
-  const fileIds = new Set(results.value.map((file: any) => file.id))
-  return storeRefs.selection.value.filter((item) => item.type === "file" && fileIds.has(item.id))
-})
-const allSelected = computed(() => results.value.length > 0 && selection.value.length === results.value.length)
+const selectable = computed<SelectionItem[]>(() => isProductSearch.value
+  ? (productSearch.value?.products ?? []).map(product => ({ type: "record", id: product.id }))
+  : results.value.map(file => ({ type: "file", id: file.id })))
+const selection = computed(() => selectable.value.filter(item =>
+  globalStore.selection.some(selected => selected.type === item.type && selected.id === item.id)))
+const allSelected = computed(() => selectable.value.length > 0 && selection.value.length === selectable.value.length)
+const breadcrumb = computed(() => [{ id: "search", label: "Search results" }])
 
 function toggleSelection() {
   if (allSelected.value) {
-    selection.value.forEach((item) => globalStore.removeFromSelection(item))
+    selection.value.forEach(item => globalStore.removeFromSelection(item))
     return
   }
-  results.value
-    .filter((file: any) => !selection.value.some((item) => item.id === file.id))
-    .forEach((file: any) => globalStore.addToSelection({ type: "file", id: file.id }))
+  selectable.value
+    .filter(item => !selection.value.some(selected => selected.type === item.type && selected.id === item.id))
+    .forEach(item => globalStore.addToSelection(item))
 }
 
 function displayFor(assetType: any): DisplayView {
@@ -192,6 +223,50 @@ function focusTerms() {
 <template>
   <div class="flex min-h-full flex-col">
     <h1 class="sr-only">Search</h1>
+    <MainPageTools area="actions">
+      <DisplayPreferences v-if="isProductSearch" :products="shownProducts" />
+      <DisplayPreferences v-else :files="results" grouped />
+    </MainPageTools>
+    <MainPageTools area="context">
+      <PageSelectionContext :items="breadcrumb" :selected-count="selection.length" :selectable-count="selectable.length"
+        :selection-label="allSelected ? 'Unselect all results on this page' : 'Select all results on this page'" @toggle="toggleSelection" />
+    </MainPageTools>
+    <MainPageTools v-if="!isProductSearch" area="filters">
+      <SearchToolbar
+        :file-type-counts="facets.fileTypes"
+        :file-types="form.fileTypes"
+        :sort="form.sort"
+        :has-query="hasQuery"
+        :chips="chips"
+        :formats="formatOptions"
+        :selected-formats="form.extensions"
+        :min-size="form.minSize"
+        :max-size="form.maxSize"
+        @update:file-types="setValues('file_types', $event)"
+        @update:sort="setSort($event)"
+        @remove-chip="removeChip($event)"
+        @toggle-format="toggleValue('extensions', $event)"
+        @clear-formats="setValues('extensions', [])"
+        @apply-size="setSizeRange($event)"
+        @clear-filters="clearFilters"
+      />
+    </MainPageTools>
+
+    <template v-if="isProductSearch">
+      <p role="status" class="mb-4 text-caption text-neutral-500">{{ productSearch?.total ?? 0 }} {{ recordLabel.lowerPlural.value }} in {{ scopeLabel }}</p>
+      <Loader v-if="productStatus === 'pending'" :text="true" />
+      <p v-else-if="productStatus === 'error'" role="alert" class="text-body text-red-700">{{ productError?.message }}</p>
+      <div v-else-if="productSearch" :aria-busy="productPlaceholder" :class="productPlaceholder && 'pointer-events-none opacity-60'">
+        <CollectionRenderProducts v-if="productSearch.products.length" :products="productSearch.products" :fields="productSearch.fields" :card-title-field="productSearch.cardTitleField" :collection-id="productInput.collectionId" server-filtered @sort="productSort = $event" />
+        <p v-else role="status" class="py-12 text-center text-body text-neutral-500">No {{ recordLabel.lowerPlural.value }} found.</p>
+        <nav v-if="productPages > 1" aria-label="Pages" class="mt-6 flex items-center justify-center gap-3 text-caption text-neutral-500">
+          <Button variant="outline" size="sm" :disabled="(form.page ?? 1) === 1 || productPlaceholder" @click="setPage((form.page ?? 1) - 1)">Previous</Button>
+          <span>Page {{ form.page ?? 1 }} of {{ productPages }}</span>
+          <Button variant="outline" size="sm" :disabled="(form.page ?? 1) >= productPages || productPlaceholder" @click="setPage((form.page ?? 1) + 1)">Next</Button>
+        </nav>
+      </div>
+    </template>
+    <template v-else>
     <div role="status" aria-live="polite" class="sr-only">
       <template v-if="status === 'success'">{{ total ? `${total} result${total > 1 ? "s" : ""} found` : "No results found" }}</template>
     </div>
@@ -202,31 +277,10 @@ function focusTerms() {
       {{ error?.message }}
     </div>
     <template v-else-if="status === 'success' && search">
-      <SearchToolbar
-        :files="results"
-        :total="total"
-        :terms="terms"
-        :scope-label="scopeLabel"
-        :file-type-counts="facets.fileTypes"
-        :file-types="form.fileTypes"
-        :sort="form.sort"
-        :has-query="hasQuery"
-        :chips="chips"
-        :formats="formatOptions"
-        :selected-formats="form.extensions"
-        :min-size="form.minSize"
-        :max-size="form.maxSize"
-        :selected-count="selection.length"
-        :all-selected="allSelected"
-        @update:file-types="setValues('file_types', $event)"
-        @update:sort="setSort($event)"
-        @remove-chip="removeChip($event)"
-        @toggle-selection="toggleSelection"
-        @toggle-format="toggleValue('extensions', $event)"
-        @clear-formats="setValues('extensions', [])"
-        @apply-size="setSizeRange($event)"
-        @clear-filters="clearFilters"
-      />
+      <p class="mb-4 text-caption text-neutral-500">
+        <span>{{ total }} {{ total === 1 ? 'result' : 'results' }}</span><template v-if="terms.length"> for {{ terms.join(', ') }}</template> in {{ scopeLabel }}
+      </p>
+
 
       <div class="flex min-h-0 flex-1 flex-col transition-opacity" :class="isPlaceholderData && 'pointer-events-none opacity-60'" :aria-busy="isPlaceholderData || undefined">
       <SearchEmptyState
@@ -286,6 +340,7 @@ function focusTerms() {
         </div>
       </section>
       </div>
+    </template>
     </template>
   </div>
 </template>

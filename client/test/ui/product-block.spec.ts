@@ -31,10 +31,10 @@ function pageWithProductsBlock() {
   }
 }
 
-async function fixture(page: Page, products: ReturnType<typeof product>[], total = products.length) {
+async function fixture(page: Page, products: ReturnType<typeof product>[], total = products.length, collection = pageWithProductsBlock()) {
   await page.route('**/trpc/**', async route => {
     const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.findById' ? pageWithProductsBlock()
+    const data = name === 'collection.findById' ? collection
       : name === 'catalogue.list' ? { products, total, fields, cardTitleField: null }
       : responses[name] ?? []
     await route.fulfill({ json: { result: { data } } })
@@ -47,8 +47,8 @@ test('a Products block draws the catalogue of the collection it is on', async ({
   await fixture(page, products)
   await page.goto('/collections/campaign')
 
-  await expect(page.getByRole('link', { name: /BOT-CIT-250/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: /BOT-GIN-250/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'BOT-CIT-250', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'BOT-GIN-250', exact: true })).toBeVisible()
 })
 
 test('a collection outgrowing one page of products points to the full catalogue', async ({ page }) => {
@@ -65,7 +65,7 @@ test('a field on the products narrows the block through the collection filter ba
   const products = [product(0, 'BOT-CIT-250', 'Autumn'), product(1, 'BOT-GIN-250', 'Spring')]
   await fixture(page, products)
   await page.goto('/collections/campaign')
-  await expect(page.getByRole('link', { name: /BOT-CIT-250/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'BOT-CIT-250', exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Filters', exact: true }).click()
   await page.getByRole('dialog', { name: 'Filters' }).getByRole('checkbox', { name: 'Season', exact: true }).click()
@@ -73,6 +73,43 @@ test('a field on the products narrows the block through the collection filter ba
   await page.getByRole('button', { name: /^Season,/ }).click()
   await page.getByRole('checkbox', { name: 'Autumn', exact: true }).check()
 
-  await expect(page.getByRole('link', { name: /BOT-CIT-250/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: /BOT-GIN-250/ })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'BOT-CIT-250', exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'BOT-GIN-250', exact: true })).toHaveCount(0)
 })
+
+test('select all includes product blocks and selecting twice clears them', async ({ page }) => {
+  await fixture(page, [product(0, 'SKU-1', 'Autumn'), product(1, 'SKU-2', 'Spring')])
+  await page.goto('/collections/campaign')
+  await page.getByRole('button', { name: 'Select All in', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: 'Select SKU-1', exact: true })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Select SKU-2', exact: true })).toBeChecked()
+  await expect(page.locator('.dashboard-layout-topbar__selector')).toContainText('2 items selected')
+  await expect(page.getByRole('button', { name: 'Download selection' })).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Select all items in this collection' }).click()
+  await expect(page.getByRole('checkbox', { name: 'Select SKU-1', exact: true })).not.toBeChecked()
+})
+
+
+for (const layout of ['automatic', 'products', 'files']) {
+  test(`a personal collection shows files and products with the ${layout} layout`, async ({ page }) => {
+    const products = [product(0, 'PERSONAL-001', 'Winter')]
+    const source = responses['collection.findById'] as any
+    const collection = { ...pageWithProductsBlock(), public: false, ownerId: 'preview-user', synchronized: false, canEdit: true, files: source.files.slice(0, 1), numberOfRecords: 1 }
+    if (layout === 'automatic') collection.page = null as any
+    if (layout === 'files') collection.page.blocks = [{ id: 'file-block', type: 'files', size: 'full', data: { title: '', layout: null, collectionId: null } }]
+    await fixture(page, products, 1, collection)
+    await page.goto('/collections/campaign')
+    await expect(page.getByRole('link', { name: 'PERSONAL-001', exact: true })).toHaveCount(1)
+    await expect(page.getByText(source.files[0].name, { exact: true })).toHaveCount(1)
+    await page.getByRole('button', { name: 'Select All in', exact: true }).click()
+    await expect(page.locator('.dashboard-layout-topbar__selector')).toContainText('2 items selected')
+    await expect(page.getByRole('button', { name: 'Download selection' })).toBeVisible()
+    await page.getByRole('button', { name: 'Clear selection', exact: true }).click()
+    await page.getByRole('button', { name: 'Collection actions', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Collection settings', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByLabel('What readers browse here')).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: 'Add by reference', exact: true })).toBeVisible()
+    await expect(dialog.getByText('This collection can hold files and products. Its contents are displayed automatically.')).toBeVisible()
+  })
+}

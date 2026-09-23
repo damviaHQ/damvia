@@ -90,10 +90,11 @@ test('collection menu aligns to its trigger and opens edit and share directly', 
   expect(errors).toEqual([])
 })
 
-test('collection search icon opens search scoped to the collection and its sub-collections', async ({ page }) => {
+test('collection search menu entry opens search scoped to the collection and its sub-collections', async ({ page }) => {
   const { errors } = await fixture(page)
   await page.goto('/collections/personal')
-  await page.getByRole('link', { name: 'Search in this collection', exact: true }).click()
+  await page.getByRole('button', { name: 'Collection actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Search in this collection', exact: true }).click()
   await expect(page).toHaveURL(/from_collection=personal/)
   await expect(page).toHaveURL(/search_scope=current_with_sub/)
   expect(errors).toEqual([])

@@ -18,6 +18,7 @@ import { EntityManager } from "typeorm"
 import { RecordAttribute } from "../entity/record-attribute"
 import { RecordChangeSource } from "../entity/record-change"
 import { diffValues, RecordChangeRow, writeRecordChanges } from "./record-history"
+import { attachFieldsByName, tableFieldNames } from "./record-tables"
 import { newOptions, normaliseValue, RecordValueError, validateValue } from "./record-values"
 
 export const LIST_MAX = 500
@@ -27,13 +28,14 @@ const WRITE_BATCH = 2000
 export type FilterOp = 'contains' | 'is' | 'is_not' | 'is_empty' | 'is_not_empty' | 'has_any'
 export type RecordFilter = { column: string, op: FilterOp, value?: string, values?: string[] }
 export type RecordSort = { column: string, direction: 'asc' | 'desc' }
-export type RecordQuery = { search?: string, filters?: RecordFilter[], sort?: RecordSort, ids?: string[] }
+export type RecordQuery = { tableId?: string, search?: string, filters?: RecordFilter[], sort?: RecordSort, ids?: string[] }
 export type Actor = { userId: string | null, source: RecordChangeSource }
 
 export type RecordRow = {
 	id: string
 	recordKey: string
 	keyColumnName: string
+	tableId: string
 	metaData: Record<string, string>
 	createdAt: Date
 	updatedAt: Date
@@ -42,7 +44,7 @@ export type RecordRow = {
 	filledCount: number
 }
 
-type RawRecordRow = { id: string, record_key: string, key_column_name: string, meta_data: Record<string, string> | null, created_at: Date, updated_at: Date, thumbnail_file_id: string | null, file_count: number, filled_count: number }
+type RawRecordRow = { id: string, record_key: string, key_column_name: string, table_id: string, meta_data: Record<string, string> | null, created_at: Date, updated_at: Date, thumbnail_file_id: string | null, file_count: number, filled_count: number }
 
 // The key column is fixed by the first record ever created; every later
 // import, creation or attach reuses it.
@@ -98,7 +100,8 @@ export function normaliseValues(fields: RecordAttribute[], keyColumnName: string
 	return result
 }
 
-export async function createRecord(em: EntityManager, input: { recordKey: string, values?: Record<string, string> }, actor: Actor): Promise<string> {
+// Without a table the record goes to the first one.
+export async function createRecord(em: EntityManager, input: { recordKey: string, values?: Record<string, string>, tableId?: string }, actor: Actor): Promise<string> {
 	const recordKey = input.recordKey.trim()
 	const [exists] = await em.query('SELECT 1 FROM records WHERE record_key = $1', [recordKey])
 	if (exists) {
@@ -108,10 +111,10 @@ export async function createRecord(em: EntityManager, input: { recordKey: string
 	const values = normaliseValues(await loadFields(em), keyColumnName, input.values ?? {})
 	const metaData = { [keyColumnName]: recordKey, ...values }
 	const [row] = await em.query(`
-		INSERT INTO records (record_key, key_column_name, meta_data)
-		VALUES ($1, $2, hstore($3::text[], $4::text[]))
+		INSERT INTO records (record_key, key_column_name, meta_data, table_id)
+		VALUES ($1, $2, hstore($3::text[], $4::text[]), $5)
 		RETURNING id
-	`, [recordKey, keyColumnName, Object.keys(metaData), Object.values(metaData)])
+	`, [recordKey, keyColumnName, Object.keys(metaData), Object.values(metaData), input.tableId ?? null])
 	await writeRecordChanges(em, [{ recordId: row.id, recordKey, action: 'create', source: actor.source, changes: diffValues(null, metaData), changedById: actor.userId }])
 	return row.id
 }
@@ -191,18 +194,30 @@ export async function patchEach(em: EntityManager, changes: { id: string, values
 const SNAPSHOT = `(SELECT coalesce(jsonb_object_agg(e.key, jsonb_build_object('old', e.value, 'new', NULL)), '{}'::jsonb) FROM each(r.meta_data) e)`
 
 // Deletes records, keeping their last values in the history. Links set on
-// their key stay and turn dangling on the next entity pass.
-export async function removeRecords(em: EntityManager, ids: string[] | null, actor: Actor): Promise<number> {
-	const where = ids ? 'r.id = ANY($3)' : 'true'
-	const parameters: unknown[] = [actor.source, actor.userId, ...(ids ? [ids] : [])]
+// their key stay and turn dangling on the next entity pass. Without ids,
+// deletes every record of the table, or of the catalogue.
+export async function removeRecords(em: EntityManager, ids: string[] | null, actor: Actor, tableId?: string): Promise<number> {
+	const scope = ids ? 'r.id = ANY($1::uuid[])' : tableId ? 'r.table_id = $1::uuid' : 'true'
+	const scopeParameters = ids ? [ids] : tableId ? [tableId] : []
 	await em.query(`
 		INSERT INTO record_changes (record_id, record_key, action, source, changes, changed_by_id)
-		SELECT r.id, r.record_key, 'delete', $1, ${SNAPSHOT}, $2 FROM records r WHERE ${where}
-	`, parameters)
-	const scope = ids ? 'record_id = ANY($1)' : 'record_id IS NOT NULL'
-	await em.query(`UPDATE asset_files SET record_id = NULL, record_view = NULL WHERE ${scope}`, ids ? [ids] : [])
-	const [, count] = await em.query(`DELETE FROM records r WHERE ${ids ? 'r.id = ANY($1)' : 'true'}`, ids ? [ids] : [])
+		SELECT r.id, r.record_key, 'delete', $${scopeParameters.length + 1}, ${SNAPSHOT}, $${scopeParameters.length + 2}::uuid FROM records r WHERE ${scope}
+	`, [...scopeParameters, actor.source, actor.userId])
+	await em.query(`UPDATE asset_files SET record_id = NULL, record_view = NULL WHERE record_id IN (SELECT r.id FROM records r WHERE ${scope})`, scopeParameters)
+	const [, count] = await em.query(`DELETE FROM records r WHERE ${scope}`, scopeParameters)
 	return count ?? 0
+}
+
+// Moves records to another table. Their values and links stay as they are.
+export async function moveRecords(em: EntityManager, ids: string[], tableId: string, actor: Actor): Promise<number> {
+	const [moved]: [{ id: string, record_key: string, from_name: string, to_name: string }[], number] = await em.query(`
+		UPDATE records r SET table_id = $2, updated_at = now()
+		FROM record_tables source, record_tables target
+		WHERE r.id = ANY($1) AND r.table_id <> $2 AND source.id = r.table_id AND target.id = $2
+		RETURNING r.id, r.record_key, source.name AS from_name, target.name AS to_name
+	`, [ids, tableId])
+	await writeRecordChanges(em, moved.map((row) => ({ recordId: row.id, recordKey: row.record_key, action: 'move', source: actor.source, changes: { table: { old: row.from_name, new: row.to_name } }, changedById: actor.userId })))
+	return moved.length
 }
 
 export function likePattern(value: string): string {
@@ -224,6 +239,7 @@ export function recordQuerySql(query: RecordQuery, fields: RecordAttribute[], ke
 		return { expression: `coalesce(r.meta_data -> ${parameter(column)}, '')`, field }
 	}
 	const conditions: string[] = []
+	if (query.tableId) conditions.push(`r.table_id = ${parameter(query.tableId)}::uuid`)
 	if (query.ids?.length) conditions.push(`r.id = ANY(${parameter(query.ids)}::uuid[])`)
 	const search = query.search?.trim()
 	if (search) {
@@ -284,10 +300,12 @@ const THUMBNAIL = `(SELECT a.id FROM asset_files a WHERE a.record_id = r.id AND 
 
 export async function listRecords(em: EntityManager, query: RecordQuery, page: { offset: number, limit: number }, thumbnailView: string | null): Promise<{ rows: RecordRow[], total: number, fields: RecordAttribute[], keyColumnName: string | null }> {
 	const [fields, keyColumnName] = await Promise.all([loadFields(em), catalogueKeyColumnName(em)])
-	const parameters: unknown[] = [thumbnailView, fields.map((field) => field.name)]
+	// A table counts the fields it shows as filled.
+	const counted = query.tableId ? await tableFieldNames(em, query.tableId) : fields.map((field) => field.name)
+	const parameters: unknown[] = [thumbnailView, counted]
 	const { where, orderBy } = recordQuerySql(query, fields, keyColumnName, parameters)
 	const rows: RawRecordRow[] = await em.query(`
-		SELECT r.id, r.record_key, r.key_column_name, hstore_to_json(r.meta_data) AS meta_data, r.created_at, r.updated_at,
+		SELECT r.id, r.record_key, r.key_column_name, r.table_id, hstore_to_json(r.meta_data) AS meta_data, r.created_at, r.updated_at,
 			${THUMBNAIL} AS thumbnail_file_id,
 			${FILE_COUNT} AS file_count,
 			(SELECT count(*) FROM each(r.meta_data) e WHERE e.value <> '' AND e.key = ANY($2))::int AS filled_count
@@ -304,6 +322,7 @@ export async function listRecords(em: EntityManager, query: RecordQuery, page: {
 			id: row.id,
 			recordKey: row.record_key,
 			keyColumnName: row.key_column_name,
+			tableId: row.table_id,
 			metaData: row.meta_data ?? {},
 			createdAt: row.created_at,
 			updatedAt: row.updated_at,
@@ -317,14 +336,14 @@ export async function listRecords(em: EntityManager, query: RecordQuery, page: {
 	}
 }
 
-// Where a record sits in the list: its 0-based position under the search,
+// Where a record sits in its table: its 0-based position under the search,
 // filters and sort, or null when they leave it out.
-export async function locateRecord(em: EntityManager, recordKey: string, query: RecordQuery): Promise<{ id: string, position: number | null } | null> {
-	const [record] = await em.query('SELECT id FROM records WHERE record_key = $1', [recordKey.trim()])
+export async function locateRecord(em: EntityManager, recordKey: string, query: RecordQuery): Promise<{ id: string, tableId: string, position: number | null } | null> {
+	const [record] = await em.query('SELECT id, table_id FROM records WHERE record_key = $1', [recordKey.trim()])
 	if (!record) return null
 	const [fields, keyColumnName] = await Promise.all([loadFields(em), catalogueKeyColumnName(em)])
 	const parameters: unknown[] = [record.id]
-	const { where, orderBy } = recordQuerySql(query, fields, keyColumnName, parameters)
+	const { where, orderBy } = recordQuerySql({ ...query, tableId: record.table_id }, fields, keyColumnName, parameters)
 	const source = orderBy.includes('file_count') ? `(SELECT r.*, ${FILE_COUNT} AS file_count FROM records r)` : 'records'
 	const [row] = await em.query(`
 		SELECT position FROM (
@@ -334,18 +353,19 @@ export async function locateRecord(em: EntityManager, recordKey: string, query: 
 		) ranked
 		WHERE id = $1
 	`, parameters)
-	return { id: record.id, position: row ? row.position : null }
+	return { id: record.id, tableId: record.table_id, position: row ? row.position : null }
 }
 
 export type CsvRow = Record<string, string>
 export type CsvAnalysis = {
 	keyColumnName: string
+	columns: string[]
 	newColumns: string[]
 	newOptions: Record<string, string[]>
 	rows: {
 		key: string
 		row: CsvRow
-		existing: { id: string, metaData: Record<string, string> } | null
+		existing: { id: string, metaData: Record<string, string>, tableId: string, tableName: string } | null
 		values: Record<string, string>
 		invalid: Record<string, string>
 		differences: Record<string, { old: string, new: string }>
@@ -376,14 +396,18 @@ export async function analyseCsv(em: EntityManager, chosenKeyColumnName: string,
 		return { name: field.name, displayName: field.displayName, valueType: field.valueType, options: [...field.options, ...(learned[column] ?? [])] }
 	}
 	const keys = [...new Set(data.map(keyOf).filter(Boolean))]
-	const existing: { id: string, record_key: string, meta_data: Record<string, string> | null }[] = keys.length
-		? await em.query('SELECT id, record_key, hstore_to_json(meta_data) AS meta_data FROM records WHERE record_key = ANY($1)', [keys])
+	const existing: { id: string, record_key: string, meta_data: Record<string, string> | null, table_id: string, table_name: string }[] = keys.length
+		? await em.query(`
+			SELECT r.id, r.record_key, hstore_to_json(r.meta_data) AS meta_data, r.table_id, t.name AS table_name
+			FROM records r JOIN record_tables t ON t.id = r.table_id WHERE r.record_key = ANY($1)
+		`, [keys])
 		: []
 	const existingByKey = new Map(existing.map((row) => [row.record_key, row]))
 	const counts = new Map<string, number>()
 	for (const row of data) counts.set(keyOf(row), (counts.get(keyOf(row)) ?? 0) + 1)
 	return {
 		keyColumnName,
+		columns,
 		newColumns,
 		newOptions: learned,
 		rows: data.map((row) => {
@@ -408,7 +432,7 @@ export async function analyseCsv(em: EntityManager, chosenKeyColumnName: string,
 			return {
 				key,
 				row,
-				existing: current ? { id: current.id, metaData: current.meta_data ?? {} } : null,
+				existing: current ? { id: current.id, metaData: current.meta_data ?? {}, tableId: current.table_id, tableName: current.table_name } : null,
 				values,
 				invalid,
 				differences,
@@ -423,9 +447,12 @@ const JSON_TO_HSTORE = `coalesce((SELECT hstore(array_agg(j.key), array_agg(j.va
 // Applies an analysed CSV in one transaction: new columns become text fields,
 // select fields learn their new options, rows with an invalid value are
 // skipped whole, and every created or changed record gets a history row.
-export async function importCsv(em: EntityManager, analysis: CsvAnalysis, userId: string | null) {
+// New records go to the table, which shows every imported column; records
+// already in another table are updated where they are.
+export async function importCsv(em: EntityManager, analysis: CsvAnalysis, userId: string | null, tableId: string) {
 	const importBatchId = randomUUID()
 	await ensureFields(em, analysis.newColumns)
+	await attachFieldsByName(em, tableId, analysis.columns)
 	for (const [name, options] of Object.entries(analysis.newOptions)) {
 		await em.query('UPDATE record_attributes SET options = options || $2::text[], updated_at = now() WHERE name = $1', [name, options])
 	}
@@ -447,10 +474,10 @@ export async function importCsv(em: EntityManager, analysis: CsvAnalysis, userId
 		const batch = creates.slice(start, start + WRITE_BATCH)
 		const metaData = batch.map((row) => ({ [analysis.keyColumnName]: row.key, ...row.values }))
 		const inserted: { id: string, record_key: string }[] = await em.query(`
-			INSERT INTO records (record_key, key_column_name, meta_data)
-			SELECT u.k, $3, ${JSON_TO_HSTORE} FROM unnest($1::text[], $2::json[]) AS u(k, m)
+			INSERT INTO records (record_key, key_column_name, meta_data, table_id)
+			SELECT u.k, $3, ${JSON_TO_HSTORE}, $4 FROM unnest($1::text[], $2::json[]) AS u(k, m)
 			RETURNING id, record_key
-		`, [batch.map((row) => row.key), metaData.map((values) => JSON.stringify(values)), analysis.keyColumnName])
+		`, [batch.map((row) => row.key), metaData.map((values) => JSON.stringify(values)), analysis.keyColumnName, tableId])
 		const ids = new Map(inserted.map((row) => [row.record_key, row.id]))
 		batch.forEach((row, index) => history.push({ recordId: ids.get(row.key) ?? null, recordKey: row.key, action: 'create', source: 'csv', changes: diffValues(null, metaData[index]), changedById: userId, importBatchId }))
 	}

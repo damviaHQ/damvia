@@ -21,6 +21,7 @@ import assetRouter from "./asset"
 import assetTypeRouter from "./asset-type"
 import assetTypeRuleRouter from "./asset-type-rule"
 import authorizedDomainRouter from "./authorized-domain"
+import catalogueRouter from "./catalogue"
 import collectionRouter from "./collection"
 import dashboardRouter from "./dashboard"
 import downloadRouter from "./download"
@@ -35,6 +36,7 @@ import metadataFieldRouter from "./metadata-field"
 import pageRouter from "./page"
 import recordRouter from "./record"
 import recordAttributeRouter from "./record-attribute"
+import recordTableRouter from "./record-table"
 import regionRouter from "./region"
 import resolverStepRouter from "./resolver-step"
 import settingsRouter from "./settings"
@@ -48,6 +50,7 @@ const appRouter = router({
 	group: groupRouter,
 	authorizedDomain: authorizedDomainRouter,
 	region: regionRouter,
+	catalogue: catalogueRouter,
 	collection: collectionRouter,
 	asset: assetRouter,
 	assetType: assetTypeRouter,
@@ -64,6 +67,7 @@ const appRouter = router({
 	download: downloadRouter,
 	record: recordRouter,
 	recordAttribute: recordAttributeRouter,
+	recordTable: recordTableRouter,
 	menuItem: menuItemRouter,
 	page: pageRouter,
 	settings: settingsRouter,

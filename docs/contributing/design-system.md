@@ -3,7 +3,7 @@ title: Design system
 description: Review the proposed Damvia design foundation and reuse its tokens across the admin and website.
 sidebar:
   order: 7
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-22
 ---
 
 Damvia’s proposed design system shares the brand’s blue and midnight palette, typography, spacing and common control styles across the admin and website. The production admin uses this foundation. A single isolated reference page documents the tokens and shared component contracts. Customer portals keep their own branding.
@@ -64,7 +64,7 @@ This documentation follows the existing website submodule pipeline. Making it pu
 
 The admin shell and dashboard use live data and preserve server permissions and maintenance actions. User management and the remaining admin screens use the shared foundation. The global Sonner notification adapter uses the shared `dv-toast` contract, including a white panel surface with the 12 px surface radius, status icon colours and square actions; authentication screens use the same global adapter. Stabilise component APIs before creating a public component explorer; [Storybook’s sharing workflow](https://storybook.js.org/docs/sharing) is one supported option. The client now adopts the neutral theme. Website adoption remains separate.
 
-Collection paths, admin asset paths, the admin top bar and the file preview use `PathBreadcrumb.vue`. Its shared collapse function preserves the first and latest path items and moves hidden ancestors into an ellipsis menu. Ancestors are links; the current page is plain text marked with `aria-current="page"`. A keyboard-accessible tooltip exposes the full name only when a visible label is actually truncated. The client and admin share this behaviour while using light or dark presentation variants.
+Collection paths, admin asset paths and the file preview use `PathBreadcrumb.vue`. Its shared collapse function preserves the first and latest path items and moves hidden ancestors into an ellipsis menu. Ancestors are links; the current page is plain text marked with `aria-current="page"`. A keyboard-accessible tooltip exposes the full name only when a visible label is actually truncated. The client and admin share this behaviour while using light or dark presentation variants.
 
 ## Publication
 
@@ -76,7 +76,7 @@ Keep the shared design-system source in `packages/design-system` in the open-sou
 
 ### Admin page headers
 
-`AdminPageHeader.vue` owns the heading of every admin screen: it renders the `admin-heading` landmark, the `h1`, an optional description and an `admin-actions` slot, and it falls back to the route's `meta.title` so the name is declared once, in `client/src/router/index.ts`. Pass `title` only when the name is dynamic, such as a folder or page name, and use the `lead` slot for an eyebrow or a back link. Do not hand-roll a heading block or restate the page name in a literal, and do not raise its size: a page name already appears in the sidebar and the breadcrumb, so its heading uses `size.page-title` and shares a line with its buttons rather than acting as a display heading. Section headings inside a page stay at or below `size.section` so they do not outrank it.
+Admin screens give the width and height to their content, not to a heading block. The top bar of `LayoutAdmin` is the page heading: it holds the page name as the `h1`, a link to the parent screen on child routes (the import under the records, a page under the pages), an info button that opens the page description, the page actions on the right and a cross that closes the administration and returns to the DAM. `AdminPageHeader.vue` feeds it: the title and description go to the layout, and its default slot is teleported next to the title. The title falls back to the route's `meta.title`, so the name is declared once, in `client/src/router/index.ts`; pass `title` only when the name is dynamic, such as a folder or page name. Keep actions to one primary button, a secondary one at most, and put the rest in a `⋮` menu. A header with `:title="null"`, used by a section shown as a tab of another page, stays in place as a compact row with its description and actions. Do not add a heading block, an eyebrow or a decorative icon above the content, and do not restate the page name. Section headings inside a page stay at or below `size.section`.
 
 ## Admin dialogs
 
@@ -86,7 +86,7 @@ The token compiler generates shadcn colour bridges for both `.dv-admin` and `.dv
 
 Dropdown menu items (`ui/dropdown-menu`) space a leading icon from its label with a built-in 8 px gap and size any icon to `--dv-icon-compact` (16 px), so callers pass the bare icon and label without margin or size classes. Destructive entries use `variant="destructive"`, which keeps the red text when the item is highlighted.
 
-Admin screens built around one large table (the records grid, the review step of the CSV import) fill the height below the top bar: the page becomes a flex column, the heading, toolbar and footer keep their size, and the table takes the rest and is the only thing that scrolls, with its header and key column sticky. Never size such a table with a guessed `calc(100dvh - …)`, which leaves the page and the table both scrolling. Below 760 px the page scrolls as usual and the table is capped at 70–75 % of the viewport.
+Admin screens built around one large table (the records grid, the review step of the CSV import) fill the height below the top bar: the page becomes a flex column, the toolbar keeps its size and carries the result count, page size and pages on its right, so no footer row takes height, and the table takes the rest and is the only thing that scrolls, with its header and key column sticky. Never size such a table with a guessed `calc(100dvh - …)`, which leaves the page and the table both scrolling. Below 760 px the page scrolls as usual and the table is capped at 70–75 % of the viewport.
 
 ## Neutral desktop client
 

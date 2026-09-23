@@ -43,7 +43,6 @@ import {
   Folder,
   FolderOpen,
   GripVertical,
-  HardDrive,
   Server,
 } from "@lucide/vue"
 import type { AcceptableValue } from "reka-ui"
@@ -225,13 +224,7 @@ function getFileExtension(filename: string): string {
           {{ assetError?.message ?? 'The folder could not be loaded.' }}
         </div>
         <template v-else-if="asset">
-          <AdminPageHeader
-            class="asset-browser__page-heading"
-            :title="asset.name"
-            :description="`${childFolders.length} ${childFolders.length === 1 ? 'folder' : 'folders'} · ${assetFiles.length} ${assetFiles.length === 1 ? 'file' : 'files'}`"
-          >
-            <template #lead><span class="asset-browser__eyebrow">Folder</span></template>
-          </AdminPageHeader>
+          <AdminPageHeader :title="asset.name" />
 
           <section class="asset-settings dv-panel" aria-labelledby="asset-settings-heading">
             <div class="asset-settings__intro">
@@ -325,13 +318,7 @@ function getFileExtension(filename: string): string {
           </section>
         </template>
         <template v-else>
-          <AdminPageHeader
-            class="asset-browser__page-heading asset-browser__page-heading--root"
-            description="Browse the folders and files connected to your cloud storage."
-          >
-            <template #lead><span class="asset-browser__eyebrow">Asset management</span></template>
-            <span class="asset-browser__heading-mark"><HardDrive /></span>
-          </AdminPageHeader>
+          <AdminPageHeader description="Browse the folders and files connected to your cloud storage." />
           <Alert v-if="syncPaused" variant="destructive" class="asset-browser__pause">
             <CloudOff />
             <AlertTitle>Synchronisation is paused: the storage plan is full</AlertTitle>
@@ -389,20 +376,15 @@ function getFileExtension(filename: string): string {
 .asset-browser__sidebar-heading { display:flex; align-items:center; gap:12px; padding:0 8px 20px; border-bottom:1px solid var(--dv-color-line); }
 .asset-browser__sidebar-heading h2 { font-size:var(--dv-size-body); }
 .asset-browser__sidebar-heading p { margin-top:2px; color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
-.asset-browser__sidebar-icon, .asset-settings__icon, .asset-browser__heading-mark { display:grid; place-items:center; flex:0 0 auto; background:var(--dv-action-soft); color:var(--dv-action-primary); }
+.asset-browser__sidebar-icon, .asset-settings__icon { display:grid; place-items:center; flex:0 0 auto; background:var(--dv-action-soft); color:var(--dv-action-primary); }
 .asset-browser__sidebar-icon { width:34px; height:34px; border-radius:var(--dv-radius-graphic); }
 .asset-browser__sidebar-icon :deep(svg) { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 .asset-browser__tree { padding-top:14px; }
 .asset-browser__handle { display:flex; align-items:center; justify-content:center; width:10px; background:var(--dv-surface-canvas); border-left:1px solid var(--dv-color-line); border-right:1px solid var(--dv-color-line); color:var(--dv-text-secondary); transition:background .15s ease,color .15s ease; }
 .asset-browser__handle:hover { background:var(--dv-action-soft); color:var(--dv-action-primary); }
 .asset-browser__handle :deep(svg) { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
-.asset-browser__main { width:100%; height:100%; overflow-y:auto; padding:30px clamp(24px,3.2vw,52px) 56px; }
-.asset-browser__breadcrumb { min-height:24px; color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
-.dv-admin .asset-browser__page-heading { padding:36px 0 30px; margin-bottom:0; }
-.asset-browser__page-heading :deep(p) { max-width:62ch; }
-.asset-browser__eyebrow { display:block; margin-bottom:8px; color:var(--dv-action-primary); font-size:var(--dv-size-caption); font-weight:650; letter-spacing:.11em; text-transform:uppercase; }
-.asset-browser__heading-mark { width:64px; height:64px; border-radius:var(--dv-radius-graphic); }
-.asset-browser__heading-mark :deep(svg) { width:25px; height:25px; }
+.asset-browser__main { width:100%; height:100%; overflow-y:auto; padding:20px clamp(24px,3.2vw,52px) 56px; }
+.asset-browser__breadcrumb { min-height:24px; margin-bottom:16px; color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
 .asset-settings { display:grid; grid-template-columns:minmax(210px,.75fr) minmax(430px,1.5fr); gap:28px; align-items:end; padding:22px; }
 .asset-settings__intro { display:flex; align-items:flex-start; gap:12px; align-self:center; }
 .asset-settings__icon { width:36px; height:36px; border-radius:var(--dv-radius-graphic); }
@@ -415,7 +397,7 @@ function getFileExtension(filename: string): string {
 .asset-settings__field > span :deep(svg) { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 .asset-settings__field :deep(button[role=combobox]) { width:100%; min-width:0; }
 .asset-settings__fields > .dv-button { min-height:40px; }
-.asset-browser__section { padding-top:40px; }
+.asset-browser__section { padding-top:28px; }
 .asset-browser__section--root { padding-top:4px; }
 .asset-browser__section-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:20px; padding-bottom:14px; border-bottom:1px solid var(--dv-color-line); }
 .asset-browser__section-heading h2 { color:var(--dv-color-midnight); font-size:var(--dv-size-section); }
@@ -462,8 +444,6 @@ function getFileExtension(filename: string): string {
 @media(max-width:760px) {
   .asset-browser__sidebar, .asset-browser__handle { display:none; }
   .asset-browser__main { padding:24px 20px 44px; }
-  .dv-admin .asset-browser__page-heading { padding:28px 0 24px; }
-  .asset-browser__heading-mark { display:none; }
   .asset-settings__fields { grid-template-columns:1fr; }
   .asset-grid--folders, .asset-grid--files, .asset-grid--sources { grid-template-columns:1fr; }
   .asset-card--file { display:grid; grid-template-columns:112px minmax(0,1fr); }

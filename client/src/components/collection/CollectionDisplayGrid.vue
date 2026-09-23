@@ -21,7 +21,7 @@ import CollectionPathTooltip from "@/components/collection/CollectionPathTooltip
 import CollectionThumbnail from "@/components/collection/CollectionThumbnail.vue"
 import { RouterOutput } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
-import { Folder } from "@lucide/vue"
+import { Folder, PackageSearch } from "@lucide/vue"
 import { ref } from "vue"
 import { RouteLocationRaw } from "vue-router"
 
@@ -60,11 +60,11 @@ function handleSelection(event: Event, collection: Collection) {
         <CollectionPathTooltip :path="getPath?.(collection)">
           <router-link :to="generateRoute(collection)" class="block size-full overflow-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-800" :aria-label="`Open ${collection.name}`"><CollectionThumbnail :collection="collection" /></router-link>
         </CollectionPathTooltip>
-        <CollectionCheckbox v-if="collection.numberOfFiles > 0" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="isCollectionSelected(collection) ? 'opacity-100' : 'opacity-0'" :label="`Select ${collection.name}`" :state="isCollectionSelected(collection) ? 'check' : false" @click.stop="handleSelection($event, collection)" />
+        <CollectionCheckbox v-if="collection.numberOfFiles > 0 || collection.numberOfRecords > 0" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="isCollectionSelected(collection) ? 'opacity-100' : 'opacity-0'" :label="`Select ${collection.name}`" :state="isCollectionSelected(collection) ? 'check' : false" @click.stop="handleSelection($event, collection)" />
         <CollectionFavoriteButton :collection="collection" overlay />
       </div>
       <div class="mt-2 flex min-w-0 items-center gap-2">
-        <Folder class="size-5 shrink-0 text-neutral-500" />
+        <component :is="collection.public && collection.catalogueMode === 'products' ? PackageSearch : Folder" class="size-5 shrink-0 text-neutral-500" />
         <CollectionPathTooltip :path="getPath?.(collection)">
           <router-link :to="generateRoute(collection)" class="min-w-0 flex-1 truncate text-sm text-neutral-600 hover:text-neutral-950" :title="getPath?.(collection) ? undefined : collection.name">{{ collection.name }}</router-link>
         </CollectionPathTooltip>

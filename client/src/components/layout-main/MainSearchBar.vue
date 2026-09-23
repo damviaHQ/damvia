@@ -16,11 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { PopoverContent, Popover } from "@/components/ui/popover"
+import { useRecordLabel } from "@/composables/useRecordLabel"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { clearRecentSearches, listRecentSearches, rememberSearch, type RecentSearch } from "@/utils/recentSearches"
 import { parseQueryParts, queryValueToArray, queryValueToString, toSearchScope, type SearchScope } from "@/utils/searchQuery"
 import { useQuery } from "@tanstack/vue-query"
-import { ChevronDown, History, Search, SlidersHorizontal, X } from "@lucide/vue"
+import { ChevronDown, History, SlidersHorizontal, X } from "@lucide/vue"
 import { PopoverAnchor } from "reka-ui"
 import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import { LocationQuery, useRoute, useRouter } from "vue-router"
@@ -30,6 +31,7 @@ const LOCAL_STORAGE_SEARCH_OPTIONS_KEY = 'damvia_search_options'
 
 const router = useRouter()
 const route = useRoute()
+const recordLabel = useRecordLabel()
 const { data: assetTypes } = useQuery({
   queryKey: ["asset-types"],
   queryFn: () => trpc.assetType.list.query(),
@@ -53,7 +55,7 @@ const searchScopeOptions = computed(() => {
 })
 const defaultSearchScope = () => Object.keys(searchScopeOptions.value)[0] as SearchScope
 
-type SearchOptions = { assetTypes: string[]; searchScope: SearchScope; exactMatch: boolean }
+type SearchOptions = { assetTypes: string[]; searchScope: SearchScope; exactMatch: boolean; kind: "files" | "products" }
 
 // Storage is untrusted: anything that is not the expected shape falls back to the defaults.
 function readStoredOptions(): SearchOptions | null {
@@ -66,6 +68,7 @@ function readStoredOptions(): SearchOptions | null {
       assetTypes: stored.assetTypes.filter((id: unknown) => typeof id === 'string'),
       searchScope: toSearchScope(stored.searchScope) ?? 'all',
       exactMatch: stored.exactMatch === true,
+      kind: stored.kind === 'products' ? 'products' : 'files',
     }
   } catch (_) {
     return null
@@ -79,6 +82,7 @@ function defaultOptions(): SearchOptions {
       .map((assetType: any) => assetType.id),
     searchScope: defaultSearchScope(),
     exactMatch: false,
+    kind: "files",
   }
 }
 
@@ -89,6 +93,7 @@ function initialOptions(): SearchOptions {
       assetTypes: queryValueToArray(route.query.asset_types),
       searchScope: toSearchScope(queryValueToString(route.query.search_scope)) ?? defaultSearchScope(),
       exactMatch: route.query.exact_match === "true",
+      kind: route.query.kind === "products" ? "products" : "files",
     }
   }
   return readStoredOptions() ?? defaultOptions()
@@ -145,6 +150,22 @@ function setSearchScope(searchScope: SearchScope) {
 function setExactMatch(exactMatch: boolean) {
   options.value = { ...options.value, exactMatch }
 }
+function setKind(kind: SearchOptions["kind"]) {
+  if (options.value.kind === kind) return
+  options.value = { ...options.value, kind, exactMatch: false }
+  close()
+  try {
+    localStorage.setItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY, JSON.stringify(options.value))
+  } catch (_) { /* storage unavailable */ }
+  if (route.name === "search") {
+    router.push({ name: "search", query: {
+      q: text.value || undefined,
+      kind: kind === "products" ? "products" : undefined,
+      from_collection: route.query.from_collection,
+      search_scope: options.value.searchScope,
+    } })
+  }
+}
 function closeAssetTypeSelect(event: KeyboardEvent) {
   if (!isAssetTypeSelectOpen.value) return
   event.stopPropagation()
@@ -197,7 +218,13 @@ function search(value = text.value) {
     routeQuery.from_collection = route.params.id as string
   }
   routeQuery.q = query
-  routeQuery.asset_types = options.value.assetTypes
+  if (options.value.kind === "products") {
+    routeQuery.kind = "products"
+    delete routeQuery.asset_types
+  } else {
+    delete routeQuery.kind
+    routeQuery.asset_types = options.value.assetTypes
+  }
   routeQuery.search_scope = options.value.searchScope
   if (options.value.exactMatch) {
     routeQuery.exact_match = "true"
@@ -208,7 +235,7 @@ function search(value = text.value) {
     localStorage.setItem(LOCAL_STORAGE_SEARCH_OPTIONS_KEY, JSON.stringify(options.value))
     hasStoredOptions.value = true
   } catch (_) { /* storage unavailable */ }
-  recent.value = rememberSearch({ query, exactMatch: options.value.exactMatch })
+  if (options.value.kind === "files") recent.value = rememberSearch({ query, exactMatch: options.value.exactMatch })
   text.value = query
   close()
   input.value?.blur()
@@ -237,25 +264,33 @@ function clearText() {
 </script>
 
 <template>
-  <div class="dashboard-layout-search-bar__container relative flex min-w-0 items-center gap-1">
+  <div class="dashboard-layout-search-bar__container relative flex min-w-0 flex-1 items-center gap-1">
     <Popover :open="isOpen">
       <PopoverAnchor as-child>
-        <form ref="anchor" role="search" class="group flex h-10 min-w-0 items-center gap-2.5 border border-neutral-200 bg-neutral-50 px-3 transition-colors focus-within:border-neutral-400 focus-within:bg-white hover:border-neutral-300 md:w-[360px]" @submit.prevent="search()">
-          <Search class="size-4 shrink-0 text-neutral-500" aria-hidden="true" />
-          <input ref="input" v-model="text" type="search" name="q" aria-label="Search assets" placeholder="Search files or references" autocomplete="off" enterkeyhint="search" class="h-full min-w-0 flex-1 bg-transparent text-[length:var(--dv-field-label-size)] text-neutral-900 outline-hidden placeholder:text-[color:var(--dv-text-secondary)] [&::-webkit-search-cancel-button]:hidden max-md:w-9" :aria-expanded="isOpen" @focus="open" @click="open" @keydown.esc.prevent="close(); input?.blur()" />
+        <form ref="anchor" role="search" class="group flex h-10 min-w-0 items-center gap-2 border border-neutral-200 bg-neutral-50 px-2.5 transition-colors focus-within:border-neutral-400 focus-within:bg-white hover:border-neutral-300 w-full max-w-[480px]" @submit.prevent="search()">
+          <input ref="input" v-model="text" type="search" name="q" :aria-label="options.kind === 'files' ? 'Search files' : `Search ${recordLabel.lowerPlural.value}`" :placeholder="options.kind === 'files' ? 'Search for a file' : `Search for a ${recordLabel.lower.value}`" autocomplete="off" enterkeyhint="search" class="h-full min-w-0 flex-1 bg-transparent text-[length:var(--dv-field-label-size)] text-neutral-900 outline-hidden placeholder:text-[color:var(--dv-text-secondary)] [&::-webkit-search-cancel-button]:hidden w-full" :aria-expanded="isOpen" @focus="open" @click="open" @keydown.esc.prevent="close(); input?.blur()" />
           <button v-if="text" type="button" aria-label="Clear search text" class="grid size-6 cursor-pointer place-items-center text-neutral-500 hover:text-neutral-900" @click="clearText"><X class="size-4" aria-hidden="true" /></button>
+          <div role="group" aria-label="Search for" class="flex h-7 shrink-0 items-center border-l border-neutral-200 pl-1">
+            <button type="button" aria-label="Search files" title="Search files" :aria-pressed="options.kind === 'files'" class="flex h-7 cursor-pointer items-center gap-1 px-1.5 text-caption text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-ring" :class="options.kind === 'files' && 'bg-neutral-200 text-neutral-900'" @click="setKind('files')"><span>Files</span></button>
+            <button type="button" :aria-label="`Search ${recordLabel.lowerPlural.value}`" :title="`Search ${recordLabel.lowerPlural.value}`" :aria-pressed="options.kind === 'products'" class="flex h-7 cursor-pointer items-center gap-1 px-1.5 text-caption text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-ring" :class="options.kind === 'products' && 'bg-neutral-200 text-neutral-900'" @click="setKind('products')"><span class="max-w-24 truncate">{{ recordLabel.plural.value }}</span></button>
+          </div>
         </form>
       </PopoverAnchor>
       <PopoverContent data-search-options align="start" :side-offset="6" class="client-search-popover w-[min(760px,calc(100vw-24px))] p-3" @open-auto-focus.prevent @close-auto-focus.prevent @interact-outside="handleInteractOutside" @escape-key-down="close">
+        <p class="mb-3 text-caption text-[color:var(--dv-text-secondary)]">
+          <template v-if="options.kind === 'products'">Find {{ recordLabel.lowerPlural.value }} by reference or details, with their linked pictures. Paste several references to find them together.</template>
+          <template v-else>Find individual pictures, documents or videos. Use asset types to filter the files.</template>
+        </p>
         <div class="flex min-w-0 flex-nowrap items-center gap-2 text-body font-medium text-neutral-600" data-search-sentence>
           <span class="shrink-0">I</span>
           <div class="relative min-w-0 shrink">
             <Label for="search-mode" class="sr-only">Search mode</Label>
             <button id="search-mode" type="button" aria-label="Search mode" :aria-pressed="options.exactMatch" :title="options.exactMatch ? 'Switch to multiple references' : 'Switch to an exact term'" :class="sentenceChoiceClasses" @click="setExactMatch(!options.exactMatch)">
-              <span class="min-w-0 truncate">{{ options.exactMatch ? "search an exact term in" : "search multiple references of" }}</span>
+              <span class="min-w-0 truncate">{{ options.exactMatch ? (options.kind === 'products' ? "search an exact phrase in" : "search an exact term in") : "search multiple references of" }}</span>
             </button>
           </div>
-          <span v-if="!canChooseAssetType" class="min-w-0 shrink truncate">{{ assetTypeLabel }}</span>
+          <span v-if="options.kind === 'products'" class="min-w-0 shrink truncate">{{ recordLabel.lowerPlural.value }}</span>
+          <span v-else-if="!canChooseAssetType" class="min-w-0 shrink truncate">{{ assetTypeLabel }}</span>
           <div v-else ref="assetTypeSelect" class="relative min-w-0 shrink" @keydown.esc="closeAssetTypeSelect">
             <Label for="search-asset-types" class="sr-only">Asset types</Label>
             <button id="search-asset-types" ref="assetTypeToggle" type="button" aria-label="Asset types" :aria-expanded="isAssetTypeSelectOpen" aria-controls="search-asset-types-options" :class="sentenceChoiceClasses" @click="isAssetTypeSelectOpen = !isAssetTypeSelectOpen">
@@ -283,7 +318,7 @@ function clearText() {
           </div>
         </div>
 
-        <div v-if="recent.length" class="mt-3 border-t border-neutral-200 pt-2">
+        <div v-if="options.kind === 'files' && recent.length" class="mt-3 border-t border-neutral-200 pt-2">
           <div class="mb-1 flex items-center justify-between">
             <span class="text-caption font-semibold uppercase tracking-[.08em] text-neutral-500">Recent searches</span>
             <button type="button" class="cursor-pointer text-caption text-neutral-500 hover:text-neutral-900" @click="forgetRecent">Clear</button>
@@ -301,7 +336,7 @@ function clearText() {
 
         <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 pt-2">
           <p class="text-caption text-[color:var(--dv-text-secondary)]">
-            <template v-if="options.exactMatch">Type the exact text above and press Enter.</template>
+            <template v-if="options.exactMatch">Type the exact phrase above and press Enter.</template>
             <template v-else>Type or paste references above, separated by spaces, and press Enter.</template>
           </p>
           <button v-if="hasStoredOptions" type="button" class="cursor-pointer text-caption text-neutral-500 hover:text-red-600" @click="resetOptions">Reset options to default</button>

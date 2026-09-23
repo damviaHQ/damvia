@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { buildRows, cleanCsv, defaultTargets, mappingErrors, sampleValues } from '@/utils/recordImport'
+import { buildRows, cellText, cleanCsv, defaultTargets, mappingErrors, sampleValues, sheetToCsv, uniqueTableName } from '@/utils/recordImport'
 
 describe('record CSV import', () => {
   test('blank lines, padded headers and cells past the last header are not data', () => {
@@ -43,5 +43,24 @@ describe('record CSV import', () => {
 
   test('samples are the first distinct values present', () => {
     expect(sampleValues([{ c: '' }, { c: 'a' }, { c: 'a' }, { c: 'b' }, { c: 'c' }, { c: 'd' }], 'c')).toEqual(['a', 'b', 'c'])
+  })
+
+  test('a sheet reads like a CSV from its first row with a value; dates become days and empty sheets say why', () => {
+    const sheet = sheetToCsv('Shoes', [
+      [null, null],
+      ['SKU', 'Launch', 'Price', 'Eco'],
+      ['S-1', new Date(Date.UTC(2026, 1, 28)), 12.5, true],
+      [null, null, null, null],
+    ])
+    expect(sheet).toEqual({ name: 'Shoes', error: null, csv: { name: 'Shoes', columns: ['SKU', 'Launch', 'Price', 'Eco'], rows: [{ SKU: 'S-1', Launch: '2026-02-28', Price: '12.5', Eco: 'true' }] } })
+    expect(cellText(new Date(Date.UTC(2026, 1, 28, 9, 30)))).toBe('2026-02-28 09:30:00')
+    expect(sheetToCsv('Empty', [[null], ['']])).toEqual({ name: 'Empty', csv: null, error: 'The sheet is empty.' })
+    expect(sheetToCsv('Head', [['SKU']]).error).toBe('The sheet has a header row but no data under it.')
+  })
+
+  test('a new table takes the name of its sheet, numbered when the name is taken', () => {
+    expect(uniqueTableName('Shoes', ['Apparel'])).toBe('Shoes')
+    expect(uniqueTableName('Shoes', ['shoes', 'Shoes (1)'])).toBe('Shoes (2)')
+    expect(uniqueTableName('  ', [])).toBe('Table')
   })
 })

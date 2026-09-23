@@ -14,12 +14,31 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
+const { randomUUID } = require('node:crypto')
+const { readFile } = require('node:fs/promises')
+const { inflateRawSync } = require('node:zlib')
 const h = require('./lib/helpers.cjs')
 const { db, save, caller, makeCollection, makeFolder, makeFile } = h
 const { DataRecord, RecordAttribute, CollectionFile } = h.entities
 const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
 const { EnrichmentSettings } = require('../dist/entity/enrichment-settings')
+const { resolveDownloadSelection } = require('../dist/services/download-selection')
 let users, collection, record, empty, hidden, front, side, field, secret
+function zipEntries(zip) {
+  const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]))
+  let offset = zip.readUInt32LE(end + 16)
+  const entries = new Map()
+  while (zip.readUInt32LE(offset) === 0x02014b50) {
+    const length = zip.readUInt16LE(offset + 28)
+    const name = zip.subarray(offset + 46, offset + 46 + length).toString()
+    const local = zip.readUInt32LE(offset + 42)
+    const start = local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28)
+    const data = zip.subarray(start, start + zip.readUInt32LE(offset + 20))
+    entries.set(name, zip.readUInt16LE(offset + 10) === 8 ? inflateRawSync(data) : data)
+    offset += 46 + length + zip.readUInt16LE(offset + 30) + zip.readUInt16LE(offset + 32)
+  }
+  return entries
+}
 before(async () => {
   users = await h.setup()
   collection = await makeCollection({ name: 'Products', catalogueMode: 'products' })
@@ -31,7 +50,7 @@ before(async () => {
   await h.services.productCollections.addRecords(db.manager, collection.id, [record.id, empty.id])
   const folder = await makeFolder()
   const media = await makeCollection({ name: 'Media', assetFolderId: folder.id })
-  const first = await makeFile(folder, { name: 'front.jpg', recordId: record.id, recordView: '00' })
+  const first = await makeFile(folder, { name: 'front.jpg', recordId: record.id, recordView: '00', hasThumbnail: true })
   front = await save(CollectionFile, { collectionId: media.id, assetFileId: first.id })
   const second = await makeFile(folder, { name: 'side.jpg', recordView: '01' })
   await save(AssetEntityLink, { assetFileId: second.id, recordId: record.id, recordKey: record.recordKey, targetKind: 'record', strategy: 'manual_file' })
@@ -46,11 +65,15 @@ after(() => h.teardown())
 test('selected records resolve legacy and active links, deduplicate assets, and publish pictures through records', async () => {
   const result = await caller(users.member).collection.getFiles({ items: [{ type: 'record', id: record.id }, { type: 'record', id: hidden.id }] })
   assert.equal(result.recordCount, 1)
-  assert.equal(result.files.length, 3)
+  assert.equal(result.files.length, 2)
   assert.deepEqual(result.files.map(file => file.recordView).filter(Boolean).sort(), ['00', '01'])
   assert.equal(result.viewsEnabled, true)
-  assert.deepEqual(result.columns.map(column => column.label), ['SKU', 'Name'])
-  assert.deepEqual(result.previewRows, [['00123', 'Été, "studio"']])
+  assert.equal(result.mainView, '00')
+  assert.deepEqual(result.columns.map(column => column.label), ['SKU', 'Name', 'Picture'])
+  assert.deepEqual(result.previewRows, [['00123', 'Été, "studio"', '']])
+  assert.deepEqual(result.previewPictures, ['https://example.test/fixture'])
+  const selection = await resolveDownloadSelection(db.manager, users.member, [{ type: 'record', id: record.id }], false)
+  assert.deepEqual(selection.pictures, [{ recordId: record.id, assetId: front.assetFileId }])
 })
 
 test('collection exports include records with no media and honor selected columns and formula protection', async () => {
@@ -62,12 +85,59 @@ test('collection exports include records with no media and honor selected column
 
 test('exports recheck access and reject hidden columns and empty selections', async () => {
   await assert.rejects(caller(users.member).download.exportRecords({ items: [{ type: 'record', id: record.id }], columns: [secret.id], format: 'csv' }), error => error.code === 'BAD_REQUEST')
+  await assert.rejects(caller(users.member).download.exportRecords({ items: [{ type: 'record', id: record.id }], columns: ['picture'], format: 'csv' }), error => error.code === 'BAD_REQUEST')
   await assert.rejects(caller(users.member).download.exportRecords({ items: [{ type: 'record', id: hidden.id }], columns: ['recordKey'], format: 'xlsx' }), error => error.code === 'BAD_REQUEST')
   await db.getRepository(h.entities.Collection).update(collection.id, { public: false, ownerId: users.admin.id })
   const result = await caller(users.member).collection.getFiles({ items: [{ type: 'collection', id: collection.id }] })
   assert.equal(result.recordCount, 0)
   assert.equal(result.files.length, 0)
   await db.getRepository(h.entities.Collection).update(collection.id, { public: true })
+})
+
+test('combined download creates one ZIP with the selected file and ordered workbook', async () => {
+  const uploads = []
+  const original = h.storage.fPutObject
+  h.storage.fPutObject = async (bucket, key, path, metadata) => {
+    uploads.push({ content: await readFile(path), metadata })
+    return original(bucket, key, path, metadata)
+  }
+  try {
+    const result = await caller(users.member).download.create({
+      collectionFileIds: [front.id],
+      imageFormat: 'original', imageResolution: 'medium',
+      videoFormat: 'original', videoResolution: 'medium', downloadType: 'direct',
+      recordExport: { items: [{ type: 'record', id: record.id }], columns: [field.id, 'recordKey'], format: 'xlsx' },
+    })
+    assert.equal(result.status, 'ready')
+    assert.equal(uploads.at(-1).metadata['Content-Type'], 'application/zip')
+    const entries = zipEntries(uploads.at(-1).content)
+    assert(entries.has('record-list.xlsx'))
+    assert([...entries.keys()].some(name => name.endsWith('/front.jpg')))
+    const workbook = zipEntries(entries.get('record-list.xlsx'))
+    const sheet = workbook.get('xl/worksheets/sheet1.xml').toString()
+    assert.match(sheet, /Name.*SKU/)
+    assert.match(sheet, /00123/)
+  } finally {
+    h.storage.fPutObject = original
+  }
+})
+
+test('queued combined download fails when the selected records are no longer visible', async () => {
+  const result = await caller(users.member).download.create({
+    collectionFileIds: [front.id],
+    imageFormat: 'original', imageResolution: 'medium',
+    videoFormat: 'original', videoResolution: 'medium', downloadType: 'email',
+    recordExport: { items: [{ type: 'record', id: record.id }], columns: ['recordKey'], format: 'csv' },
+  })
+  await db.getRepository(h.entities.Collection).update(collection.id, { public: false, ownerId: users.admin.id })
+  try {
+    const processor = h.state.processors.get('download/create-archive')
+    await processor([{ id: randomUUID(), name: 'download/create-archive', data: { downloadId: result.id } }])
+    const saved = await db.getRepository(h.entities.Download).findOneByOrFail({ id: result.id })
+    assert.equal(saved.status, 'failed')
+  } finally {
+    await db.getRepository(h.entities.Collection).update(collection.id, { public: true })
+  }
 })
 
 test('nested, excluded and whole-catalogue memberships determine the exported rows', async () => {

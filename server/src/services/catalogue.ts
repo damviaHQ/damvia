@@ -14,17 +14,41 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
 import { EntityManager } from "typeorm"
+import { z } from "zod"
 import { RecordAttribute } from "../entity/record-attribute"
 import { User } from "../entity/user"
 import { userCollectionFilesQuery, userCollectionsQuery } from "./collection"
 import { visibleCollectionIdsSql, visibleRecordsCondition } from "./product-collections"
 import { catalogueKeyColumnName, likePattern, loadFields, RecordQuery, recordQuerySql } from "./records"
 
+const relatedFilter = z.object({
+	column: z.string().min(1).max(200),
+	op: z.enum(['contains', 'is', 'is_not', 'is_empty', 'is_not_empty', 'has_any']),
+	value: z.string().max(500).optional(),
+	values: z.string().max(500).array().max(100).optional(),
+}).refine(filter => ['is_empty', 'is_not_empty'].includes(filter.op) || (filter.op === 'has_any' ? !!filter.values?.length : !!filter.value?.trim()), 'Complete each filter before saving.')
+
+export const relatedRecordsSettings = z.object({
+	enabled: z.boolean(),
+	groups: z.object({
+		scope: z.enum(['current', 'all']),
+		matchField: z.string().min(1).max(200).nullable(),
+		hasPhoto: z.boolean(),
+		filters: relatedFilter.array().max(10),
+		excludeFilters: relatedFilter.array().max(10),
+	}).array().min(1).max(5),
+})
+export type RelatedRecordsSettings = z.infer<typeof relatedRecordsSettings>
+export const defaultRelatedRecords: RelatedRecordsSettings = {
+	enabled: true,
+	groups: [{ scope: 'all', matchField: '$family', hasPhoto: false, filters: [], excludeFilters: [] }],
+}
+
 export const CATALOGUE_PAGE_MAX = 96
 // How many visuals a card carries before it shows a "+N" badge.
 export const CARD_VISUALS = 4
 const DETAIL_VISUALS = 60
-const FACET_VALUES = 50
+const FACET_VALUES = 200
 
 export type CatalogueVisual = { id: string, view: string | null, thumbnailStorageKey: string }
 export type CatalogueCard = {
@@ -40,6 +64,9 @@ export type CatalogueCard = {
 }
 export type CatalogueQuery = RecordQuery & {
 	collectionId?: string
+	collectionOnly?: boolean
+	searchTerms?: string[]
+	related?: { settings: RelatedRecordsSettings, source: CatalogueCard, collectionId?: string }
 	// One model: every product sharing the value of the family field.
 	familyKey?: string
 	// Products an administrator's definition calls ready, or the rest.
@@ -65,22 +92,22 @@ function readableValues(metaData: Record<string, string>, fields: RecordAttribut
 // Free text reaches the key and the fields an administrator marked searchable.
 // The records list searches every value, which a reader must not do: probing
 // for a value would otherwise confirm what a field kept out of sight holds.
-function searchCondition(search: string | undefined, fields: RecordAttribute[], parameters: unknown[]) {
-	const text = search?.trim()
-	if (!text) {
+function searchCondition(search: string | string[] | undefined, fields: RecordAttribute[], parameters: unknown[]) {
+	const terms = (Array.isArray(search) ? search : [search ?? '']).map(term => term.trim()).filter(Boolean)
+	if (!terms.length) {
 		return 'true'
 	}
-	parameters.push(likePattern(text))
-	const pattern = `$${parameters.length}`
+	parameters.push(terms.map(likePattern))
+	const patterns = `$${parameters.length}::text[]`
 	parameters.push(fields.filter((field) => field.searchable).map((field) => field.name))
-	return `(r.record_key ILIKE ${pattern} OR EXISTS (
+	return `(r.record_key ILIKE ANY(${patterns}) OR EXISTS (
 		SELECT 1 FROM each(r.meta_data) e
-		WHERE e.key = ANY($${parameters.length}::text[]) AND e.value ILIKE ${pattern}
+		WHERE e.key = ANY($${parameters.length}::text[]) AND e.value ILIKE ANY(${patterns})
 	))`
 }
 
-// The files a reader may open, as a subquery. Media keep the rights of the
-// library: a product stays visible while a file of it does not.
+// Files accessible through file collections or a visible record, with
+// licence dates and region restrictions applied to both access paths.
 function visibleFileIdsSql(user: User, parameters: unknown[], em: EntityManager) {
 	const [sql, params] = userCollectionFilesQuery(user, em).select('collection_file.asset_file_id').getQueryAndParameters()
 	const offset = parameters.length
@@ -90,29 +117,34 @@ function visibleFileIdsSql(user: User, parameters: unknown[], em: EntityManager)
 
 // The scope of a listing: everything the reader may see, narrowed to one
 // collection and its descendants when the reader opened one.
-export async function scopeCondition(em: EntityManager, user: User, collectionId: string | undefined, parameters: unknown[], hideWithoutMedia = false) {
-    let visible = visibleRecordsCondition(user, 'r', parameters, em)
-    if (hideWithoutMedia) {
-        const files = visibleFileIdsSql(user, parameters, em)
-        visible += ` AND EXISTS (
-            SELECT 1 FROM asset_files a
-            LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
-            WHERE coalesce(l.record_id, a.record_id) = r.id AND a.id IN (${files})
-        )`
-    }
-    if (!collectionId) return visible
-    const collection = await userCollectionsQuery(user, em).andWhere('collection.id = :id', { id: collectionId }).getOne()
-    if (!collection) throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
-    if (collection.includesAllRecords) return visible
-    parameters.push(collection.path ?? '')
-    const pathParameter = `$${parameters.length}`
-    return `${visible} AND EXISTS (
-        SELECT 1 FROM collection_records cr
-        INNER JOIN collections holder ON holder.id = cr.collection_id
-        WHERE cr.record_id = r.id AND NOT cr.excluded
-        AND holder.id IN (${visibleCollectionIdsSql(user, parameters, em)})
-        AND holder.mpath LIKE ${pathParameter} || '%'
-    )`
+export async function scopeCondition(em: EntityManager, user: User, collectionId: string | undefined, parameters: unknown[], hideWithoutMedia = false, collectionOnly = false) {
+	let visible = visibleRecordsCondition(user, 'r', parameters, em)
+	if (hideWithoutMedia) {
+		const files = visibleFileIdsSql(user, parameters, em)
+		visible += ` AND EXISTS (
+			SELECT 1 FROM asset_files a
+			LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
+			WHERE coalesce(l.record_id, a.record_id) = r.id AND a.id IN (${files})
+		)`
+	}
+
+	if (!collectionId) {
+		return visible
+	}
+	const collection = await userCollectionsQuery(user, em).andWhere('collection.id = :id', { id: collectionId }).getOne()
+	if (!collection) {
+		throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+	}
+	if (collection.includesAllRecords) {
+		return visible
+	}
+	parameters.push(collectionOnly ? collection.id : collection.path ?? '')
+	const pathParameter = `$${parameters.length}`
+	return `${visible} AND EXISTS (
+		SELECT 1 FROM collection_records cr
+		INNER JOIN collections holder ON holder.id = cr.collection_id
+		WHERE cr.record_id = r.id AND NOT cr.excluded AND holder.id IN (${visibleCollectionIdsSql(user, parameters, em)}) AND ${collectionOnly ? `holder.id = ${pathParameter}::uuid` : `holder.mpath LIKE ${pathParameter} || '%'`}
+	)`
 }
 
 async function visualsOf(em: EntityManager, user: User, recordIds: string[], thumbnailView: string | null, perRecord: number) {
@@ -151,6 +183,41 @@ async function visualsOf(em: EntityManager, user: User, recordIds: string[], thu
 	return byRecord
 }
 
+async function relatedCondition(em: EntityManager, user: User, related: NonNullable<CatalogueQuery['related']>, fields: RecordAttribute[], keyColumnName: string | null, parameters: unknown[]) {
+	if (!related.settings.enabled) return 'false'
+	const groups: string[] = []
+	for (const group of related.settings.groups) {
+		if (group.scope === 'current' && !related.collectionId) continue
+		const columns = [...group.filters, ...group.excludeFilters].map(filter => filter.column)
+		if (columns.some(column => column !== 'recordKey' && column !== keyColumnName && !fields.some(field => field.name === column))) continue
+		if (group.matchField === '$family' && !related.source.family) continue
+		if (group.matchField && group.matchField !== '$family' && (!fields.some(field => field.name === group.matchField) || !related.source.metaData[group.matchField])) continue
+		const conditions = [await scopeCondition(em, user, group.scope === 'current' ? related.collectionId : undefined, parameters)]
+		if (group.matchField === '$family') {
+			parameters.push(related.source.family!.key)
+			conditions.push(`r.family_key = $${parameters.length}`)
+		} else if (group.matchField) {
+			parameters.push(group.matchField, related.source.metaData[group.matchField])
+			conditions.push(`r.meta_data -> $${parameters.length - 1} = $${parameters.length}`)
+		}
+		conditions.push(recordQuerySql({ filters: group.filters }, fields, keyColumnName, parameters).where)
+		for (const filter of group.excludeFilters) {
+			conditions.push(`NOT (${recordQuerySql({ filters: [filter] }, fields, keyColumnName, parameters).where})`)
+		}
+		if (group.hasPhoto) {
+			const files = visibleFileIdsSql(user, parameters, em)
+			conditions.push(`EXISTS (
+				SELECT 1 FROM asset_files a
+				LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
+				WHERE coalesce(l.record_id, a.record_id) = r.id AND a.mime_type LIKE 'image/%' AND a.id IN (${files})
+			)`)
+		}
+		groups.push(`(${conditions.join(' AND ')})`)
+	}
+	parameters.push(related.source.id)
+	return `r.id <> $${parameters.length}::uuid AND (${groups.join(' OR ') || 'false'})`
+}
+
 export async function listCatalogue(
 	em: EntityManager,
 	user: User,
@@ -161,26 +228,20 @@ export async function listCatalogue(
 ) {
 	const [fields, keyColumnName] = await Promise.all([readableFields(em), catalogueKeyColumnName(em)])
 	const parameters: unknown[] = []
-	const scope = await scopeCondition(em, user, query.collectionId, parameters)
-	const search = searchCondition(query.search, fields, parameters)
-	const { where, orderBy } = recordQuerySql({ ...query, search: undefined }, fields, keyColumnName, parameters)
+	const scope = await scopeCondition(em, user, query.collectionId, parameters, hideWithoutMedia, query.collectionOnly)
+	const search = searchCondition(query.searchTerms ?? query.search, fields, parameters)
+	const { where, orderBy } = recordQuerySql({
+		...query,
+		search: undefined,
+		filters: query.filters?.map(filter => ({ ...filter, column: fields.find(field => field.id === filter.column)?.name ?? filter.column })),
+	}, fields, keyColumnName, parameters)
 	const readiness = query.readiness === 'ready' ? ' AND r.readiness_ready' : query.readiness === 'incomplete' ? ' AND NOT r.readiness_ready' : ''
-	// An administrator can keep products with nothing to show out of the
-	// catalogue. It is a count per row, so it is only ever applied to a listing.
-	let withMedia = ''
-	if (hideWithoutMedia) {
-		const files = visibleFileIdsSql(user, parameters, em)
-		withMedia = ` AND EXISTS (
-			SELECT 1 FROM asset_files a
-			LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
-			WHERE coalesce(l.record_id, a.record_id) = r.id AND a.id IN (${files})
-		)`
-	}
 	let family = ''
 	if (query.familyKey) {
 		parameters.push(query.familyKey)
 		family = ` AND r.family_key = $${parameters.length}`
 	}
+	const related = query.related ? await relatedCondition(em, user, query.related, fields, keyColumnName, parameters) : 'true'
 	// The page bounds are the last two placeholders, whatever came before.
 	parameters.push(page.limit, page.offset)
 	const rows: { id: string, record_key: string, meta_data: Record<string, string>, readiness_filled: number, readiness_total: number, readiness_ready: boolean, family_key: string | null, family_label: string | null, total: string }[] = await em.query(`
@@ -188,7 +249,7 @@ export async function listCatalogue(
 			r.readiness_filled, r.readiness_total, r.readiness_ready, r.family_key, r.family_label,
 			count(*) OVER () AS total
 		FROM records r
-		WHERE ${scope} AND (${where}) AND ${search}${readiness}${family}${withMedia}
+		WHERE ${scope} AND (${where}) AND ${search}${readiness}${family} AND (${related})
 		ORDER BY ${orderBy}
 		LIMIT $${parameters.length - 1} OFFSET $${parameters.length}
 	`, parameters)
@@ -210,7 +271,33 @@ export async function listCatalogue(
 	return { rows: cards, total: rows.length ? Number(rows[0].total) : 0, fields, keyColumnName }
 }
 
-export async function getCatalogueRecord(em: EntityManager, user: User, id: string, thumbnailView: string | null) {
+export async function catalogueFacets(em: EntityManager, user: User, query: CatalogueQuery, hideWithoutMedia = false) {
+	const [fields, keyColumnName] = await Promise.all([readableFields(em), catalogueKeyColumnName(em)])
+	const parameters: unknown[] = []
+	const scope = await scopeCondition(em, user, query.collectionId, parameters, hideWithoutMedia, query.collectionOnly)
+	const [count] = await em.query(`SELECT count(*)::int AS total FROM records r WHERE ${scope}`, parameters)
+	const attributes = await Promise.all(fields.filter(field => field.facetable).map(async field => {
+		const values = [...parameters]
+		const search = searchCondition(query.searchTerms ?? query.search, fields, values)
+		const { where } = recordQuerySql({ filters: query.filters?.filter(filter => filter.column !== field.name && filter.column !== field.id).map(filter => ({ ...filter, column: fields.find(field => field.id === filter.column)?.name ?? filter.column })) }, fields, keyColumnName, values)
+		values.push(field.name)
+		const expression = `r.meta_data -> $${values.length}`
+		const options: { id: string, label: string, count: number }[] = await em.query(`
+			SELECT value AS id, value AS label, count(DISTINCT r.id)::int AS count
+			FROM records r
+			CROSS JOIN LATERAL unnest(${field.valueType === 'multi_select' ? `string_to_array(${expression}, '|')` : `ARRAY[${expression}]`}) AS value
+			WHERE ${scope} AND ${search} AND (${where}) AND value IS NOT NULL AND value <> ''
+			GROUP BY value ORDER BY value LIMIT ${FACET_VALUES}
+		`, values)
+		for (const value of query.filters?.find(filter => filter.column === field.name || filter.column === field.id)?.values ?? []) {
+			if (!options.some(option => option.id === value)) options.push({ id: value, label: value, count: 0 })
+		}
+		return { id: field.id, label: field.displayName ?? field.name, options }
+	}))
+	return { total: count.total as number, assetTypes: [], fileTypes: [], extensions: [], attributes }
+}
+
+export async function getCatalogueRecord(em: EntityManager, user: User, id: string, thumbnailView: string | null, relatedSettings = defaultRelatedRecords, collectionId?: string, relatedOffset = 0, hideWithoutMedia = false) {
 	const { rows, fields, keyColumnName } = await listCatalogue(em, user, { ids: [id] }, { offset: 0, limit: 1 }, thumbnailView)
 	if (!rows.length) {
 		throw new TRPCError({ code: 'NOT_FOUND', message: 'Product not found.' })
@@ -224,19 +311,27 @@ export async function getCatalogueRecord(em: EntityManager, user: User, id: stri
 		FROM asset_files a
 		INNER JOIN asset_folders f ON f.id = a.folder_id
 		LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
-		WHERE coalesce(l.record_id, a.record_id) = $1::uuid
+		WHERE (
+			coalesce(l.record_id, a.record_id) = $1::uuid
+			OR EXISTS (
+				SELECT 1 FROM asset_entity_links range_link
+				INNER JOIN records range_record ON range_record.id = $1::uuid
+					AND (range_record.meta_data -> range_link.attribute_name) = range_link.attribute_value
+				WHERE range_link.asset_file_id = a.id AND range_link.target_kind = 'attribute' AND range_link.status = 'active'
+			)
+		)
 		AND a.id IN (${visibleFiles})
 		ORDER BY a.record_view NULLS LAST, a.name
 	`, parameters)
-	// The other products of the same model, so a reader jumps from one colour
-	// or format to the next.
-	const siblings = rows[0].family
-		? (await listCatalogue(em, user, { familyKey: rows[0].family.key }, { offset: 0, limit: 24 }, thumbnailView)).rows
-			.filter((sibling) => sibling.id !== id)
-		: []
+	if (collectionId) await scopeCondition(em, user, collectionId, [])
+	const related = await listCatalogue(em, user, {
+		related: { settings: relatedSettings, source: rows[0], collectionId },
+		sort: { column: 'recordKey', direction: 'asc' },
+	}, { offset: relatedOffset, limit: 24 }, thumbnailView, hideWithoutMedia)
 	return {
 		...rows[0],
-		siblings,
+		siblings: related.rows,
+		relatedTotal: related.total,
 		visuals: visuals.get(id)?.visuals ?? [],
 		visualCount: visuals.get(id)?.visualCount ?? rows[0].visualCount,
 		fields,

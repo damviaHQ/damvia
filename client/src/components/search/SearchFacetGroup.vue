@@ -27,7 +27,8 @@ const props = withDefaults(defineProps<{
   selected: string[]
   open?: boolean
   limit?: number
-}>(), { open: true, limit: 8 })
+  showHeader?: boolean
+}>(), { open: true, limit: 8, showHeader: true })
 const emit = defineEmits<{ toggle: [id: string] }>()
 
 const isOpen = ref(props.open)
@@ -79,8 +80,8 @@ const hiddenCount = computed(() => filter.value.trim() ? 0 : available.value.len
 </script>
 
 <template>
-  <section v-if="!isEmpty" :aria-labelledby="`${id}-title`" class="border-t border-neutral-200 pt-1">
-    <div class="flex h-8 items-center pr-2 hover:bg-neutral-200/60">
+  <section v-if="!isEmpty" :aria-labelledby="showHeader ? `${id}-title` : undefined" :aria-label="showHeader ? undefined : title" :class="showHeader ? 'border-t border-neutral-200 pt-1' : ''">
+    <div v-if="showHeader" class="flex h-8 items-center pr-2 hover:bg-neutral-200/60">
       <button type="button" class="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2" :aria-expanded="isOpen" :aria-controls="`${id}-options`" @click="isOpen = !isOpen">
         <span :id="`${id}-title`" :class="sidebarSectionTitleClasses" class="min-w-0 flex-1 truncate text-left">{{ title }}</span>
         <span v-if="selected.length" class="grid size-5 place-items-center bg-neutral-800 text-[11px] font-semibold text-white" :aria-label="`${selected.length} selected`">{{ selected.length }}</span>
@@ -93,8 +94,12 @@ const hiddenCount = computed(() => filter.value.trim() ? 0 : available.value.len
         <ChevronRight v-else :class="menuIconClasses" />
       </button>
     </div>
-    <div v-show="isOpen" :id="`${id}-options`" class="pb-1">
-      <input v-if="filterable && isFilterOpen" :id="`${id}-filter`" ref="filterInput" v-model="filter" type="search" :aria-label="`Search in ${title}`" :placeholder="`Search in ${title.toLowerCase()}…`" class="mx-3 mb-1 h-7 w-[calc(100%-24px)] border border-neutral-200 bg-white px-2 text-body text-neutral-900 placeholder:text-[color:var(--dv-text-secondary)] focus-visible:outline-2 focus-visible:outline-ring" @keydown.esc.prevent="closeFilter" />
+    <div v-show="!showHeader || isOpen" :id="`${id}-options`" class="pb-1">
+      <button v-if="!showHeader && filterable && !isFilterOpen" type="button" class="mx-2 mb-1 flex h-7 items-center gap-2 px-1 text-caption text-neutral-600 hover:text-neutral-950" :aria-label="`Search in ${title}`" @click="toggleFilter">
+        <Search class="size-3.5" aria-hidden="true" />
+        Search options
+      </button>
+      <input v-if="filterable && isFilterOpen" :id="`${id}-filter`" ref="filterInput" v-model="filter" type="search" :aria-label="`Search in ${title}`" :placeholder="`Search in ${title.toLowerCase()}…`" class="facet-option-search mx-3 mb-1 h-7 w-[calc(100%-24px)] border border-neutral-200 bg-white px-2 text-body text-neutral-900 placeholder:text-[color:var(--dv-text-secondary)]" @keydown.esc.prevent="closeFilter" />
       <p v-if="!visible.length" class="px-3 py-1 text-caption text-[color:var(--dv-text-secondary)]">No value matches "{{ filter.trim() }}"</p>
       <ul v-else class="flex flex-col">
         <li v-for="(option, index) in visible" :key="option.id" class="min-w-0">
@@ -111,3 +116,10 @@ const hiddenCount = computed(() => filter.value.trim() ? 0 : available.value.len
     </div>
   </section>
 </template>
+
+<style scoped>
+.facet-option-search:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: -2px;
+}
+</style>

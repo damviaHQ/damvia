@@ -13,22 +13,19 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { Checkbox } from "@/components/ui/checkbox"
+import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
+import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import { gridCardClasses, gridPreviewClasses } from "@/components/collection/gridStyles"
 import { RouterOutput } from "@/services/server.ts"
-import { ImageOff } from "@lucide/vue"
 import { computed } from "vue"
 
 type Product = RouterOutput["catalogue"]["list"]["products"][number]
 
-// One card for one product: its main visual, the visuals that come with it,
-// its reference and the one field an administrator chose as a title. Every
-// line is always drawn, so a product missing a value keeps the same height as
-// its neighbours and the grid stays a grid.
 const props = defineProps<{
   product: Product
   cardTitleField: string | null
   selected: boolean
+  collectionId?: string
 }>()
 const emit = defineEmits<{ "update:selected": [boolean] }>()
 
@@ -38,21 +35,27 @@ const overflow = computed(() => Math.max(0, props.product.visualCount - props.pr
 
 <template>
   <article :class="gridCardClasses">
-    <div :class="[gridPreviewClasses, 'grid place-items-center']">
-      <img v-if="product.thumbnailURL" :src="product.thumbnailURL" :alt="product.recordKey" class="size-full object-contain" loading="lazy" />
-      <ImageOff v-else class="size-6 text-neutral-400" aria-hidden="true" />
-      <Checkbox :model-value="selected" class="absolute left-2 top-2 bg-white"
-        :aria-label="`Select ${product.recordKey}`" @update:model-value="emit('update:selected', !!$event)" />
+    <div :class="[gridPreviewClasses, selected && 'outline-2 outline-neutral-500']">
+      <router-link :to="{ name: 'product', params: { id: product.id }, query: collectionId ? { collection: collectionId } : {} }"
+        class="absolute inset-0 flex size-full items-center justify-center p-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-800"
+        :aria-label="`Open ${product.recordKey}`">
+        <img v-if="product.thumbnailURL" :src="product.thumbnailURL" :alt="product.recordKey" class="size-full object-contain" loading="lazy" decoding="async" />
+        <thumbnailPlaceholder v-else class="h-20 w-auto! fill-neutral-400" aria-hidden="true" />
+      </router-link>
+      <CollectionCheckbox :label="`Select ${product.recordKey}`"
+        class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
+        :class="selected ? 'opacity-100' : 'opacity-0'" :state="selected ? 'check' : false" @click="emit('update:selected', !selected)" />
     </div>
-    <router-link :to="{ name: 'product', params: { id: product.id } }" class="mt-3 grid gap-0.5 no-underline">
-      <span class="truncate text-body text-neutral-900">{{ product.recordKey }}</span>
-      <span v-if="cardTitleField" class="truncate text-caption text-neutral-500">{{ title ?? "&nbsp;" }}</span>
+    <router-link :to="{ name: 'product', params: { id: product.id }, query: collectionId ? { collection: collectionId } : {} }"
+      class="mt-2.5 block truncate text-sm font-normal text-neutral-800 no-underline hover:text-neutral-950" :title="product.recordKey">
+      {{ product.recordKey }}
     </router-link>
-    <div class="mt-3 flex min-h-10 items-center gap-2">
-      <span v-for="visual in product.visuals" :key="visual.id" class="size-10 overflow-hidden bg-neutral-100">
+    <p v-if="cardTitleField" class="mt-1 truncate text-xs text-neutral-500" :title="title ?? undefined">{{ title ?? "\u00a0" }}</p>
+    <div v-if="product.visuals.length" class="mt-2 flex items-center gap-1" :aria-label="`${product.visualCount} visuals`">
+      <span v-for="visual in product.visuals" :key="visual.id" class="size-7 overflow-hidden bg-neutral-100">
         <img :src="visual.thumbnailURL ?? ''" :alt="visual.view ?? product.recordKey" class="size-full object-contain" loading="lazy" />
       </span>
-      <span v-if="overflow" class="grid size-10 place-items-center bg-neutral-100 text-caption text-neutral-600">+{{ overflow }}</span>
+      <span v-if="overflow" class="grid size-7 place-items-center bg-neutral-100 text-caption text-neutral-600">+{{ overflow }}</span>
     </div>
   </article>
 </template>

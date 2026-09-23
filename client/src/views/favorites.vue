@@ -19,6 +19,7 @@ import { useGlobalStore } from "@/stores/globalStore"
 import { computed } from "vue"
 import { useCollectionFavorites } from "@/composables/useCollectionFavorites"
 import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
+import MainPageTools from "@/components/layout-main/MainPageTools.vue"
 import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import Loader from "@/components/Loader.vue"
 import { useFileFavorites } from "@/composables/useFileFavorites"
@@ -46,8 +47,8 @@ function collectionPath(collection: { id: string }) {
   return collectionPaths.value.get(collection.id)
 }
 
-function filePath(file: { collectionId: string; name: string }) {
-  const parentPath = collectionPaths.value.get(file.collectionId)
+function filePath(file: { collectionId: string | null; name: string }) {
+  const parentPath = file.collectionId ? collectionPaths.value.get(file.collectionId) : undefined
   return parentPath ? `${parentPath} / ${file.name}` : undefined
 }
 </script>
@@ -60,10 +61,12 @@ function filePath(file: { collectionId: string; name: string }) {
     {{ error?.message || collectionsError?.message }}
   </div>
   <div v-else-if="status === 'success'" class="favorites__container">
-    <div class="mb-6 flex min-h-10 items-center justify-between gap-3">
+    <MainPageTools area="context">
       <h1 class="text-body font-semibold leading-5 tracking-normal">Favorites</h1>
+    </MainPageTools>
+    <MainPageTools area="actions">
       <DisplayPreferences v-if="favorites?.length || collections?.length" :files="favorites ?? []" :collections="collections ?? []" />
-    </div>
+    </MainPageTools>
     <div v-if="!favorites?.length && !collections?.length" class="grid justify-items-center gap-3 py-20 text-center [&_p]:max-w-sm [&_p]:text-sm [&_p]:text-neutral-500"><h2>No favorites yet</h2><p>Save collections and assets with the star icon to find them here.</p><router-link :to="{ name: 'search' }" class="dv-button">Browse assets</router-link></div>
     <div v-else class="grid gap-8">
       <section v-if="collections?.length" aria-labelledby="favorite-collections-heading">

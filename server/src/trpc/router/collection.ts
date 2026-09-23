@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
 import { Brackets, ILike, In, IsNull, Not } from "typeorm"
 import { z } from "zod"
+import { relatedRecordsSettings } from "../../services/catalogue"
 import { AssetFolder } from "../../entity/asset-folder"
 import { ACTION_BAR_ACTIONS, CATALOGUE_MODES, Collection } from "../../entity/collection"
 import { Group } from "../../entity/group"
@@ -42,6 +43,7 @@ import invitationRouter, { formatInvitation } from "./collection/invitation"
 import { formatLicense } from "./license"
 import { formatPage } from "./page"
 import { splitMulti } from "../../services/record-values"
+
 import { resolveDownloadSelection } from "../../services/download-selection"
 
 export type FormatCollectionOptions = {
@@ -66,6 +68,7 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		numberOfFiles: collection.numberOfFiles,
 		numberOfRecords: collection.numberOfRecords,
 		catalogueMode: collection.catalogueMode,
+		relatedRecords: opts.user && collection.canEdit(opts.user) ? collection.relatedRecords : undefined,
 		includesAllRecords: collection.includesAllRecords,
 		// The rules belong to whoever may edit the collection; a reader only
 		// ever sees their outcome.
@@ -547,11 +550,12 @@ export default router({
 				if (recordIds.length) {
 					const rows = await pickableRecords(em, ctx.user, 'id', recordIds)
 					await addRecords(em, collection.id, rows.map((row) => row.id))
-					if (collection.catalogueMode === 'files') {
-						await em.getRepository(Collection).update(collection.id, {
-							catalogueMode: collection.numberOfFiles > 0 ? 'both' : 'products',
-						})
+					if (rows.length && collection.catalogueMode === 'files') {
+						const hasFiles = await em.getRepository(CollectionFile).existsBy({ collectionId: collection.id })
+						collection.catalogueMode = hasFiles ? 'both' : 'products'
+						await em.getRepository(Collection).update(collection.id, { catalogueMode: collection.catalogueMode })
 					}
+					if (rows.length && (collection.public || !collection.ownerId)) await createCataloguePage(em, collection)
 				}
 			})
 		}),
@@ -774,6 +778,7 @@ export default router({
 				value: z.string().optional(),
 				values: z.string().array().optional(),
 			})).max(10).nullable().optional(),
+			relatedRecords: relatedRecordsSettings.nullable().optional(),
 			includesAllRecords: z.boolean().optional(),
 		}))
 		.mutation(async ({ input, ctx }) => {
@@ -791,23 +796,26 @@ export default router({
 			const writesMembership = input.includesAllRecords !== undefined
 				|| input.recordFilters !== undefined
 				|| input.recordTableId !== undefined
-			if (writesMembership && ctx.user.role !== UserRole.ADMIN) {
+			if ((writesMembership || input.relatedRecords !== undefined) && ctx.user.role !== UserRole.ADMIN) {
 				throw new TRPCError({ code: 'FORBIDDEN', message: 'Only an administrator sets the rules of a collection.' })
 			}
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).update(collection.id, {
 					...(input.catalogueMode !== undefined ? { catalogueMode: input.catalogueMode } : {}),
+					...(input.relatedRecords !== undefined ? { relatedRecords: input.relatedRecords } : {}),
 					...(input.recordTableId !== undefined ? { recordTableId: input.recordTableId } : {}),
 					...(input.recordFilters !== undefined ? { recordFilters: input.recordFilters } : {}),
 					...(input.includesAllRecords !== undefined ? { includesAllRecords: input.includesAllRecords } : {}),
 				})
-				const updated = await em.getRepository(Collection).findOneByOrFail({ id: collection.id })
-				// Turning a collection into a catalogue gives it the page that
-				// draws the products, so it stops opening on an empty layout.
-				if (updated.catalogueMode !== 'files') {
-					await createCataloguePage(em, updated)
+				if (writesMembership || input.catalogueMode !== undefined) {
+					const updated = await em.getRepository(Collection).findOneByOrFail({ id: collection.id })
+					// Turning a collection into a catalogue gives it the page that
+					// draws the products, so it stops opening on an empty layout.
+					if (updated.catalogueMode !== 'files') {
+						await createCataloguePage(em, updated)
+					}
+					await refreshDynamicCollection(em, updated)
 				}
-				await refreshDynamicCollection(em, updated)
 			})
 			const saved = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOneOrFail()
 			return formatCollection({ collection: saved, user: ctx.user })
@@ -916,6 +924,7 @@ export default router({
 		.mutation(async ({ input, ctx }) => {
 			const selection = await resolveDownloadSelection(dataSource.manager, ctx.user, input.items)
 			const collectionFiles = selection.files
+			const pictures = new Map(selection.pictures.map(picture => [picture.recordId, picture.assetId]))
 			const licenses = Object.values(
 				collectionFiles.reduce((licenses, file) => {
 					if (file.assetFile.license) {
@@ -929,8 +938,13 @@ export default router({
 			return {
 				recordCount: selection.rows.length,
 				columns: selection.columns,
-				previewRows: selection.rows.slice(0, 5),
+				previewRows: selection.rows.slice(0, 12),
+				previewPictures: await Promise.all(selection.recordIds.slice(0, 12).map(id => {
+					const assetId = pictures.get(id)
+					return assetId ? assetsS3().presignedGetObject(assetsS3Bucket(), `asset-file/${assetId}-thumbnail`) : null
+				})),
 				viewsEnabled: selection.viewsEnabled,
+				mainView: selection.mainView,
 				files: await Promise.all(collectionFiles.map(file => formatCollectionFile({ file, recordAttributes }))),
 				licenses: await Promise.all(licenses.map(formatLicense)),
 				allowDirectDownload:

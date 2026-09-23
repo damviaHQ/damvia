@@ -65,7 +65,7 @@ export function providePageFilter(enabled: MaybeRefOrGetter<boolean> = true): Pa
       state.value = { ...state.value, attributes }
       return
     }
-    if (key === 'assetTypes' || key === 'fileTypes' || key === 'extensions') {
+    if (key === 'assetTypes' || key === 'fileTypes' || key === 'extensions' || key === 'orientations') {
       const values = state.value[key]
       state.value = {
         ...state.value,
@@ -87,7 +87,7 @@ export function providePageFilter(enabled: MaybeRefOrGetter<boolean> = true): Pa
       state.value = { ...state.value, attributes }
       return
     }
-    if (key === 'assetTypes' || key === 'fileTypes' || key === 'extensions') {
+    if (key === 'assetTypes' || key === 'fileTypes' || key === 'extensions' || key === 'orientations') {
       state.value = { ...state.value, [key]: [] }
     }
   }

@@ -13,40 +13,58 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import PageSelectionContext from "@/components/PageSelectionContext.vue"
+import MainPageTools from "@/components/layout-main/MainPageTools.vue"
+import { Button } from "@/components/ui/button"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { Settings, FilePenLine } from "@lucide/vue"
+import { useGlobalStore } from "@/stores/globalStore"
+import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import Loader from "@/components/Loader.vue"
 import PageFilterBar from "@/components/PageFilterBar.vue"
 import PageFilterToggle from "@/components/PageFilterToggle.vue"
 import PageRenderer from "@/components/page-renderer/PageRenderer.vue"
-import { providePageFilter } from "@/composables/usePageFilter"
-import { providePageListings } from "@/composables/usePageListings"
+import { usePageContent } from "@/composables/usePageContent"
 import { trpc } from "@/services/server.ts"
 import { useQuery } from "@tanstack/vue-query"
-import { computed, watch } from "vue"
+import { computed } from "vue"
 import { useRoute } from "vue-router"
 
 const route = useRoute()
+const globalStore = useGlobalStore()
 const { status, data: page, error } = useQuery({
   queryKey: computed(() => ["pages", route.params.id]),
   queryFn: () => trpc.page.findById.query(route.params.id as string),
 })
 
-// A custom page lists files and collections like a collection does, so it gets
-// the same filter. The blocks announce what they draw, which is what the bar
-// counts and builds its facets from.
-// An admin can take the action bar off a page; a hidden filter then narrows
-// nothing, even with filters ticked on another page.
 const showsBar = computed(() => page.value?.showActionBar ?? true)
-const { files: shownFiles, collections: shownCollections } = providePageListings()
-const pageFilter = providePageFilter(showsBar)
-watch(() => route.params.id, () => pageFilter.clear())
+const { shownFiles, shownCollections, shownProducts, filterable, selectable, selection, layoutLocked, toggleSelection } = usePageContent({
+  filterEnabled: showsBar,
+  pageKey: () => route.params.id,
+  blocks: computed(() => page.value?.blocks ?? []),
+})
 </script>
 
 <template>
   <div v-if="page" class="page__container">
-    <div v-if="showsBar" class="page__header-actions mb-4 flex items-center justify-end">
-      <PageFilterToggle :files="shownFiles" />
-    </div>
-    <PageFilterBar v-if="showsBar" :files="shownFiles" :collections="shownCollections" />
+    <MainPageTools area="actions">
+      <template v-if="showsBar">
+      <PageFilterToggle :files="filterable" />
+      <DisplayPreferences :files="shownFiles" :collections="shownCollections" :products="shownProducts.length ? shownProducts : undefined" :layout-locked="layoutLocked" />
+      </template>
+      <DropdownMenu v-if="globalStore.user?.role === 'admin'">
+        <DropdownMenuTrigger as-child><Button aria-label="Page actions" title="Page actions" variant="ghost" size="icon-sm"><Settings /></Button></DropdownMenuTrigger>
+        <DropdownMenuContent align="end" :collision-padding="12">
+          <DropdownMenuItem as-child><router-link :to="{ name: 'admin-page', params: { id: page.id } }"><FilePenLine class="size-4" />Edit page</router-link></DropdownMenuItem>
+          <DropdownMenuItem as-child><router-link :to="{ name: 'admin-pages' }"><Settings class="size-4" />Manage pages</router-link></DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </MainPageTools>
+    <MainPageTools area="context">
+      <PageSelectionContext :items="[{ id: page.id, label: page.name ?? 'Page' }]" :selected-count="selection.length"
+        :selectable-count="selectable.length" selection-label="Select all items on this page" @toggle="toggleSelection" />
+    </MainPageTools>
+    <MainPageTools area="filters"><PageFilterBar :show-summary="false" v-if="showsBar" :files="filterable" :collections="shownCollections" /></MainPageTools>
     <PageRenderer :blocks="page.blocks ?? []" :assets="page.assets"
       :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
   </div>

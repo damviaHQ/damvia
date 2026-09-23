@@ -18,7 +18,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { usePageFilter } from "@/composables/usePageFilter"
 import { useGlobalStore } from "@/stores/globalStore"
-import type { DisplayFile } from "@/utils/displayPreferences"
 import {
   availableGroups,
   fileFacets,
@@ -26,23 +25,24 @@ import {
   NAME_FILTER_KEY,
   pageFilterCount,
   type FilterableFile,
+  type PageFacets,
 } from "@/utils/pageFilter"
 import { Filter } from "@lucide/vue"
 import { computed } from "vue"
 
-const props = withDefaults(defineProps<{ files?: DisplayFile[], restricted?: boolean }>(), { files: () => [], restricted: false })
+const props = withDefaults(defineProps<{ files?: FilterableFile[], restricted?: boolean, facets?: PageFacets, showSingleValues?: boolean }>(), { files: () => [], restricted: false })
 
 const store = useGlobalStore()
 const filter = usePageFilter()
 
 const files = computed(() => props.files as unknown as FilterableFile[])
-const facets = computed(() => fileFacets(files.value, filter.state.value))
+const facets = computed(() => props.facets ?? fileFacets(files.value, filter.state.value))
 
 // Every filter this page can offer. The name always can: it matches the files
 // and the sub-collections alike, and it needs no values behind it.
 const offered = computed(() => [
-  { key: NAME_FILTER_KEY, title: "Name", detail: "Files and collections" },
-  ...availableGroups(filter.state.value, facets.value).map((group) => ({
+  { key: NAME_FILTER_KEY, title: "Name", detail: "Search this page" },
+  ...availableGroups(filter.state.value, facets.value, props.showSingleValues).map((group) => ({
     key: group.key,
     title: group.title,
     detail: `${group.options.length} value${group.options.length === 1 ? "" : "s"}`,
@@ -79,7 +79,7 @@ function clearAll() {
         class="relative text-neutral-500 data-[state=open]:bg-neutral-100 data-[state=open]:text-neutral-950"
       >
         <Filter aria-hidden="true" />
-        <span v-if="count" class="absolute -right-0.5 -top-0.5 grid size-4 place-items-center rounded-full bg-neutral-800 text-[10px] font-semibold tabular-nums text-white ring-2 ring-white">
+        <span v-if="count" class="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-0.5 text-[10px] leading-none font-semibold tabular-nums text-neutral-700 ring-2 ring-white">
           {{ count }}<span class="sr-only"> filters active</span>
         </span>
       </Button>
@@ -87,7 +87,6 @@ function clearAll() {
     <PopoverContent align="end" :side-offset="8" :collision-padding="12" class="w-64 p-0" aria-label="Filters">
       <div class="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
         <h2 class="text-[13px] font-semibold text-neutral-900">Filters</h2>
-        <span class="text-[11px] text-neutral-500">Only for you</span>
       </div>
       <p class="px-4 pb-2 text-[11px] leading-4 text-neutral-500">Choose what to filter this page by. Only what is ticked appears above the content.</p>
       <ul class="flex flex-col pb-1">
@@ -95,14 +94,14 @@ function clearAll() {
           <label :for="`page-filter-choice-${index}`" class="flex min-h-8 w-full cursor-pointer items-center gap-2 px-4 py-1 text-body text-neutral-800 hover:bg-neutral-100">
             <Checkbox :id="`page-filter-choice-${index}`" :aria-label="item.title" :model-value="store.pageFilters.includes(item.key)" @update:model-value="toggle(item.key)" />
             <span class="min-w-0 flex-1 truncate">{{ item.title }}</span>
-            <span v-if="groupValueCount(filter.state.value, item.key)" class="grid size-4 shrink-0 place-items-center rounded-full bg-neutral-800 text-[10px] font-semibold tabular-nums text-white">
+            <span v-if="groupValueCount(filter.state.value, item.key)" class="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-white px-0.5 text-[10px] leading-none font-semibold tabular-nums text-neutral-700">
               {{ groupValueCount(filter.state.value, item.key) }}<span class="sr-only"> values in use</span>
             </span>
             <span v-else class="shrink-0 text-caption text-[color:var(--dv-text-secondary)]">{{ item.detail }}</span>
           </label>
         </li>
       </ul>
-      <p v-if="offered.length === 1" class="px-4 pb-2 text-[11px] leading-4 text-neutral-500">This page holds nothing else to filter by.</p>
+      <p v-if="offered.length === 1" class="px-4 pb-2 text-[11px] leading-4 text-neutral-500">Other filters appear when this page has more than one value to choose from.</p>
       <button
         v-if="chosenCount || count"
         type="button"

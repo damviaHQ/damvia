@@ -13,19 +13,21 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-vi.mock('@/services/server.ts', () => ({ trpc: { assetType: { list: { query: vi.fn().mockResolvedValue([{ id: 't1', name: 'Packshot', includeInSearchByDefault: true }]) } } } }))
+vi.mock('@/services/server.ts', () => ({ trpc: { env: { query: vi.fn().mockResolvedValue({ appName: 'Damvia', recordLabel: { singular: 'Product', plural: 'Products' } }) }, assetType: { list: { query: vi.fn().mockResolvedValue([{ id: 't1', name: 'Packshot', includeInSearchByDefault: true }]) } } } }))
 
+const { useGlobalStore } = await import('@/stores/globalStore')
 const { default: MainSearchBar } = await import('@/components/layout-main/MainSearchBar.vue')
 
 async function setup(query: Record<string, any> = {}) {
   const router = createRouter({ history: createMemoryHistory(), routes: ['home', 'search', 'collection'].map((name) => ({ name, path: name === 'home' ? '/' : name === 'search' ? '/search' : '/collections/:id', component: { render: () => h('div') } })) })
   await router.push(Object.keys(query).length ? { name: 'search', query } : { name: 'home' })
-  const wrapper = mount(MainSearchBar, { global: { plugins: [router, [VueQueryPlugin, { queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }) }]], stubs: { Popover: { template: '<div><slot /></div>' }, PopoverAnchor: { template: '<div><slot /></div>' }, PopoverContent: { template: '<div><slot /></div>' } } } })
+  const wrapper = mount(MainSearchBar, { global: { plugins: [router, createPinia(), [VueQueryPlugin, { queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }) }]], stubs: { Popover: { template: '<div><slot /></div>' }, PopoverAnchor: { template: '<div><slot /></div>' }, PopoverContent: { template: '<div><slot /></div>' } } } })
   return { router, wrapper }
 }
 
@@ -39,6 +41,21 @@ describe('MainSearchBar', () => {
       expect(wrapper.find('input').exists()).toBe(true)
       wrapper.unmount()
     }
+  })
+
+  test('file and record searches have visible labels using the configured record name', async () => {
+    const { wrapper } = await setup()
+    await flushPromises()
+    const store = useGlobalStore()
+    store.env = { ...store.env!, recordLabel: { singular: 'Event', plural: 'Events' } }
+    await flushPromises()
+    expect(wrapper.get('button[aria-label="Search files"]').text()).toBe('Files')
+    expect(wrapper.get('button[aria-label="Search events"]').text()).toBe('Events')
+    await wrapper.get('button[aria-label="Search events"]').trigger('click')
+    expect(wrapper.get('button[aria-label="Search events"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.text()).toContain('Find events by reference or details, with their linked pictures.')
+    expect(wrapper.find('#search-asset-types').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   test('a repeated q param on the results page keeps the first value as the text', async () => {

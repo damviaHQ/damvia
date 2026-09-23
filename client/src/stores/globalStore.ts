@@ -37,6 +37,21 @@ export const useGlobalStore = defineStore('global', () => {
 	// A selection holds whatever the reader is about to act on: collections,
 	// files, or products from the catalogue.
 	const selection = ref<SelectionItem[]>([])
+	const productNavigationSources = ref<{ id: number, productIds: string[] }[]>([])
+	let nextProductNavigationSource = 0
+	const productNavigationIds = computed(() => [...new Set(productNavigationSources.value.flatMap(source => source.productIds))])
+	function registerProductNavigationSource() {
+		const id = nextProductNavigationSource++
+		productNavigationSources.value.push({ id, productIds: [] })
+		return id
+	}
+	function updateProductNavigationSource(id: number, productIds: string[]) {
+		const source = productNavigationSources.value.find(source => source.id === id)
+		if (source) source.productIds = productIds
+	}
+	function removeProductNavigationSource(id: number) {
+		productNavigationSources.value = productNavigationSources.value.filter(source => source.id !== id)
+	}
 	const displayPreferences = ref<{ [assetTypeId: string]: DisplayView }>(
 		JSON.parse(localStorage.getItem('dam_display_preferences') || '{}')
 	)
@@ -149,6 +164,10 @@ export const useGlobalStore = defineStore('global', () => {
 		setDisplayPreferences,
 		fetchEnv,
 		selection,
+		productNavigationIds,
+		registerProductNavigationSource,
+		updateProductNavigationSource,
+		removeProductNavigationSource,
 		setSelection(items: SelectionItem[]) {
 			selection.value = items
 		},

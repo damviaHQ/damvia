@@ -23,7 +23,7 @@ const { Collection, CollectionFile, CollectionInvitation, AssetFolder } = harnes
 const { Page } = require('../dist/entity/page')
 const { MenuItem } = require('../dist/entity/menu-item')
 const { upsertFolder, deleteFolder } = harness.services.assets
-const { synchronizeCollection, reparentSubtree, destroySynchronizedCollections, userCollectionsQuery } = harness.services.collections
+const { synchronizeCollection, reparentSubtree, destroySynchronizedCollections, userCollectionsQuery, defaultMenuSection } = harness.services.collections
 let fixtures
 before(async () => {
     fixtures = await harness.setup()
@@ -260,7 +260,8 @@ test('deleting a whole tree lands custom collections at the root as drafts, keep
     assert.equal((await menuItemsOf(custom.id)).length, 0)
     assert.equal((await menuItemsOf(grandChild.id)).length, 0)
     const survivor = await db.getRepository(MenuItem).findOneByOrFail({ id: divider.id })
-    assert.equal(survivor.parentId, null)
+    // The nearest item that stays is the sidebar section the library hangs under.
+    assert.equal(survivor.parentId, (await defaultMenuSection(db.manager)).id)
     assert.deepEqual(state.removedKeys.filter(key => key.startsWith('collections/')), [collection.thumbnailStorageKey])
     const orphan = (await caller(fixtures.admin).collection.listOrphaned()).find(o => o.id === custom.id)
     assert.equal(orphan.orphanedReason, 'folder_deleted')
@@ -358,7 +359,13 @@ test('the upgrade merges duplicate mirrors of one folder and keeps every custom 
     const loserChild = await insert('Deeper', deeper.id, loser.id)
     const direct = await insert('Brief', null, loser.id)
     const nested = await insert('Notes', null, loserChild.id)
+    // The kept mirror already holds custom collections with the same names:
+    // the old unique (parent_id, name) constraint must not block the merge.
+    const keptBrief = await insert('Brief', null, kept.id)
+    const keptNotes = await insert('Notes', null, kept.id)
     await db.runMigrations()
+    assert.equal((await row(keptBrief.id)).parentId, kept.id)
+    assert.equal((await row(keptNotes.id)).parentId, kept.id)
     assert.equal(await db.getRepository(Collection).countBy({ id: loser.id }), 0)
     assert.equal(await db.getRepository(Collection).countBy({ id: loserChild.id }), 0)
     assert.equal((await row(kept.id)).parentId, collection.id)
@@ -409,7 +416,7 @@ test('a custom collection moved to the top level leaves the tree and gets its ow
     assert.equal(moved.path, `${custom.id}.`)
     const items = await menuItemsOf(custom.id)
     assert.equal(items.length, 1)
-    assert.equal(items[0].parentId, null)
+    assert.equal(items[0].parentId, (await defaultMenuSection(db.manager)).id)
     await assertTreesConsistent()
 })
 

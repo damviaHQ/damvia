@@ -23,11 +23,13 @@ import {
   Blocks,
   ContactRound,
   ChartColumn,
+  ChevronRight,
   Copyright,
   FileCog,
   FilePenLine,
   Folders,
   HardDrive,
+  Info,
   KeyRound,
   Layers,
   Link2,
@@ -35,17 +37,19 @@ import {
   LayoutDashboard,
   Menu,
   Package,
+  PackageSearch,
   PanelLeftClose,
   PanelLeftOpen,
   Settings,
-  SquareChevronLeft,
   Unlink,
   Users,
+  X,
 } from "@lucide/vue"
-import { computed, ref, watch, provide } from "vue"
+import { computed, reactive, ref, watch, provide } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import ClientLogo from '@/components/ClientLogo.vue'
-import PathBreadcrumb, { type PathBreadcrumbItem } from '@/components/navigation/PathBreadcrumb.vue'
+import { adminPageHeadingKey, type AdminPageHeading } from '@/components/admin/AdminPageHeader.vue'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import '@/styles/admin.css'
 provide('damvia-admin-theme', true)
 const route = useRoute()
@@ -57,20 +61,21 @@ const SIDEBAR_HIDDEN_KEY = 'damvia-admin-sidebar-hidden'
 const readSidebarHidden = () => { try { return localStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1' } catch { return false } }
 const sidebarHidden = ref(readSidebarHidden())
 watch(sidebarHidden, (hidden) => { try { localStorage.setItem(SIDEBAR_HIDDEN_KEY, hidden ? '1' : '0') } catch {} })
-// Child routes highlight no sidebar entry, so the breadcrumb is their only locator.
+// The page's AdminPageHeader fills this; its actions are teleported next to the title.
+const pageHeading = reactive<AdminPageHeading>({})
+provide(adminPageHeadingKey, pageHeading)
+const pageTitle = computed(() => pageHeading.title ?? String(route.meta.title ?? 'Administration'))
+// Child routes highlight no sidebar entry, so the parent link is their only way back.
 const adminParents: Record<string, string> = {
   'admin-record-import': 'admin-records',
   'admin-page': 'admin-pages',
 }
-const routeTitle = (name: string) => String(router.resolve({ name }).meta.title ?? name)
-const adminBreadcrumbItems = computed<PathBreadcrumbItem[]>(() => {
-  const name = String(route.name ?? 'admin-dashboard')
-  const parent = adminParents[name]
-  return [
-    { id: 'workspace', label: 'Workspace', to: { name: 'admin-dashboard' } },
-    ...(parent ? [{ id: parent, label: routeTitle(parent), to: { name: parent } }] : []),
-    { id: name, label: String(route.meta.title ?? 'Administration') },
-  ]
+const pageParent = computed(() => {
+  const name = String(route.name ?? '')
+  const parent = adminParents[name] ?? (name === 'admin-assets' && route.params.id ? name : undefined)
+  if (!parent) return undefined
+  const title = String(router.resolve({ name: parent }).meta.title ?? parent)
+  return { name: parent, title: parent === 'admin-records' ? recordLabel.plural.value : title }
 })
 export type Asset = RouterOutput["asset"]["tree"][number]
 
@@ -148,6 +153,10 @@ const storageLevel = computed(() => {
               <FilePenLine class="w-4 h-4 mr-2" />
               Collections
               <span v-if="orphans?.length" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums" :title="`${orphans.length} orphaned collection${orphans.length === 1 ? '' : 's'}`">{{ orphans.length }}</span>
+            </router-link>
+            <router-link :to="{ name: 'admin-product-collections' }" class="menu-item">
+              <PackageSearch class="w-4 h-4 mr-2" />
+              {{ recordLabel.plural.value }} collections
             </router-link>
             <router-link :to="{ name: 'admin-pages' }" class="menu-item">
               <FilePenLine class="w-4 h-4 mr-2" />
@@ -239,7 +248,19 @@ const storageLevel = computed(() => {
       </div>
     </aside>
     <div class="admin-workspace">
-      <header class="admin-topbar"><button v-if="sidebarHidden" type="button" class="sidebar-toggle sidebar-toggle--topbar" aria-label="Show menu" title="Show menu" aria-controls="admin-navigation" aria-expanded="false" @click="sidebarHidden = false"><PanelLeftOpen /></button><PathBreadcrumb :items="adminBreadcrumbItems" /><router-link :to="{ name: 'home' }" class="dv-button">Open your DAM <SquareChevronLeft /></router-link></header>
+      <header class="admin-topbar">
+        <button v-if="sidebarHidden" type="button" class="sidebar-toggle sidebar-toggle--topbar" aria-label="Show menu" title="Show menu" aria-controls="admin-navigation" aria-expanded="false" @click="sidebarHidden = false"><PanelLeftOpen /></button>
+        <div class="admin-topbar-title">
+          <template v-if="pageParent"><router-link :to="{ name: pageParent.name }" class="admin-topbar-parent">{{ pageParent.title }}</router-link><ChevronRight class="admin-topbar-separator" aria-hidden="true" /></template>
+          <h1 :title="pageTitle">{{ pageTitle }}</h1>
+          <Popover v-if="pageHeading.description">
+            <PopoverTrigger class="admin-topbar-info" :aria-label="`About ${pageTitle}`"><Info /></PopoverTrigger>
+            <PopoverContent align="start" class="admin-topbar-about">{{ pageHeading.description }}</PopoverContent>
+          </Popover>
+        </div>
+        <div id="admin-topbar-actions" class="admin-actions"></div>
+        <router-link :to="{ name: 'home' }" class="admin-topbar-exit" aria-label="Close the administration" title="Close the administration"><X /></router-link>
+      </header>
       <div v-if="showStorageBanner && storage" role="status" class="storage-banner flex items-center gap-2 px-8 py-2 text-body"
         :class="storagePercent >= 90 ? 'storage-banner--danger' : 'storage-banner--warning'">
         <HardDrive class="w-4 h-4" />
@@ -300,9 +321,22 @@ const storageLevel = computed(() => {
 #admin-content:focus { outline:none; }
 .skip-link { position:absolute; top:8px; left:8px; z-index:100; padding:8px 12px; background:white; color:var(--dv-text-primary); font-size:var(--dv-size-body); transform:translateY(-200%); }
 .skip-link:focus { transform:none; }
-.admin-topbar { min-height:65px; padding:12px 36px; display:flex; align-items:center; justify-content:space-between; gap:16px; background:white; border-bottom:1px solid var(--dv-color-line); font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
-.admin-topbar > :deep(.dv-breadcrumb) { flex:1; min-width:0; }
-.admin-topbar .dv-button { font-size:var(--dv-size-caption); }
+.admin-topbar { min-height:57px; padding:8px 28px; display:flex; align-items:center; gap:12px; background:white; border-bottom:1px solid var(--dv-color-line); color:var(--dv-text-secondary); }
+.admin-topbar-title { display:flex; flex:1; align-items:center; gap:6px; min-width:0; }
+.admin-topbar-title h1 { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--dv-text-primary); font-size:var(--dv-size-page-title); font-weight:600; letter-spacing:-.015em; }
+.admin-topbar-parent { flex:none; max-width:30%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--dv-size-page-title); }
+.admin-topbar-parent:hover { color:var(--dv-text-primary); }
+.admin-topbar-separator { flex:none; width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
+.admin-topbar-info { display:grid; flex:none; place-items:center; width:28px; height:28px; border-radius:var(--dv-radius-data); color:var(--dv-text-secondary); }
+.admin-topbar-info:hover, .admin-topbar-info[data-state=open] { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
+.admin-topbar-info > svg { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
+:global(.admin-topbar-about) { width:min(360px, calc(100vw - 32px)); font-size:var(--dv-size-body); line-height:1.55; color:var(--dv-text-secondary); }
+.admin-topbar > .admin-actions { align-items:center; }
+.admin-topbar > .admin-actions:empty { display:none; }
+.admin-topbar-exit { display:grid; flex:none; place-items:center; width:36px; height:36px; margin-left:4px; border-radius:var(--dv-radius-data); }
+.admin-topbar-exit:hover { background:var(--dv-surface-canvas); color:var(--dv-text-primary); }
+.admin-topbar-exit > svg { width:var(--dv-icon-default); height:var(--dv-icon-default); }
+.admin-topbar a:focus-visible, .admin-topbar-info:focus-visible { outline:2px solid var(--dv-color-line); outline-offset:2px; }
 .mobile-nav-toggle { display:none; }
 @media(max-width:760px) {
  .admin-shell { height:auto; min-height:100dvh; display:block; overflow:visible; }
@@ -312,7 +346,8 @@ const storageLevel = computed(() => {
  .admin-sidebar { display:none; width:100%; }
  .admin-sidebar.is-open { display:flex; }
  .admin-nav { overflow:visible; }
- .admin-topbar { padding:12px 20px; }
+ .admin-topbar { flex-wrap:wrap; padding:10px 20px; }
+ .admin-topbar > .admin-actions { order:3; width:100%; }
  .admin-workspace { display:block; overflow-x:clip; overflow-y:visible; }
  .admin-workspace > #admin-content { overflow:visible; }
 }

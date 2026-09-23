@@ -111,11 +111,11 @@ test('the list searches every value, filters, sorts numbers as numbers and count
     await make('LST-2', { bf_name: 'Beta', price: '10', tags: 'Sale|New' })
     const broken = await make('LST-3', { bf_name: 'Gamma' })
     await db.query(`UPDATE records SET meta_data = meta_data || 'price=>n/a'::hstore WHERE id = $1`, [broken])
-    const list = input => admin.record.list({ page: 1, size: 50, filters: [{ column: 'recordKey', op: 'contains', value: 'LST-' }], ...input })
+    const list = input => admin.record.list({ offset: 0, limit: 50, filters: [{ column: 'recordKey', op: 'contains', value: 'LST-' }], ...input })
     const keys = result => result.records.map(r => r.recordKey)
 
-    assert.deepEqual(keys(await admin.record.list({ page: 1, size: 50, search: 'beta' })), ['LST-2'])
-    assert.deepEqual(keys(await admin.record.list({ page: 1, size: 50, search: '%' })), [])
+    assert.deepEqual(keys(await admin.record.list({ offset: 0, limit: 50, search: 'beta' })), ['LST-2'])
+    assert.deepEqual(keys(await admin.record.list({ offset: 0, limit: 50, search: '%' })), [])
     assert.deepEqual(keys(await list({ sort: { column: 'price', direction: 'asc' } })), ['LST-1', 'LST-2', 'LST-3'])
     assert.deepEqual(keys(await list({ sort: { column: 'price', direction: 'desc' } })), ['LST-2', 'LST-1', 'LST-3'])
     assert.deepEqual(keys(await list({ sort: { column: 'recordKey', direction: 'desc' } })), ['LST-3', 'LST-2', 'LST-1'])
@@ -130,12 +130,13 @@ test('the list searches every value, filters, sorts numbers as numbers and count
     assert.equal(all.keyColumnName, 'SKU')
     await rejects(list({ sort: { column: "x') OR true --", direction: 'asc' } }), 'BAD_REQUEST')
     await rejects(list({ filters: [{ column: 'nope', op: 'is', value: 'x' }] }), 'BAD_REQUEST')
-    const page = await admin.record.list({ page: 2, size: 1, filters: [{ column: 'recordKey', op: 'contains', value: 'LST-' }] })
+    const page = await admin.record.list({ offset: 1, limit: 1, filters: [{ column: 'recordKey', op: 'contains', value: 'LST-' }] })
     assert.deepEqual([page.total, keys(page)], [3, ['LST-2']])
 
     const lst = [{ column: 'recordKey', op: 'contains', value: 'LST-' }]
     const locate = input => admin.record.locate({ filters: lst, ...input })
-    assert.deepEqual(await locate({ recordKey: 'LST-3', sort: { column: 'recordKey', direction: 'desc' } }), { id: broken, position: 0 })
+    const firstTable = (await admin.recordTable.list())[0].id
+    assert.deepEqual(await locate({ recordKey: 'LST-3', sort: { column: 'recordKey', direction: 'desc' } }), { id: broken, tableId: firstTable, position: 0 })
     assert.equal((await locate({ recordKey: 'LST-1', sort: { column: 'price', direction: 'desc' } })).position, 1)
     assert.equal((await locate({ recordKey: 'LST-2', sort: { column: 'fileCount', direction: 'asc' } })).position, 1)
     assert.equal((await locate({ recordKey: 'LST-1', search: 'beta' })).position, null, 'a record the search leaves out has no position')
@@ -149,7 +150,7 @@ test('bulk edits and removals write one history row per record and leave links d
     assert.deepEqual(await admin.record.bulkPatch({ ids: [a.id, b.id], values: { colour: 'Red' } }), { updated: 0 })
     assert.deepEqual((await changesOf('BLK-1')).map(c => [c.action, c.source]), [['create', 'grid'], ['update', 'bulk']])
 
-    const record = (await admin.record.list({ page: 1, size: 1, search: 'NEW-1' })).records[0]
+    const record = (await admin.record.list({ offset: 0, limit: 1, search: 'NEW-1' })).records[0]
     const link = await db.getRepository(AssetEntityLink).findOneByOrFail({ recordKey: 'NEW-1' })
     assert.deepEqual(await admin.record.remove({ ids: [record.id] }), { removed: 1 })
     assert.equal((await db.getRepository(AssetEntityLink).findOneByOrFail({ id: link.id })).status, 'dangling')
@@ -194,22 +195,23 @@ test('a CSV import creates text fields, learns select options, skips invalid row
         { SKU: 'BLK-2', colour: 'Red' },
         { SKU: ' ', bf_name: 'No key' },
     ]
-    const compared = await admin.record.compareCsv({ keyColumnName: 'SKU', data })
+    const tableId = (await admin.recordTable.list())[0].id
+    const compared = await admin.record.compareCsv({ tableId, keyColumnName: 'SKU', data })
     assert.deepEqual(compared.newColumns, ['csv_new'])
     assert.deepEqual(compared.newOptions, { colour: ['Green'] })
     assert.deepEqual(compared.rows.map(row => row.status), ['new', 'invalid', 'changed', 'unchanged', 'missing_key'])
     assert.match(compared.rows[1].invalid.price, /must be a number/)
 
-    const imported = await admin.record.importCsv({ keyColumnName: 'SKU', data })
+    const imported = await admin.record.importCsv({ tableId, keyColumnName: 'SKU', data })
     assert.deepEqual([imported.newRecords, imported.updatedRecords], [['CSV-1'], ['BLK-1']])
     assert.deepEqual(imported.skipped.map(s => [s.key, s.column]), [['CSV-2', 'price']])
     assert.equal((await field('csv_new')).valueType, 'text')
     assert.deepEqual((await field('colour')).options, ['Red', 'Blue', 'Green'])
     const batch = (await db.getRepository(RecordChange).findBy({ importBatchId: imported.importBatchId })).map(c => [c.recordKey, c.action, c.source]).sort()
     assert.deepEqual(batch, [['BLK-1', 'update', 'csv'], ['CSV-1', 'create', 'csv']])
-    const untouched = (await admin.record.list({ page: 1, size: 1, search: 'BLK-2' })).records[0]
+    const untouched = (await admin.record.list({ offset: 0, limit: 1, search: 'BLK-2' })).records[0]
     assert.equal('csv_new' in untouched.metaData, false)
-    assert.equal((await admin.record.list({ page: 1, size: 1, search: 'CSV-2' })).total, 0)
+    assert.equal((await admin.record.list({ offset: 0, limit: 1, search: 'CSV-2' })).total, 0)
 })
 
 test('fields change type, seed their options, reorder, and take their values with them when removed', async () => {
@@ -247,6 +249,75 @@ test('an export follows the filters and keeps the key first', async () => {
     assert.equal(exported.rows[0][exported.columns.indexOf('price')], '9')
 })
 
+test('the upgrade puts every record and field in one first table named after the records', async () => {
+    const [table, ...others] = await admin.recordTable.list()
+    assert.equal(others.length, 0)
+    assert.equal(table.name, 'Products')
+    const [{ missing }] = await db.query('SELECT count(*)::int AS missing FROM records WHERE table_id IS DISTINCT FROM $1', [table.id])
+    assert.equal(missing, 0)
+    const fields = await admin.recordAttribute.list()
+    assert.deepEqual(new Set(table.fieldIds), new Set(fields.map(f => f.id)))
+})
+
+test('tables organise records: names stay unique, lists, imports and moves follow the table, fields stay shared', async () => {
+    const [main] = await admin.recordTable.list()
+    const shoes = await admin.recordTable.create({ name: 'Shoes' })
+    const again = await admin.recordTable.create({ name: 'shoes' })
+    assert.deepEqual([shoes.name, again.name, (await admin.recordTable.create({ name: 'Shoes' })).name], ['Shoes', 'shoes (1)', 'Shoes (2)'])
+    await rejects(admin.recordTable.rename({ id: again.id, name: 'Shoes' }), 'CONFLICT')
+
+    const colour = await field('colour')
+    const size = await admin.recordAttribute.create({ name: 'shoe_size', displayName: null, facetable: false, viewable: true, searchable: false, tableId: shoes.id })
+    const tables = await admin.recordTable.list()
+    const byId = id => tables.find(t => t.id === id)
+    assert.deepEqual(byId(shoes.id).fieldIds, [size.id], 'a field made from a table shows in that table only')
+    assert.ok(!byId(main.id).fieldIds.includes(size.id))
+
+    const data = [{ SKU: 'SHO-1', colour: 'Red', shoe_size: '42' }, { SKU: 'SHO-2', colour: 'Blue' }, { SKU: 'LST-1', colour: 'Red' }]
+    const compared = await admin.record.compareCsv({ tableId: shoes.id, keyColumnName: 'SKU', data })
+    assert.deepEqual(compared.rows.map(row => row.otherTable), [null, null, main.name])
+    const imported = await admin.record.importCsv({ tableId: shoes.id, keyColumnName: 'SKU', data })
+    assert.deepEqual(imported.newRecords, ['SHO-1', 'SHO-2'])
+    assert.deepEqual((await admin.recordTable.list()).find(t => t.id === shoes.id).fieldIds, [size.id, colour.id], 'an import shows the shared fields it maps')
+
+    const keys = result => result.records.map(r => r.recordKey).sort()
+    assert.deepEqual(keys(await admin.record.list({ tableId: shoes.id, offset: 0, limit: 50 })), ['SHO-1', 'SHO-2'])
+    assert.deepEqual(keys(await admin.record.list({ tableId: shoes.id, offset: 0, limit: 50, filters: [{ column: 'colour', op: 'is', value: 'Red' }] })), ['SHO-1'])
+    const red = await admin.record.list({ offset: 0, limit: 50, filters: [{ column: 'colour', op: 'is', value: 'Red' }, { column: 'recordKey', op: 'contains', value: 'LST-1' }] })
+    assert.equal(red.records[0].tableId, main.id, 'a key already in another table is updated where it is')
+    assert.equal((await admin.record.list({ tableId: shoes.id, offset: 0, limit: 1 })).records[0].filledCount <= 2, true)
+    assert.deepEqual((await admin.record.exportRows({ tableId: shoes.id })).columns, ['SKU', 'shoe_size', 'colour'])
+
+    const located = await admin.record.locate({ recordKey: 'SHO-2', tableId: main.id, sort: { column: 'recordKey', direction: 'asc' } })
+    assert.deepEqual([located.tableId, located.position], [shoes.id, 1], 'locate answers in the table the record is in')
+
+    const lst = red.records[0]
+    assert.deepEqual(await admin.record.moveToTable({ ids: [lst.id], tableId: shoes.id }), { moved: 1 })
+    assert.deepEqual(await admin.record.moveToTable({ ids: [lst.id], tableId: shoes.id }), { moved: 0 })
+    const moved = (await changesOf('LST-1')).at(-1)
+    assert.deepEqual([moved.action, moved.changes], ['move', { table: { old: main.name, new: 'Shoes' } }])
+    await rejects(admin.record.moveToTable({ ids: [lst.id], tableId: '00000000-0000-4000-8000-000000000000' }), 'NOT_FOUND')
+
+    const created = await admin.record.create({ recordKey: 'SHO-3', tableId: again.id })
+    assert.equal(created.tableId, again.id)
+    await admin.recordTable.setFieldTables({ fieldId: colour.id, tableIds: [again.id, main.id] })
+    const after = await admin.recordTable.list()
+    assert.ok(after.find(t => t.id === again.id).fieldIds.includes(colour.id))
+    assert.ok(!after.find(t => t.id === shoes.id).fieldIds.includes(colour.id))
+    assert.deepEqual((await admin.recordTable.setFields({ id: shoes.id, fieldIds: [colour.id, size.id] })).find(t => t.id === shoes.id).fieldIds, [colour.id, size.id])
+
+    await rejects(admin.recordTable.remove({ id: again.id }), 'BAD_REQUEST')
+    await admin.recordTable.remove({ id: again.id, moveTo: shoes.id })
+    assert.equal((await admin.record.get(created.id)).tableId, shoes.id)
+    const ids = (await admin.recordTable.list()).map(t => t.id).reverse()
+    assert.deepEqual((await admin.recordTable.reorder({ ids })).map(t => t.id), ids)
+
+    assert.deepEqual(await admin.record.removeAll({ tableId: shoes.id }), { removed: 4 })
+    assert.ok((await admin.record.list({ offset: 0, limit: 1 })).total > 0, 'other tables keep their records')
+    for (const table of (await admin.recordTable.list()).filter(t => t.id !== main.id)) await admin.recordTable.remove({ id: table.id, moveTo: main.id })
+    await rejects(admin.recordTable.remove({ id: main.id }), 'BAD_REQUEST')
+})
+
 test('Unmatched creates records through the same path and with history', async () => {
     await admin.entityResolution.createRecord({ key: 'UNM-1' })
     const [created] = await changesOf('UNM-1')
@@ -254,10 +325,11 @@ test('Unmatched creates records through the same path and with history', async (
 })
 
 test('every record and field procedure needs an approved admin', async () => {
-    const { id } = (await admin.record.list({ page: 1, size: 1 })).records[0]
+    const { id } = (await admin.record.list({ offset: 0, limit: 1 })).records[0]
     const attribute = (await admin.recordAttribute.list())[0]
+    const table = (await admin.recordTable.list())[0]
     const calls = [
-        c => c.record.list({ page: 1, size: 1 }),
+        c => c.record.list({ offset: 0, limit: 1 }),
         c => c.record.get(id),
         c => c.record.locate({ recordKey: 'LST-1' }),
         c => c.record.create({ recordKey: 'SEC-1' }),
@@ -268,8 +340,16 @@ test('every record and field procedure needs an approved admin', async () => {
         c => c.record.removeAll(),
         c => c.record.history({ id }),
         c => c.record.exportRows({}),
-        c => c.record.compareCsv({ keyColumnName: 'SKU', data: [] }),
-        c => c.record.importCsv({ keyColumnName: 'SKU', data: [] }),
+        c => c.record.compareCsv({ tableId: table.id, keyColumnName: 'SKU', data: [] }),
+        c => c.record.importCsv({ tableId: table.id, keyColumnName: 'SKU', data: [] }),
+        c => c.record.moveToTable({ ids: [id], tableId: table.id }),
+        c => c.recordTable.list(),
+        c => c.recordTable.create({ name: 'sec' }),
+        c => c.recordTable.rename({ id: table.id, name: 'sec' }),
+        c => c.recordTable.reorder({ ids: [table.id] }),
+        c => c.recordTable.setFields({ id: table.id, fieldIds: [] }),
+        c => c.recordTable.setFieldTables({ fieldId: attribute.id, tableIds: [] }),
+        c => c.recordTable.remove({ id: table.id }),
         c => c.recordAttribute.create({ name: 'sec', displayName: null, facetable: false, viewable: false, searchable: false }),
         c => c.recordAttribute.update({ id: attribute.id, displayName: 'x' }),
         c => c.recordAttribute.reorder({ ids: [attribute.id] }),

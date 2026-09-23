@@ -15,6 +15,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRender from "@/components/collection/CollectionRender.vue"
 import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
+import BlockProducts from "@/components/page-renderer/blocks/BlockProducts.vue"
+import { useRecordLabel } from "@/composables/useRecordLabel"
+import type { EditorBlock } from "@/components/page-renderer/types"
 import PageRenderer from "@/components/page-renderer/PageRenderer.vue"
 import { usePageFilter } from "@/composables/usePageFilter"
 import { RouterOutput } from "@/services/server.ts"
@@ -30,14 +33,23 @@ const props = defineProps<{
   generateRoute: (collection: Collection) => RouteLocationRaw
 }>()
 
+const { plural } = useRecordLabel()
+const personal = computed(() => !props.collection.public && !!props.collection.ownerId && !props.collection.synchronized)
+const blocks = computed<EditorBlock[]>(() => props.collection.page?.blocks ?? [])
+const missingProducts = computed(() => !blocks.value.some(block => block.type === 'products' && (!block.data.collectionId || block.data.collectionId === props.collection.id)))
+const missingFiles = computed(() => !blocks.value.some(block => block.type === 'files' && (!block.data.collectionId || block.data.collectionId === props.collection.id)))
+const missingCollections = computed(() => !blocks.value.some(block => block.type === 'collections'))
+const showProducts = computed(() => (props.collection.numberOfRecords > 0 || props.collection.includesAllRecords) && (!props.collection.page || (personal.value && missingProducts.value)))
+
 const childrenCollections = computed<Collection[]>(() => props.collection.children)
 
 // A section whose every item is filtered out goes away, heading included, so the
 // page does not keep a title over nothing.
 const pageFilter = usePageFilter()
-const showCollections = computed(() => !!childrenCollections.value?.length &&
+const showCollections = computed(() => (!props.collection.page || (personal.value && missingCollections.value)) && !!childrenCollections.value?.length &&
   (!pageFilter.isActive.value || childrenCollections.value.some(collection => matchesCollection(collection, pageFilter.state.value))))
-const showFiles = computed(() => !!props.collection?.files &&
+const showFiles = computed(() => (!props.collection.page || (personal.value && missingFiles.value && !!props.collection.files?.length)) && !!props.collection?.files &&
+  (!!props.collection.files.length || (!showProducts.value && !childrenCollections.value?.length)) &&
   (!pageFilter.isActive.value || props.collection.files.some((file: File) => matchesFile(file, pageFilter.state.value))))
 
 const getGlobalAssetType = computed(() => {
@@ -55,10 +67,14 @@ const getGlobalAssetType = computed(() => {
 <template>
   <PageRenderer v-if="collection.page" :blocks="collection.page.blocks ?? []" :assets="collection.page.assets"
     :collection="collection" :generate-route="generateRoute" />
-  <div v-else class="collection-layout-renderer__container flex flex-col gap-8 mb-6">
+  <div v-if="showCollections || showProducts || showFiles" class="collection-layout-renderer__container flex flex-col gap-8 mb-6" :class="{ 'mt-8': collection.page }">
     <div v-if="showCollections">
       <div class="mb-4 text-[12px] font-semibold text-neutral-500">Collections</div>
       <CollectionRender :collections="childrenCollections" :generate-route="generateRoute" />
+    </div>
+    <div v-if="showProducts">
+      <div class="mb-4 text-[12px] font-semibold text-neutral-500">{{ plural }}</div>
+      <BlockProducts :data="{ title: '', layout: null, collectionId: null }" :collection="collection" />
     </div>
     <div v-if="showFiles">
       <div class="mb-4 text-[12px] font-semibold text-neutral-500">

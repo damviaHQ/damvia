@@ -51,7 +51,7 @@ const { data: menuItems, status, error } = useQuery({
           @update:modelValue="isAdminDialogCreateCollectionOpen = $event" />
       </AdminPageHeader>
       <div class="dv-panel admin-menu-tree">
-        <p class="admin-form-note">Drag items to change their order, or use Move up and Move down in an item’s menu. Open an item’s menu to edit it or set the home page.</p>
+        <p class="admin-form-note">Drag items to change their order, or use Move up and Move down in an item’s menu. Use Move to… in an item’s menu to choose another parent. Automatic entries follow their collection hierarchy.</p>
         <div v-if="!menuItems?.length" class="admin-empty"><h2>No menu items yet</h2><p>Add a collection, page or link to your navigation.</p></div>
         <items-tree :items="menuItems" />
       </div>

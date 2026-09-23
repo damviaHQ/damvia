@@ -414,3 +414,40 @@ test('a page uses the room it is given rather than a fixed width', async ({ page
   expect(read).toBeGreaterThan(1200)
   expect(errors).toEqual([])
 })
+
+
+test('the Products source excludes file-only collections and keeps nested catalogues reachable', async ({ page }) => {
+  const productsBlock = { ...filesBlock, id: 'block-products', type: 'products' }
+  const { saves, errors } = await fixture(page, { blocks: [productsBlock, filesBlock] })
+  await page.route('**/trpc/collection.tree*', route => route.fulfill({ json: { result: { data: [
+    { id: 'files-only', name: 'File-only source', catalogueMode: 'files', numberOfRecords: 0, children: [] },
+    { id: 'folder', name: 'Catalogue folder', catalogueMode: 'files', numberOfRecords: 0, children: [
+      { id: 'winter', name: 'Winter products', catalogueMode: 'products', numberOfRecords: 0, children: [] },
+    ] },
+    { id: 'mixed', name: 'Mixed source', catalogueMode: 'both', numberOfRecords: 0, children: [] },
+    { id: 'personal', name: 'Personal products', catalogueMode: 'files', numberOfRecords: 2, children: [] },
+  ] } } }))
+  await page.route('**/trpc/catalogue.list*', route => route.fulfill({ json: { result: { data: { products: [], total: 0, fields: [], cardTitleField: null } } } }))
+  await page.goto('/collections/campaign/edit')
+  const block = page.locator('[data-block-index="0"]')
+  await block.hover()
+  await block.getByRole('button', { name: 'Block settings' }).click()
+  const panel = page.getByRole('dialog')
+  await panel.locator('.vue-treeselect__control').click()
+  await expect(panel.getByText('File-only source', { exact: true })).toHaveCount(0)
+  await expect(panel.getByText('Mixed source', { exact: true })).toBeVisible()
+  await expect(panel.getByText('Personal products', { exact: true })).toBeVisible()
+  await expect(panel.locator('.vue-treeselect__option--disabled').filter({ hasText: 'Catalogue folder' })).toBeVisible()
+  await panel.locator('.vue-treeselect__option').filter({ hasText: 'Catalogue folder' }).locator('.vue-treeselect__option-arrow-container').click()
+  await panel.getByText('Winter products', { exact: true }).click()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect.poll(() => saves.at(-1)?.blocks[0].data.collectionId).toBe('winter')
+
+  const files = page.locator('[data-block-index="1"]')
+  await files.hover()
+  await files.getByRole('button', { name: 'Block settings' }).click()
+  await panel.locator('.vue-treeselect__control').click()
+  await expect(panel.getByText('File-only source', { exact: true })).toBeVisible()
+  expect(errors).toEqual([])
+})

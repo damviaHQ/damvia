@@ -44,6 +44,7 @@ test('empty My collections is a keyboard-accessible destination with a working c
   await page.screenshot({ path: '/tmp/damvia-my-collections-empty.png' })
   await page.getByRole('button', { name: 'Create your first collection', exact: true }).click()
   const dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel('What this collection holds')).toHaveCount(0)
   await dialog.getByLabel('Collection name', { exact: true }).fill('Launch shortlist')
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(page).toHaveURL(/\/collections\/created$/)

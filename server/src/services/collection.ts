@@ -150,9 +150,10 @@ export async function syncCollectionMenuItems(em: EntityManager, collection: Col
 
 	const section = collection.parentId ? null : await defaultMenuSection(em)
 	if (!collection.parentId) {
+		// A root's existing link may have been placed anywhere in the menu.
+		// Respect that location instead of recreating it in the default section.
 		const count = await em.getRepository(MenuItem).countBy({
 			collectionId: collection.id,
-			parentId: section ? section.id : IsNull(),
 		})
 		if (count > 0) {
 			return []

@@ -62,6 +62,52 @@ export function readCsv(file: File): Promise<CsvFile> {
   })
 }
 
+export type WorkbookSheet = { name: string, csv: CsvFile | null, error: string | null }
+type SheetCell = string | number | boolean | Date | null | undefined | ((...args: never[]) => unknown)
+
+// A date cell becomes a day, as date fields store it; a date with a time
+// keeps the time.
+export function cellText(value: SheetCell): string {
+  if (value == null) return ""
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return ""
+    const iso = value.toISOString()
+    return iso.endsWith("T00:00:00.000Z") ? iso.slice(0, 10) : iso.slice(0, 19).replace("T", " ")
+  }
+  return typeof value === "function" ? "" : String(value)
+}
+
+// A sheet read like a CSV: the first row with a value names the columns.
+export function sheetToCsv(name: string, data: SheetCell[][]): WorkbookSheet {
+  const start = data.findIndex((row) => row.some((cell) => cellText(cell).trim() !== ""))
+  if (start < 0) return { name, csv: null, error: "The sheet is empty." }
+  const header = data[start].map((cell) => cellText(cell))
+  const rows = data.slice(start + 1).map((row) => Object.fromEntries(header.map((column, index) => [column, cellText(row[index])])))
+  const csv = cleanCsv(name, header, rows)
+  if (!csv.columns.length) return { name, csv: null, error: "The sheet has no header row." }
+  if (!csv.rows.length) return { name, csv: null, error: "The sheet has a header row but no data under it." }
+  return { name, csv, error: null }
+}
+
+// Every sheet of an Excel workbook, in order.
+export async function readWorkbook(file: File): Promise<WorkbookSheet[]> {
+  const { default: readExcelFile } = await import("read-excel-file/browser")
+  const sheets = await readExcelFile(file)
+  return sheets.map((sheet) => sheetToCsv(sheet.sheet, sheet.data as SheetCell[][]))
+}
+
+// "Shoes", then "Shoes (1)", "Shoes (2)"… when the name is taken, as the
+// server names a new table.
+export function uniqueTableName(name: string, taken: string[]): string {
+  const names = new Set(taken.map((item) => item.toLowerCase()))
+  const base = name.trim() || "Table"
+  if (!names.has(base.toLowerCase())) return base
+  for (let n = 1; ; n++) {
+    const candidate = `${base} (${n})`
+    if (!names.has(candidate.toLowerCase())) return candidate
+  }
+}
+
 export function sampleValues(rows: Record<string, string>[], column: string, count = 3): string[] {
   const samples: string[] = []
   for (const row of rows) {

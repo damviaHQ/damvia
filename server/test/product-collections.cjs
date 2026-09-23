@@ -291,10 +291,9 @@ test('turning the same collection into a catalogue twice at once does not race',
     const { Page } = require('../dist/entity/page')
     const { PageBlock } = require('../dist/entity/page-block')
     const collection = await makeCollection({ name: 'Raced', catalogueMode: 'products' })
-    const [a, b] = await Promise.all([
-        db.transaction(em => createCataloguePage(em, collection)),
-        db.transaction(em => createCataloguePage(em, collection)),
-    ])
+    const pages = await Promise.all(Array.from({ length: 8 }, () => db.transaction(em => createCataloguePage(em, collection))))
+    const [a, b] = pages
+    assert.equal(new Set(pages.map(page => page.id)).size, 1)
     assert.equal(a.id, b.id)
     assert.equal(await db.getRepository(Page).countBy({ collectionId: collection.id }), 1)
     assert.equal(await db.getRepository(PageBlock).countBy({ pageId: a.id }), 1)
@@ -367,9 +366,50 @@ test('everything short of ready leaves the catalogue in one move', async () => {
     await db.transaction(em => addRecords(em, collection.id, all))
     await db.query(`UPDATE records SET readiness_ready = false WHERE record_key = ANY($1::text[])`, [['PC-2', 'PC-3']])
 
+    const preview = await admin.collection.recordPreview({ id: collection.id, offset: 0, limit: 1 })
+    assert.equal(preview.rows.length, 1)
+    assert.equal(preview.total, 3)
+    assert.equal(preview.included, 3)
+    assert.equal(preview.notReady, 2)
     assert.equal(await admin.collection.excludeNotReadyRecords({ id: collection.id }), 2)
     assert.equal(await numberOfRecords(collection.id), 1)
     // Running it again has nothing left to take out.
     assert.equal(await admin.collection.excludeNotReadyRecords({ id: collection.id }), 0)
     await db.query(`UPDATE records SET readiness_ready = true WHERE record_key = ANY($1::text[])`, [['PC-2', 'PC-3']])
+})
+
+test('adding products to a collection with a custom page appends a products block without replacing its content', async () => {
+    const { Page } = require('../dist/entity/page')
+    const { PageBlock } = require('../dist/entity/page-block')
+    const collection = await makeCollection({ name: 'Custom catalogue' })
+    const page = await harness.save(Page, { collectionId: collection.id })
+    const text = await harness.save(PageBlock, { pageId: page.id, type: 'text', position: 0, size: 'full', data: { html: '<p>Introduction</p>' } })
+    await admin.collection.addItems({ id: collection.id, items: [{ type: 'record', id: await recordId('PC-1') }] })
+    const blocks = await db.getRepository(PageBlock).find({ where: { pageId: page.id }, order: { position: 'ASC' } })
+    assert.deepEqual(blocks.map(block => block.type), ['text', 'products'])
+    assert.equal(blocks[0].id, text.id)
+    assert.equal(blocks[0].data.html, '<p>Introduction</p>')
+})
+
+
+test('a personal collection accepts products and files in either order without choosing a type', async () => {
+    const { Page } = require('../dist/entity/page')
+    const folder = await harness.makeFolder({ name: 'Personal collection files' })
+    const file = await harness.makeFile(folder, { name: 'personal.jpg' })
+    const library = await makeCollection({ name: 'Personal collection source' })
+    const source = await harness.save(harness.entities.CollectionFile, { collectionId: library.id, assetFileId: file.id })
+    const product = await recordId('PC-1')
+    await db.transaction(em => addRecords(em, library.id, [product]))
+    const member = caller(fixtures.member)
+    for (const order of ['record', 'file']) {
+        const collection = await member.collection.createUserCollection({ name: `Personal ${order} first` })
+        const items = [{ type: 'record', id: product }, { type: 'file', id: source.id }]
+        if (order === 'file') items.reverse()
+        for (const item of items) await member.collection.addItems({ id: collection.id, items: [item] })
+        const saved = await member.collection.findById(collection.id)
+        assert.equal(saved.numberOfRecords, 1)
+        assert.equal(saved.files.length, 1)
+        assert.equal((await member.catalogue.list({ collectionId: collection.id, offset: 0, limit: 10 })).total, 1)
+        assert.equal(await db.getRepository(Page).countBy({ collectionId: collection.id }), 0, 'the contents use the automatic layout')
+    }
 })

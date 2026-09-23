@@ -27,12 +27,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useFileFavorites } from "@/composables/useFileFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { getFileExtension } from "@/utils/fileExtention.ts"
 import { formatFileSize } from "@/utils/fileSize.ts"
-import { useQuery, useQueryClient } from "@tanstack/vue-query"
+import { useQueryClient } from "@tanstack/vue-query"
 import {
   createColumnHelper,
   createSortedRowModel,
@@ -68,10 +69,12 @@ const hoveredRowId = ref<string | null>(null)
 const copiedCellId = ref<string | null>(null)
 
 const haveAccessToFavorites = globalStore.user?.role !== "guest"
-const { data: favorites } = useQuery({
-  queryKey: ["favorites"],
-  queryFn: () => trpc.favorite.list.query(),
-})
+const {
+  isFavorite,
+  toggle: toggleFavorite,
+  isSaving: isSavingFavorite,
+  isSuccess: favoritesReady,
+} = useFileFavorites()
 
 const removable = computed(
   () => props.collection?.canEdit && !props.collection.synchronized
@@ -87,10 +90,6 @@ function isFileSelected(file: File) {
   return globalStore.selection.some(
     (selection) => selection.type === "file" && selection.id === file.id
   )
-}
-
-function isFavorite(file: File) {
-  return favorites.value?.some((favorite) => favorite.id === file.id)
 }
 
 function toggleGlobalSelection() {
@@ -117,24 +116,6 @@ function handleSelection(file: File) {
     return
   }
   globalStore.addToSelection({ id: file.id, type: "file" })
-}
-
-async function addToFavorite(file: File) {
-  try {
-    await trpc.favorite.add.mutate({ collectionFileId: file.id })
-    await queryClient.invalidateQueries({ queryKey: ["favorites"] })
-  } catch (error) {
-    toast.error((error as Error).message)
-  }
-}
-
-async function removeFromFavorite(file: File) {
-  try {
-    await trpc.favorite.remove.mutate({ collectionFileId: file.id })
-    await queryClient.invalidateQueries({ queryKey: ["favorites"] })
-  } catch (error) {
-    toast.error((error as Error).message)
-  }
 }
 
 async function remove(file: File) {
@@ -354,17 +335,20 @@ const table = useTable<typeof features, File>({
               <div class="collection-list-files__actions-container flex items-center justify-end [background-color:inherit] gap-2">
                 <template v-if="haveAccessToFavorites">
                   <div v-if="isFavorite(cell.row.original)" class="favorite-button-container relative inline-flex items-center justify-center w-6 h-6 [&:hover_.file-is-favorite]:opacity-0 [&:hover_.star-off-button]:opacity-100">
-                    <Button @click="removeFromFavorite(cell.row.original)" type="button" variant="ghost" size="icon"
+                    <Button @click="toggleFavorite(cell.row.original)" type="button" variant="ghost" size="icon"
+                      :disabled="isSavingFavorite(cell.row.original.id) || !favoritesReady" :aria-pressed="true"
                       :aria-label="`Remove ${cell.row.original.name} from favorites`"
                       class="collection-list-files__button border-0 [background:initial] opacity-0 [transition:opacity_0.2s_ease-in-out,_color_0.2s_ease-in-out] flex items-center justify-center w-6 h-6 [&.visible-on-hover]:opacity-0 [&.file-is-favorite]:opacity-100 file-is-favorite">
                       <Star class="w-5 h-5 text-[var(--dv-selection-color)] hover:text-neutral-800" />
                     </Button>
-                    <button @click="removeFromFavorite(cell.row.original)" type="button" tabindex="-1" aria-hidden="true"
-                      class="collection-list-files__button border-0 [background:initial] opacity-0 [transition:opacity_0.2s_ease-in-out,_color_0.2s_ease-in-out] flex items-center justify-center w-6 h-6 [&.visible-on-hover]:opacity-0 [&.file-is-favorite]:opacity-100 star-off-button absolute top-0 left-0 opacity-0 [transition:opacity_0.2s_ease-in-out] w-full h-full">
+                    <button @click="toggleFavorite(cell.row.original)" type="button" tabindex="-1" aria-hidden="true"
+                      :disabled="isSavingFavorite(cell.row.original.id) || !favoritesReady"
+                      class="collection-list-files__button border-0 [background:initial] opacity-0 [transition:opacity_0.2s_ease-in-out,_color_0.2s_ease-in-out] flex items-center justify-center w-6 h-6 [&.visible-on-hover]:opacity-0 [&.file-is-favorite]:opacity-100 star-off-button absolute top-0 left-0 opacity-0 pointer-events-none [transition:opacity_0.2s_ease-in-out] w-full h-full">
                       <StarOff class="w-5 h-5 text-[var(--dv-selection-color)] hover:text-neutral-800" />
                     </button>
                   </div>
-                  <button v-else @click="addToFavorite(cell.row.original)" type="button"
+                  <button v-else @click="toggleFavorite(cell.row.original)" type="button"
+                    :disabled="isSavingFavorite(cell.row.original.id) || !favoritesReady" :aria-pressed="false"
                     :aria-label="`Add ${cell.row.original.name} to favorites`"
                     class="collection-list-files__button border-0 [background:initial] opacity-0 [transition:opacity_0.2s_ease-in-out,_color_0.2s_ease-in-out] flex items-center justify-center w-6 h-6 [&.visible-on-hover]:opacity-0 [&.file-is-favorite]:opacity-100 visible-on-hover favorite-hover">
                     <Star class="w-5 h-5 text-[var(--dv-selection-color)] hover:text-neutral-800" />

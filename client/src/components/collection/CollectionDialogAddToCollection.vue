@@ -30,7 +30,7 @@ import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { ChevronDown, ChevronRight, CirclePlus, Folder, Loader2Icon } from "@lucide/vue"
 import { TreeItem, TreeRoot } from 'reka-ui'
-import {computed, ref} from "vue"
+import {computed, ref, watch} from "vue"
 import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import CollectionDialogCreatePublic from "@/components/collection/CollectionDialogCreatePublic.vue";
 
@@ -54,11 +54,14 @@ const { data: privateCollections } = useQuery({
 const { data: publicCollections } = useQuery({
   queryKey: ['collection', 'treeAdmin', 'public'],
   queryFn: () => trpc.collection.treeAdmin.query(),
+  enabled: computed(() => globalStore.user?.role === 'admin'),
 })
 
 const usablePublicCollections = computed(() => (publicCollections.value ?? []).filter(
   (collection: RouterOutput['collection']['findById']) => !collection.synchronized,
 ))
+
+watch(() => props.modelValue, () => { selectedCollection.value = null })
 
 const isLoading = ref(false)
 
@@ -74,13 +77,13 @@ async function addToCollection() {
       items: globalStore.selection,
     })
 
-    queryClient.invalidateQueries({ queryKey: ["collection", "tree"] })
-    queryClient.invalidateQueries({ queryKey: ["collection", "ListPrivateCollections"] })
+    queryClient.invalidateQueries({ queryKey: ["collection"] })
+    queryClient.invalidateQueries({ queryKey: ["catalogue"] })
     emit("update:modelValue", false)
     toast.success("Items added to collection")
   } catch (error) {
     console.error("Error adding items to collection:", error)
-    toast.error("Failed to add items to collection")
+    toast.error((error as Error).message)
   } finally {
     isLoading.value = false
   }
@@ -196,6 +199,6 @@ async function addToCollection() {
       </DialogFooter>
     </DialogContent>
   </Dialog>
-  <CollectionDialogCreate v-if="tabId === 'private'" v-model="isCollectionModalOpen" />
+  <CollectionDialogCreate v-if="tabId === 'private'" v-model="isCollectionModalOpen" @created="selectedCollection = $event" />
   <CollectionDialogCreatePublic v-if="tabId === 'public'" v-model="isCollectionModalOpen" />
 </template>

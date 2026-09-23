@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { fixture, records } from './records-fixtures'
+import { fixture, records, tables } from './records-fixtures'
 
 // A catalogue admin edits in the grid like a spreadsheet and opens a record
 // as a card with its fields, its pictures and its history.
@@ -90,12 +90,12 @@ test('filters, columns, bulk actions and fields are one click away', async ({ pa
   expect(errors).toEqual([])
 })
 
-// Typing a key that exists links to its row, on whatever page it falls, and
-// only the grid scrolls, never the page around it.
-test('an existing key jumps to its row on its page', async ({ page }) => {
-  const { errors, calls } = await fixture(page)
+// Typing a key that exists links to its row, wherever it falls in the list,
+// and only the grid scrolls, never the page around it.
+test('an existing key jumps to its row', async ({ page }) => {
+  const { errors } = await fixture(page)
   await page.route('**/trpc/record.create*', route => route.fulfill({ status: 409, json: { error: { message: 'A record with key WX5678-200 already exists.', code: -32009, data: { code: 'CONFLICT', httpStatus: 409 } } } }))
-  await page.route('**/trpc/record.locate*', route => route.fulfill({ json: { result: { data: { id: records[1].id, position: 150 } } } }))
+  await page.route('**/trpc/record.locate*', route => route.fulfill({ json: { result: { data: { id: records[1].id, tableId: tables[0].id, position: 1 } } } }))
   await page.goto('/admin/data-enrichment/records')
   const grid = page.getByRole('grid', { name: 'product list' })
   await expect(grid.locator('[data-cell="0-1"]')).toContainText('WX5678-100')
@@ -105,7 +105,6 @@ test('an existing key jumps to its row on its page', async ({ page }) => {
   await page.keyboard.press('Enter')
   await expect(page.getByRole('alert').filter({ hasText: 'already exists' })).toBeVisible()
   await page.getByRole('button', { name: 'Go to WX5678-200' }).click()
-  await expect.poll(() => calls.filter(call => call.name === 'record.list').some(call => (call.input as { page: number }).page === 2)).toBe(true)
   await expect(grid.locator('[data-cell="1-1"]')).toBeFocused()
   await expect(grid.locator('tr.is-flashed')).toContainText('WX5678-200')
   await expect(page.getByRole('button', { name: 'Go to WX5678-200' })).toHaveCount(0)
@@ -145,6 +144,36 @@ test('the frozen line moves in the Columns list', async ({ page }) => {
   await page.getByRole('button', { name: 'Move the frozen line down' }).click()
   await expect(grid.locator('[data-cell="0-2"]')).toHaveClass(/is-frozen-edge/)
   await page.screenshot({ path: process.env.RECORDS_SHOTS ? `${process.env.RECORDS_SHOTS}/records-frozen.png` : undefined })
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('damvia_records_grid')!).order.slice(0, 4))).toEqual(['thumbnail', 'key', 'field:name', 'frozen'])
+  expect(await page.evaluate((id) => JSON.parse(localStorage.getItem('damvia_records_grid')!).tables[id].order.slice(0, 4), tables[0].id)).toEqual(['thumbnail', 'key', 'field:name', 'frozen'])
+  expect(errors).toEqual([])
+})
+
+// Tables sit as small tabs above the toolbar; the grid scrolls instead of
+// paging, with the count under it.
+test('tables show as tabs, each with its own list, and records move between them', async ({ page }) => {
+  const { errors, calls } = await fixture(page)
+  await page.goto('/admin/data-enrichment/records')
+  const tabs = page.getByRole('tablist', { name: 'Tables' })
+  await expect(tabs.getByRole('tab', { name: 'Products' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByText('Rows per page')).toHaveCount(0)
+  await expect(page.locator('.records-footer')).toContainText('3 products')
+  await expect.poll(() => calls.filter(call => call.name === 'record.list').at(-1)?.input).toMatchObject({ tableId: tables[0].id, offset: 0, limit: 200 })
+
+  const grid = page.getByRole('grid', { name: 'product list' })
+  await grid.getByRole('checkbox', { name: 'Select WX5678-200' }).click()
+  await page.getByRole('button', { name: 'Move to table' }).click()
+  await page.getByRole('dialog').getByLabel('Table').selectOption({ label: 'Apparel' })
+  await page.getByRole('dialog').getByRole('button', { name: 'Move' }).click()
+  await expect.poll(() => calls.find(call => call.name === 'record.moveToTable')?.input).toEqual({ ids: [records[1].id], tableId: tables[1].id })
+
+  await tabs.getByRole('tab', { name: 'Apparel' }).click()
+  await expect(page).toHaveURL(new RegExp(`table=${tables[1].id}`))
+  await expect(page.getByRole('heading', { name: 'No products in Apparel yet' })).toBeVisible()
+  await expect(grid.getByRole('columnheader')).toHaveCount(7)
+
+  await page.getByRole('button', { name: 'Add a table' }).click()
+  await page.getByLabel('Name of the new table').fill('Shoes')
+  await page.keyboard.press('Enter')
+  await expect.poll(() => calls.find(call => call.name === 'recordTable.create')?.input).toEqual({ name: 'Shoes' })
   expect(errors).toEqual([])
 })

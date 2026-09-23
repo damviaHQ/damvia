@@ -75,6 +75,14 @@ export class Download {
 	@Column({ type: 'uuid', array: true, default: [] })
 	collectionFileIds: string[]
 
+	@Column({ type: 'jsonb', nullable: true })
+	recordExport: {
+		items: { id: string, type: 'collection' | 'file' | 'record' }[]
+		columns: string[]
+		format: 'csv' | 'xlsx'
+		recordIds: string[]
+	} | null
+
 	@Column({ enum: DownloadStatus })
 	status: DownloadStatus
 

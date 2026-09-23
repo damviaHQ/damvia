@@ -30,8 +30,11 @@ import { RouterInput, RouterOutput, trpc } from "@/services/server.ts"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
+  Check,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Download,
   SquareArrowLeft,
   SquareArrowRight,
   Star,
@@ -52,6 +55,7 @@ type Props = {
   collection?: Collection
   modelValue: string | null
   recordId?: string
+  productIds?: string[]
 }
 
 const emit = defineEmits<{
@@ -95,13 +99,20 @@ const loadError = ref('')
 const retry = ref(0)
 const previewId = ref<string | null>(null)
 const selectedViews = ref<string[]>([])
-const files = computed<File[]>(() => resolvesSelection.value ? selection.value?.files ?? [] : props.files ?? props.collection?.files ?? [])
+const copiedField = ref<string | null>(null)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+const files = computed<File[]>(() => {
+  const available: File[] = resolvesSelection.value ? selection.value?.files ?? [] : props.files ?? props.collection?.files ?? []
+  return props.recordId && selection.value?.viewsEnabled ? available.filter(file => !!file.recordView) : available
+})
 const currentFile = computed(() => files.value.find(file => file.id === (resolvesSelection.value ? previewId.value : props.modelValue)))
 const productTitle = computed(() => selection.value?.previewRows?.[0]?.[0] ?? recordLabel.singular.value)
 const title = computed(() => props.recordId ? productTitle.value : currentFile.value?.name ?? 'Download')
 const productFacts = computed(() => (selection.value?.columns ?? []).map((column, index) => ({ ...column, value: selection.value?.previewRows?.[0]?.[index] })).filter(column => column.value))
-const viewOptions = computed(() => [...new Set(files.value.map(file => file.recordView ?? ''))].sort())
-const showViews = computed(() => !!props.recordId && !!selection.value?.viewsEnabled && viewOptions.value.some(Boolean))
+const viewOptions = computed(() => [...new Set(files.value.map(file => file.recordView).filter((view): view is string => !!view))].sort())
+const showViews = computed(() => !!props.recordId && !!selection.value?.viewsEnabled && !!viewOptions.value.length)
+const productIndex = computed(() => props.recordId ? (props.productIds ?? []).indexOf(props.recordId) : -1)
+const canNavigateProducts = computed(() => productIndex.value >= 0 && (props.productIds?.length ?? 0) > 1)
 const downloadFiles = computed(() => props.recordId
   ? files.value.filter(file => !showViews.value || selectedViews.value.includes(file.recordView ?? ''))
   : currentFile.value ? [currentFile.value] : [])
@@ -127,8 +138,11 @@ watch([() => props.modelValue, () => props.recordId, resolvesSelection, retry], 
     const result = await trpc.collection.getFiles.mutate({ items: [{ type: props.recordId ? 'record' : 'file', id: props.recordId ?? props.modelValue }] })
     if (cancelled) return
     selection.value = result
-    previewId.value = result.files[0]?.id ?? null
-    selectedViews.value = [...new Set(result.files.map(file => file.recordView ?? ''))]
+    const availableFiles = props.recordId && result.viewsEnabled ? result.files.filter(file => !!file.recordView) : result.files
+    const availableViews = [...new Set(availableFiles.map(file => file.recordView).filter((view): view is string => !!view))].sort()
+    const initialView = availableViews.includes(result.mainView) ? result.mainView : availableViews[0]
+    previewId.value = (availableFiles.find(file => file.recordView === initialView) ?? availableFiles[0])?.id ?? null
+    selectedViews.value = props.recordId && result.viewsEnabled && initialView ? [initialView] : []
     form.value.imageFormat = 'original'
     form.value.videoFormat = 'original'
     form.value.downloadType = 'direct'
@@ -257,6 +271,12 @@ function changeFile(addToIndex: number) {
   else emit("update:modelValue", files.value[newIndex].id)
 }
 
+function changeProduct(addToIndex: number) {
+  if (!canNavigateProducts.value || !props.productIds) return
+  const nextIndex = (productIndex.value + addToIndex + props.productIds.length) % props.productIds.length
+  emit('update:modelValue', props.productIds[nextIndex])
+}
+
 function truncateFileName(name: string, maxLength: number = 60) {
   if (name.length <= maxLength) return name
   return name.slice(0, maxLength - 3) + "..."
@@ -270,13 +290,16 @@ function handleKeyDown(event: KeyboardEvent) {
     emit("update:modelValue", null)
     return
   }
-  if (target?.closest('input, textarea, select, button, [role="radio"], [contenteditable="true"]')) return
+  if (target?.closest('input, textarea, select, [role="radio"], [contenteditable="true"]')) return
+  if (target?.closest('button') && !target.closest('.gallery-modal__previous-file, .gallery-modal__next-file')) return
   if (event.key === "ArrowLeft") {
     event.preventDefault()
-    changeFile(-1)
+    if (props.recordId) changeProduct(-1)
+    else changeFile(-1)
   } else if (event.key === "ArrowRight") {
     event.preventDefault()
-    changeFile(1)
+    if (props.recordId) changeProduct(1)
+    else changeFile(1)
   }
 }
 
@@ -286,7 +309,23 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleKeyDown)
+  clearTimeout(copiedTimer)
 })
+
+async function copyValue(value: string, field: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    copiedField.value = field
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => { copiedField.value = null }, 1800)
+  } catch {
+    toast.error('Could not copy to clipboard.')
+  }
+}
+
+function copyProductData() {
+  return copyValue(productFacts.value.map(fact => `${fact.label}: ${fact.value}`).join('\n'), 'all')
+}
 
 watch(currentFile, (file) => {
   if (!file || (viewedAt.get(file.id) ?? 0) > Date.now() - 30 * 60 * 1000) return
@@ -311,8 +350,8 @@ watch(() => props.modelValue, (newValue) => {
 <template>
   <Teleport to="body">
   <FocusScope v-if="modelValue && (currentFile || resolvesSelection)" as="div" trapped loop tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="gallery-modal-title"
-    :class="{ 'is-product': !!recordId }" class="gallery-modal dv-theme dv-neutral dv-client bg-white fixed top-0 left-0 w-full h-full z-40 py-5 px-7 text-neutral-800 outline-hidden" @mount-auto-focus="focusModal">
-    <div class="gallery-modal__header flex items-center justify-between mb-4 flex-wrap gap-3">
+    :class="{ 'is-product': !!recordId }" class="gallery-modal dv-theme dv-neutral dv-client bg-white fixed top-0 left-0 w-full z-40 text-neutral-800 outline-hidden" @mount-auto-focus="focusModal">
+    <div class="gallery-modal__header flex items-center justify-between gap-3">
       <div class="flex items-center gap-3">
         <template v-if="currentFile && !recordId && haveAccessToFavorites">
           <button v-if="isFavorite(currentFile)" @click="toggleFavorite(currentFile)" :disabled="isSavingFavorite(currentFile.id) || !favoritesReady" type="button"
@@ -329,7 +368,7 @@ watch(() => props.modelValue, (newValue) => {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger class="flex items-center">
-                <span class="block text-[17px] font-semibold leading-none truncate max-w-[300px] md:max-w-[400px]">
+                <span class="block text-[16px] font-semibold leading-6 truncate max-w-[300px] md:max-w-[400px]">
                   {{ truncateFileName(title) }}
                 </span>
               </TooltipTrigger>
@@ -353,18 +392,17 @@ watch(() => props.modelValue, (newValue) => {
         <Button aria-label="Close preview" variant="ghost" size="icon" type="button"
           class="text-neutral-800 hover:text-neutral-600 bg-transparent hover:bg-neutral-100 ml-2"
           @click="$emit('update:modelValue', null)">
-          <X strokeWidth="3" />
+          <X :size="20" :stroke-width="2" />
         </Button>
       </div>
     </div>
     <div class="gallery-modal__body">
-      <div class="gallery-modal__preview relative w-full">
-        <template v-if="currentFile">
-        <div v-if="files.length > 1" class="gallery-modal__navigation absolute top-0 left-0 right-0 bottom-0 flex justify-between items-center pointer-events-none select-none [z-index:2] [&:hover_.gallery-modal\_\_key-info]:opacity-100 [&:focus-within_.gallery-modal\_\_key-info]:opacity-100">
-          <button type="button" :aria-label="recordId ? 'Previous view' : 'Previous file'" aria-keyshortcuts="ArrowLeft" class="gallery-modal__previous-file pointer-events-auto cursor-pointer p-4 mr-auto" @click="changeFile(-1)">
+      <div class="gallery-modal__preview relative w-full" :class="{ 'with-view-strip': !!recordId && !!files.length }">
+        <div v-if="recordId ? canNavigateProducts : !!currentFile && files.length > 1" class="gallery-modal__navigation absolute top-0 left-0 right-0 bottom-0 flex justify-between items-center pointer-events-none select-none [z-index:2] [&:hover_.gallery-modal\_\_key-info]:opacity-100 [&:focus-within_.gallery-modal\_\_key-info]:opacity-100">
+          <button type="button" :aria-label="recordId ? 'Previous product' : 'Previous file'" aria-keyshortcuts="ArrowLeft" class="gallery-modal__previous-file pointer-events-auto cursor-pointer p-4 mr-auto" @click="recordId ? changeProduct(-1) : changeFile(-1)">
             <ChevronLeft strokeWidth="3" class="w-10 h-10" />
           </button>
-          <button type="button" :aria-label="recordId ? 'Next view' : 'Next file'" aria-keyshortcuts="ArrowRight" class="gallery-modal__next-file pointer-events-auto cursor-pointer p-4 ml-auto" @click="changeFile(1)">
+          <button type="button" :aria-label="recordId ? 'Next product' : 'Next file'" aria-keyshortcuts="ArrowRight" class="gallery-modal__next-file pointer-events-auto cursor-pointer p-4 ml-auto" @click="recordId ? changeProduct(1) : changeFile(1)">
             <ChevronRight strokeWidth="3" class="w-10 h-10" />
           </button>
           <div aria-hidden="true" class="gallery-modal__key-info absolute bottom-4 right-4 flex items-center [background-color:rgba(0,_0,_0,_0.5)] [color:rgba(255,_255,_255,_0.7)] [padding:0.5rem_1rem] [border-radius:9999px] [font-size:0.75rem] opacity-0 [transition:opacity_0.3s_ease] select-none [&_svg]:mr-1">
@@ -373,7 +411,8 @@ watch(() => props.modelValue, (newValue) => {
             <span class="ml-2">Use keyboard to navigate</span>
           </div>
         </div>
-        <div class="gallery-modal__preview-thumbnail-container flex items-center justify-center [height:calc(100vh_-_90px)] w-full [margin:0_auto]">
+        <template v-if="currentFile">
+        <div class="gallery-modal__preview-thumbnail-container flex items-center justify-center w-full">
           <video v-if="isVideoFile && currentFile.fileURL" :src="currentFile.fileURL" controls
             class="gallery-modal__preview-thumbnail [max-width:90%] [max-height:90%] object-contain" />
           <div v-else-if="isVideoFile && !currentFile.fileURL" class="gallery-modal__placeholder-container flex flex-col items-center justify-center h-full w-full gap-4 p-8">
@@ -471,23 +510,23 @@ watch(() => props.modelValue, (newValue) => {
         </div>
         <div v-if="recordId && files.length" class="product-view-strip" aria-label="Product views">
           <button v-for="file in files" :key="file.id" type="button" :aria-pressed="currentFile?.id === file.id"
-            :aria-label="`Preview ${showViews && file.recordView ? `view ${file.recordView}` : file.name}`" @click="previewId = file.id">
+            :aria-label="`Preview ${file.name}`" @click="previewId = file.id">
             <img v-if="file.thumbnailURL" :src="file.thumbnailURL" alt="" />
             <thumbnailPlaceholder v-else aria-hidden="true" />
-            <span>{{ showViews && file.recordView ? `View ${file.recordView}` : file.name }}</span>
+            <span :title="file.name">{{ file.name }}</span>
           </button>
         </div>
       </div>
       <aside class="gallery-modal__download-container" aria-label="Download options">
         <template v-if="!isResolving && !loadError">
           <div v-if="recordId && productFacts.length">
-            <h3 class="mb-3 text-[13px] font-semibold">{{ recordLabel.singular.value }}</h3>
-            <dl class="file-facts"><template v-for="fact in productFacts" :key="fact.id"><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></template></dl>
+            <div class="facts-heading"><h3>{{ recordLabel.singular.value }}</h3><button type="button" :aria-label="`Copy all ${recordLabel.lower.value} data`" :title="copiedField === 'all' ? 'Copied' : 'Copy all data'" @click="copyProductData"><Check v-if="copiedField === 'all'" :size="16" /><Copy v-else :size="16" /></button></div>
+            <div class="product-facts"><button v-for="fact in productFacts" :key="fact.id" type="button" class="product-fact" :aria-label="`Copy ${fact.label} value`" :title="`Copy ${fact.label}`" @click="copyValue(fact.value || '', fact.id)"><span class="fact-label">{{ fact.label }}</span><span class="fact-value">{{ fact.value }}</span><Check v-if="copiedField === fact.id" :size="15" aria-hidden="true" /><Copy v-else :size="15" aria-hidden="true" /></button></div>
           </div>
           <fieldset v-if="showViews" class="product-views">
             <legend>Views to download</legend>
-            <button type="button" class="select-all-views" @click="selectedViews = [...viewOptions]">Select all</button>
-            <div class="view-options"><label v-for="view in viewOptions" :key="view"><input v-model="selectedViews" type="checkbox" :value="view" />{{ view ? `View ${view}` : 'Unnumbered' }}</label></div>
+            <div class="view-actions"><button type="button" @click="selectedViews = [...viewOptions]">Select all</button><button type="button" @click="selectedViews = []">Remove all</button></div>
+            <div class="view-options"><label v-for="view in viewOptions" :key="view"><input v-model="selectedViews" type="checkbox" :value="view" />{{ view }}</label></div>
           </fieldset>
           <CollectionDownloadFileOptions :files="downloadFiles" :direct-limit="recordId ? 2_000_000_000 : 5_000_000_000"
             v-model:image-format="form.imageFormat" v-model:image-resolution="form.imageResolution"
@@ -502,53 +541,68 @@ watch(() => props.modelValue, (newValue) => {
             </div>
           </div>
         </template>
-        <div class="gallery-modal__download-action">
-          <Button @click="download" class="w-full" :disabled="!canDownload">
-            {{ isLoading ? 'Preparing files…' : recordId ? (showViews && selectedViews.length === viewOptions.length ? 'Download all views' : `Download ${downloadFiles.length} ${downloadFiles.length === 1 ? 'file' : 'files'}`) : 'Download' }}
-          </Button>
-          <p class="mt-2 text-xs text-neutral-500" role="status">{{ recordId ? `${downloadFiles.length} files · ` : '' }}{{ formatFileSize(totalSize) }}</p>
-          <p v-if="hasCustomDownloadSettings" class="mt-1 text-xs text-neutral-500">Final size may vary.</p>
-          <p v-if="totalSize >= 10_000_000_000" class="mt-2 text-sm text-destructive" role="alert">Select fewer files to stay under 10 GB.</p>
-        </div>
       </aside>
     </div>
+    <div class="gallery-modal__footer">
+      <span role="status">{{ recordId ? `${downloadFiles.length} ${downloadFiles.length === 1 ? 'file' : 'files'} · ` : '' }}{{ formatFileSize(totalSize) }}<span v-if="hasCustomDownloadSettings"> · Final size may vary</span></span>
+      <div class="gallery-modal__actions"><Button variant="outline" @click="$emit('update:modelValue', null)">Cancel</Button><Button @click="download" :disabled="!canDownload"><Download :size="16" />{{ isLoading ? 'Preparing files…' : recordId ? (showViews && selectedViews.length === viewOptions.length ? 'Download all views' : `Download ${downloadFiles.length} ${downloadFiles.length === 1 ? 'file' : 'files'}`) : 'Download' }}</Button></div>
+    </div>
+    <p v-if="totalSize >= 10_000_000_000" class="gallery-modal__limit text-sm text-destructive" role="alert">Select fewer files to stay under 10 GB.</p>
   </FocusScope>
   </Teleport>
 </template>
 
 <style scoped>
-.gallery-modal { display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
-.gallery-modal__header { flex-shrink:0; }
-.gallery-modal__body { display:grid; grid-template-columns:minmax(0,1fr) 320px; flex:1; min-height:0; gap:24px; }
-.gallery-modal__preview { display:flex; flex-direction:column; min-width:0; min-height:0; }
+.gallery-modal { display:flex; flex-direction:column; height:100dvh; overflow:hidden; padding:0; }
+.gallery-modal button, .gallery-modal select { border-radius:0; }
+.gallery-modal__header { flex-shrink:0; min-height:46px; padding:7px 20px 7px 28px; border-bottom:1px solid hsl(var(--border)); }
+.gallery-modal__header > div { min-width:0; }
+.gallery-modal__header > div:last-child > button { width:32px; height:32px; }
+.gallery-modal__body { display:grid; grid-template-columns:minmax(0,1fr) 320px; flex:1; min-height:0; padding:16px 0 0 28px; }
+.gallery-modal__preview { display:flex; flex-direction:column; min-width:0; min-height:0; padding-right:20px; }
 .gallery-modal__preview-thumbnail-container { flex:1; height:auto; min-height:0; }
-.gallery-modal__download-container { display:flex; flex-direction:column; gap:24px; min-width:0; overflow-y:auto; border-left:1px solid #e5e5e5; padding:8px 0 0 24px; }
-.gallery-modal__download-action { margin-top:auto; position:sticky; bottom:0; padding:12px 0; background:white; }
-.gallery-modal__empty { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:16px; color:#737373; font-size:14px; }
-.is-product .gallery-modal__navigation { bottom:116px; }
-.product-view-strip { display:flex; flex-shrink:0; gap:12px; overflow-x:auto; padding:12px 4px; border-top:1px solid #e5e5e5; }
-.product-view-strip button { width:100px; flex-shrink:0; border:1px solid #e5e5e5; padding:6px; }
-.product-view-strip button[aria-pressed=true] { border-color:#262626; box-shadow:inset 0 0 0 1px #262626; }
+.gallery-modal__download-container { display:flex; flex-direction:column; gap:20px; min-width:0; overflow-y:auto; border-left:1px solid hsl(var(--border)); padding:18px 20px 24px; }
+.gallery-modal__download-container :deep(.file-options) { gap:20px; }
+.gallery-modal__empty { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:16px; color:hsl(var(--muted-foreground)); font-size:14px; }
+.with-view-strip .gallery-modal__navigation { bottom:112px; }
+.product-view-strip { display:flex; flex-shrink:0; gap:12px; overflow-x:auto; padding:12px 4px; border-top:1px solid hsl(var(--border)); }
+.product-view-strip button { width:112px; flex-shrink:0; border:1px solid hsl(var(--border)); padding:6px; text-align:left; }
+.product-view-strip button[aria-pressed=true] { border-color:hsl(var(--foreground)); box-shadow:inset 0 0 0 1px hsl(var(--foreground)); }
 .product-view-strip img, .product-view-strip svg { width:100%; height:64px; object-fit:contain; }
 .product-view-strip span { display:block; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:4px; }
-.product-views { position:relative; }
-.product-views legend { font-size:13px; font-weight:600; margin-bottom:12px; }
-.select-all-views { display:block; margin-bottom:10px; font-size:12px; text-decoration:underline; text-underline-offset:3px; }
+.facts-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.facts-heading h3, .product-views legend { font-size:13px; font-weight:600; }
+.facts-heading button { display:flex; align-items:center; justify-content:center; width:28px; height:28px; color:hsl(var(--muted-foreground)); }
+.facts-heading button:hover { color:hsl(var(--foreground)); background:hsl(var(--muted)); }
+.product-facts { border-top:1px solid hsl(var(--border)); }
+.product-fact { display:grid; grid-template-columns:minmax(0,96px) minmax(0,1fr) 16px; align-items:start; width:100%; gap:10px; padding:9px 4px; border-bottom:1px solid hsl(var(--border)); text-align:left; font-size:12px; }
+.product-fact:hover, .product-fact:focus-visible { background:hsl(var(--muted)); }
+.product-fact svg { color:hsl(var(--muted-foreground)); }
+.fact-label { color:hsl(var(--muted-foreground)); }
+.fact-value { overflow-wrap:anywhere; }
+.product-views legend { margin-bottom:10px; }
+.view-actions { display:flex; gap:12px; margin-bottom:12px; }
+.view-actions button { font-size:12px; text-decoration:underline; text-underline-offset:3px; }
 .view-options { display:flex; flex-wrap:wrap; gap:8px; }
-.view-options label { display:flex; align-items:center; gap:6px; border:1px solid #e5e5e5; padding:8px; font-size:12px; cursor:pointer; }
-.view-options input { accent-color:#262626; width:16px; height:16px; }
-.gallery-modal button:focus-visible, .gallery-modal input:focus-visible { outline:2px solid #262626; outline-offset:3px; }
-@media(max-width:640px) {
-  .gallery-modal { padding:16px; overflow-y:auto; }
-  .gallery-modal__body { display:flex; flex-direction:column; flex:none; gap:20px; }
-  .gallery-modal__preview { flex:none; height:38dvh; }
-  .gallery-modal__download-container { flex:none; overflow:visible; border-left:0; border-top:1px solid #e5e5e5; padding:20px 0 0; }
-  .gallery-modal__download-action { position:static; }
-  .gallery-modal__previous-file, .gallery-modal__next-file { padding:4px; }
-  .gallery-modal__key-info { display:none; }
-}
-
+.view-options label { display:flex; align-items:center; gap:6px; border:1px solid hsl(var(--border)); padding:7px 9px; font-size:12px; cursor:pointer; }
+.view-options label:has(input:checked) { border-color:hsl(var(--primary)); }
+.view-options input { accent-color:hsl(var(--primary)); width:16px; height:16px; }
+.gallery-modal__footer { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:62px; margin:0 20px 0 28px; padding:10px 0; border-top:1px solid hsl(var(--border)); }
+.gallery-modal__footer > span { color:hsl(var(--muted-foreground)); font-size:12px; }
+.gallery-modal__actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+.gallery-modal__limit { padding:0 28px 8px; }
+.gallery-modal button:focus-visible, .gallery-modal input:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:3px; }
 .file-facts { display:grid; grid-template-columns:minmax(0,max-content) minmax(0,1fr); gap:4px 16px; font-size:var(--dv-size-caption); }
 .file-facts dt { color:var(--dv-text-secondary); }
 .file-facts dd { overflow-wrap:anywhere; }
+@media(max-width:640px) {
+  .gallery-modal__header { padding:7px 16px; }
+  .gallery-modal__body { display:flex; flex-direction:column; min-height:0; padding:14px 16px 0; overflow-y:auto; }
+  .gallery-modal__preview { flex:none; height:38dvh; min-height:280px; padding-right:0; }
+  .gallery-modal__download-container { flex:none; overflow:visible; border-left:0; border-top:1px solid hsl(var(--border)); padding:20px 0; }
+  .gallery-modal__footer { align-items:stretch; flex-direction:column; margin:0 16px; }
+  .gallery-modal__actions { justify-content:flex-start; }
+  .gallery-modal__previous-file, .gallery-modal__next-file { padding:4px; }
+  .gallery-modal__key-info { display:none; }
+}
 </style>

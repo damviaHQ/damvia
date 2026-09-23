@@ -17,6 +17,7 @@ import sharp from "sharp"
 import { IsNull } from "typeorm"
 import { z } from "zod"
 import { adminClientLogoEnabled, createLogoUpload, getClientLogo, removeClientLogo, LOGO_MIME_TYPES, processClientLogo } from "../../services/branding"
+import { defaultRelatedRecords, relatedRecordsSettings } from "../../services/catalogue"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { ReadinessDefinition } from "../../entity/readiness-definition"
 import { rerunEntityStage, rerunFamilyStage, rerunReadinessStage } from "../../services/enrichment"
@@ -44,6 +45,7 @@ export default router({
         familyAttributeName: settings.familyAttributeName,
         familyAxisAttributeNames: settings.familyAxisAttributeNames,
         cardTitleAttributeName: settings.cardTitleAttributeName,
+        relatedRecords: settings.relatedRecords ?? defaultRelatedRecords,
       }
     }),
   // What a product must carry to read as ready in the catalogue.
@@ -86,6 +88,7 @@ export default router({
       hideRecordsWithoutMedia: z.boolean().optional(),
       familyAttributeName: z.string().trim().min(1).max(100).nullable().optional(),
       familyAxisAttributeNames: z.string().trim().min(1).max(100).array().max(2).optional(),
+      relatedRecords: relatedRecordsSettings.optional(),
       cardTitleAttributeName: z.string().trim().min(1).max(100).nullable().optional(),
     }))
     .mutation(async ({ input }) => {

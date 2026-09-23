@@ -19,6 +19,7 @@ import { RECORD_VALUE_TYPES, RecordAttribute } from "../../entity/record-attribu
 import { dataSource } from "../../env"
 import { rerunEntityStage } from "../../services/enrichment"
 import { MAX_OPTIONS, MULTI_SELECT_SEPARATOR, optionsFromValues, validateValue } from "../../services/record-values"
+import { attachNewField, tableExists } from "../../services/record-tables"
 import { catalogueKeyColumnName, fieldIsLinked } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
@@ -98,9 +99,12 @@ export default router({
 			facetable: z.boolean(),
 			viewable: z.boolean(),
 			searchable: z.boolean(),
+			// The table the field is added from; without one it shows in every table.
+			tableId: z.uuid().optional(),
 		}))
 		.mutation(async ({ input }) => {
 			const repository = dataSource.getRepository(RecordAttribute)
+			if (input.tableId) await tableExists(dataSource.manager, input.tableId)
 			if (input.name === await catalogueKeyColumnName(dataSource.manager)) {
 				throw new TRPCError({ code: 'BAD_REQUEST', message: `${input.name} is the key column.` })
 			}
@@ -119,6 +123,7 @@ export default router({
 				searchable: input.searchable,
 			})
 			await repository.save(attribute)
+			await attachNewField(dataSource.manager, attribute.id, input.tableId ?? null)
 			return { ...formatRecordAttribute(attribute), invalidCount: await invalidCount(attribute) }
 		}),
 	update: publicProcedure

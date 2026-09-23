@@ -20,7 +20,8 @@ import { moveForKey, moveInGrid, startsTyping, type GridMove, type GridPosition 
 import { fillDownPlan, fillPlan, inRange, pastePlan, parseClipboard, rangeOf, rangeSize, toClipboard, type CellWrite, type GridRange } from "@/utils/gridRange"
 import { VALUE_TYPE_LABELS, type ValueField } from "@/utils/recordValues"
 import { ArrowDown, ArrowUp, ChevronDown, EyeOff, Filter, Maximize2, PencilLine, Plus, Trash2 } from "@lucide/vue"
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { observeElementRect, useVirtualizer, type Rect, type Virtualizer } from "@tanstack/vue-virtual"
+import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from "vue"
 import RecordCellEditor, { type EditorMove } from "./RecordCellEditor.vue"
 import RecordCellValue from "./RecordCellValue.vue"
 
@@ -31,13 +32,17 @@ export type GridSort = { column: string, direction: "asc" | "desc" } | null
 export type GridWrite = { record: GridRecord, field: GridField, value: string }
 
 const props = defineProps<{
-  rows: GridRecord[]
+  // One entry per record of the list; null for a row not loaded yet.
+  rows: (GridRecord | null)[]
   columns: GridColumn[]
   fieldCount: number
   // How many of the columns, from the left, stay in place when scrolling
   // sideways; up to the key when not given.
   frozen?: number
   wrap?: boolean
+  // Changes when the list itself changes (table, search, filters, sort), not
+  // when more of its rows load.
+  listKey?: string
   sort: GridSort
   selected: string[]
   recordLabel: string
@@ -57,6 +62,8 @@ const emit = defineEmits<{
   editField: [field: GridField]
   removeField: [field: GridField]
   reveal: [recordKey: string]
+  // The rows on screen, so the parent loads them.
+  range: [start: number, end: number]
 }>()
 
 const root = ref<HTMLElement | null>(null)
@@ -94,21 +101,58 @@ const conflictKey = ref<string | null>(null)
 const creating = ref(false)
 const flashed = ref<string | null>(null)
 
+// Only the rows on screen are drawn; spacer rows keep the scroll height.
+const ROW_HEIGHT = 37
+const virtualizer = useVirtualizer(computed(() => ({
+  count: props.rows.length,
+  getScrollElement: () => root.value,
+  estimateSize: () => ROW_HEIGHT,
+  overscan: 12,
+  // Rows show before the grid is measured, and where it measures nothing.
+  initialRect: { width: 1200, height: 900 },
+  observeElementRect: (instance: Virtualizer<HTMLElement, Element>, callback: (rect: Rect) => void) => observeElementRect(instance, (rect) => callback(rect.height ? rect : { width: rect.width, height: 900 })),
+  getItemKey: (index: number) => props.rows[index]?.id ?? `row-${index}`,
+})))
+const virtualRows = computed(() => virtualizer.value.getVirtualItems())
+const paddingTop = computed(() => virtualRows.value[0]?.start ?? 0)
+const paddingBottom = computed(() => virtualizer.value.getTotalSize() - (virtualRows.value.at(-1)?.end ?? 0))
+// Rows are one line high unless text wraps; only wrapped rows are measured.
+function measureRow(element: Element | ComponentPublicInstance | null) {
+  if (props.wrap && element instanceof Element) virtualizer.value.measureElement(element)
+}
+watch(virtualRows, (items) => {
+  if (items.length) emit("range", items[0].index, items[items.length - 1].index)
+}, { immediate: true })
+watch(() => props.wrap, () => virtualizer.value.measure())
+const loadedRows = computed(() => props.rows.filter((row): row is GridRecord => !!row))
+
 const shape = computed(() => ({
   rows: props.rows.length,
   columns: props.columns.length,
   editable: (column: number) => props.columns[column]?.kind === "field",
 }))
-const allSelected = computed(() => props.rows.length > 0 && props.rows.every((row) => props.selected.includes(row.id)))
-const someSelected = computed(() => props.rows.some((row) => props.selected.includes(row.id)))
+const allSelected = computed(() => loadedRows.value.length > 0 && loadedRows.value.every((row) => props.selected.includes(row.id)))
+const someSelected = computed(() => loadedRows.value.some((row) => props.selected.includes(row.id)))
 
 function cellElement(position: GridPosition): HTMLElement | null {
   return root.value?.querySelector(`[data-cell="${position.row}-${position.column}"]`) ?? null
 }
 
+// A cell off screen is scrolled to first, then focused once drawn.
 function focusCell(position: GridPosition) {
   focused.value = position
-  nextTick(() => cellElement(position)?.focus())
+  if (cellElement(position)) {
+    nextTick(() => cellElement(position)?.focus())
+    return
+  }
+  virtualizer.value.scrollToIndex(position.row, { align: "auto" })
+  let tries = 0
+  const attempt = () => {
+    const cell = cellElement(position)
+    if (cell) cell.focus()
+    else if (tries++ < 10) requestAnimationFrame(attempt)
+  }
+  requestAnimationFrame(attempt)
 }
 
 function valueAt(position: GridPosition): string {
@@ -217,7 +261,11 @@ function extendTo(position: GridPosition) {
   head.value = position
   const size = rangeSize(range.value)
   rangeMessage.value = `${size.rows} rows by ${size.columns} columns selected`
-  nextTick(() => cellElement(position)?.scrollIntoView({ block: "nearest", inline: "nearest" }))
+  nextTick(() => {
+    const cell = cellElement(position)
+    if (cell) cell.scrollIntoView({ block: "nearest", inline: "nearest" })
+    else virtualizer.value.scrollToIndex(position.row, { align: "auto" })
+  })
 }
 
 function rangeValues(target: GridRange): string[][] {
@@ -230,14 +278,20 @@ function rangeValues(target: GridRange): string[][] {
   return block
 }
 
-// Writes to read-only cells (key, picture, counts) are dropped and counted.
+// Writes to read-only cells (key, picture, counts) are dropped and counted;
+// rows not loaded yet are left alone.
 async function writeCells(writes: CellWrite[]) {
   const accepted: GridWrite[] = []
+  let unloaded = 0
   for (const write of writes) {
     const column = props.columns[write.column]
     const row = props.rows[write.row]
-    if (column?.kind === "field" && column.field && row) accepted.push({ record: row, field: column.field, value: write.value })
+    if (!row) unloaded++
+    else if (column?.kind === "field" && column.field) accepted.push({ record: row, field: column.field, value: write.value })
   }
+  writes = writes.filter((write) => props.rows[write.row])
+  if (!writes.length) return
+  if (unloaded) rangeMessage.value = `${unloaded} ${unloaded === 1 ? "cell" : "cells"} not loaded yet left as they are`
   const skipped = writes.length - accepted.length
   if (accepted.length === 1 && !skipped) {
     const only = writes[0]
@@ -324,10 +378,12 @@ function onCellMouseenter(position: GridPosition, event: MouseEvent) {
   extendTo(position)
 }
 
-watch(() => props.rows.map((row) => row.id).join(), () => {
+watch(() => props.listKey, () => {
   head.value = null
   copied.value = null
-  if (focused.value.row >= props.rows.length) focused.value = { row: Math.max(0, props.rows.length - 1), column: focused.value.column }
+})
+watch(() => props.rows.length, (count) => {
+  if (focused.value.row >= count) focused.value = { row: Math.max(0, count - 1), column: focused.value.column }
 })
 
 // A cell takes focus on mouse down, before its click: whether it already had
@@ -366,7 +422,7 @@ function toggleRow(id: string, checked: boolean) {
 }
 
 function toggleAll(checked: boolean) {
-  const ids = props.rows.map((row) => row.id)
+  const ids = loadedRows.value.map((row) => row.id)
   emit("update:selected", checked ? [...new Set([...props.selected, ...ids])] : props.selected.filter((id) => !ids.includes(id)))
 }
 
@@ -415,17 +471,23 @@ async function submitNewKey() {
 
 defineExpose({
   focusNewRow: () => {
-    newKeyInput.value?.scrollIntoView({ block: "nearest" })
-    newKeyInput.value?.focus()
+    root.value?.scrollTo({ top: root.value.scrollHeight })
+    nextTick(() => {
+      newKeyInput.value?.scrollIntoView({ block: "nearest" })
+      newKeyInput.value?.focus()
+    })
   },
-  // Focuses the key cell of a row on the current page and flashes the row.
+  // Brings a row on screen, so the parent loads it.
+  scrollToRow: (index: number) => virtualizer.value.scrollToIndex(index, { align: "center" }),
+  scrollToTop: () => root.value?.scrollTo({ top: 0 }),
+  // Focuses the key cell of a loaded row and flashes the row.
   revealRow: (id: string) => {
-    const row = props.rows.findIndex((record) => record.id === id)
+    const row = props.rows.findIndex((record) => record?.id === id)
     if (row < 0) return false
     const column = Math.max(0, props.columns.findIndex((item) => item.kind === "key"))
     head.value = null
+    virtualizer.value.scrollToIndex(row, { align: "center" })
     focusCell({ row, column })
-    nextTick(() => cellElement({ row, column })?.scrollIntoView({ block: "center", inline: "nearest" }))
     flashed.value = id
     setTimeout(() => { if (flashed.value === id) flashed.value = null }, 2000)
     newKeyError.value = ""
@@ -446,8 +508,8 @@ defineExpose({
       <thead>
         <tr>
           <th class="records-grid-select" scope="col">
-            <Checkbox :model-value="allSelected ? true : someSelected ? 'indeterminate' : false" :aria-label="`Select every ${recordLabel} on this page`"
-              :disabled="!rows.length" @update:model-value="(value) => toggleAll(value === true)" />
+            <Checkbox :model-value="allSelected ? true : someSelected ? 'indeterminate' : false" :aria-label="`Select every loaded ${recordLabel}`"
+              :disabled="!loadedRows.length" @update:model-value="(value) => toggleAll(value === true)" />
           </th>
           <th v-for="(column, c) in columns" :key="column.id" scope="col" :aria-sort="ariaSort(column)" :style="frozenStyle(c)"
             :class="{ 'is-frozen': frozenLefts[c] !== null, 'is-frozen-edge': c === frozenCount - 1, 'is-thumbnail': column.kind === 'thumbnail' }">
@@ -484,7 +546,14 @@ defineExpose({
         </tr>
       </thead>
       <tbody @keydown="onKeydown" @copy="onCopy" @paste="onPaste">
-        <tr v-for="(row, r) in rows" :key="row.id" :aria-selected="selected.includes(row.id)" :class="{ 'is-selected': selected.includes(row.id), 'is-flashed': flashed === row.id }">
+        <tr v-if="paddingTop" class="records-grid-spacer" aria-hidden="true"><td :colspan="columns.length + 1" :style="{ height: `${paddingTop}px` }" /></tr>
+        <template v-for="{ index: r, key } in virtualRows" :key="String(key)">
+        <tr v-if="!rows[r]" :ref="measureRow" :data-index="r" class="records-grid-loading" :aria-rowindex="r + 2">
+          <td class="records-grid-select" />
+          <td v-for="(column, c) in columns" :key="column.id" :style="frozenStyle(c)" :class="{ 'is-frozen': frozenLefts[c] !== null, 'is-frozen-edge': c === frozenCount - 1 }"><span class="records-grid-skeleton" aria-hidden="true" /></td>
+        </tr>
+        <template v-else>
+        <tr v-for="row in [rows[r]!]" :key="row.id" :ref="measureRow" :data-index="r" :aria-rowindex="r + 2" :aria-selected="selected.includes(row.id)" :class="{ 'is-selected': selected.includes(row.id), 'is-flashed': flashed === row.id }">
           <td class="records-grid-select">
             <Checkbox :model-value="selected.includes(row.id)" :aria-label="`Select ${row.recordKey}`" @update:model-value="(value) => toggleRow(row.id, value === true)" />
           </td>
@@ -525,6 +594,9 @@ defineExpose({
               @mousedown.stop.prevent @click.stop @pointerdown.stop.prevent="startFill" @dblclick.stop="applyFill(rows.length - 1)" />
           </td>
         </tr>
+        </template>
+        </template>
+        <tr v-if="paddingBottom > 0" class="records-grid-spacer" aria-hidden="true"><td :colspan="columns.length + 1" :style="{ height: `${paddingBottom}px` }" /></tr>
         <tr class="records-grid-new">
           <td class="records-grid-select"><Plus class="size-4 mx-auto admin-text-secondary" aria-hidden="true" /></td>
           <td :colspan="columns.length">

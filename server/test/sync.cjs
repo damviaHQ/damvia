@@ -25,7 +25,7 @@ const queuedSyncs = () => state.queued.filter(job => job.name === 'collectionSyn
 const queuedContent = () => state.queued.filter(job => job.name === 'assetUpdateContentQueue').map(job => job.assetFileId)
 const folderRow = externalId => db.getRepository(AssetFolder).findOneByOrFail({ externalId })
 const fileRow = externalId => db.getRepository(AssetFile).findOneByOrFail({ externalId })
-const collectionIdsOf = assetFileId => db.getRepository(CollectionFile).findBy({ assetFileId }).then(rows => rows.map(row => row.collectionId).sort())
+const collectionIdsOf = assetFileId => db.getRepository(CollectionFile).findBy({ assetFileId }).then(rows => rows.map(row => row.collectionId).filter(Boolean).sort())
 before(async () => { fixtures = await harness.setup() })
 after(() => harness.teardown())
 
@@ -137,6 +137,7 @@ test('moving a file to another folder replaces its collection memberships and re
     state.queued.length = 0
     await upsertFile({ ...input, folderExternalId: target.externalId })
     const file = await fileRow(externalId)
+    assert.equal((await db.getRepository(CollectionFile).findBy({ assetFileId: file.id })).filter(row => row.collectionId === null).length, 1, 'moving a picture preserves its record access identity')
     assert.equal(file.folderId, target.id)
     assert.equal(file.licenseId, folderLicense.id)
     assert.equal(file.status, 'up_to_date')

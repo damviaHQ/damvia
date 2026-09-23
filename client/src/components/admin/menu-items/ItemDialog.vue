@@ -80,12 +80,7 @@ const subCollections = computed(() => {
     return []
   }
 
-  const path = props.parent?.collectionPath
-  const root = path
-    ? path.reduce((collections: Collection[], id: string) => {
-      return collections?.find((c: Collection) => c.id === id)?.children
-    }, collections.value)
-    : collections.value
+  const root = collections.value
   const mapCollection = (collection: Collection | Collection) => ({
     id: collection.id,
     label: collection.name,
@@ -169,7 +164,7 @@ async function handleSubmit() {
           {{ item ? "Edit item" : "Add item to menu" }}
         </DialogTitle>
         <DialogDescription class="text-body admin-text-secondary mb-4">
-          Choose a section, collection, page, link or divider for your navigation.
+          Choose a section, collection, page, link or divider for your navigation. Adding a collection here creates a link; it does not change its parent collection or access rules.
         </DialogDescription>
 
       </DialogHeader>

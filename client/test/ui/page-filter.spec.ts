@@ -7,16 +7,16 @@ const shot = (index: number, name: string, mimeType: string, type: 'photo' | 're
   id: `file-${index}`,
   name,
   size: String(size),
-  dimensions: { width: 800, height: 600 },
+  dimensions: index === 1 ? { width: 600, height: 800 } : { width: 800, height: 600 },
   updatedAt: `2026-0${index + 1}-01T10:00:00Z`,
   mimeType,
   thumbnailURL: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#e6e2dc"/></svg>'),
   fileURL: '#',
   collectionId: 'campaign',
   assetTypeId: type,
-  assetType: { id: type, name: type === 'photo' ? 'Photography' : 'Renders', defaultDisplay: 'grid', attributes: [], productAttributes: [{ id: 'colour', name: 'colour', displayName: 'Colour' }], listDisplayItems: ['size', 'format', 'updated_at'] },
-  product: { id: `product-${index}`, attributes: [{ id: 'colour', name: 'colour', displayName: 'Colour', value: colour }] },
-  productView: 'Front',
+  assetType: { id: type, name: type === 'photo' ? 'Photography' : 'Renders', defaultDisplay: 'grid', attributes: [], recordAttributes: [{ id: 'colour', name: 'colour', displayName: 'Colour' }], listDisplayItems: ['size', 'format', 'updated_at'] },
+  record: { id: `record-${index}`, attributes: [{ id: 'colour', name: 'colour', displayName: 'Colour', value: colour }] },
+  recordView: 'Front',
   attributes: [],
   licenses: [],
   createdAt: '2026-09-01T10:00:00Z',
@@ -116,6 +116,22 @@ test('taking a filter off the bar takes its values with it', async ({ page }) =>
   await expect(cards(page)).toHaveCount(4)
 })
 
+test('orientation filters files by their dimensions', async ({ page }) => {
+  await fixture(page)
+  await page.goto('/collections/campaign')
+  await activate(page, 'Orientation')
+  await page.getByRole('button', { name: /^Orientation,/ }).click()
+  await page.getByRole('checkbox', { name: 'Portrait' }).click()
+  await page.keyboard.press('Escape')
+  await expect(cards(page)).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Orientation, Portrait' })).toBeVisible()
+  await page.getByRole('button', { name: 'Orientation, Portrait' }).click()
+  await expect(page.locator('#page-filter-orientations-title')).toHaveCount(0)
+  await page.getByRole('checkbox', { name: 'Portrait' }).click()
+  await page.keyboard.press('Escape')
+  await expect(cards(page)).toHaveCount(4)
+})
+
 test('a name narrows the files and the sub-collections at once, and empty sections go away', async ({ page }) => {
   await fixture(page)
   await page.goto('/collections/campaign')
@@ -141,7 +157,7 @@ test('a name narrows the files and the sub-collections at once, and empty sectio
   await expect(cards(page)).toHaveCount(4)
 })
 
-test('a facet chip narrows the files and is removable, in grid, masonry and list alike', async ({ page }) => {
+test('a selected filter narrows the files and can be cleared, in grid, masonry and list alike', async ({ page }) => {
   await fixture(page)
   await page.goto('/collections/campaign')
   await activate(page, 'Asset type')
@@ -150,7 +166,7 @@ test('a facet chip narrows the files and is removable, in grid, masonry and list
   await page.getByRole('checkbox', { name: 'Renders' }).click()
   await page.keyboard.press('Escape')
   await expect(cards(page)).toHaveCount(2)
-  await expect(page.getByLabel('Active page filters')).toContainText('Renders')
+  await expect(page.getByRole('button', { name: 'Asset type, Renders' })).toBeVisible()
 
   for (const view of ['Masonry', 'List'] as const) {
     await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
@@ -160,13 +176,15 @@ test('a facet chip narrows the files and is removable, in grid, masonry and list
     await expect(rows).toHaveCount(2)
   }
 
-  // Back to the grid, then the chip is taken off and everything returns.
+  // Back to the grid, then the value is unchecked and everything returns.
   await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
   await page.getByRole('dialog', { name: 'Display preferences' }).getByRole('tab', { name: 'Grid', exact: true }).click()
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Remove filter Renders' }).click()
+  await page.getByRole('button', { name: 'Asset type, Renders' }).click()
+  await page.getByRole('checkbox', { name: 'Renders' }).click()
+  await page.keyboard.press('Escape')
   await expect(cards(page)).toHaveCount(4)
-  await expect(page.getByLabel('Active page filters')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Asset type, Any' })).toBeVisible()
 })
 
 test('a list column header sorts, and size sorts by its bytes rather than its text', async ({ page }) => {
@@ -198,3 +216,26 @@ test('a list column header sorts, and size sorts by its bytes rather than its te
   await expect(cell('File')).not.toHaveAttribute('aria-sort', 'ascending')
   expect(await names()).toEqual(['Catalogue.pdf', 'Chair side.png', 'Chair front.jpg', 'Living room.jpg'])
 })
+
+for (const width of [1440, 900, 390]) {
+  test(`filter overflow is confined to the horizontal rail at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 700 })
+    await fixture(page)
+    await page.goto('/collections/campaign')
+    await activate(page, 'Name', 'Asset type', 'File type', 'Format', 'Colour')
+    const rail = page.locator('.filter-rail-viewport')
+    await expect(rail).toBeVisible()
+    const dimensions = await page.evaluate(() => {
+      const measure = (el: Element) => ({ x: el.scrollWidth - el.clientWidth, y: el.scrollHeight - el.clientHeight })
+      return {
+        document: measure(document.documentElement),
+        main: measure(document.querySelector('main')!),
+        rail: measure(document.querySelector('.filter-rail-viewport')!),
+      }
+    })
+    expect(dimensions.document).toEqual({ x: 0, y: 0 })
+    expect(dimensions.main.x).toBe(0)
+    expect(dimensions.rail.y).toBe(0)
+    if (width < 1000) expect(dimensions.rail.x).toBeGreaterThan(0)
+  })
+}

@@ -196,8 +196,10 @@ async function onSubmit() {
       await trpc.collection.setRecordRules.mutate({
         id: props.collection.id,
         catalogueMode: form.value.catalogueMode,
-        recordFilters: form.value.recordFilters.filter(filterIsComplete),
-        ...(canSetAllRecords.value ? { includesAllRecords: form.value.includesAllRecords } : {}),
+        ...(canSetAllRecords.value ? {
+          recordFilters: form.value.recordFilters.filter(filterIsComplete),
+          includesAllRecords: form.value.includesAllRecords,
+        } : {}),
       })
     }
     if (canMove.value && (form.value.parentId ?? null) !== (props.collection.parentId ?? null)) {
@@ -263,7 +265,7 @@ async function onSubmit() {
         </FieldGroup>
       </section>
 
-      <CollectionProductSettings v-if="collection.canEdit" :collection-id="collection.id" :number-of-records="collection.numberOfRecords ?? 0"
+      <CollectionProductSettings v-if="collection.canEdit" :personal="!collection.public && !!collection.ownerId && !collection.synchronized" :collection-id="collection.id" :number-of-records="collection.numberOfRecords ?? 0"
         v-model:catalogue-mode="form.catalogueMode" v-model:includes-all-records="form.includesAllRecords"
         v-model:record-filters="form.recordFilters" />
 

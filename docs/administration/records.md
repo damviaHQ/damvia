@@ -1,12 +1,12 @@
 ---
 title: Records
-description: Create, edit and import a catalogue of records (products, events, venues), type their fields, see the files matched to each one and its history, and choose which fields power search and display.
+description: Create, edit and import a catalogue of records (products, events, venues), organise it in tables, type its fields, see the files matched to each record and its history, and choose which fields power search and display.
 sidebar:
   order: 10
 lastUpdated: 2026-09-22
 ---
 
-The Data enrichment area adds context to mirrored assets. Damvia keeps a flat catalogue of **records**, created on screen or imported by CSV, extracts a record key and optional view from each filename, and uses selected record fields for search, filters and display.
+The Data enrichment area adds context to mirrored assets. Damvia keeps a catalogue of **records**, organised in tables and created on screen or imported from CSV or Excel files, extracts a record key and optional view from each filename, and uses selected record fields for search, filters and display.
 
 A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), section **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
 
@@ -51,32 +51,47 @@ At the upgrade that brought this screen, `PRODUCT_MATCHING_REGEX` was copied int
 
 The old job that applied the regex every 5 minutes still runs, but only on files that no step owns: files of a type without steps, or of a type not related to records. It leaves alone files linked by hand. Once every record-related type has steps, set `ENABLE_LEGACY_PRODUCT_MATCHING=false` to stop it. The **Use PRODUCT_MATCHING_REGEX** button adds the old regex as a step to a type that has none.
 
+## Organise records in tables
+
+The catalogue is one source of data split into **tables**, like the sheets of a workbook: one per product line (shoes, apparel, accessories) or any grouping your team works by. The tables show as small tabs above the grid, left of the search and the Filters and Columns buttons; when there are more than fit, the tabs scroll sideways. The open one is kept in the address (`?table=`).
+
+- **Fields are shared.** A field such as Colour exists once for the whole catalogue; each table chooses which fields it shows. Readers never see tables: search, filters, facets, collections and file links work on every record at once.
+- **Keys are unique across tables.** A key belongs to one record, in one table.
+- **+** after the tabs adds a table. Double-click a tab, or open its ▾ menu, to rename it; drag tabs to reorder them.
+- **Delete table** in the ▾ menu of the open tab removes it. A table that holds records asks where to move them first; they keep their values, files and history. The last table cannot be deleted.
+- To move records, tick them and use **Move to table** in the bar at the bottom. The move is written to each record's history. Fields the other table does not show keep their values.
+- A new field added from the records page shows in the open table. **Manage fields** has a **Tables** column to show a field in other tables, or to stop showing it somewhere without removing its values.
+
+At the upgrade that brought tables, every record and field went into a first table named after your record label, plural.
+
 ## Work on records like a spreadsheet
 
-**Data enrichment → Products** (the menu uses your record label, `/admin/data-enrichment/records`) lists the records in a grid. Every change is saved as soon as it is made and written to the record's history.
+**Data enrichment → Products** (the menu uses your record label, `/admin/data-enrichment/records`) lists the records of the open table in a grid. Every change is saved as soon as it is made and written to the record's history.
+
+There are no pages: the grid scrolls through the whole table and loads rows as they come on screen. Search, filters and sort always run on the whole table, not on the rows already loaded. The count under the grid gives the number of records, or how many of them match.
 
 | To | Do |
 |---|---|
-| Add a record | Type its key in the last row and press Enter, or use **Add product** at the top. The record opens as a card to fill in. A key already taken is refused in the row, with a **Go to** link that opens the page holding that record and highlights its row; search and filters that hide it are cleared first. |
+| Add a record | Type its key in the last row and press Enter, or use **Add product** at the top. The record goes to the open table and opens as a card to fill in. A key already taken is refused in the row, with a **Go to** link that scrolls to that record and highlights its row; its table opens if it is another one, and search and filters that hide it are cleared first. |
 | Edit a value | Click a cell to select it, then click again, double-click, press Enter or Space to continue the value, or start typing to replace it. Enter saves and moves down, Tab saves and moves right, Esc cancels. A select opens its list of options; type to narrow it and add a missing option from there. |
-| Select several cells | Drag across them, Shift+click the far corner, or hold Shift with the arrow keys. Ctrl+A or ⌘+A selects every cell of the page, Esc goes back to one cell. |
+| Select several cells | Drag across them, Shift+click the far corner, or hold Shift with the arrow keys. Ctrl+A or ⌘+A selects every cell of the table, Esc goes back to one cell. |
 | Copy and paste | Ctrl+C or ⌘+C copies the selected cells as tab-separated rows, the form Sheets and Excel use, so a block goes both ways. Ctrl+V or ⌘+V pastes: one value fills every selected cell, a block the selection holds a whole number of times is repeated across it, and any other block is laid from the top-left cell. |
-| Duplicate values down | Drag the small square at the corner of the selection up or down: the selected rows repeat over the rows you cover. Double-click the square to fill to the last row of the page, or press Ctrl+D or ⌘+D to copy the first row of the selection into the rows below it. |
+| Duplicate values down | Drag the small square at the corner of the selection up or down: the selected rows repeat over the rows you cover. Double-click the square to fill to the last row, or press Ctrl+D or ⌘+D to copy the first row of the selection into the rows below it. |
 | Clear values | Delete or Backspace clears every selected cell. |
 | Undo an edit | Use **Undo** on the notice that confirms the edit. The undo is a change of its own in the history. |
 
-A paste, fill or clear over several cells is checked before anything is sent: one value its field refuses and nothing is saved. It is saved in one go, can be undone in one go, and each record it changes gets one history entry. The key, picture and count columns are never written; the notice says how many of their cells were left out. A paste or fill stops at the last row of the page.
+A paste, fill or clear over several cells is checked before anything is sent: one value its field refuses and nothing is saved. It is saved in one go, can be undone in one go, and each record it changes gets one history entry. The key, picture and count columns are never written; the notice says how many of their cells were left out. Rows not loaded yet, far from the part of the grid on screen, are left as they are. A paste or fill stops at the last row.
 | Find records | The search box looks in the key and every value. **Filters** narrow by field (contains, is, is not, is empty, is any of the options), and several filters narrow each other. |
 | Sort | Open a column's menu. Numbers and dates sort by value; values that do not fit their type come last. |
-| Arrange columns | **Columns** shows, hides and reorders them, and each column can be resized from its right edge; a long value never widens its column. Columns above the **Frozen** line in **Columns** stay in place when the grid scrolls sideways; drag the line, or move it with its arrows, to freeze more or fewer columns. It starts just after the key column, which can be moved but not hidden. **Wrap text** at the top of **Columns** shows up to four lines per cell, line breaks included, instead of one. The layout is kept in this browser only. **Files** counts the files linked to each record and **Filled** how many of its fields hold a value. |
-| Act on several records | Tick them, across pages if needed: **Set a field** gives them one value, **Export CSV** exports them, **Delete** removes them. |
-| Export | **Export CSV** in the ⋮ menu exports every record the search and filters find, or the selection when there is one, never only the visible page. At most 10,000 records per export. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet never runs them as formulas. |
+| Arrange columns | **Columns** shows, hides and reorders them, and each column can be resized from its right edge; a long value never widens its column. Columns above the **Frozen** line in **Columns** stay in place when the grid scrolls sideways; drag the line, or move it with its arrows, to freeze more or fewer columns. It starts just after the key column, which can be moved but not hidden. **Wrap text** at the top of **Columns** shows up to four lines per cell, line breaks included, instead of one. The layout is kept for each table, in this browser only. **Files** counts the files linked to each record and **Filled** how many of its fields hold a value. |
+| Act on several records | Tick them, anywhere in the table: **Set a field** gives them one value, **Move to table** moves them to another table, **Export CSV** exports them, **Delete** removes them. The header box ticks every row loaded. |
+| Export | **Export CSV** in the ⋮ menu exports every record of the open table the search and filters find, with the fields the table shows, or the selection when there is one, never only the rows loaded. At most 10,000 records per export. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet never runs them as formulas. |
 
 The ↗ button next to a key, or Enter on the key, opens the record as a card on the right. Its address carries `?record=`, so a link to it can be shared with another admin.
 
-- **Fields** lists every field with an input of its type; a value is saved when you leave the field or pick an option. The pencil next to a field's name edits the field itself (display name, type, options, switches), and **Add a field** at the bottom adds one to every record.
+- **Fields** lists the fields of the table with an input of their type; a value is saved when you leave the field or pick an option. Fields the table does not show but that hold a value for this record follow under **Not shown in this table**. The pencil next to a field's name edits the field itself (display name, type, options, switches), and **Add a field** at the bottom adds one, shown in the open table.
 - **Files** shows the files linked to the record with their thumbnail, the primary one marked, and what linked each of them: a matching step and its pattern, a folder, a file set by hand, the CSV mapping or the file metadata. Files linked to a range the record belongs to follow under **Covering the range**. Files are attached from [Unmatched](#fix-what-matching-could-not), not from the card.
-- **History** lists who created, changed or deleted the record, when, where (grid, card, bulk edit, CSV import, Unmatched, removal of a field) and each value before and after. A record deleted and created again under the same key shows its earlier life. History started with this version; earlier changes are not listed, and it is never pruned.
+- **History** lists who created, changed, moved or deleted the record, when, where (grid, card, bulk edit, CSV import, Unmatched, removal of a field) and each value before and after, or the tables of a move. A record deleted and created again under the same key shows its earlier life. History started with this version; earlier changes are not listed, and it is never pruned.
 
 **Delete product** at the bottom of the card, or **Delete** on a selection, removes records. Their last values stay in the history. Files linked to their key stay linked and appear as dangling in Unmatched until a record with that key exists again.
 
@@ -100,9 +115,11 @@ A field turned into a select without options takes its options from the values r
 
 Add a field from the ⋮ menu, from **Columns**, from a record's card, or in **Manage fields**. Its name is the CSV column name and cannot change afterwards; its display name can. Edit or remove a field from its column menu or in **Manage fields**. Removing a field removes its value from every record, and each record keeps the lost value in its history.
 
-## Prepare the CSV
+## Prepare the file
 
-The first row holds the column names and each row after it is one record. One column holds a stable, unique key such as `sku`. Save the sheet as CSV (UTF-8) from Excel, Numbers or Google Sheets; commas, semicolons and tabs all work, and blank lines are ignored.
+Import a CSV file or an Excel workbook (`.xlsx`). The first row holds the column names and each row after it is one record. One column holds a stable, unique key such as `sku`. A CSV saved as UTF-8 from Excel, Numbers or Google Sheets works with commas, semicolons or tabs; blank lines are ignored. Older formats (`.xls`, `.ods`, `.numbers`) must be saved as `.xlsx` or CSV first.
+
+In a workbook, each sheet is read like a CSV: its first row with a value names the columns. Date cells become `YYYY-MM-DD`. Sheets with the same columns fill the same fields: a Colour column in the Shoes sheet and in the Apparel sheet both go into the one Colour field.
 
 The key column name is fixed by the first record, imported or created on screen. When a file does not have that column, you choose the column whose values are matched against the stored keys. The easiest way to update what is stored is to start from **Export** on the records page, edit it, and import it back.
 
@@ -118,18 +135,19 @@ ABC123-002,Example bag,Black,Accessories
 
 ## Compare before importing
 
-Open **Import CSV** on the records page (`/admin/data-enrichment/records/import`). Nothing is saved before the last step.
+Open **Import** on the records page (`/admin/data-enrichment/records/import`). Nothing is saved before the last step.
 
-1. **File**: drop the CSV or choose it.
-2. **Columns**: check the key column, then say where each other column goes. A column goes into the field with the same name or display name, case aside; otherwise it becomes a new Text field. Pick another field, or **Don't import**, for any column. Sample values show what each column holds. Under **Empty cells**, choose whether an empty cell keeps the value already stored (the default) or clears it.
-3. **Review**: counts of new, changed, unchanged and not imported rows sit above the list; click one to show only those rows. A changed row lists each field as old value → new value. Every changed row is ticked and will be applied; untick the ones to leave as stored, or use the header box to untick or tick them all. New rows are always created. The fields that will be created and the options that will be added to select fields are listed at the top.
-4. **Import** writes it all in one go: if it fails, nothing is written. Each created or changed record gets a history entry from the import.
+1. **File**: drop the CSV or the workbook, or choose it.
+2. **Tables**: say where each sheet goes. A CSV goes to the table open on the records page; each sheet of a workbook goes to a new table named after the sheet, numbered when a table already has the name ("Shoes (1)", "Shoes (2)"). Rename a new table here, pick an existing table instead, or untick a sheet to leave it out. The sheets then go through the next steps one after the other, and **Skip this sheet** passes one.
+3. **Columns**: check the key column, then say where each other column goes. A column goes into the field with the same name or display name, case aside; otherwise it becomes a new Text field. Pick another field, or **Don't import**, for any column. Sample values show what each column holds. Under **Empty cells**, choose whether an empty cell keeps the value already stored (the default) or clears it.
+4. **Review**: counts of new, changed, unchanged and not imported rows sit above the list; click one to show only those rows. A changed row lists each field as old value → new value. Every changed row is ticked and will be applied; untick the ones to leave as stored, or use the header box to untick or tick them all. New rows are always created. The fields that will be created and the options that will be added to select fields are listed at the top. A key already stored in another table is updated there and stays there; the review says which table, and **Move to table** moves it afterwards.
+5. **Import** writes the sheet in one go: if it fails, nothing of that sheet is written. A new table is created just before its first import. New records go to the table, which then shows every column imported. Each created or changed record gets a history entry from the import.
 
 Rows are not imported when they have no key, when their key appears on several rows of the file, or when a value is refused by its field, such as text in a Number field. The review gives the reason for each; fix the file and import it again.
 
-CSV is parsed in the browser and sent as JSON. The API body limit is 5 MiB, so the JSON request may exceed the limit even when the original CSV does not. Split large catalogues into batches with the same key column.
+Files are read in the browser and sent as JSON. The API body limit is 5 MiB, so the JSON request may exceed the limit even when the original CSV does not. Split large catalogues into batches with the same key column.
 
-**Remove all products** in the ⋮ menu deletes every record, including those outside the current search and filters. Their values stay in the history, links set on their keys wait as dangling, and no source file is deleted.
+**Remove all products of this table** in the ⋮ menu deletes every record of the open table, including those outside the current search and filters. Other tables keep theirs. Their values stay in the history, links set on their keys wait as dangling, and no source file is deleted.
 
 ## How a file ends up linked
 
@@ -194,10 +212,11 @@ A search now lists each file once, even when it sits in several collections the 
 
 ## Configure record fields
 
-On the records page, open ⋮ → **Manage fields**. The panel lists every field with its type. Drag the fields, or use the arrows, to set the order of the grid and the card for everyone; each admin can still rearrange the grid for themselves with **Columns**. Tick what each field does for readers, and use the pencil for its display name, type and options, or the bin to remove it. The old **Fields** address opens this panel, and `?tab=metadata` opens File metadata.
+On the records page, open ⋮ → **Manage fields**. The panel lists every field of the catalogue with its type and the tables that show it. Drag the fields, or use the arrows, to set the catalogue order; each admin can still rearrange the grid for themselves with **Columns**. Tick what each field does for readers, and use the pencil for its display name, type and options, or the bin to remove it. The old **Fields** address opens this panel, and `?tab=metadata` opens File metadata.
 
 | Setting | Effect |
 |---|---|
+| Tables | The tables whose grid and card show the field. Unticking a table hides the field there and keeps its values. |
 | Display name | Label shown to admins and readers instead of the name. Set with the pencil. |
 | Type and options | How values are entered and checked; see [Give each field a type](#give-each-field-a-type). Set with the pencil. |
 | Filter | The field becomes a faceted filter in the DAM search. Ticking it also ticks Show. |

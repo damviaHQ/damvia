@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import RecordFilters from "@/components/records/RecordFilters.vue"
+import CollectionDialogAddRecordsByKey from "@/components/collection/CollectionDialogAddRecordsByKey.vue"
 import FieldDescription from "@/components/ui/field/FieldDescription.vue"
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
@@ -21,75 +21,53 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { useGlobalStore } from "@/stores/globalStore.ts"
-import { trpc } from "@/services/server.ts"
-import { filterIsComplete, type RecordFilter } from "@/utils/recordFilters"
-import { useQuery } from "@tanstack/vue-query"
+import type { RecordFilter } from "@/utils/recordFilters"
 import { ListPlus } from "@lucide/vue"
-import { computed } from "vue"
+import { computed, ref } from "vue"
 
-const props = defineProps<{ collectionId: string, numberOfRecords: number }>()
+defineProps<{ collectionId: string, numberOfRecords: number, personal?: boolean }>()
 const catalogueMode = defineModel<"files" | "products" | "both">("catalogueMode", { required: true })
 const includesAllRecords = defineModel<boolean>("includesAllRecords", { required: true })
-const recordFilters = defineModel<RecordFilter[]>("recordFilters", { required: true })
+defineModel<RecordFilter[]>("recordFilters", { required: true })
 
 const globalStore = useGlobalStore()
 const { plural, singular, lowerPlural } = useRecordLabel()
-// The rules are written against the catalogue fields, which only an
-// administrator may read.
 const isAdmin = computed(() => globalStore.user?.role === "admin")
-const { data: fields } = useQuery({
-  enabled: isAdmin,
-  queryKey: ["record-attributes"],
-  queryFn: () => trpc.recordAttribute.list.query(),
-})
-const { data: keyLabel } = useQuery({
-  enabled: isAdmin,
-  queryKey: ["records", "key-label"],
-  queryFn: async () => (await trpc.record.list.query({ offset: 0, limit: 1 })).keyColumnName ?? "Key",
-})
-const incomplete = computed(() => recordFilters.value.some((filter) => !filterIsComplete(filter)))
+const isAddByKeyOpen = ref(false)
 </script>
 
 <template>
   <section class="grid gap-4" aria-labelledby="collection-products-heading">
-    <h3 id="collection-products-heading" class="text-sm font-semibold">{{ plural }}</h3>
-    <FieldGroup>
+    <h3 id="collection-products-heading" class="text-sm font-semibold">{{ personal ? "Contents" : plural }}</h3>
+    <FieldDescription v-if="personal">This collection can hold files and {{ lowerPlural }}. Its contents are displayed automatically.</FieldDescription>
+    <FieldDescription v-if="personal || catalogueMode !== 'files' || numberOfRecords > 0">
+      Anyone who can open this collection can view and download its {{ lowerPlural }}’ linked pictures.
+      No separate file collection is needed. Licence dates and regional restrictions still apply.
+    </FieldDescription>
+    <FieldGroup v-if="!personal && isAdmin">
       <Label for="collection-catalogue-mode">What readers browse here</Label>
       <select id="collection-catalogue-mode" v-model="catalogueMode" class="record-native-select">
         <option value="files">Files only</option>
         <option value="products">{{ plural }} only</option>
-        <option value="both">Files and {{ plural.toLowerCase() }}</option>
+        <option value="both">Files and {{ lowerPlural }}</option>
       </select>
-      <FieldDescription>{{ numberOfRecords }} {{ numberOfRecords === 1 ? singular.toLowerCase() : plural.toLowerCase() }} in this collection.</FieldDescription>
+      <FieldDescription>{{ numberOfRecords }} {{ numberOfRecords === 1 ? singular.toLowerCase() : lowerPlural }} in this collection.</FieldDescription>
     </FieldGroup>
-
-    <div v-if="catalogueMode !== 'files'" class="grid justify-items-start gap-1">
-      <Button type="button" variant="outline" size="sm" as-child>
-        <router-link :to="{ name: 'admin-collection-products', params: { id: collectionId } }">
-          <ListPlus class="size-5" />Build this catalogue
-        </router-link>
+    <div v-if="personal || catalogueMode !== 'files'" class="grid justify-items-start gap-2">
+      <Button v-if="isAdmin && !personal" type="button" variant="outline" size="sm" as-child>
+        <router-link :to="{ name: 'admin-collection-products', params: { id: collectionId } }"><ListPlus class="size-4" />Build this catalogue</router-link>
       </Button>
-      <FieldDescription>
-        Pick the {{ lowerPlural }} by reference or by rules, see what is ready, and take out the ones you do not want.
-      </FieldDescription>
+      <Button v-else type="button" variant="outline" size="sm" @click="isAddByKeyOpen = true"><ListPlus class="size-4" />Add by reference</Button>
+      <FieldDescription v-if="isAdmin && !personal">Manage references, automatic rules and readiness in the catalogue builder.</FieldDescription>
+      <FieldDescription v-else>Add {{ lowerPlural }} from the catalogue or paste their references.</FieldDescription>
     </div>
-
-    <div v-if="isAdmin" class="flex items-start gap-3">
+    <div v-if="isAdmin && !personal && catalogueMode !== 'files'" class="flex items-start gap-3">
       <Checkbox id="collection-all-records" v-model="includesAllRecords" class="mt-0.5" aria-describedby="collection-all-records-help" />
       <div class="grid gap-1">
         <Label for="collection-all-records">Show the whole catalogue</Label>
-        <FieldDescription id="collection-all-records-help">Every {{ singular.toLowerCase() }} is reachable through this collection, without listing them one by one.</FieldDescription>
+        <FieldDescription id="collection-all-records-help">Every {{ singular.toLowerCase() }} and its linked pictures are accessible through this collection. Use a curated collection to include or exclude individual entries.</FieldDescription>
       </div>
     </div>
-
-    <FieldGroup v-if="isAdmin && !includesAllRecords">
-      <Label>Rules</Label>
-      <RecordFilters v-if="fields" :fields="fields" :key-label="keyLabel ?? 'Key'" v-model="recordFilters" />
-      <FieldDescription>
-        Every {{ singular.toLowerCase() }} matching these rules joins the collection, and leaves it when it stops matching.
-        {{ plural }} added by hand stay whatever the rules say.
-      </FieldDescription>
-      <p v-if="incomplete" role="status" class="text-caption text-neutral-500">A rule without a value is ignored until you fill it.</p>
-    </FieldGroup>
+    <CollectionDialogAddRecordsByKey v-model="isAddByKeyOpen" :collection-id="collectionId" />
   </section>
 </template>

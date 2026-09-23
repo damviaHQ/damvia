@@ -22,6 +22,7 @@ import {
   matchesCollection,
   groupValueCount,
   matchesFile,
+  orientationOf,
   pageFilterCount,
   type FilterableFile,
   type PageFilterState,
@@ -90,6 +91,28 @@ describe('page filter', () => {
     expect(namesOf(state({ attributes: { 'attr-colour': ['Red', 'Blue'] } }))).toEqual(['Chair front.jpg', 'Chair side.png'])
   })
 
+  test('orientation groups dimensions without exposing individual ratios', () => {
+    const images: FilterableFile[] = [
+      { name: 'Tall.jpg', dimensions: { width: 2205, height: 3307 } },
+      { name: 'Wide.jpg', dimensions: { width: 3307, height: 2205 } },
+      { name: 'Square.jpg', dimensions: { width: 1000, height: 1000 } },
+      { name: 'Unknown.jpg', dimensions: { width: null, height: 1000 } },
+    ]
+    expect(images.map(orientationOf)).toEqual(['portrait', 'landscape', 'square', null])
+    const current = emptyPageFilter()
+    expect(fileFacets(images, current).orientations).toEqual([
+      { id: 'portrait', label: 'Portrait', count: 1 },
+      { id: 'landscape', label: 'Landscape', count: 1 },
+      { id: 'square', label: 'Square', count: 1 },
+    ])
+    expect(availableGroups(current, fileFacets(images, current)).map(group => group.title)).toContain('Orientation')
+    expect(images.filter(image => matchesFile(image, state({ orientations: ['portrait'] }))).map(image => image.name)).toEqual(['Tall.jpg'])
+    expect(images.filter(image => matchesFile(image, state({ orientations: ['landscape', 'square'] }))).map(image => image.name)).toEqual(['Wide.jpg', 'Square.jpg'])
+    expect(filterChipsOf(state({ orientations: ['portrait'] }), fileFacets(images, current))).toEqual([
+      { key: 'orientations', value: 'portrait', label: 'Portrait', category: 'Orientation' },
+    ])
+  })
+
   test('a count says what picking the value would show, so its own dimension is left out', () => {
     const facets = fileFacets(files, state({ assetTypes: [packshot.id] }))
     // Asset type counts ignore the chosen asset type, or the other values would read zero.
@@ -137,6 +160,8 @@ describe('page filter', () => {
     // A dimension with a single value narrows nothing, so it is not offered.
     const single = [file('Only one.jpg', 'image/jpeg', packshot, [colour])]
     expect(availableGroups(current, fileFacets(single, current))).toEqual([])
+    expect(availableGroups(current, fileFacets(single, current), true).map(group => group.title))
+      .toEqual(["Asset type", "File type", "Format", "colour"])
   })
 
   test('a dimension in use stays offered even once its values collapse to one', () => {

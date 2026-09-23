@@ -13,29 +13,33 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import FilterChipList from "@/components/FilterChipList.vue"
 import SearchFacetGroup from "@/components/search/SearchFacetGroup.vue"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { usePageFilter } from "@/composables/usePageFilter"
 import { useGlobalStore } from "@/stores/globalStore"
-import type { DisplayCollection, DisplayFile } from "@/utils/displayPreferences"
+import type { DisplayCollection } from "@/utils/displayPreferences"
 import {
   availableGroups,
   fileFacets,
-  filterChipsOf,
   matchesCollection,
   matchesFile,
   NAME_FILTER_KEY,
   type FilterableCollection,
   type FilterableFile,
+  type PageFacets,
 } from "@/utils/pageFilter"
 import { ChevronDown, Search, X } from "@lucide/vue"
 import { computed } from "vue"
 
 const props = withDefaults(defineProps<{
-  files?: DisplayFile[]
+  files?: FilterableFile[]
   collections?: DisplayCollection[]
-}>(), { files: () => [], collections: () => [] })
+  showSummary?: boolean
+  showSingleValues?: boolean
+  facets?: PageFacets
+  total?: number
+  shown?: number
+}>(), { files: () => [], collections: () => [], showSummary: true })
 
 const filter = usePageFilter()
 const store = useGlobalStore()
@@ -44,22 +48,21 @@ const store = useGlobalStore()
 // filtered set would take away every value the reader has not picked yet.
 const files = computed(() => props.files as unknown as FilterableFile[])
 const collections = computed(() => props.collections as unknown as FilterableCollection[])
-const facets = computed(() => fileFacets(files.value, filter.state.value))
-const chips = computed(() => filterChipsOf(filter.state.value, facets.value))
+const facets = computed(() => props.facets ?? fileFacets(files.value, filter.state.value))
 
 // Only what the reader put on the bar from the funnel: showing every facet at
 // once was a wall of controls on a page that already has plenty.
 const showName = computed(() => store.pageFilters.includes(NAME_FILTER_KEY))
-const groups = computed(() => availableGroups(filter.state.value, facets.value)
+const groups = computed(() => availableGroups(filter.state.value, facets.value, props.showSingleValues)
   .filter((group) => store.pageFilters.includes(group.key))
   .map((group) => ({ ...group, id: group.key.replace(":", "-") })))
 const isEmpty = computed(() => !showName.value && !groups.value.length)
 
-const total = computed(() => files.value.length + collections.value.length)
-const shown = computed(() =>
+const total = computed(() => props.total ?? files.value.length + collections.value.length)
+const shown = computed(() => props.shown ?? (
   files.value.filter((file) => matchesFile(file, filter.state.value)).length +
   collections.value.filter((collection) => matchesCollection(collection, filter.state.value)).length
-)
+))
 const summaryLabel = computed(() => {
   if (!filter.isActive.value) return `${total.value} ${total.value === 1 ? "item" : "items"}`
   return `${shown.value} of ${total.value} ${total.value === 1 ? "item" : "items"}`
@@ -79,7 +82,7 @@ const triggerLabel = (selected: string[], options: { id: string, label: string }
         type="text"
         aria-label="Filter by name"
         placeholder="Filter by name"
-        class="h-[29px] w-56 rounded-full border border-neutral-200 bg-white pl-8 pr-8 text-[12px] text-neutral-900 placeholder:text-[color:var(--dv-text-secondary)] focus-visible:outline-2 focus-visible:outline-ring"
+        class="h-[29px] w-56 rounded-full border border-neutral-200 bg-white pl-8 pr-8 text-[12px] text-neutral-900 placeholder:text-[color:var(--dv-text-secondary)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
         @input="filter.setName(($event.target as HTMLInputElement).value)"
         @keydown.esc.prevent="filter.setName('')"
       >
@@ -107,11 +110,11 @@ const triggerLabel = (selected: string[], options: { id: string, label: string }
           :title="group.title"
           :options="group.options"
           :selected="group.selected"
+          :show-header="false"
           @toggle="filter.toggleValue(group.key, $event)"
         />
       </PopoverContent>
     </Popover>
-    <FilterChipList :chips="chips" label="Active page filters" @remove="filter.toggleValue($event.key, $event.value)" @clear="filter.clear()" />
-    <p class="ml-auto text-caption tabular-nums text-[color:var(--dv-text-secondary)]" aria-live="polite">{{ summaryLabel }}</p>
+    <p :class="showSummary ? 'ml-auto text-caption tabular-nums text-[color:var(--dv-text-secondary)]' : 'sr-only'" aria-live="polite">{{ summaryLabel }}</p>
   </div>
 </template>

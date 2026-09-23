@@ -29,11 +29,11 @@ const rows = [
   { id: 'r2', recordKey: 'A-2', metaData: { Colour: '', Price: 'n/a' }, thumbnailURL: null, fileCount: 3, filledCount: 1 },
 ]
 
-function setup(commit = vi.fn().mockResolvedValue(undefined), create = vi.fn().mockResolvedValue(undefined)) {
+function setup(commit = vi.fn().mockResolvedValue(undefined), create = vi.fn().mockResolvedValue(undefined), list: (typeof rows[number] | null)[] = rows) {
   const commitMany = vi.fn().mockResolvedValue(undefined)
   const wrapper = mount(RecordsGrid, {
     attachTo: document.body,
-    props: { rows, columns, fieldCount: 2, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, commitMany, addOption: vi.fn(), create },
+    props: { rows: list, columns, fieldCount: 2, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, commitMany, addOption: vi.fn(), create },
   })
   return { wrapper, commit, commitMany, create }
 }
@@ -172,6 +172,17 @@ describe('RecordsGrid', () => {
     await cell(wrapper, 0, 3).trigger('keydown', { key: 'ArrowDown', shiftKey: true })
     await cell(wrapper, 0, 3).trigger('keydown', { key: 'd', ctrlKey: true })
     expect(commit).toHaveBeenLastCalledWith(rows[1], price, '10')
+    wrapper.unmount()
+  })
+
+  test('a row not loaded yet shows as a placeholder, reports the rows on screen, and is left out of a filled range', async () => {
+    const { wrapper, commit, commitMany } = setup(undefined, undefined, [rows[0], null, rows[1]])
+    expect(wrapper.findAll('tr.records-grid-loading')).toHaveLength(1)
+    expect(wrapper.emitted('range')?.[0]).toEqual([0, 2])
+    await cell(wrapper, 0, 2).trigger('click')
+    await cell(wrapper, 0, 2).get('.records-grid-fill-handle').trigger('dblclick')
+    expect(commit).toHaveBeenLastCalledWith(rows[1], colour, 'Blue')
+    expect(commitMany).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 })

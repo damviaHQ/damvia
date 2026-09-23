@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { Column, Entity, PrimaryColumn, UpdateDateColumn } from "typeorm"
+import type { RelatedRecordsSettings } from "../services/catalogue"
 
 @Entity('enrichment_settings')
 export class EnrichmentSettings {
@@ -53,6 +54,9 @@ export class EnrichmentSettings {
 	// card carries the reference alone.
 	@Column({ type: 'varchar', nullable: true })
 	cardTitleAttributeName: string | null
+
+	@Column({ type: 'jsonb', nullable: true })
+	relatedRecords: RelatedRecordsSettings | null
 
 	@UpdateDateColumn()
 	updatedAt: Date

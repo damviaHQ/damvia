@@ -81,7 +81,7 @@ Moving a file in the cloud changes its type to the destination folder's type on 
 
 ## Record and search effects
 
-Mark a type **Related to records** when its files should participate in record-view filters. Filename matching and the imported catalogue still determine which record a file belongs to; the type only enables that record-related presentation.
+Mark a type **Related to records** when its files should participate in record-view filters. Automatic matching runs for types with this option enabled, using the rules configured in **Link to records** (named after your records in Settings). The type identifies which files to match; record collections then grant access to the linked pictures, subject to licence dates and regional restrictions. A separate picture collection is optional.
 
 **Search by default** preselects the type for new search sessions. Readers can change the selection and Damvia remembers their preference. Use this setting for the core assets people normally expect, and leave decorative or supporting material unselected when it would make searches noisy.
 

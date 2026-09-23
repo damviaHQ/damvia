@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import RelatedRecordsSettings from "@/components/catalogue/RelatedRecordsSettings.vue"
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -252,13 +253,13 @@ const removeBackgroundImage = async () => {
         </form>
         <template v-if="enrichmentStatus === 'success'">
           <h3 id="views-heading" class="views-heading">Views</h3>
-          <p>For brands that sell products. A product is usually shot several times: front, back, side, close-up, in use. Each of these pictures is a view, and a number after the product key in the file name tells them apart:</p>
+          <p>Optional: distinguish several pictures of the same record by view. For example, a product may have front, back, side and close-up pictures. A number after its reference in the file name tells them apart:</p>
           <ul class="views-example">
             <li><code>{{ viewFile(1) }}</code> product <code>ABC123-001</code>, view <code>{{ viewNumber(1) }}</code>, the front for example</li>
             <li><code>{{ viewFile(2) }}</code> same product, view <code>{{ viewNumber(2) }}</code>, the back</li>
             <li><code>{{ viewFile(3) }}</code> same product, view <code>{{ viewNumber(3) }}</code>, the side</li>
           </ul>
-          <p>With views on, all these files are linked to the same {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }}, search can be filtered by view (only the fronts, for example), and one view is used as the {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }}'s picture. Leave views off if each file shows its record once, as for events or venues.</p>
+          <p>With views on, all these files are linked to the same {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }}, search can be filtered by view (only the fronts, for example), and one view is used as the {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }}'s picture. Matching and picture access through collections also work with views off.</p>
           <form class="record-label-form" aria-labelledby="views-heading" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
             <label class="views-switch"><Switch v-model="recordLabel.viewsEnabled" />Files show several views of each {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }}</label>
             <template v-if="recordLabel.viewsEnabled">
@@ -289,6 +290,7 @@ const removeBackgroundImage = async () => {
         </template>
 
         <template v-if="enrichmentStatus === 'success'">
+          <RelatedRecordsSettings class="mt-6 border-t border-neutral-200 pt-6" />
           <h3 id="readiness-heading" class="views-heading">Ready to use</h3>
           <p>Say what a {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} must carry to count as ready. The catalogue then shows how far each one is, and readers can keep only the ones that are ready. Requiring nothing leaves every {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} ready.</p>
           <div class="record-label-field">

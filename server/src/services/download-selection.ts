@@ -51,11 +51,35 @@ export async function resolveDownloadSelection(em: EntityManager, user: User, it
   if (records.length > EXPORT_MAX) throw new TRPCError({ code: 'BAD_REQUEST', message: `Select up to ${EXPORT_MAX.toLocaleString('en-US')} records at a time.` })
   const keyName = await catalogueKeyColumnName(em)
   const fields = await em.getRepository(RecordAttribute).find({ where: { viewable: true }, order: { position: 'ASC', name: 'ASC' } })
-  const columns = [{ id: 'recordKey', label: keyName ?? 'Reference' }, ...fields.filter(field => field.name !== keyName).map(field => ({ id: field.id, label: field.displayName || field.name }))]
+  const columns = [{ id: 'recordKey', label: keyName ?? 'Reference' }, ...fields.filter(field => field.name !== keyName).map(field => ({ id: field.id, label: field.displayName || field.name })), ...(records.length <= 1000 ? [{ id: 'picture', label: 'Picture' }] : [])]
   const rows = records.map(record => [record.recordKey, ...fields.filter(field => field.name !== keyName).map(field => {
     const value = record.metaData?.[field.name] ?? ''
     return field.valueType === 'multi_select' ? value.split('|').filter(Boolean).join(', ') : value
-  })])
+  }), ...(records.length <= 1000 ? [''] : [])])
+  const pictures: { recordId: string, assetId: string }[] = []
+  if (records.length) {
+    const [visibleFiles, visibleParameters] = userCollectionFilesQuery(user, em)
+      .select('collection_file.asset_file_id').getQueryAndParameters()
+    const accessibleFiles = visibleFiles.replace(/\$(\d+)/g, (_, index) => `$${Number(index) + 2}`)
+    const found: { recordId: string, assetId: string }[] = await em.query(`
+      WITH linked AS (
+        SELECT coalesce(l.record_id, a.record_id) AS record_id, a.id AS asset_id,
+          a.record_view, a.name
+        FROM asset_files a
+        LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id
+          AND l.target_kind = 'record' AND l.status = 'active'
+        WHERE coalesce(l.record_id, a.record_id) = ANY($1::uuid[])
+          AND a.mime_type LIKE 'image/%' AND a.has_thumbnail
+          ${settings.viewsEnabled ? "AND NULLIF(a.record_view, '') IS NOT NULL" : ''}
+          AND a.id IN (${accessibleFiles})
+      )
+      SELECT DISTINCT ON (record_id) record_id AS "recordId", asset_id AS "assetId"
+      FROM linked
+      ORDER BY record_id, (record_view IS NOT DISTINCT FROM $2) DESC,
+        record_view NULLS LAST, name, asset_id
+    `, [records.map(record => record.id), settings.thumbnailView, ...visibleParameters])
+    pictures.push(...found)
+  }
   const files = includeFiles ? await userCollectionFilesQuery(user, em)
     .andWhere(new Brackets(q => {
       q.where({ id: In(items.filter(item => item.type === 'file').map(item => item.id)) })
@@ -64,7 +88,8 @@ export async function resolveDownloadSelection(em: EntityManager, user: User, it
         SELECT a.id FROM asset_files a
         LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
         WHERE coalesce(l.record_id, a.record_id) IN (:...downloadRecordIds)
+          ${settings.viewsEnabled ? "AND NULLIF(a.record_view, '') IS NOT NULL" : ''}
       )`, { downloadRecordIds: records.map(record => record.id) })
     })).orderBy('asset_file.name', 'ASC').addOrderBy('collection_file.id', 'ASC').getMany() : []
-  return { files: [...new Map(files.map(file => [file.assetFileId, file])).values()], fields, columns, rows, viewsEnabled: settings.viewsEnabled }
+  return { files: [...new Map(files.map(file => [file.assetFileId, file])).values()], fields, columns, rows, pictures, recordIds: records.map(record => record.id), viewsEnabled: settings.viewsEnabled, mainView: settings.thumbnailView }
 }

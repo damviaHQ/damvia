@@ -3,12 +3,12 @@ title: Administration
 description: Choose the administrative guide for access, assets, collections, pages, records or workspace health.
 sidebar:
   order: 1
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-23
 ---
 
 The administration area controls who can enter the library, how source files are classified, what readers see, and whether the instance is healthy. These guides describe administrative decisions and their consequences. Everyday reader workflows belong in the separate website knowledge base and onboarding.
 
-The icon next to the logo hides the administration menu so a screen can use the full width. The icon at the left of the top bar brings the menu back. Each browser remembers the choice.
+The top bar shows the name of the current screen and its buttons, such as Add or Import. The info icon next to the name explains what the screen is for, and the cross at the far right closes the administration and returns to the library. The icon next to the logo hides the administration menu so a screen can use the full width. The icon at the left of the top bar brings the menu back. Each browser remembers the choice.
 
 ## Start with access and a healthy source
 
@@ -42,7 +42,7 @@ Source files are managed in the connected cloud storage. Damvia's asset tree is 
 ## Publishing and sharing
 
 - [Collections and sharing](./collections-and-sharing.md): choose manual or synchronised collections, set visibility and invite guests.
-- [Menu and pages](./menu-and-pages.md): arrange navigation and editorial pages.
+- [Menu and pages](./menu-and-pages.md): arrange navigation, move menu links between parents, and build editorial pages.
 - [Downloads](./downloads.md): formats, limits, expiry and operational consequences.
 
 Collections organise references to assets. Copying a file into another collection does not copy the asset or change its type or licence. A page block also does not add a file to its collection.
@@ -50,8 +50,8 @@ Collections organise references to assets. Copying a file into another collectio
 ## Data enrichment and reporting
 
 - [Variants](./variants.md): show the versions of one creative as one card and name what differs between them.
-- [Product catalogue](./catalogue.md): open the record database to readers, with product collections built by hand or by rules, a readiness score, models and reader assortments.
-- [Records](./records.md): the daily screens and the four setup steps of data enrichment; create and edit products, events or anything files are about in a spreadsheet grid or as a card with their files and history, import them by CSV, type their fields, say how files find their record and fix the unmatched ones.
+- [Product catalogue](./catalogue.md): open the record database to readers, with a dedicated collection builder, reference/CSV and automatic rule sources, an inclusion preview, readiness, configurable related products, and reader assortments.
+- [Records](./records.md): the daily screens and the four setup steps of data enrichment; create and edit products, events or anything files are about in a spreadsheet grid organised in tables or as a card with their files and history, import them from CSV or Excel, type their fields, say how files find their record and fix the unmatched ones.
 - [Insights](./analytics.md): interpret recorded activity and retention.
 - [Dashboard](./dashboard.md): storage usage, source state and items needing attention.
 
@@ -69,7 +69,7 @@ Collections organise references to assets. Copying a file into another collectio
 | Groups, regions and authorised domains | `/admin/groups`, `/admin/regions`, `/admin/authorized-domains` | admin |
 | Records and their fields, file metadata | `/admin/data-enrichment/records` (fields under ⋮ → Manage fields, `?fields=1`), `/admin/data-enrichment/records/import`, `/admin/data-enrichment/file-metadata`; `/admin/data-enrichment/fields` redirects | admin |
 | Product collections, on the collection itself | Edit collection → Products | admin or the owner; the whole-catalogue switch is admin only |
-| Readiness and model field | `/admin/settings` | admin |
+| Readiness, model field and default related products | `/admin/settings` | admin |
 | Link to records and To review | `/admin/data-enrichment/matching`, `/admin/data-enrichment/unmatched` | admin |
 | Setup guide and variants | `/admin/data-enrichment`, `/admin/data-enrichment/variants` | admin |
 

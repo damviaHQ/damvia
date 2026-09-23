@@ -287,7 +287,7 @@ test('direct download runs as the requesting user and inaccessible requests roll
     assert.equal(result.fileCount, 1)
     assert.equal((await db.getRepository(Download).findOneByOrFail({ id: result.id })).userId, user.id)
     await db.getRepository(License).update(license.id, { usageTo: '2000-01-01' })
-    await assert.rejects(caller(user).download.create(input), /no longer available/)
+    await assert.rejects(caller(user).download.create(input), error => error.code === 'BAD_REQUEST' && /No files are available/.test(error.message))
     assert.equal(await db.getRepository(Download).countBy({ userId: user.id }), 1)
 })
 
@@ -590,7 +590,7 @@ test('insights are admin only; each action is recorded once and survives the rem
     assert.deepEqual(await Promise.all(['asset_view', 'search', 'asset_download', 'favorite'].map(events)), [1, 2, 1, 1])
     await db.getRepository(License).update(license.id, { usageTo: '2000-01-01' })
     await assert.rejects(caller(user).analytics.trackView({ collectionFileId: file.id }), e => e.code === 'NOT_FOUND')
-    await assert.rejects(caller(user).download.create({ ...downloadOptions, downloadType: 'direct', collectionFileIds: [file.id] }), /no longer available/)
+    await assert.rejects(caller(user).download.create({ ...downloadOptions, downloadType: 'direct', collectionFileIds: [file.id] }), error => error.code === 'BAD_REQUEST' && /No files are available/.test(error.message))
     assert.equal(await events('asset_download'), 1)
     const overview = await caller(admin).analytics.overview(range)
     assert.equal(typeof overview.totals.downloads, 'number')

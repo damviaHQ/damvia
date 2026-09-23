@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import ItemDialog from "@/components/admin/menu-items/ItemDialog.vue"
+import MoveDialog from "@/components/admin/menu-items/MoveDialog.vue"
 import ItemsTree from "@/components/admin/menu-items/ItemsTree.vue"
 import IconCloudSync from "@/components/icons/IconCloudSync.vue"
 import { Button } from "@/components/ui/button"
@@ -49,7 +50,7 @@ const props = defineProps<{ parent?: MenuItem; item: MenuItem; index: number; co
 const actionsTrigger = ref<{ $el: HTMLElement }>()
 const isOpen = ref(false)
 const dropdownOpen = ref(false)
-const activeDialog = ref<"add" | "edit" | null>(null)
+const activeDialog = ref<"add" | "edit" | "move" | null>(null)
 const queryClient = useQueryClient()
 
 const isAddDialogOpen = computed({
@@ -63,6 +64,10 @@ const isEditDialogOpen = computed({
   set: (value) => {
     if (!value) activeDialog.value = null
   },
+})
+const isMoveDialogOpen = computed({
+  get: () => activeDialog.value === "move",
+  set: (value) => { if (!value) activeDialog.value = null },
 })
 const editedItem = computed(() => {
   if (props.item.type === "divider") {
@@ -94,7 +99,7 @@ async function moveItem(delta: number) {
   actionsTrigger.value?.$el.focus()
 }
 
-function openDialog(type: "add" | "edit") {
+function openDialog(type: "add" | "edit" | "move") {
   activeDialog.value = type
   closeDropdown()
 }
@@ -163,6 +168,10 @@ function openDialog(type: "add" | "edit") {
             <Settings />
             <span>Edit Item</span>
           </DropdownMenuItem>
+          <DropdownMenuItem v-if="item.type !== 'section'" @select="openDialog('move')">
+            <Folder />
+            <span>{{ item.followsCollectionParent ? 'About automatic placement' : 'Move to…' }}</span>
+          </DropdownMenuItem>
           <DropdownMenuItem v-if="index > 0" @select="moveItem(-1)">
             <ArrowUp />
             <span>Move up</span>
@@ -183,6 +192,7 @@ function openDialog(type: "add" | "edit") {
       </DropdownMenu>
 
       <ItemDialog v-if="['collection', 'section'].includes(item.type)" :parent="item" v-model:open="isAddDialogOpen" />
+      <MoveDialog :item="item" v-model:open="isMoveDialogOpen" />
       <ItemDialog :item="editedItem" :parent="parent" v-model:open="isEditDialogOpen" />
     </div>
     <div v-if="item.children && isOpen" class="items-tree__children">
