@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-23
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -132,6 +132,10 @@ Two restrictions separate this router from `record.list`, which is admin only. F
 | `create` | mutation | `userApproved` | New collection, under any parent including a synchronized one; `catalogueMode` sets what readers browse there from the start, defaulting to `files`; `public` is forced to `false` for non-admins, so only admins create public ones. `BAD_REQUEST` when a sibling already has that name |
 | `createFromAsset` | mutation | `userAdmin` | Synchronised collection from an asset folder, at the root or under a custom collection (`BAD_REQUEST` under a synchronized parent, whose sub-folders the sync links itself); pushes `collection/synchronization` |
 | `addRecordsByKey` | mutation | `userApproved` | Adds products to a collection by record key, for the editor of that collection. An administrator matches the whole record database, anyone else only what they can already see. Returns what was added, what matched and the keys that matched nothing |
+| `create` also gives a collection born as a catalogue (`catalogueMode` other than `files`) a page carrying a `products` block, and `setRecordRules` does the same when a collection becomes one. |
+| `recordPreview` | query | `userApproved` | The membership of a collection as its editor sees it, excluded rows included, with each product's readiness. `FORBIDDEN` for anyone who cannot edit the collection |
+| `setRecordsExcluded` | mutation | `userApproved` | Takes products out of what readers get, or puts them back, without touching the membership rows. The reader count follows |
+| `excludeNotReadyRecords` | mutation | `userApproved` | Excludes every product of the collection the readiness definition does not call ready; returns how many moved |
 | `createUserCollection` | mutation | `userApproved` | Private collection owned by the caller, optionally as a catalogue through `catalogueMode`. The rules and the whole-catalogue flag stay out of reach; see `setRecordRules` |
 | `ListPrivateCollections` | query | `userApproved` | The caller's private collections |
 | `addItems` | mutation | `userApproved` | Duplicates selected files or whole collections into a collection the caller can edit (`duplicateCollection`, `duplicateFiles`) |

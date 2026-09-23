@@ -3,7 +3,7 @@ title: Product catalogue
 description: Open the record database to readers as a catalogue, with product collections, readiness and models.
 sidebar:
   order: 15
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-23
 ---
 
 The record database is an administrative tool until you open part of it to readers. A **product collection** does that: it holds records instead of files, and readers browse those records as a catalogue of cards, each carrying its main visual, the visuals attached to it and the field values you made visible. This is the route to take when your readers think in products rather than in folders.
@@ -20,15 +20,9 @@ A product no collection holds is invisible to everybody, administrators included
 
 ## Create a product collection
 
-**Collections** → **New collection** asks what the collection is, and the three answers differ only in where its contents come from:
+Product collections have their own page, apart from **Collections**: it is named after your records in the sidebar (for example **Products collections**), and lists only catalogues. Its **New … collection** button asks for a name and nothing else, then takes you straight to the screen described below to fill it.
 
-| Type | What you give it |
-|---|---|
-| Files | A name. You fill it with files by hand. |
-| Synchronized | A folder of your cloud storage. It mirrors that folder at every sync. |
-| Products | A name. Readers browse it as a catalogue. |
-
-Naming the type here only sets a starting point. Every collection, a synchronized one included, can later hold products as well.
+A product collection is a collection like any other: same address, same breadcrumb, same selection bar, same action bar. What draws the products is a **Products** block on its page, added for you the moment the collection becomes a catalogue. Open **Edit page** to move it, give it a title, choose grid or list, or put it next to a banner and a text block. Readers meet one application, not two.
 
 ## Turn an existing collection into a product collection
 
@@ -37,8 +31,8 @@ Open a collection, then **Edit collection**. The Products section chooses what r
 | Choice | What readers get |
 |---|---|
 | Files only | The collection as it has always worked. This is what every existing collection keeps. |
-| Products only | Opening the collection opens the catalogue filtered to its products. |
-| Files and products | The files stay in place, with a link to the products of the collection above them. |
+| Products only | The collection opens on its products. |
+| Files and products | The products come first, then the sub-collections and the files. |
 
 Membership is built in three ways, and they mix freely:
 
@@ -47,6 +41,18 @@ Membership is built in three ways, and they mix freely:
 - **By rules.** This is the dynamic assortment: a collection on `Season is Winter 2024` gains and loses products as the field changes. The Rules block builds the membership from the record fields, using the conditions of the records grid: contains, is, is not, is empty, is not empty, is any of. Every product matching the rules joins the collection and leaves it when it stops matching. **Only an administrator writes rules**, including on a collection they own: a rule fills a collection from the whole record database without looking at what its author may see, so anyone else would read the catalogue through a collection of their own. The owner of a collection still chooses what readers browse there and adds products by hand, which is checked against their own visibility.
 
 Whichever way a collection is built, it only ever stores a list of references. The field values, the visuals and the readiness of a product are read live, so a product corrected in the grid is corrected everywhere it appears.
+
+## Build the catalogue and see what is ready
+
+**Collections** → the **Products** action on a product collection opens the screen the catalogue is built on. It shows every product the collection holds, one row each, with no value editing: that stays in the records grid.
+
+Each row carries its reference, the card title field, how it got there (by hand or by a rule) and its **readiness** score. That score is production information, which is why it lives here and never on a reader's card.
+
+The switch in the first column decides whether a product reaches readers. Turning it off **takes the product out of the catalogue without removing it**: the row stays, greyed, and the count readers see drops by one. This matters for a rule-driven collection, where a deletion would be undone at the next pass; an exclusion is a decision, and a refresh leaves it alone.
+
+**Exclude the N not ready** takes out, in one move, every product the readiness definition does not call ready. Use it to publish a collection while the missing pictures are still being shot, then put products back as they land.
+
+Removing a row, rather than excluding it, is only offered for products added by hand. A product a rule brought in leaves the collection by changing the rule or the record.
 
 **Products added by hand are never removed by a rule.** A refresh only ever rewrites the rows it wrote itself, so an editor can pin a product into a seasonal collection without the next pass taking it away.
 
@@ -60,9 +66,19 @@ Rules are applied the moment you save them. After that, a record edited in the g
 
 Sidebar headings are menu entries of type **Section**, so the catalogue gets its own part of the navigation next to the library. Create a section named Catalogue in `/admin/menu-items`, then drop the product collections under it. A reader who cannot see anything inside a section is not shown the heading. See [Menu and pages](./menu-and-pages.md).
 
-## Searching the catalogue
+## Searching and narrowing the catalogue
 
 The search box above the grid reads the product key and the fields marked **Search** in the field settings. A field left out of search is never matched, even when it is shown on the product page, so a value kept out of sight cannot be confirmed by probing for it. See [Records](./records.md).
+
+The filter icon of the action bar works on products exactly as it works on files: pick the fields you want on the bar, then pick values, and the chips show what is on. A product offers the fields marked **Filter** in the field settings, and the dimensions that belong to files alone, asset type and format, do not appear where there are no files. A collection holding both offers one bar over both, so a field shared by a product and its media narrows the two at once.
+
+## What a card shows
+
+A catalogue card carries the main visual, the reference and the visuals attached to the product. Settings → **Card title field** names the one field shown under the reference, on a single line, for example *Style name*; leaving it on **Reference only** shows the reference alone.
+
+One field, one line, deliberately. A card that grew with its content left a product carrying a long description towering over an empty neighbour, and the grid stopped reading as a grid. Every other field is on the product page.
+
+Readiness, file counts and the fields a product does not fill are not shown to readers. They are how you steer the catalogue, not how somebody browses it; see the readiness screen below.
 
 ## Say what makes a product ready to use
 
@@ -72,7 +88,7 @@ Settings → **Ready to use** describes what a complete product is in your organ
 - **Required views**: the view numbers it must have a file for, for example `00` for the front and `01` for the back. Views are configured in the same screen; see [Records](./records.md).
 - **Labels**: what a complete product and an incomplete one are called, for example "Ready to use" and "To complete".
 
-Each product then carries a score, shown on its card and on its page, and readers can keep only what is ready or only what is missing something. **Requiring nothing leaves every product ready**, which is what a fresh instance does until you fill this in.
+Each product then carries a score, which you read in administration to see what is left to produce. **Requiring nothing leaves every product ready**, which is what a fresh instance does until you fill this in.
 
 The score is recomputed when a record is edited or imported, when files are linked during a sync, and when you save the definition. A required view counts as filled as soon as one file carries that view, whether it reaches the record through a link or through the older matching column.
 
@@ -82,7 +98,7 @@ The score is recomputed when a record is edited or imported, when files are link
 
 A brand usually sells one model in several colours or formats: one style with three colourways, one flavour in a single can and in a four-pack. Settings → **Model field** names the field holding that model, for example *Style name*. Products sharing its value form one model.
 
-The value is matched on a normalised key: case, accents and stray spaces are ignored, so `Pampa`, ` pampa ` and `PAMPÁ` are the same model. The name shown to readers is the value as it was typed. The catalogue then offers a **By model** view listing one card per model, and each product page lists the other entries of its model.
+The value is matched on a normalised key: case, accents and stray spaces are ignored, so `Pampa`, ` pampa ` and `PAMPÁ` are the same model. The name shown to readers is the value as it was typed. Each product page then lists the other entries of its model.
 
 Changing the model field regroups the whole catalogue at once. Clearing it drops the grouping, and nothing else changes.
 

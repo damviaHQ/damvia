@@ -49,6 +49,7 @@ Blocks are ordered and use one of three widths: full, half or third. Consecutive
 | Collections | The collection's children or a chosen selection. It can focus on custom page collections or plain sub-collections. |
 | Files | Files from a collection. |
 | Latest files | Recently added files, optionally scoped to a collection. |
+| Products | The products of a collection, in grid or list. See [Product catalogue](./catalogue.md). |
 
 Drag a block into the page or add it at the end. Each block can be resized, reordered, duplicated, configured or deleted. Text is edited in place. **Save** writes the full page; **Discard** returns to the last saved version. Leaving with unsaved changes asks for confirmation.
 
