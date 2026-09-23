@@ -30,6 +30,7 @@ export enum PageBlockType {
 	COLLECTIONS = 'collections',
 	FILES = 'files',
 	LAST_FILES = 'last_files',
+	PRODUCTS = 'products',
 	TEXT = 'text',
 	IMAGE = 'image',
 	VIDEO = 'video',

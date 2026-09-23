@@ -48,7 +48,7 @@ const hasSettings = computed(() => props.block.type !== "text" && props.block.ty
 // and jumps to the corner of the screen.
 const isMenuOpen = ref(false)
 const listingType = computed(() =>
-  ["collections", "files", "last_files"].includes(props.block.type) ? (props.block.type as any) : null
+  ["collections", "files", "last_files", "products"].includes(props.block.type) ? (props.block.type as any) : null
 )
 </script>
 

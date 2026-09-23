@@ -28,14 +28,12 @@ import { trpc } from "@/services/server.ts"
 import { providePageFilter } from "@/composables/usePageFilter"
 import { providePageListings } from "@/composables/usePageListings"
 import { useGlobalStore } from "@/stores/globalStore"
-import { useRecordLabel } from "@/composables/useRecordLabel"
 import { isRestricted, type ActionBarAction } from "@/utils/actionBar"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   ChevronRight,
   FilePenLine,
   Link,
-  Package,
   Search,
   Settings,
   Trash2,
@@ -45,7 +43,6 @@ import { computed, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 
 const router = useRouter()
-const { lowerPlural } = useRecordLabel()
 const route = useRoute()
 const globalStore = useGlobalStore()
 const storeRefs = storeToRefs(globalStore)
@@ -68,14 +65,6 @@ const { status, data: collection, error } = useQuery({
     }
   }
 })
-
-// A collection an administrator turned into a product collection is browsed in
-// the catalogue; one holding both keeps its files here and offers a way over.
-watch(collection, (current) => {
-  if (current?.catalogueMode === "products") {
-    router.replace({ name: "catalogue", query: { collection: current.id } })
-  }
-}, { immediate: true })
 
 const maxSelectableItems = computed(() => {
   if (!collection.value) {
@@ -111,7 +100,10 @@ const selection = computed(() => {
 
 // What the page draws, announced by the renderers themselves: a block may list
 // collections chosen by hand, or the files of another collection entirely.
-const { files: shownFiles, collections: shownCollections } = providePageListings()
+const { files: shownFiles, collections: shownCollections, products: shownProducts } = providePageListings()
+// Products narrow on the same field facets as files, so both go to the filter
+// together. The display preferences stay on files, which alone have a type.
+const filterable = computed(() => [...shownFiles.value, ...shownProducts.value])
 
 // The reader narrows what is on this page. The bar is switched on for good, the
 // values are not: they describe the collection being read, so they start empty
@@ -212,10 +204,6 @@ function removeSelectedFiles() {
     {{ error?.message }}
   </div>
   <div v-else-if="status === 'success'" class="collection__container">
-    <router-link v-if="collection.catalogueMode === 'both'" :to="{ name: 'catalogue', query: { collection: collection.id } }"
-      class="mb-4 inline-flex items-center gap-2 text-body text-neutral-600">
-      <Package class="size-4" aria-hidden="true" />{{ collection.numberOfRecords }} {{ lowerPlural }} in this collection
-    </router-link>
     <div class="collection__header mb-6 flex flex-wrap items-center justify-between gap-4">
       <div class="flex min-w-0 flex-1 items-center">
         <div v-if="selection.length > 0" class="collection__selection-container flex items-center text-neutral-500" @mouseenter="isHovered = true"
@@ -276,7 +264,7 @@ function removeSelectedFiles() {
             <Search class="text-neutral-500 hover:text-neutral-800" />
           </router-link>
         </Button>
-        <PageFilterToggle v-if="shows('filter')" :files="shownFiles" :restricted="restricted('filter')" />
+        <PageFilterToggle v-if="shows('filter')" :files="filterable" :restricted="restricted('filter')" />
         <DisplayPreferences v-if="shows('display')" :files="shownFiles" :collections="shownCollections" :layout-locked="layoutLocked" :restricted="restricted('display')" />
         <Button aria-label="Share collection" :title="actionTitle('share', 'Share collection')" v-if="collection.canEdit && shows('share')" @click="isShareModalOpen = true" type="button" variant="ghost"
           size="icon-sm">
@@ -286,7 +274,7 @@ function removeSelectedFiles() {
           :collection="collection" />
       </div>
     </div>
-    <PageFilterBar v-if="shows('filter')" :files="shownFiles" :collections="shownCollections" />
+    <PageFilterBar v-if="shows('filter')" :files="filterable" :collections="shownCollections" />
     <CollectionRenderLayout :key="collection.id" :collection="collection"
       :generate-route="(c) => ({ name: 'collection', params: { id: c.id } })" />
     <CollectionDialogEdit v-model="isEditCollectionModalOpen" :collection="collection" />

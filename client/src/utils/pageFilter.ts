@@ -66,8 +66,10 @@ function matchesName(name: string, term: string): boolean {
   return !needle || name.toLowerCase().includes(needle)
 }
 
+// A name with no dot has no extension. Without this a file called README, or
+// a product reference, becomes a format of its own on the filter bar.
 export function fileExtensionOf(file: FilterableFile): string {
-  return getFileExtension(file.name)
+  return file.name.includes('.') ? getFileExtension(file.name) : ''
 }
 
 function attributeValues(file: FilterableFile, attributeId: string): string[] {

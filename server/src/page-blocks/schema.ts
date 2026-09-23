@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 // runtime through the "server" file: dependency, so it must depend on zod only.
 import { z } from "zod"
 
-export const BLOCK_TYPES = ['hero', 'text', 'image', 'video', 'collections', 'files', 'last_files'] as const
+export const BLOCK_TYPES = ['hero', 'text', 'image', 'video', 'collections', 'files', 'last_files', 'products'] as const
 export const BLOCK_SIZES = ['full', 'half', 'third'] as const
 
 export type BlockType = typeof BLOCK_TYPES[number]
@@ -113,6 +113,9 @@ export const blockDataSchemas = {
 	collections: z.object({ title, layout, collectionsId: z.uuid().array().max(200).nullish(), layoutFilter: z.enum(['with_layout', 'without_layout']).nullish() }),
 	files: z.object({ title, layout: fileLayout, masonrySize, collectionId: z.uuid().nullish() }),
 	last_files: z.object({ title, layout: fileLayout, masonrySize }),
+	// The products of a collection, drawn with the chrome of the page holding
+	// the block. See docs/administration/catalogue.md.
+	products: z.object({ title, layout, collectionId: z.uuid().nullish() }),
 } satisfies Record<BlockType, z.ZodType>
 
 export type BlockDataMap = { [T in BlockType]: z.infer<typeof blockDataSchemas[T]> }

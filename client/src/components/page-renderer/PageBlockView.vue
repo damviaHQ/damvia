@@ -19,6 +19,7 @@ import BlockFiles from "./blocks/BlockFiles.vue"
 import BlockHero from "./blocks/BlockHero.vue"
 import BlockImage from "./blocks/BlockImage.vue"
 import BlockLastFiles from "./blocks/BlockLastFiles.vue"
+import BlockProducts from "./blocks/BlockProducts.vue"
 import BlockText from "./blocks/BlockText.vue"
 import BlockVideo from "./blocks/BlockVideo.vue"
 import type { Collection, EditorBlock, PageAssets } from "./types"
@@ -41,5 +42,7 @@ defineProps<{
     :collection="collection" :generate-route="generateRoute" :editing="editing" />
   <BlockFiles v-else-if="block.type === 'files'" :data="block.data" :collection="collection" :editing="editing" />
   <BlockLastFiles v-else-if="block.type === 'last_files'" :data="block.data" :collection="collection"
+    :editing="editing" />
+  <BlockProducts v-else-if="block.type === 'products'" :data="block.data" :collection="collection"
     :editing="editing" />
 </template>

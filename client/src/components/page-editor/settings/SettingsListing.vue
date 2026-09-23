@@ -28,7 +28,7 @@ import { useRoute } from "vue-router"
 import Treeselect from "vue3-treeselect-ts"
 
 // The three listing blocks share every option they have.
-const props = defineProps<{ data: any; type: "collections" | "files" | "last_files" }>()
+const props = defineProps<{ data: any; type: "collections" | "files" | "last_files" | "products" }>()
 const emit = defineEmits<{ (e: "update", data: any): void }>()
 
 const fieldId = useId()
@@ -79,7 +79,7 @@ function patch(values: Record<string, unknown>) {
           <SelectItem value="grid">Grid</SelectItem>
           <SelectItem value="list">List</SelectItem>
           <!-- Collection cards are all the same shape, so only files tile. -->
-          <SelectItem v-if="type !== 'collections'" value="masonry">Masonry</SelectItem>
+          <SelectItem v-if="type !== 'collections' && type !== 'products'" value="masonry">Masonry</SelectItem>
         </SelectContent>
       </Select>
     </FieldGroup>
@@ -119,7 +119,7 @@ function patch(values: Record<string, unknown>) {
         </SelectContent>
       </Select>
     </FieldGroup>
-    <FieldGroup v-else-if="type === 'files'">
+    <FieldGroup v-else-if="type === 'files' || type === 'products'">
       <Label :id="`${fieldId}-collection`">Collection (optional)</Label>
       <Treeselect :model-value="data.collectionId ?? null" :options="collectionOptions" :clearable="true" :flat="true"
         placeholder="This collection" @update:model-value="patch({ collectionId: $event || null })" />

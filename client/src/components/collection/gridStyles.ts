@@ -3,7 +3,7 @@ export const gridCardClasses = 'group w-[276px] max-w-full min-w-0'
 export const gridPreviewClasses = 'relative h-[196px] overflow-hidden bg-neutral-100'
 
 // Production thumbnail favorite styling: light-filled stars with no button surface.
-export const thumbnailFavoriteButtonClasses = 'group/favorite grid size-6 shrink-0 place-items-center border-0 bg-transparent p-0 text-neutral-500 transition-[opacity,color] duration-200 ease-in-out motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-600'
+export const thumbnailFavoriteButtonClasses = 'group/favorite grid size-6 shrink-0 place-items-center border-0 bg-transparent p-0 text-[var(--dv-selection-color)] transition-[opacity,color] duration-200 ease-in-out motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-600'
 
 // Masonry fills the whole width: the chosen size sets the smallest tile the
 // reader wants, the columns then share whatever is left over, and the gap is

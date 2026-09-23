@@ -180,3 +180,43 @@ describe('page filter', () => {
     expect(chips).toEqual([{ key: 'attribute:attr-gone', value: 'Nothing', label: 'Nothing', category: undefined }])
   })
 })
+
+// A product carries a reference and its fields, and none of what a file has.
+// The facets are the same machinery: what does not apply drops out on its own.
+describe('products on the filter bar', () => {
+  const product = (recordKey: string, fields: Record<string, string>): FilterableFile => ({
+    name: recordKey,
+    record: {
+      attributes: Object.entries(fields).map(([name, value]) => ({ id: name, name, displayName: name, value })),
+    },
+  })
+  const products = [
+    product('02352-236-M', { season: 'Winter 2024', colour: 'Rust' }),
+    product('02352-271-M', { season: 'Winter 2024', colour: 'Sand' }),
+    product('02352-297-M', { season: 'Summer 2025', colour: 'Sand' }),
+  ]
+
+  test('the fields of a product become filters, and the file dimensions do not', () => {
+    const state = emptyPageFilter()
+    const groups = availableGroups(state, fileFacets(products, state))
+    expect(groups.map(group => group.key).sort()).toEqual(['attribute:colour', 'attribute:season'])
+    const season = groups.find(group => group.key === 'attribute:season')
+    expect(season?.options).toEqual([
+      { id: 'Summer 2025', label: 'Summer 2025', count: 1 },
+      { id: 'Winter 2024', label: 'Winter 2024', count: 2 },
+    ])
+  })
+
+  test('choosing a value keeps the products carrying it, and the chip says which field', () => {
+    const state: PageFilterState = { ...emptyPageFilter(), attributes: { season: ['Winter 2024'] } }
+    expect(products.filter(current => matchesFile(current, state)).map(current => current.name))
+      .toEqual(['02352-236-M', '02352-271-M'])
+    expect(filterChipsOf(state, fileFacets(products, state)))
+      .toEqual([{ key: 'attribute:season', value: 'Winter 2024', label: 'Winter 2024', category: 'season' }])
+  })
+
+  test('the reference is searched by the name filter, so a partial reference narrows the grid', () => {
+    const state: PageFilterState = { ...emptyPageFilter(), name: '236' }
+    expect(products.filter(current => matchesFile(current, state)).map(current => current.name)).toEqual(['02352-236-M'])
+  })
+})

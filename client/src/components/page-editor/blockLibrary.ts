@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import type { EditorBlock } from "@/components/page-renderer/types"
-import { Clock, Files, FileText, Image, LayoutGrid, LayoutPanelTop, Video } from "@lucide/vue"
+import { Clock, Files, FileText, Image, LayoutGrid, LayoutPanelTop, PackageSearch, Video } from "@lucide/vue"
 import { emptyBlockData, type BlockType } from "server/src/page-blocks/schema"
 
 export type LibraryItem = {
@@ -32,6 +32,7 @@ export const BLOCK_LIBRARY: LibraryItem[] = [
   { type: "collections", name: "Collections", description: "Sub-collections or a chosen selection", icon: LayoutGrid },
   { type: "files", name: "Files", description: "Every file of a collection", icon: Files },
   { type: "last_files", name: "Latest files", description: "Recently added files", icon: Clock },
+  { type: "products", name: "Products", description: "The products of a collection", icon: PackageSearch },
 ]
 
 export function libraryItem(type: BlockType) {

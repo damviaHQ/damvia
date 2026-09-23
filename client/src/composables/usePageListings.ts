@@ -13,9 +13,13 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. */
 import type { DisplayCollection, DisplayFile } from '@/utils/displayPreferences'
+import type { FilterableFile } from '@/utils/pageFilter'
 import { computed, inject, onScopeDispose, provide, ref, watch, type InjectionKey, type Ref } from 'vue'
 
-export type PageListing = { files?: DisplayFile[], collections?: DisplayCollection[] }
+// Products are announced apart from files: they narrow with the same field
+// facets, but the display preferences group files by asset type and a product
+// has none.
+export type PageListing = { files?: DisplayFile[], collections?: DisplayCollection[], products?: FilterableFile[] }
 
 type Registry = { add: (source: Ref<PageListing>) => void }
 const key = Symbol('page-listings') as InjectionKey<Registry>
@@ -25,18 +29,19 @@ const key = Symbol('page-listings') as InjectionKey<Registry>
 // what the collection being browsed holds. The renderers announce what they
 // draw, and the display preferences describe that rather than guessing.
 export function providePageListings() {
-	const entries = ref<{ id: number, files: DisplayFile[], collections: DisplayCollection[] }[]>([])
+	const entries = ref<{ id: number, files: DisplayFile[], collections: DisplayCollection[], products: FilterableFile[] }[]>([])
 	let nextId = 0
 
 	provide(key, {
 		add(source) {
 			const id = nextId++
-			entries.value.push({ id, files: [], collections: [] })
+			entries.value.push({ id, files: [], collections: [], products: [] })
 			const stop = watch(source, listing => {
 				const entry = entries.value.find(item => item.id === id)
 				if (!entry) return
 				entry.files = listing.files ?? []
 				entry.collections = listing.collections ?? []
+				entry.products = listing.products ?? []
 			}, { immediate: true })
 			// Runs in the registering component's scope, so a block that goes
 			// away takes its listing with it.
@@ -50,6 +55,7 @@ export function providePageListings() {
 	return {
 		files: computed(() => entries.value.flatMap(entry => entry.files)),
 		collections: computed(() => entries.value.flatMap(entry => entry.collections)),
+		products: computed(() => entries.value.flatMap(entry => entry.products)),
 	}
 }
 

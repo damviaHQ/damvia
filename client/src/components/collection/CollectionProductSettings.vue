@@ -13,7 +13,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import CollectionDialogAddRecordsByKey from "@/components/collection/CollectionDialogAddRecordsByKey.vue"
 import RecordFilters from "@/components/records/RecordFilters.vue"
 import FieldDescription from "@/components/ui/field/FieldDescription.vue"
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
@@ -26,16 +25,15 @@ import { trpc } from "@/services/server.ts"
 import { filterIsComplete, type RecordFilter } from "@/utils/recordFilters"
 import { useQuery } from "@tanstack/vue-query"
 import { ListPlus } from "@lucide/vue"
-import { computed, ref } from "vue"
+import { computed } from "vue"
 
 const props = defineProps<{ collectionId: string, numberOfRecords: number }>()
-const isAddByKeyOpen = ref(false)
 const catalogueMode = defineModel<"files" | "products" | "both">("catalogueMode", { required: true })
 const includesAllRecords = defineModel<boolean>("includesAllRecords", { required: true })
 const recordFilters = defineModel<RecordFilter[]>("recordFilters", { required: true })
 
 const globalStore = useGlobalStore()
-const { plural, singular } = useRecordLabel()
+const { plural, singular, lowerPlural } = useRecordLabel()
 // The rules are written against the catalogue fields, which only an
 // administrator may read.
 const isAdmin = computed(() => globalStore.user?.role === "admin")
@@ -65,11 +63,15 @@ const incomplete = computed(() => recordFilters.value.some((filter) => !filterIs
       <FieldDescription>{{ numberOfRecords }} {{ numberOfRecords === 1 ? singular.toLowerCase() : plural.toLowerCase() }} in this collection.</FieldDescription>
     </FieldGroup>
 
-    <div class="grid justify-items-start gap-1">
-      <Button type="button" variant="outline" size="sm" @click="isAddByKeyOpen = true">
-        <ListPlus class="size-5" />Add by reference
+    <div v-if="catalogueMode !== 'files'" class="grid justify-items-start gap-1">
+      <Button type="button" variant="outline" size="sm" as-child>
+        <router-link :to="{ name: 'admin-collection-products', params: { id: collectionId } }">
+          <ListPlus class="size-5" />Build this catalogue
+        </router-link>
       </Button>
-      <FieldDescription>Paste a list of {{ singular.toLowerCase() }} keys, or load the CSV they come in.</FieldDescription>
+      <FieldDescription>
+        Pick the {{ lowerPlural }} by reference or by rules, see what is ready, and take out the ones you do not want.
+      </FieldDescription>
     </div>
 
     <div v-if="isAdmin" class="flex items-start gap-3">
@@ -90,5 +92,4 @@ const incomplete = computed(() => recordFilters.value.some((filter) => !filterIs
       <p v-if="incomplete" role="status" class="text-caption text-neutral-500">A rule without a value is ignored until you fill it.</p>
     </FieldGroup>
   </section>
-  <CollectionDialogAddRecordsByKey v-model="isAddByKeyOpen" :collection-id="collectionId" />
 </template>
