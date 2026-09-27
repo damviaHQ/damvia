@@ -3,7 +3,7 @@ title: Menu and pages
 description: Arrange the reader navigation and build editorial pages without changing the assets or collections they display.
 sidebar:
   order: 9
-lastUpdated: 2026-09-23
+lastUpdated: 2026-09-27
 ---
 
 The menu controls how readers reach content. Pages combine text and media with live collection or file listings. A page presents existing content; it does not move assets, add files to collections or change their permissions.
@@ -22,7 +22,7 @@ Open `/admin/menu-items` to add one of five entries. Product lists use collectio
 
 Removing an entry removes everything under it, so a section holding entries is refused: move them elsewhere first. A section is a heading, not a link. It lives at the top level of the menu and holds the entries dropped under it; it cannot be placed inside another entry. One section is marked as the default for collections: a new public root collection adds its entry there, which is why the upgrade turns the former **Library** heading into a section and moves every existing top-level entry under it. A reader is not shown a section whose entries they are all unable to see; an administrator keeps it, so a section created a moment ago can be filled.
 
-Entries may be nested and reordered among their siblings. Use **Move to…** in an entry’s menu to move it, with its menu children, to the top level or under another section or collection. This changes navigation only; collection membership and access rules stay unchanged. An automatically mirrored child instead offers **About automatic placement**: move the actual collection in Collection settings, or add a separate menu link elsewhere. Sections stay at the top level. Moving a collection moves its synchronised menu entries. Collection and page entries can be set as Home. Damvia keeps only one Home entry; if none exists, the client falls back to the first accessible collection or its welcome state.
+Entries may be nested and reordered among their siblings. Use **Move to…** in an entry’s menu to move it, with its menu children, to the top level or under another section or collection. This changes navigation only; collection membership and access rules stay unchanged. An automatically mirrored child cannot be moved or removed on its own, because the menu under a synchronised entry always mirrors the collection's children. It offers **About automatic placement** instead: move the actual collection in Collection settings, make it private to hide it, or add a separate menu link elsewhere. Sections stay at the top level. Moving a collection moves its synchronised menu entries. Collection and page entries can be set as Home. Damvia keeps only one Home entry; if none exists, the client falls back to the first accessible collection or its welcome state.
 
 Creating a collection with a parent makes it an actual child: it appears in that collection and inherits its visibility and access rules. Creating it at the top level and adding its link under another menu entry only changes navigation. The menu picker therefore offers all public collections, independently of their actual parent.
 

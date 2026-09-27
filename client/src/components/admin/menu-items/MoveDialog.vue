@@ -73,7 +73,7 @@ async function submit() {
       <DialogHeader>
         <DialogTitle>Move menu item</DialogTitle>
         <DialogDescription v-if="item.followsCollectionParent">
-          This entry automatically follows its parent collection. To change that relationship, move the collection in Collection settings. To show another link elsewhere, use Add menu item.
+          This entry automatically follows its parent collection. To change that relationship, move the collection in Collection settings, or make it private to hide it. To show another link elsewhere, use Add menu item.
         </DialogDescription>
         <DialogDescription v-else>
           Move this link and its menu children. Collections and their access rules stay unchanged.

@@ -237,9 +237,14 @@ export default router({
 			id: z.uuid(),
 		}))
 		.mutation(async ({ input }) => {
-			const menuItem = await dataSource.getTreeRepository(MenuItem).findOneBy({ id: input.id })
+			const menuItem = await dataSource.getTreeRepository(MenuItem).findOne({ where: { id: input.id }, relations: { parent: true, collection: true } })
 			if (!menuItem) {
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'Parent item not found.' })
+			}
+			// The menu mirrors the collection tree under a synced parent, and
+			// the next sync would bring the entry back anyway.
+			if (followsCollectionParent(menuItem, menuItem.parent)) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'This entry follows its parent collection. Move the collection out of it in Collection settings, or make it private.' })
 			}
 			// Everything under an item goes with it. A section holds the whole
 			// menu, so emptying it is asked for rather than done silently.

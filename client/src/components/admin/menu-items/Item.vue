@@ -184,7 +184,7 @@ function openDialog(type: "add" | "edit" | "move") {
             <Home />
             <span>Set as Home</span>
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" @click="handleRemove(item)">
+          <DropdownMenuItem v-if="!item.followsCollectionParent" variant="destructive" @click="handleRemove(item)">
             <Trash />
             <span>Remove from menu</span>
           </DropdownMenuItem>

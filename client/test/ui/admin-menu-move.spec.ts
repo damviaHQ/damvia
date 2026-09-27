@@ -53,9 +53,10 @@ test('a root product collection linked under a synced branch can move out throug
 
 test('generated entries explain the collection relationship instead of offering a menu move', async ({ page, mockTrpc }) => {
   const api = await open(page, mockTrpc, true)
+  await expect(page.getByRole('menuitem', { name: 'Remove from menu' })).toHaveCount(0)
   await page.getByRole('menuitem', { name: 'About automatic placement' }).click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog).toContainText('move the collection in Collection settings')
+  await expect(dialog).toContainText('move the collection in Collection settings, or make it private')
   await expect(dialog.getByRole('combobox')).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Close', exact: true }).first().click()
   expect(api.count('menuItem.move')).toBe(0)

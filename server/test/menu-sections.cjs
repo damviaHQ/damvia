@@ -153,9 +153,13 @@ test('generated children explain their placement and cannot detach from the coll
     const tree = await caller(fixtures.admin).menuItem.list()
     assert.equal(tree.find(item => item.id === branch.id).children[0].followsCollectionParent, true)
     await assert.rejects(caller(fixtures.admin).menuItem.move({ id: link.id, parentId: null }), error => error.code === 'BAD_REQUEST' && /Collection settings/.test(error.message))
+    await assert.rejects(caller(fixtures.admin).menuItem.remove({ id: link.id }), error => error.code === 'BAD_REQUEST' && /Collection settings/.test(error.message))
     const separate = await caller(fixtures.admin).menuItem.create({ type: 'collection', collectionId: child.id, data: {} })
     const section = await defaultMenuSection(db.manager)
     await caller(fixtures.admin).menuItem.move({ id: separate.id, parentId: section.id })
+    await caller(fixtures.admin).menuItem.remove({ id: separate.id })
+    await caller(fixtures.admin).menuItem.remove({ id: branch.id })
+    assert.deepEqual(await itemsOf(child.id), [])
     await assertPathsConsistent()
 })
 
