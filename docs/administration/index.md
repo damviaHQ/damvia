@@ -3,7 +3,7 @@ title: Administration
 description: Choose the administrative guide for access, assets, collections, pages, records or workspace health.
 sidebar:
   order: 1
-lastUpdated: 2026-09-23
+lastUpdated: 2026-09-27
 ---
 
 The administration area controls who can enter the library, how source files are classified, what readers see, and whether the instance is healthy. These guides describe administrative decisions and their consequences. Everyday reader workflows belong in the separate website knowledge base and onboarding.
@@ -28,6 +28,7 @@ The [Dashboard](./dashboard.md) is the first place to check storage, source sync
 - [Groups and regions](./groups-and-regions.md): model teams and markets, and understand how group restrictions inherit through collection trees.
 - [Roles and access](../introduction/roles-and-access.md): exact visibility and edit rules.
 - [Accounts and links](./accounts-and-links.md): sessions, invitations, signed URLs and revocation limits.
+- [Audit log](./audit-log.md): who changed what, sign-ins, refusals, and how long entries are kept.
 
 Managers only receive the Users area and can act only on users in their own region. All other administration areas require an admin. The server enforces those permissions even if somebody opens an admin URL directly.
 
@@ -44,6 +45,7 @@ Source files are managed in the connected cloud storage. Damvia's asset tree is 
 - [Collections and sharing](./collections-and-sharing.md): choose manual or synchronised collections, set visibility and invite guests.
 - [Menu and pages](./menu-and-pages.md): arrange navigation, move menu links between parents, and build editorial pages.
 - [Downloads](./downloads.md): formats, limits, expiry and operational consequences.
+- [Phones](./phones.md): what people and administrators can do on a phone, and what stays on a computer.
 
 Collections organise references to assets. Copying a file into another collection does not copy the asset or change its type or licence. A page block also does not add a file to its collection.
 

@@ -8,7 +8,7 @@ lastUpdated: 2026-09-21
 
 The CLI lives in `server/src/cli.ts` and is built with Commander. It connects to the database and starts pg-boss before running a command, so it needs the same `.env` as the server and a reachable `DATABASE_URL`.
 
-The CLI also validates `APP_SECRET` at startup, including for help and version commands. Set a randomly generated secret of at least 32 bytes as described in [Server configuration](../configuration/server-env.md#app_secret-signs-every-session).
+The CLI also validates `APP_SECRET` at startup, including for help and version commands. Set a randomly generated secret of at least 32 bytes as described in [Server configuration](../configuration/server-env.md#app_secret-protects-two-step-verification).
 
 ## Running a command
 

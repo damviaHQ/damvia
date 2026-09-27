@@ -3,7 +3,7 @@ title: Design system
 description: Review the proposed Damvia design foundation and reuse its tokens across the admin and website.
 sidebar:
   order: 7
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-27
 ---
 
 Damvia’s proposed design system shares the brand’s blue and midnight palette, typography, spacing and common control styles across the admin and website. The production admin uses this foundation. A single isolated reference page documents the tokens and shared component contracts. Customer portals keep their own branding.
@@ -126,7 +126,7 @@ Client collection dialogs share title/description headers and aligned footers. T
 
 ### Dialogs and confirmations
 
-Use the shared dialog surface, heading and description classes in `client/src/components/ui/dialog/styles.ts` for both Dialog and AlertDialog. Keep neutral client dialogs static, use shared field components for forms, and keep action footers distinct from content. See `docs/_internal/client-modal-review.md` for the desktop client review coverage.
+Use the shared dialog surface, heading and description classes in `client/src/components/ui/dialog/styles.ts` for both Dialog and AlertDialog. Keep neutral client dialogs static, use shared field components for forms, and keep action footers distinct from content.
 
 Client modal hierarchy uses headings, grouping and whitespace. Do not add decorative horizontal rules between sections, preference rows or above action footers. Field borders and data-table boundaries remain functional. Dialog and confirmation footers share `dialogFooterClasses`.
 

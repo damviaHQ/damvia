@@ -3,12 +3,14 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-27
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
 
 The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). `APP_SECRET` is validated at startup. Other variables may use a default or fail when first used; empty and absent values can behave differently.
+
+Any variable can also be read from a file, the way Docker and Kubernetes mount secrets: `APP_SECRET_FILE=/run/secrets/app_secret` sets `APP_SECRET` to the file's contents, without one trailing newline. A value set directly in `APP_SECRET` wins over the file. The file must be readable by the user the server runs as.
 
 ## Server
 
@@ -20,7 +22,7 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). `
 | `ADMIN_CLIENT_LOGO` | `false` | Host-only: `true` uses the uploaded client logo in the admin sidebar when available; otherwise Damvia. Cannot be changed through the DAM admin. `ADMIN-CLIENT-LOGO` is an accepted alias and takes precedence when both are set. Restart the server after changing it. |
 | `APP_URL` | `http://localhost:5173` | Public URL of the client. Every link in an email is built from it, and expired download links redirect to `APP_URL/link-expired`. |
 | `API_URL` | `http://localhost:3000` | Public URL of this server. Download links are `API_URL/v1/downloads/{id}`. |
-| `APP_SECRET` | required | Randomly generated signing secret of at least 32 bytes, for example `openssl rand -hex 32`. Checked at startup. JWTs last 180 days; changing the secret logs every user out. |
+| `APP_SECRET` | required | Randomly generated signing secret of at least 32 bytes, for example `openssl rand -hex 32`. Checked at startup. Encrypts two-step verification secrets and signs the short-lived sign-in challenge. Changing it keeps sessions but makes every enrolled authenticator unreadable, so users must be reset with `user.resetMfa` and enrol again. |
 | `PORT` | `3000` | HTTP port the server listens on (`0.0.0.0`). |
 | `NODE_ENV` | unset | `production` in deployments. `npm start` sets it. |
 | `ENABLE_WORKER` | unset (worker off) | `true` processes jobs and registers cron schedules inside this process. Without it the process still queues jobs. `npm run dev` sets it. See [Worker and scaling](../deployment/worker-and-scaling.md). |
@@ -29,7 +31,44 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). `
 | `ASSET_SYNC_MAX_DELETION_PERCENT` | `20` | Share of a source's folders and files that may be absent from one listing before the sync refuses to mark them for deletion (whole number, 0 to 100; the check only applies above 20 items). `100` disables it. A value that does not parse stops the server at startup. See [Sources](../integrations/sources.md#how-the-runs-work). |
 | `STORAGE_DISK_PATH` | `/` | Path whose disk is measured with `statfs` for the hosting contact. Inside a container `/` reports the host disk that holds Docker's data, which is where the MinIO volume lives on a single-disk server. Set it to the volume's mount point when MinIO sits on another disk. |
 | `SERVER_ALERT_EMAILS` | unset | Comma-separated addresses of whoever runs the server and must be told about a critical server problem. They receive the `disk-alert` emails, an admin logged in with one of these addresses sees the server disk on the dashboard, and every admin sees them as the contact to raise the plan when storage passes 80 %. Unset means no disk alert and no disk figure for anyone. |
+| `REQUEST_LOG` | `true` | `false` stops the one-line log written for every HTTP response (method, path without its query string, status, duration, client address, request id). |
 | `ANALYTICS_RETENTION_DAYS` | `365` | Days of activity events kept for [Insights](../administration/analytics.md). The `activity/prune-events` job deletes older events every night. `0` keeps them forever. |
+| `ANALYTICS_SEARCH_MODE` | `named` | How searches are kept for [Insights](../administration/analytics.md): `named` with the searcher, `anonymous` with the terms but not who typed them (search audiences are then empty), `off` not at all. Any other value stops the server at startup. |
+| `PRIVACY_CONTROLLER` | unset | Name of the organisation responsible for the personal data, shown on the privacy page. Unset, the page refers to "the organisation that gave you access". |
+| `PRIVACY_CONTACT` | unset | Email address or URL for privacy requests, shown on the privacy page. |
+| `LICENSE_EXPIRY_NOTICE_DAYS` | `30,7,1` | Days before a licence's end date on which admins get the `license-expiring` email. Empty sends none. Anything but whole numbers stops the server at startup. |
+| `AUDIT_RETENTION_DAYS` | `730` | Days of [audit log](../administration/audit-log.md) entries kept. The `audit/prune` job deletes older entries every night. `0` keeps them forever. |
+| `AUDIT_LOG_IP` | `true` | `false` stops recording the client address and browser of each audit entry. |
+| `AUDIT_LOG_STREAM` | `false` | `true` also writes every audit entry to the server log as an `audit` line, for a log collector or SIEM. |
+
+### Sign-in and sessions
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SESSION_IDLE_HOURS` | `12` | A session unused for this long ends. Whole hours. |
+| `SESSION_MAX_HOURS` | `720` | A session ends this long after sign-in, however active (30 days). Set `12` for an absolute limit of one working day. |
+| `SESSION_COOKIE_SAMESITE` | `lax` | `lax` works when the client and the API share a registrable domain (`dam.example.com` and `api.dam.example.com`, or one hostname). `none` is only for a client and an API on unrelated domains, and requires HTTPS. |
+| `MFA_REQUIRED_ROLES` | unset | Comma-separated roles (`admin`, `manager`, `member`, `guest`) that must use two-step verification. Their users are asked to enrol at their next sign-in and can do nothing else until they have. Single sign-on sessions are exempt. An unknown role stops the server at startup. |
+| `PASSWORD_BREACH_CHECK` | `true` | Checks new passwords against the Have I Been Pwned breach list. Only the first 5 characters of the password's SHA-1 leave the server. `false` for servers without internet access. |
+| `TRUST_PROXY` | `1` | How many reverse proxies to trust for the client address (`X-Forwarded-For`), used by rate limiting and logs. A number of hops, `true` (any, only on a private network), `false`, or a comma-separated list of proxy addresses. |
+
+### Single sign-on
+
+Optional OpenID Connect sign-in. See [Single sign-on](../integrations/single-sign-on.md) for the provider setup and how accounts are matched.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `OIDC_ISSUER` | unset | Issuer URL. With `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET`, turns single sign-on on. Setting only some of the three stops the server at startup. |
+| `OIDC_CLIENT_ID` | unset | Client id registered at the provider. |
+| `OIDC_CLIENT_SECRET` | unset | Client secret. |
+| `OIDC_LABEL` | `Single sign-on` | Text of the sign-in button. |
+| `OIDC_SCOPES` | `openid email profile` | Scopes requested. |
+| `OIDC_TRUST_EMAIL` | `false` | `true` treats the `email` claim as verified without `email_verified`. Only for a provider where users cannot choose their address. |
+| `OIDC_AUTO_CREATE` | `false` | `true` creates an approved member at first sign-in when no account matches. |
+| `OIDC_DEFAULT_REGION` | first region by name | Region name for accounts created at sign-in. |
+| `OIDC_GROUPS_CLAIM` | unset | ID token claim listing the user's groups. |
+| `OIDC_GROUP_MAP` | unset | JSON object mapping provider group values to Damvia group names. Invalid JSON stops the server at startup. |
+| `OIDC_ONLY` | `false` | `true` makes single sign-on the only way in, except for guests. |
 
 ### Database
 
@@ -41,8 +80,9 @@ The server loads `server/.env` with `dotenv` at startup (`server/src/env.ts`). `
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MAIN_S3_URL` | none, required | `http(s)://ACCESS_KEY:SECRET_KEY@host:port/bucket`. Bucket for collection and page thumbnails, page images/videos and the login background. |
+| `MAIN_S3_URL` | none, required | `http(s)://ACCESS_KEY:SECRET_KEY@host:port/bucket`. Percent-encode a key that contains `/`, `+`, `@` or `:` (for example `/` becomes `%2F`). Bucket for collection and page thumbnails, page images/videos and the login background. |
 | `ASSETS_S3_URL` | none, required | Same syntax. Bucket for asset originals (`asset-file/{id}`), asset thumbnails and download archives (`downloads/{id}`). |
+| `S3_ENCRYPTION_CHECK` | `true` | At startup, asks each bucket for its default server-side encryption and logs a `security.configuration` warning when a bucket has none or the answer cannot be read. `false` skips the check, for a provider that does not implement `GetBucketEncryption`. |
 
 The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`. Details in [Object storage](../integrations/object-storage.md).
 
@@ -54,6 +94,7 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 | `SMTP_PORT` | `1025` | SMTP port. The defaults match MailHog from `docker-compose.yml`. |
 | `SMTP_USER` | unset | SMTP login. Authentication is only enabled when **both** `SMTP_USER` and `SMTP_PASS` are set. |
 | `SMTP_PASS` | unset | SMTP password. |
+| `SMTP_REQUIRE_TLS` | `false` | `true` refuses to send unless the server upgrades the connection with STARTTLS. Recommended for any relay outside the host. Port `465` always uses implicit TLS. |
 | `MAILCONFIG` | unset | Base64-encoded JSON of the mail templates. When unset, the server reads `server/mailconfig.json` and exits with an error if the file is unreadable. See [Email templates](../configuration/email-templates.md). |
 
 ### Cloud storage sync

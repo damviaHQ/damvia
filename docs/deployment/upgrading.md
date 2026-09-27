@@ -3,7 +3,7 @@ title: Upgrading
 description: Pull, build, restart; migrations run on their own at startup.
 sidebar:
   order: 6
-lastUpdated: 2026-09-23
+lastUpdated: 2026-09-27
 ---
 
 To upgrade an instance, rebuild the server image and client files, then deploy them together. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
@@ -28,6 +28,43 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
    ```
    then copy `client/dist/` to the static host. Deploy the client **after** the server, since the client is built against the server's tRPC types and may call procedures the old server does not have.
 5. Check `docs/reference/environment-variables.md` of the new version (or the diff of `server/.env.template`) for new variables.
+
+## Sign-in and sessions in this upgrade
+
+The `1792195200000-security-hardening` migration replaces signed tokens with sessions stored in the database, and adds two-step verification, sign-in lockout and account suspension.
+
+Before restarting:
+
+- Check that `APP_URL` is the exact origin users open the client at, including the port if it is not the default. The API now answers cross-origin requests from that origin only, and refuses a `POST` from any other origin with a `403`.
+- Check that the client and the API share a registrable domain: one hostname, or `dam.example.com` with `api.dam.example.com`. The session is now a cookie with `SameSite=Lax`, which the browser does not send from an unrelated site. For unrelated domains, set `SESSION_COOKIE_SAMESITE=none` and serve both over HTTPS. See [Reverse proxy](./reverse-proxy.md#the-session-cookie-must-reach-the-api).
+- Make the proxy set `X-Forwarded-For`, and set `TRUST_PROXY` to the number of proxies in front of the API if there is more than one. Otherwise every visitor shares the sign-in rate limits of the proxy's address.
+- Review the new variables: `SESSION_IDLE_HOURS`, `SESSION_MAX_HOURS`, `SESSION_COOKIE_SAMESITE`, `MFA_REQUIRED_ROLES`, `PASSWORD_BREACH_CHECK`, `TRUST_PROXY`, `REQUEST_LOG`, `SMTP_REQUIRE_TLS`, `S3_ENCRYPTION_CHECK`, and the `_FILE` suffix that reads any variable from a file. See [Environment variables](../reference/environment-variables.md).
+- The Docker image now runs as the `node` user (uid 1000). Make any mounted file readable by that user. See [Server with Docker](./server-docker.md).
+- Rebuild and deploy the client with the server: the old client sends an `authorization` header the new server ignores.
+
+What the migration does:
+
+- Adds the `user_sessions` and `login_tokens` tables, `token_hash` on `collection_invitations`, and on `users` the columns `failed_login_count`, `locked_until`, `mfa_secret`, `mfa_enabled_at`, `mfa_recovery_codes`, `mfa_last_step`, `oidc_subject` and `suspended_at`.
+- Clears the unsalted SHA-512 password hashes left from before scrypt. Those users sign in once through **Reset password**, or through an email link. Scrypt hashes are kept.
+
+What users notice:
+
+- A browser signed in before the upgrade is moved to a session silently on its first load: the client exchanges its `dam_token` cookie once through `auth.upgradeLegacyToken`, then deletes the cookie. A browser that does not open the app before the old token expires signs in again.
+- Invitation emails sent before the upgrade, with `?dam_token=` links, keep working through the same exchange until their token expires, 180 days after it was issued, or until `APP_SECRET` changes. Invitations sent from now on use `APP_URL/login?invite=...`.
+- Login and approval emails sent before the upgrade no longer sign anyone in; users request a new login email or sign in with their password.
+- New passwords need 12 to 128 characters and are checked against known breaches. Existing passwords keep working and are not checked again.
+- Deleting a user now deletes their personal collections and keeps the common collections they owned, without an owner. It used to fail while the user had personal collections.
+
+Scripts or integrations that called the API with an `authorization` header holding a JWT stop working: only `auth.upgradeLegacyToken` reads that header. They must sign in with `auth.login` and keep the `damvia_session` cookie.
+
+Rolling back drops the new tables and columns: sessions, suspensions and two-step enrolments are lost, and the cleared SHA-512 hashes are not restored. The previous version does not read these sessions, so everyone signs in again.
+
+## Downloads in this upgrade
+
+- A direct download is now limited to 1 GB of source files and 300 images for everyone, decided by the server: larger requests are prepared by the worker and emailed. Desktop users who used to download 2 to 5 GB directly now get an email, so check that the worker and SMTP are healthy.
+- Downloading licensed files requires accepting the usage terms; an older client that does not send the acceptance gets an error. Deploy the client together with the API.
+- A shared download link stops working when its owner is suspended, loses approval or loses access to one of the files.
+- Signed links to previews and originals now expire after one hour instead of seven days.
 
 ## pg-boss 12 in this upgrade
 
@@ -77,7 +114,7 @@ Downtime includes maintenance, migrations and verification. Measure it on a rest
 Before restarting, set a randomly generated `APP_SECRET` of at least 32 bytes. The server and CLI validate it at startup; `openssl rand -hex 32` generates a suitable value.
 
 - Users must sign in again. Existing session and email login links are replaced by newly issued links; pending password resets must be requested again.
-- Passwords continue to work. Their stored hashes are upgraded on successful login; new and reset passwords use scrypt.
+- Passwords continue to work; new and reset passwords use scrypt. Hashes older than scrypt were upgraded on successful login until the `1792195200000-security-hardening` migration, which clears the ones still left.
 - Collection descendants inherit their parent’s group restrictions. The migration updates existing descendants as well as enforcing inheritance for future children.
 - Guests start with no groups. The migration removes existing guests from their region’s default group. Review guests who intentionally need that group and explicitly reassign it after the upgrade; other memberships are preserved.
 - Licence dates and allowed regions apply to every non-admin user, including owners and invitees. Start and end dates are inclusive. Drafts are visible only to admins and their owner.
@@ -187,6 +224,9 @@ Two stages join the enrichment pass, `families` and `readiness`, plus `product-r
 | `1790553600000-records` | Renames `products` to `records` (`product_key` to `record_key`, `primary_key_name` to `key_column_name`), `product_attributes` to `record_attributes`, `asset_files.product_id` and `product_view` to `record_id` and `record_view`, `asset_types.is_related_to_products` to `is_related_to_records`; rewrites the `product_attribute.` prefix of `list_display_items` to `record_attribute.`; creates the single-row `enrichment_settings` table holding the record label. Renames only; rolling back reverses them |
 | `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |
 | `1790467200000-asset-type-rules` | `asset_type_rules` table; `asset_type_source` and `asset_type_rule_id` on `asset_folders`. Existing typed folders whose type differs from their parent's, and typed roots, are marked `manual`; the others `inherited`. Rolling back drops the table and the three columns and loses nothing the previous version reads |
+| `1792454400000-download-license-acceptance` | `license_accepted_at` and `license_ids` on `downloads`, empty for earlier downloads. Rolling back drops them |
+| `1792281600000-audit-log` | `audit_log` table with an append-only trigger (`audit_log_append_only`). Starts empty: nothing before the upgrade is recorded. Rolling back drops the table and every entry; export it first if you need it |
+| `1792195200000-security-hardening` | `user_sessions` and `login_tokens` tables; `token_hash` on `collection_invitations`; `failed_login_count`, `locked_until`, `mfa_secret`, `mfa_enabled_at`, `mfa_recovery_codes`, `mfa_last_step`, `oidc_subject` (unique) and `suspended_at` on `users`. Clears unsalted SHA-512 password hashes. Rolling back drops the tables and columns; the cleared hashes are not restored |
 | `1790294400000-collection-nesting` | `orphaned_at`, `orphaned_from_name` and `orphaned_reason` on `collections`; drops the unique `(parent_id, name)` constraint first, so custom collections with the same name can share a parent from then on; retires duplicate mirrors of one folder under one parent, moving their custom collections under the kept mirror even when it already holds one with the same name; rebuilds `mpath` of `collections` and `menu_items` from `parent_id`; recounts `number_of_files`; adds the partial unique index `idx_collections_parent_asset_folder` on `(parent_id, asset_folder_id)` plus `text_pattern_ops` indexes on the `mpath` of `collections`, `menu_items` and `asset_folders` |
 
 TypeORM records applied migrations in the `migrations` table; the same migration never runs twice.

@@ -23,7 +23,7 @@ A new environment variable is added in three places: the code, `server/.env.temp
 | `reference/` | Reference | Exact lookup material: env vars, jobs, CLI, ports, troubleshooting |
 | `contributing/` | Contributing | For developers: architecture, data model, API, jobs, storage drivers |
 | `assets/` | (not a group) | Images referenced relatively from pages |
-| `_internal/` | (excluded) | Repo-only notes, never published |
+| `_internal/` | (excluded) | Repo-only contributor reference (the page map), never published |
 
 A folder is a sidebar group. `index.md` is the group's landing page. Files are kebab-case, one topic per file.
 
@@ -61,7 +61,7 @@ Write for a person evaluating, installing, configuring or maintaining Damvia. St
 - Label executable examples and unexecuted operational procedures honestly. A source review or compilation does not prove a live integration; record actual results in `reference/validation-status.md`.
 - Never cite line numbers. Name files and symbols instead: they are greppable and their absence is detectable.
 - Keep one authoritative explanation for each rule and link to it. Do not repeat schemas, procedure inventories, component styling or historical test counts across task pages.
-- Put stable implementation contracts in `contributing/`, exact lookup material in `reference/`, current limitations in `reference/known-limitations.md`, release-specific changes in release notes, and temporary audits in `_internal/`.
+- Put stable implementation contracts in `contributing/`, exact lookup material in `reference/`, current limitations in `reference/known-limitations.md`, and release-specific changes in release notes. Temporary audits and working notes stay out of the repository.
 - A task guide states its audience, prerequisites, steps, expected result and material failure or recovery cases. Preserve exact technical detail when the reader must enter it or act on it.
 - Plain Markdown. Starlight asides are fine (`:::note`, `:::tip`, `:::caution`). No custom components, no imports, so the files stay readable on GitHub.
 - Cross-link with relative paths: `[Licenses](../administration/licenses.md)`. The website remark plugin resolves the target against the source file before converting it to an absolute `/docs/...` route; keep the `.md` links readable on GitHub.

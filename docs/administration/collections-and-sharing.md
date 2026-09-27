@@ -3,7 +3,7 @@ title: Collections and sharing
 description: Choose manual or synchronised collections, control access, and understand what source changes do to their contents.
 sidebar:
   order: 8
-lastUpdated: 2026-09-23
+lastUpdated: 2026-09-27
 ---
 
 A collection is the unit people browse and share. Public collections make up the common catalogue; private collections belong to one user. A collection can follow a source folder or be assembled from selected files.
@@ -84,6 +84,8 @@ Draft collections are visible only to admins and their owner. Admins are exempt 
 
 An owner or admin can invite an email address to a collection and choose an expiry date. **Send Invite** emails an access link. **Copy Link** creates the invitation without sending it and produces a link that begins the email-login flow.
 
+Guests cannot invite anyone: they view and download only, and the server refuses them every collection change. Only the people who can edit a collection receive its list of invitations, with the invited emails and expiry dates; other readers never do.
+
 If the address has no account, Damvia creates an approved guest in the inviter's region with no groups. The invitation gives access to the selected collection and its descendants until the start of the selected expiry date. It gives read/download access, not edit rights.
 
 Removing the invitation ends that access path. It does not remove access gained through ownership, public/group rules or another invitation, and it does not revoke a storage URL that has already been signed. Moving a synchronised collection can change which ancestor invitations cover it.
@@ -108,7 +110,7 @@ The DAM fills the browser window. The sidebar keeps the account menu at its bott
 
 Search uses the same fixed tools area: display preferences and global selection actions at the top, then the local selection beside **Search results**, with file type, sort, format and size filters to its right. Select-all applies to results on the current page and preserves selections elsewhere. Its hover labels match collection pages. Advanced search criteria remain in the sidebar; result counts and the search scope appear above the results. Product search uses the same selection and display controls.
 
-Open the gear menu (**Collection actions**) for **Share collection**, **Collection settings**, **Edit page**, and **Search in this collection**. Only authorized actions appear. Removing selected assets or products is also available there when permitted. The global selection count, Download and Add to collection sit to the right of search. The local checkbox reads “Select All in” or, for example, “2 items selected in” followed by the collection path. Hovering a partial selection offers “Select All in”; hovering a complete selection offers “Remove Selection in”, which clears that local selection without deleting any content. The chosen filters sit to its right, without a separate visible item count. Filters stay on a single horizontally scrollable row. Arrow controls indicate more filters to the left or right and let you scroll through them; touch and trackpad scrolling also work. On narrow screens, the filter row sits below the selection. Banners and custom page content scroll below this tools area.
+Open the gear menu (**Collection actions**) for **Share collection**, **Collection settings** and **Edit page**. Only authorized actions appear. Searching from the top search bar while a collection is open offers to search this collection, with or without its sub-collections. Removing selected assets or products is also available there when permitted. The global selection count, Download and Add to collection sit to the right of search. The local checkbox reads “Select All in” or, for example, “2 items selected in” followed by the collection path. Hovering a partial selection offers “Select All in”; hovering a complete selection offers “Remove Selection in”, which clears that local selection without deleting any content. The chosen filters sit to its right, without a separate visible item count. Filters stay on a single horizontally scrollable row. Arrow controls indicate more filters to the left or right and let you scroll through them; touch and trackpad scrolling also work. On narrow screens, the filter row sits below the selection. Banners and custom page content scroll below this tools area.
 
 ## Narrow what is on screen
 
@@ -132,11 +134,11 @@ The chosen filters stay across navigation and reloads until they are unticked; t
 
 In list view, the column headers sort the rows. Clicking a header sorts ascending, clicking it again descending. **Size** sorts by the real byte count and **Updated at** by the real date, not by the text in the cell. Sorting lasts as long as the view; it is not saved.
 
-This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, choose **Search in this collection** in the gear menu, which opens the search scoped to that collection. The search has its own facets, counted across the whole library — see [Products and PIM](./records.md#configure-record-fields).
+This filter is not the search. It only sees the current page, and it is not shareable through the URL. To look through a collection and everything under it, search from the top search bar while the collection is open: the search is scoped to that collection and its sub-collections unless you pick another scope. The search has its own facets, counted across the whole library — see [Products and PIM](./records.md#configure-record-fields).
 
 ## Choose who sees the action bar tools
 
-**Action bar** in the collection settings decides who sees three tools above the collection: **Search in collection**, **Filter** and **Display preferences**. Each tool takes one of four choices:
+**Action bar** in the collection settings decides who sees three tools of the collection: searching inside it from the top search bar (**Search**), **Filter** and **Display preferences**. A reader who may not search the collection still uses the search bar, but it searches the whole library they can see. Each tool takes one of four choices:
 
 | Choice | Who sees the tool |
 |---|---|

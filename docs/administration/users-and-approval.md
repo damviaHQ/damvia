@@ -3,7 +3,7 @@ title: Users and approval
 description: Approve accounts, assign roles, groups and regions, and remove access without confusing verification with approval.
 sidebar:
   order: 3
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-27
 ---
 
 An account normally needs two independent conditions before it can use the library: its email must be verified and the account must be approved. Roles then decide what the person can administer; regions, groups, collection rules and file licences decide what content they can see.
@@ -12,17 +12,17 @@ An account normally needs two independent conditions before it can use the libra
 
 At sign-up, Damvia creates a member in the selected region and adds the region's default group. It sends a verification email. The new account is approved immediately only when its email domain is in the authorised-domain list; otherwise it waits for an admin or manager.
 
-After verification, Damvia emails the admins and managers in the same region to request approval. If that region has no admin or manager, no approval request can be delivered. Give every active region at least one responsible approver.
+After verification, Damvia emails every admin and the managers of the user's region to request approval, with a link to the user's page in `/admin/users`. Only approved, verified and not suspended admins and managers receive it. Give every active region a manager, or rely on the admins.
 
 The first account cannot approve itself. Promote it through the database as described in [First admin](../getting-started/first-admin.md), then add the organisation's authorised domains and regional approvers.
 
 ## Approve a user
 
-Open `/admin/users`. A verified, unapproved account shows an **Approve** action. Approval enables normal access and sends the user-approved email.
+Open `/admin/users`. A verified, unapproved account shows an **Approve** action. Approval enables normal access and sends the user-approved email, which carries a single-use sign-in link valid 7 days. An account that has not verified its email address cannot be approved; ask the user to follow the verification email, or resend it with `user.resendVerificationEmailFor`.
 
-Managers see and change users only in their own region. They may approve members and guests, edit their name/company/groups, and remove eligible accounts. They cannot grant `admin` or `manager`, change their own role or region, or change/remove another manager or admin.
+Managers see and change users only in their own region. They may approve members and guests, edit their name/company/groups, and remove eligible accounts. They cannot grant `admin` or `manager`, change anyone's region (their own included), change another user's email address, or change/remove another manager or admin.
 
-Admins can manage every region and assign all roles. Before granting an administrative role, check whether the person also receives sensitive operational data or maintenance email.
+Admins can manage every region and assign all roles. Only an admin changes another user's email address; the change ends that user's sessions, cancels their pending reset and email links, and sends a verification email to the new address. Before granting an administrative role, check whether the person also receives sensitive operational data or maintenance email. To require two-step verification for administrative roles, set `MFA_REQUIRED_ROLES=admin,manager`; see [Accounts and links](./accounts-and-links.md#two-step-verification).
 
 ## Choose the role
 
@@ -49,17 +49,34 @@ Removing a domain affects only future sign-ups. It does not revoke existing acco
 
 ## Password and passwordless modes
 
-With normal authentication, accounts use a password and receive verification/reset emails. Passwords are stored with scrypt and a separate random salt; older supported hashes are upgraded on successful login.
+With normal authentication, accounts use a password and receive verification/reset emails. Passwords are stored with scrypt and a separate random salt, and must be 12 to 128 characters.
 
-With `ENABLE_PASSWORD_LESS_AUTH=true`, sign-up has no password and login emails a time-limited link. Existing password hashes are not erased, and changing the flag should be tested with existing accounts before rollout. Invitation links can also trigger the email-login flow regardless of the global mode.
+With `ENABLE_PASSWORD_LESS_AUTH=true`, sign-up has no password and login emails a single-use link valid 15 minutes. Existing password hashes are not erased, and changing the flag should be tested with existing accounts before rollout. Invitation links can also trigger the email-login flow regardless of the global mode.
 
-Changing `APP_SECRET` invalidates every current session and signed login/invitation JWT. Password resets also invalidate earlier sessions for that account. See [Accounts and links](./accounts-and-links.md).
+A password reset ends every session of that account. Session lifetimes, lockout and two-step verification are described in [Accounts and links](./accounts-and-links.md).
 
 ## Maintenance contacts
 
 An admin can be designated to receive customer-facing storage and maintenance email. This is distinct from `SERVER_ALERT_EMAILS`, which identifies the people operating the host and controls server-disk alerts/visibility.
 
 Ensure at least one active admin is a maintenance contact when storage alerts are enabled. Removing or demoting the last contact leaves customer-level alerts without a recipient.
+
+## Act on an account without deleting it
+
+Open a user from the Users screen (`/admin/users/{id}`). The **Account access** section of the details dialog holds these actions. It appears for accounts you may manage: admins see it on every account but their own, managers on members and guests of their region.
+
+| Action | Procedure | Effect |
+|---|---|---|
+| Suspend access | `user.suspend` | Asks for confirmation, then blocks every sign-in and email, ends every session, cancels pending email links and stops the account's download links. Data is kept. Nobody can suspend their own account. The list shows a **Suspended** badge. |
+| Restore access | `user.resume` | Lifts a suspension and clears a sign-in lockout. |
+| Sign out everywhere | `user.revokeSessions` | Ends every session of the account. |
+| Send password reset | `user.sendPasswordResetFor` | Sends the reset-password email. Refused for a suspended account. |
+| Resend verification email | `user.resendVerificationEmailFor` | Shown while the email is unverified. Sends the verification email again. |
+| Reset two-step verification | `user.resetMfa` | Admins only, shown when the account has two-step verification on. Removes the enrolment and ends every session. The user enrols again at next sign-in if their role requires it. |
+
+Managers and admins can also approve and suspend from a phone; see [Phones](./phones.md).
+
+Suspension is the reversible way to cut someone off, for example while an incident is investigated or when a person leaves but their collections must stay.
 
 ## Remove an account carefully
 
@@ -70,10 +87,10 @@ Before removal, inspect:
 - pending downloads;
 - administrative or maintenance-contact responsibilities.
 
-Deletion can fail while private collections still reference the owner. Reassign or delete those collections first. Removing a user deletes their invitations and downloads; prepared download objects are also removed. Deleting the invitation creator does not revoke invitations they sent when the invitation remains otherwise valid.
+Removing a user deletes their personal (private) collections, the invitations addressed to their email and their downloads; prepared download objects are also removed. Common (public) collections they owned are kept without an owner. Move anything worth keeping out of their personal collections first. Deleting the invitation creator does not revoke invitations they sent when the invitation remains otherwise valid. If the account may be needed again, suspend it instead.
 
 ## Search and export
 
-The Users screen supports text search, role/region/status filters and CSV export of the displayed administrative fields. Treat exports as personal data: store them temporarily, restrict access and delete them according to the organisation's retention policy.
+The Users screen supports text search, role/region/status filters and CSV export of the displayed administrative fields. For a periodic access review, **Export access review** in the Users screen header saves `access-review-YYYY-MM-DD.csv`: `user.accessReview` returns a CSV of every account the caller can list (a manager: every account of their region) with the columns `email`, `name`, `company`, `role`, `region`, `groups`, `approved`, `email_verified`, `mfa`, `mfa_required`, `suspended_at`, `last_login_at` and `created_at`. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet does not run them as formulas. Treat exports as personal data: store them temporarily, restrict access and delete them according to the organisation's retention policy.
 
-When diagnosing why someone cannot enter, check in this order: email verification, approval, current session validity, role/region, group membership, collection rule, then file licence. Admin accounts are poor test subjects for the last step because they bypass licence checks.
+When diagnosing why someone cannot enter, check in this order: suspension, sign-in lockout, email verification, approval, two-step verification, current session validity, role/region, group membership, collection rule, then file licence. Admin accounts are poor test subjects for the last step because they bypass licence checks.

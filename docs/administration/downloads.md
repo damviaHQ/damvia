@@ -3,7 +3,7 @@ title: Downloads
 description: Understand direct and emailed exports, conversion limits, access rechecks and seven-day link expiry.
 sidebar:
   order: 11
-lastUpdated: 2026-09-23
+lastUpdated: 2026-09-27
 ---
 
 Damvia packages one or more accessible files as a downloadable object in the assets bucket. Small exports can finish in the request; larger exports are prepared by the worker and announced by email. Every prepared object expires after seven days.
@@ -25,7 +25,7 @@ File selections resolve all accessible media linked to the selected records, wit
 | Direct | Damvia prepares the file or archive while the request is open and returns it when ready. Proxy timeouts must allow long conversions. |
 | Email | A background job prepares the export, then emails a link when it is ready. The worker and SMTP must be healthy. |
 
-The client normally offers direct multi-file downloads only up to 2 GB and 300 images. Single-file direct downloads can be offered up to 5 GB. The server rejects any request whose accessible source files total 10 GB or more. These are decimal byte limits.
+The server decides the mode. A direct download is allowed only up to 1 GB of source files (1,000,000,000 bytes) and 300 images, on computers and phones alike; a larger request is prepared by the worker and emailed even when the browser asked for a direct download. The response says which mode was used. The server rejects any request whose accessible source files total 10 GB or more, and refuses a new emailed export while the same person already has 5 in preparation. A request lists at most 10,000 files. These are decimal byte limits, measured on the source files: a conversion can produce a larger result.
 
 For several files, Damvia creates an uncompressed zip and preserves the file collection path beneath an `export/` folder. Pictures accessed through records without a file collection are placed directly in `export/`. A single file is delivered directly. Up to 25 files may be fetched or converted at once, so a large export can require substantial temporary disk and CPU.
 
@@ -39,17 +39,25 @@ Video conversion requires ffmpeg. Image conversion uses sharp. Conversion output
 
 When a request is created, files the requester cannot see are excluded. Before a queued email export is prepared, Damvia checks the requester's current approval, collection access and file licences again.
 
-If access has been revoked or a licence has expired, the export becomes `failed`, no ready email is sent and no link is exposed. Temporary storage or provider failures use the queue's retry policy; exhausted jobs require diagnosis before a new request is submitted.
+If access has been revoked or a licence has expired, the export becomes `failed`, no ready email is sent and no link is exposed. Temporary storage or provider failures use the queue's retry policy; exhausted jobs require diagnosis before a new request is submitted. The worker also refuses an export whose files now total 10 GB or more.
 
-Licence acceptance shown in the browser is an acknowledgement, not a server-side acceptance record. The server enforces visibility and licence conditions independently. See [Licences](./licenses.md).
+## Usage terms are accepted and recorded
+
+When a selected file has a licence, the request must say that the person agreed to its usage terms, or the server refuses it. The download keeps the time of acceptance (`license_accepted_at`) and the licences concerned (`license_ids`), and each per-file download event records the licence and the acceptance time. The server still enforces visibility and licence conditions independently. See [Licences](./licenses.md).
 
 ## Links expire after seven days
 
-A ready download uses `API_URL/v1/downloads/{id}`. That route does not require a session; it redirects to a short-lived signed object URL while the download record is ready and unexpired. Anyone who holds the public link can use it during that period.
+A ready download uses `API_URL/v1/downloads/{id}`. That route does not require a session, so the link can be copied and passed on: anyone who holds it can use it while it is valid. Each time it is opened, Damvia checks that the download is ready and unexpired and that its owner is still approved, verified, not suspended and still able to see every file in it. Then it redirects to a signed object URL valid for 5 minutes. Otherwise it redirects to `/link-expired`, so suspending the owner or removing their access also stops links they shared.
+
+The ready email carries the same link.
 
 Every minute, the cleanup job marks overdue downloads expired and deletes their stored objects. Expired entries remain visible in the download history for about a month. Deleting a user removes that user's downloads and stored objects immediately.
 
-Removing an invitation or rotating `APP_SECRET` does not revoke an already issued object URL. See [Accounts and links](./accounts-and-links.md).
+A signed object URL already handed out keeps working until its own expiry: 5 minutes for a download, one hour for the previews and originals shown in the library. See [Accounts and links](./accounts-and-links.md).
+
+## On a phone
+
+The phone interface offers **Download now** up to 1 GB and **Email me a link** above it, with the same format choices reduced to original, JPEG or WebP, and MP4 at 720p. Account → **Downloads** lists each export with its status and expiry, and a ready one has a **Copy link** button and the phone's share sheet. See [Phones](./phones.md).
 
 ## Diagnose a failed or stuck export
 

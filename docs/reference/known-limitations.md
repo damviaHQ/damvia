@@ -3,7 +3,7 @@ title: Known limitations
 description: Operational limitations affecting synchronisation, recovery and deployment.
 sidebar:
   order: 7
-lastUpdated: 2026-09-23
+lastUpdated: 2026-09-27
 ---
 
 This page tracks operational limitations that remain in the application. For installation checks, see [Validation status](./validation-status.md) and [Acceptance checklist](../deployment/acceptance-checklist.md).
@@ -18,7 +18,6 @@ This page tracks operational limitations that remain in the application. For ins
 - Dropbox retries a `401` once after refreshing its token. A second `401` fails the run. OneDrive plans folders in parent-first order before writing them. Provider authentication, rate limits and production-shaped subfolder behaviour still need monitoring on the actual tenant.
 - Preview errors are swallowed before a file is marked `up_to_date`; only original upload errors fail the job. Integrity checks validate original size/presence, not preview health.
 - Until the first storage measurement after the `storage_usage` migration, stored usage is 0. The quota check then only counts files downloaded since startup, so up to one plan's worth of files can download on top of what is already stored. The first measurement runs within 30 minutes; clicking "Measure now" closes the window immediately.
-- S3 credentials in URL username/password fields are not percent-decoded before being passed to MinIO. Use URL-safe credentials until this parser is fixed.
 
 ## Collections
 
@@ -40,4 +39,4 @@ This page tracks operational limitations that remain in the application. For ins
 
 Run one server process with `ENABLE_WORKER=true` to handle the API, background tasks and cloud sync. With the flag off, the process can publish jobs but does not process them or register schedules. Source initialisation can overlap queue startup. Failed jobs have a limited number of retries; an interrupted job may already have uploaded a file or sent an email before it runs again. See [Worker and scaling](../deployment/worker-and-scaling.md).
 
-Deleting an owner can fail while private collections still reference that user. Main-bucket uploads cannot be rebuilt from cloud sources. See [Validation status](./validation-status.md) for the checks that passed and the tests still needed on a running instance.
+Main-bucket uploads cannot be rebuilt from cloud sources. See [Validation status](./validation-status.md) for the checks that passed and the tests still needed on a running instance.

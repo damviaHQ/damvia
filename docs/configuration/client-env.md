@@ -3,7 +3,7 @@ title: Client configuration
 description: "The client has four build-time variables: the API endpoint and three brand colours."
 sidebar:
   order: 3
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-27
 ---
 
 The client is a static bundle built by Vite. Its configuration is read when you run `npm run dev` or `npm run build`, and the values end up inside the JavaScript. Changing `client/.env` on a running dev server has no effect until it restarts; changing it in production means rebuilding and redeploying the bundle.
@@ -23,7 +23,9 @@ VITE_BRAND_COLOR_STRONG=
 
 ## The API endpoint includes /trpc
 
-`VITE_API_ENDPOINT` is the full URL of the tRPC endpoint: the server's public `API_URL` followed by `/trpc`. The client sends every request there with an `authorization` header holding the session token from the `dam_token` cookie. The server's CORS is open to any origin, so the client and API can live on different hosts without extra configuration; see [Reverse proxy](../deployment/reverse-proxy.md).
+`VITE_API_ENDPOINT` is the full URL of the tRPC endpoint: the server's public `API_URL` followed by `/trpc`. The client sends every request there with the browser's credentials, so the API's HttpOnly session cookie travels with it; the client never reads or stores the session itself. At start-up it asks the API who is signed in (`user.me`) and waits for the answer before opening any route.
+
+The API accepts requests from the origin of its `APP_URL` only. The client must therefore be served from exactly that origin, and share a registrable domain with the API (one hostname, or `dam.example.com` and `api.dam.example.com`) unless the server sets `SESSION_COOKIE_SAMESITE=none`. See [Server configuration](./server-env.md#sessions-live-in-the-database) and [Reverse proxy](../deployment/reverse-proxy.md).
 
 ## Brand colours are resolved by Tailwind
 

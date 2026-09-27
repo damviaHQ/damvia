@@ -3,7 +3,7 @@ title: Records
 description: Create, edit and import a catalogue of records (products, events, venues), organise it in tables, type its fields, see the files matched to each record and its history, and choose which fields power search and display.
 sidebar:
   order: 10
-lastUpdated: 2026-09-22
+lastUpdated: 2026-09-27
 ---
 
 The Data enrichment area adds context to mirrored assets. Damvia keeps a catalogue of **records**, organised in tables and created on screen or imported from CSV or Excel files, extracts a record key and optional view from each filename, and uses selected record fields for search, filters and display.
@@ -176,13 +176,15 @@ The attach dialog searches records by key and by searchable attribute, or picks 
 
 ## Use the metadata written inside the files
 
-Damvia reads the EXIF (camera, lens, date taken, GPS) and IPTC (title, caption, keywords, credit, city, copyright) metadata of every image it processes. Each tag becomes a field on **Data enrichment → File metadata** (`/admin/data-enrichment/file-metadata`), created switched off the first time a file carries it, so nothing shows to readers until an admin decides. Formats that carry no readable metadata, such as PSD files, are skipped without an error. Images processed before this feature have none until `npm run cli -- metadata:backfill` is run once on the server.
+Damvia reads the EXIF (camera, lens, date taken, GPS), IPTC (title, caption, keywords, credit, city, copyright) and XMP metadata of every image it processes. From XMP it keeps the Dublin Core elements (`xmp.dc.title`, `xmp.dc.description`, `xmp.dc.creator`, `xmp.dc.subject`, `xmp.dc.rights` and the other `dc` properties), the IPTC core stored in XMP (`xmp.photoshop.Headline`, `Credit`, `Source`, `City`, `State`, `Country`, `DateCreated`, `xmp.Iptc4xmpCore.Location`), the rights properties (`xmp.xmpRights.UsageTerms`, `WebStatement`, `Marked`, `Owner`) and `xmp.xmp.Rating`, `Label` and `CreateDate`. An image that carries a C2PA manifest (Content Credentials) gets `c2pa.manifest` = `present`; Damvia records that the manifest exists, not whether its signature is valid, which only a C2PA validator can tell. Each tag becomes a field on **Data enrichment → File metadata** (`/admin/data-enrichment/file-metadata`), created switched off the first time a file carries it, so nothing shows to readers until an admin decides. Formats that carry no readable metadata, such as PSD files, are skipped without an error. Images processed before this feature have none until `npm run cli -- metadata:backfill` is run once on the server.
 
 | Switch | Effect |
 |---|---|
 | Searchable | Free-text search also looks in this field. |
 | Filter | The field becomes a filter in search: its values for text, a from/to range for dates. A GPS position cannot be a filter. Text fields show their 200 most used values. |
 | Visible | The value is shown under **From the file** in the file preview and can be chosen as a list column on an asset type. |
+
+Search and filters use a field only while it is also **Visible**: a hidden field is never searched or offered as a filter, because matching on it would reveal its values. Filter values, and the date bounds of a date filter, come only from files the reader can open.
 | Can link | The field may link files to records, through a **Metadata** step on the Link to products screen. Say whether the value is a record key or the value of an attribute (a range). |
 
 Metadata belongs to the file, so these filters also work on files no record is linked to. Cameras write some fields reliably; people write others, which can be wrong or outdated. Only tick **Can link** for a field your team fills reliably: until then, a value equal to a record key links nothing. When a trusted field has a record key on an unmatched file, the Unmatched screen suggests it with **Accept**. Dates are stored as the camera wrote them, without time zone conversion.
@@ -222,6 +224,8 @@ On the records page, open ⋮ → **Manage fields**. The panel lists every field
 | Filter | The field becomes a faceted filter in the DAM search. Ticking it also ticks Show. |
 | Show | The value can appear in file details and configured list views. |
 | Search | Free-text search checks this field. |
+
+As for file metadata, **Search** and **Filter** apply only while **Show** is on, and filter values come only from records linked to files the reader can open.
 
 Choose facetable columns with a manageable set of values such as category, colour family or season. Very high-cardinality values produce unwieldy filters even though the interface hides options that would yield no result.
 

@@ -1,15 +1,17 @@
 # Page map
 
-Repo-only. Which documentation page covers which part of the code. Update the page on the right when you touch the code on the left.
+Contributor reference, kept in the repository and not published on the documentation site. It lists which documentation page covers which part of the code: when you change the code on the left, update the page on the right in the same pull request.
 
 | Code | Page(s) |
 |---|---|
 | `server/test/`, `client/test/unit/`, `client/vitest.config.ts`, `.github/workflows/ci.yml` | `contributing/index.md`, `reference/validation-status.md`, `getting-started/local-setup.md` |
+| `client/src/mobile/`, `client/src/composables/useIsPhone.ts`, `client/src/layouts/LayoutRouter.vue`, `meta.mobile` / `meta.roles` in `client/src/router/` | `administration/phones.md`, `contributing/architecture.md` |
+| `server/src/services/download.ts` (`DOWNLOAD_LIMITS`, `downloadDelivery`), `client/src/utils/downloadDelivery.ts`, the `/v1/downloads` route in `server/src/server.ts` | `administration/downloads.md`, `administration/phones.md`, `administration/accounts-and-links.md` |
 | `server/src/env.ts` | `reference/environment-variables.md`, `configuration/server-env.md` |
 | `server/.env.template`, `client/.env.template` | `reference/environment-variables.md`, `configuration/client-env.md` |
 | `server/src/worker.ts` | `reference/background-jobs.md`, `deployment/worker-and-scaling.md` |
 | `server/src/index.ts` (startup, 5-minute sync loop) | `integrations/index.md`, `deployment/worker-and-scaling.md` |
-| `server/src/server.ts` (Fastify, CORS, body limit, `/v1/downloads/:id`) | `deployment/reverse-proxy.md`, `administration/downloads.md` |
+| `server/src/server.ts` (Fastify, cookie, helmet, CORS and origin check, request log, body limit, `/v1/downloads/:id`) | `deployment/reverse-proxy.md`, `administration/downloads.md`, `contributing/architecture.md` |
 | `server/src/cli.ts`, `server/src/services/system.ts` | `reference/cli.md`, `deployment/integrity-check.md` |
 | `server/src/asset-updater/sources.ts` (`ASSET_SOURCES`, overlap rules), `server/src/env.ts` (`assetUpdaters`), `server/src/entity/asset-source.ts` (run status) | `integrations/sources.md`, `reference/environment-variables.md`, `administration/dashboard.md` |
 | `server/src/asset-updater/dropbox.ts` | `integrations/dropbox.md` |
@@ -19,7 +21,14 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/src/services/image-processor.ts` | `administration/assets-tree.md`, `getting-started/index.md` (system packages) |
 | `server/src/services/mailer.ts`, `server/mailconfig.json` | `configuration/email-templates.md`, `integrations/smtp.md` |
 | `server/src/services/user.ts`, `trpc/router/user.ts`, `trpc/router/authorized-domain.ts` | `administration/users-and-approval.md`, `introduction/roles-and-access.md`, `getting-started/first-admin.md` |
-| `server/src/trpc/index.ts` (auth predicates) | `introduction/roles-and-access.md` |
+| `server/src/trpc/index.ts` (auth predicates, MFA enrolment gate) | `introduction/roles-and-access.md`, `contributing/api.md` |
+| `server/src/trpc/router/audit.ts`, `services/audit.ts`, `entity/audit-log.ts`, `trpc/index.ts` (`EXPLICITLY_AUDITED`), `client/src/views/admin/admin-audit-log.vue` | `administration/audit-log.md`, `contributing/api.md`, `contributing/data-model.md`, `reference/background-jobs.md` |
+| `server/src/services/oidc.ts`, `server/src/oidc-routes.ts` | `integrations/single-sign-on.md`, `reference/environment-variables.md` |
+| `server/src/services/security-checks.ts`, `server/src/load-env.ts` | `configuration/server-env.md`, `reference/environment-variables.md`, `deployment/server-docker.md` |
+| `server/src/trpc/router/auth.ts`, `services/session.ts`, `services/sign-in.ts`, `services/login-token.ts`, `services/rate-limit.ts`, `services/mfa.ts`, `services/password-policy.ts`, `entity/user-session.ts`, `entity/login-token.ts` | `administration/accounts-and-links.md`, `configuration/server-env.md`, `contributing/api.md`, `contributing/data-model.md`, `reference/troubleshooting.md` |
+| `server/src/services/security-checks.ts` (`security.configuration` warnings) | `configuration/server-env.md`, `deployment/server-docker.md` |
+| `server/src/load-env.ts` (`loadFileVariables`, `*_FILE`) | `reference/environment-variables.md`, `deployment/server-docker.md` |
+| `client/src/views/auth/auth-login.vue` (link and invitation exchange, MFA step), `client/src/components/auth/MfaSetup.vue`, `client/src/components/dialog-member/DialogMemberSecurity.vue` (Account > Security) | `administration/accounts-and-links.md`, `contributing/architecture.md` |
 | `server/src/services/collection.ts`, `trpc/router/collection.ts`, `trpc/router/collection/invitation.ts`, `entity/collection.ts` | `administration/collections-and-sharing.md`, `introduction/roles-and-access.md` |
 | `client/src/utils/pageFilter.ts`, `composables/usePageFilter.ts`, `components/PageFilterBar.vue`, `PageFilterToggle.vue`, `FilterChipList.vue`, `TableSortHeader.vue`, `components/collection/CollectionRender*.vue`, `CollectionDisplayList*.vue` | `administration/collections-and-sharing.md`, `administration/menu-and-pages.md` |
 | `server/src/trpc/router/region.ts`, `group.ts`, `entity/region.ts`, `entity/group.ts` | `administration/groups-and-regions.md` |
@@ -46,7 +55,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 | `server/Dockerfile` | `deployment/server-docker.md`, `getting-started/index.md` |
 | `server/docker-compose.yml` | `getting-started/local-setup.md`, `reference/ports-and-services.md` |
 | `client/tailwind.config.js` (brand colours), `client/index.html`, `client/public/` | `configuration/client-env.md`, `configuration/branding.md` |
-| `client/src/services/server.ts`, `client/src/stores/globalStore.ts` (token, cookie) | `deployment/client-build.md`, `deployment/reverse-proxy.md` |
+| `client/src/services/server.ts`, `client/src/stores/globalStore.ts` (credentials, `whenReady`, legacy token exchange) | `deployment/client-build.md`, `deployment/reverse-proxy.md`, `configuration/client-env.md` |
 | `client/src/router/index.ts` (admin routes) | `administration/index.md` |
 | `client/vite.config.ts`, `client/package.json` scripts | `deployment/client-build.md` |
 | `server/src/trpc/router/*` (procedure list) | `contributing/api.md` |
@@ -60,7 +69,7 @@ Repo-only. Which documentation page covers which part of the code. Update the pa
 
 | Concern | Pages |
 |---|---|
-| JWT, password reset, invitation expiry and signed storage links | `administration/accounts-and-links.md` |
+| Sessions, email links, lockout, two-step verification, suspension, invitation expiry and signed storage links | `administration/accounts-and-links.md` |
 | Worker failures, provider credentials, temporary storage and monitoring | `deployment/operations.md` |
 | Release, installation and restore qualification | `deployment/acceptance-checklist.md`, `reference/validation-status.md` |
 | Unresolved implementation defects | `reference/known-limitations.md` (remove or update entries when fixed) |
@@ -70,4 +79,4 @@ End-user instructions are maintained as a separate how-to knowledge base and onb
 
 ## Relevance test for documentation updates
 
-Update a public page when a code change alters a reader's action, visible result, configuration, supported capability, permission, limit, compatibility, failure mode or recovery procedure. Keep implementation-only changes in code, tests, pull requests or `_internal/` notes. Rewrite the existing explanation instead of appending a chronological account of the change.
+Update a public page when a code change alters a reader's action, visible result, configuration, supported capability, permission, limit, compatibility, failure mode or recovery procedure. Keep implementation-only changes in code, tests or pull request descriptions. Rewrite the existing explanation instead of appending a chronological account of the change.

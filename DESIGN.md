@@ -1,6 +1,6 @@
-# Damvia design system — proposal 0.1
+# Damvia design system
 
-The approved direction is being implemented on `2609-design-system`. The production admin shell and dashboard now adopt it; the tenant portal retains its branding. The interactive reference is `client/design-system.html`; the shared foundation is `packages/design-system`.
+The admin shell and dashboard use this direction; the tenant portal keeps its own branding. The interactive reference is `client/design-system.html`; the shared foundation is `packages/design-system`.
 
 ## Direction
 
@@ -61,7 +61,7 @@ The prototype also contains surface-specific composition and decorative tones. T
 
 Share design tokens, fonts and component CSS across Vue and Astro. Keep complex product behaviour in Vue, using the existing Reka/Radix accessibility primitives during the real admin rebuild. Do not force a Vue runtime onto static marketing pages just to share styles. Keep shadcn as the product component foundation and apply Damvia tokens to its styles. The preview dialog reuses the existing shadcn Dialog root and Radix content, overlay, title and close primitives; it avoids loading production Tailwind styles into the standalone preview. Do not replace the production shadcn components in this proposal.
 
-The package is private during design review. Publish a versioned release only after the API, naming, license and maintenance policy are settled. Keep the existing AGPL license; no new permissive license is implied. Open-source contributors can already inspect the files. Documentation is prepared in `docs/contributing/design-system.md`, which follows the existing website’s Starlight pipeline.
+`packages/design-system` is not published to npm yet. A versioned release follows once the API, naming and maintenance policy are settled, under the same AGPL license as the rest of Damvia. Documentation is prepared in `docs/contributing/design-system.md`, which follows the existing website’s Starlight pipeline.
 
 Migration sequence: agree on the direction, stabilise foundational components, rebuild the admin shell and users page with real permissions and data, migrate remaining admin workflows, apply the system to the Astro website, then evaluate selective neutral portal improvements. Add public component stories and visual regression coverage as production components stabilise.
 

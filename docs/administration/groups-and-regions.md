@@ -3,7 +3,7 @@ title: Groups and regions
 description: Model organisational access with one region per user, multiple groups and inherited collection restrictions.
 sidebar:
   order: 4
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-27
 ---
 
 Regions and groups answer different questions. A region determines who administers a user and which file licences allow them. Groups determine which restricted collection branches they can open.
@@ -29,7 +29,7 @@ Removing a region strips it from licence rules, which can hide files from moved 
 
 A user may belong to several groups. A collection with no group restriction follows its ordinary public/owner/invitation rules. A restricted collection is visible through that rule only to users who belong to at least one allowed group.
 
-Group restrictions inherit down the collection tree. New manual, copied and synchronised children take the parent's restriction, and later changes propagate to descendants. A moved synchronised branch takes the restriction of its new parent.
+Group restrictions inherit down the collection tree. New manual, copied and synchronised children take the parent's restriction, and a change to the parent's groups propagates to descendants. Saving a parent's other settings, such as its name or description, leaves the groups and draft state of its children untouched. A moved synchronised branch takes the restriction of its new parent.
 
 Only the collection owner or an admin can edit its allowed groups. Public collections have no owner, so admins control their restrictions.
 
@@ -46,6 +46,8 @@ A group can let someone open a collection while a file licence still hides some 
 
 Adding someone to a group can expose every permitted non-draft descendant in each branch restricted to that group. Removing the membership can remove those branches immediately, except where public, ownership or invitation rules provide another access path.
 
-When merging or deleting a group, move its users and any regional default-group references first. Then update collection restrictions that name it. Test with a non-admin account from each affected region; admins bypass file licences and can see public drafts.
+Deleting a group is refused while it has members, is a region's default group, or still limits a collection or one of its action-bar tools. Dropping it from a collection could leave that collection with no group, which opens it to every member.
+
+**Move users and regions** merges one group into another in a single step: memberships (a person already in both keeps one), regional defaults, collection restrictions and action-bar rules all switch to the target group. The source group can then be deleted. Test with a non-admin account from each affected region; admins bypass file licences and can see public drafts.
 
 For the full combination of roles, invitations, drafts, groups and licences, see [Roles and access](../introduction/roles-and-access.md).

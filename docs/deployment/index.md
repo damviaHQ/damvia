@@ -3,7 +3,7 @@ title: Deployment
 description: The production topology and the order to set it up in.
 sidebar:
   order: 1
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-27
 ---
 
 A production Damvia is one Node.js process (API plus worker plus cloud sync), one static site, and three services. The repository ships a Dockerfile for the server and nothing else: how you host the static client, Postgres, S3 and SMTP is your choice.
@@ -27,6 +27,7 @@ A production Damvia is one Node.js process (API plus worker plus cloud sync), on
 | 3. Put both behind HTTPS and make S3 reachable | [Reverse proxy](./reverse-proxy.md) |
 | 4. Plan updates | [Upgrading](./upgrading.md) |
 | 5. Plan backups and the recovery drill | [Backups](./backups.md), [Integrity check](./integrity-check.md) |
+| 6. Harden the deployment | [Hardening checklist](./hardening.md), [Security architecture](./security.md) |
 
 ## Minimum viable production
 

@@ -3,10 +3,10 @@ title: Server configuration
 description: What each group of server variables controls, and the values that trip people up.
 sidebar:
   order: 2
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-27
 ---
 
-`server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
+`server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Any variable can instead be read from a file by setting `NAME_FILE=/path`, which suits Docker and Kubernetes secrets; a value set directly in `NAME` wins. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
 
 ## The two URLs must be the public ones
 
@@ -14,18 +14,37 @@ lastUpdated: 2026-09-21
 
 The client has its own copy of the API location, `VITE_API_ENDPOINT`, which is `API_URL` plus `/trpc` and is baked in at build time. See [Client configuration](./client-env.md).
 
-## APP_SECRET signs every session
+`APP_URL` must also be the exact origin the browser shows for the client (scheme, host and port). The API accepts cross-origin requests from that origin only, and refuses any `POST` whose `Origin` header is neither the origin of `APP_URL` nor that of `API_URL` with a `403`. A client served from a second hostname that is not `APP_URL` cannot sign in.
 
-Auth tokens are JSON Web Tokens signed with `APP_SECRET` and valid for 180 days. The client stores the token in the `dam_token` cookie for 365 days. Consequences:
+## Sessions live in the database
 
-- Set a randomly generated secret of at least 32 bytes (`openssl rand -hex 32`). Startup checks this requirement; there is no default.
-- Rotating the secret invalidates every token at once: every user is logged out and every unexpired invitation link stops working.
+A sign-in creates a row in `user_sessions` and sets an HttpOnly cookie, `damvia_session`, that holds a random token; the database keeps only its SHA-256 hash. The browser sends the cookie with every API call, and the client's JavaScript never reads it. A session ends after `SESSION_IDLE_HOURS` without use (12 by default), `SESSION_MAX_HOURS` after sign-in (720, 30 days, by default), or earlier when the user signs out or an event ends it; [Accounts and links](../administration/accounts-and-links.md) lists them.
+
+The cookie is `SameSite=Lax` and marked `Secure` when `API_URL` starts with `https:`. `Lax` requires the client and the API to share a registrable domain: one hostname, or `dam.example.com` with `api.dam.example.com`. For a client and an API on unrelated domains, set `SESSION_COOKIE_SAMESITE=none`, which forces `Secure` and therefore needs HTTPS on both. See [Reverse proxy](../deployment/reverse-proxy.md).
+
+For an absolute limit of one working day, set `SESSION_MAX_HOURS=12`. A new `SESSION_IDLE_HOURS` applies to existing sessions at their next request; `SESSION_MAX_HOURS` is fixed on each session when it is created, so a shorter value applies to new sign-ins only.
+
+## APP_SECRET protects two-step verification
+
+Set a randomly generated secret of at least 32 bytes (`openssl rand -hex 32`). Startup checks this requirement; there is no default. The secret no longer signs sessions. It encrypts the two-step verification secrets stored in `users.mfa_secret` (AES-256-GCM, with a key derived by HKDF) and signs the five-minute challenge between a password and its verification code. Consequences of changing it:
+
+- Signed-in users stay signed in.
+- Every enrolled authenticator becomes unreadable: those users cannot finish a sign-in until an admin resets their two-step verification with `user.resetMfa`, then they enrol again.
+- Browsers still holding a pre-upgrade `dam_token`, and invitation emails sent before the upgrade, can no longer be exchanged for a session. See [Upgrading](../deployment/upgrading.md#sign-in-and-sessions-in-this-upgrade).
+
+Keep the secret stable, and back it up with the configuration.
+
+## Sign-in is rate limited behind the proxy
+
+Sign-in, email-link, sign-up, password-reset and verification-code attempts are counted per client address and per account, in the memory of the API process. The client address comes from `X-Forwarded-For`, trusting as many proxies as `TRUST_PROXY` says (1 by default). Behind two proxies, such as a CDN and nginx, set `TRUST_PROXY=2`; with `1` every visitor seems to come from the CDN and they share one limit. `TRUST_PROXY=true` trusts any chain and suits only a private network. The limits are listed in [Accounts and links](../administration/accounts-and-links.md#sign-in-attempts-are-limited).
+
+`MFA_REQUIRED_ROLES`, for example `admin,manager`, makes two-step verification compulsory for those roles: their users must enrol at their next sign-in and cannot turn it off. `PASSWORD_BREACH_CHECK=false` stops new passwords from being checked against Have I Been Pwned, for a server without internet access.
 
 ## Passwordless mode changes the login flow
 
-`ENABLE_PASSWORD_LESS_AUTH=true` switches the whole instance to email login: sign-up stores no password, the login form asks for an email only, and each login queues a `mailer/log-in` email with a link that carries a fresh token. With `false` (the default), users have passwords. The same email path is also used, regardless of the flag, when the login page is opened through a collection share link: the link carries an `auth_params` parameter with `magicLink: true` and the invited email, and the form then sends a login email instead of asking for a password.
+`ENABLE_PASSWORD_LESS_AUTH=true` switches the whole instance to email login: sign-up stores no password, the login form asks for an email only, and each login queues a `mailer/log-in` email with a single-use link valid 15 minutes. The form always answers that an email was sent; the email goes only to an existing account that is not suspended. With `false` (the default), users have passwords. The same email path is also used, regardless of the flag, when the login page is opened through a collection share link: the link carries an `auth_params` parameter with `magicLink: true` and the invited email, and the form then sends a login email instead of asking for a password.
 
-Passwords use scrypt with a random salt (`hashPassword` in `server/src/services/credentials.ts`). Older hashes are upgraded on successful login. Passwordless sign-up stores no password, but enabling the flag does not erase existing hashes or disable the password-reset API.
+Passwords use scrypt with a random salt (`hashPassword` in `server/src/services/credentials.ts`). A new password must be 12 to 128 characters and differ from the email address. Passwordless sign-up stores no password, but enabling the flag does not erase existing hashes or disable the password-reset API.
 
 ## Worker on or off
 
@@ -37,7 +56,9 @@ Passwords use scrypt with a random salt (`hashPassword` in `server/src/services/
 
 ## Two buckets, credentials in the URL
 
-`MAIN_S3_URL` and `ASSETS_S3_URL` pack endpoint, credentials and bucket into one URL: `https://ACCESS_KEY:SECRET_KEY@s3.example.com/bucket`. The scheme decides TLS, the port defaults to 443 or 80. The two buckets have different lifecycles: the assets bucket can be rebuilt from the cloud storage, the main bucket cannot. [Object storage](../integrations/object-storage.md) covers bucket policies and MinIO versus AWS.
+`MAIN_S3_URL` and `ASSETS_S3_URL` pack endpoint, credentials and bucket into one URL: `https://ACCESS_KEY:SECRET_KEY@s3.example.com/bucket`. The scheme decides TLS, the port defaults to 443 or 80. The keys are percent-decoded, so write a `/`, `+`, `@` or `:` in a key as `%2F`, `%2B`, `%40` or `%3A`.
+
+At startup the server asks each bucket for its default server-side encryption and logs a `security.configuration` warning when there is none. Turn it on for both buckets: with MinIO, configure a KMS and run `mc encrypt set sse-s3 <alias>/<bucket>`; on AWS, new buckets already encrypt with SSE-S3. `S3_ENCRYPTION_CHECK=false` skips the check for a provider that does not answer it. The same startup check warns when `APP_URL`, `API_URL` or a bucket URL uses plain HTTP on a non-local host in production. The two buckets have different lifecycles: the assets bucket can be rebuilt from the cloud storage, the main bucket cannot. [Object storage](../integrations/object-storage.md) covers bucket policies and MinIO versus AWS.
 
 ## STORAGE_QUOTA is the plan, not the disk
 
@@ -63,7 +84,7 @@ Leave `SERVER_ALERT_EMAILS` empty and the server never sends nor shows a disk fi
 
 ## Mail
 
-`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` configure Nodemailer. Authentication is only sent when both user and password are set, so leave both empty for an unauthenticated relay such as MailHog. The server adds the header `X-PM-Message-Stream: outbound` to every email, which Postmark uses to pick the message stream and other providers ignore.
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` configure Nodemailer. Authentication is only sent when both user and password are set, so leave both empty for an unauthenticated relay such as MailHog. Port `465` uses implicit TLS. On any other port, set `SMTP_REQUIRE_TLS=true` for a relay outside the host: sending then fails unless the server upgrades the connection with STARTTLS, instead of sending sign-in links in clear text. Startup logs a `security.configuration` warning when a non-local relay runs without it. The server adds the header `X-PM-Message-Stream: outbound` to every email, which Postmark uses to pick the message stream and other providers ignore.
 
 `MAILCONFIG` holds the templates as base64 JSON. It exists so a container can carry the templates without a mounted file; leaving it empty falls back to `server/mailconfig.json`. See [Email templates](./email-templates.md).
 
@@ -86,8 +107,9 @@ Record matching is set in the admin, on **Data enrichment → Link to products**
 | `PORT` | The container runtime imposes a port. Default `3000`. |
 | `NODE_ENV` | `npm start` already sets `production`. |
 | `APP_NAME` | Shown as the browser tab title and in the public `env` query. |
+| `REQUEST_LOG` | `false` stops the `http.response` line written for every request. |
 
-The API, worker and CLI all require a valid `APP_SECRET` at startup. See [Accounts and links](../administration/accounts-and-links.md) for token lifetime and revocation limits.
+The API, worker and CLI all require a valid `APP_SECRET` at startup. See [Accounts and links](../administration/accounts-and-links.md) for session and link lifetimes.
 
 For `docker run --env-file`, use literal `KEY=value` lines without quotes or inline comments. The server template uses separate comment lines. Docker does not parse this file as dotenv or as a shell script.
 

@@ -3,16 +3,16 @@ title: Integrity check
 description: What the daily integrity check compares between the database and the assets bucket, and when to run it by hand.
 sidebar:
   order: 8
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-27
 ---
 
 The integrity check is the repair tool for the assets bucket. It runs every day at 05:00 UTC as the `system/integrity-check` job and on demand with `npm run cli -- check-integrity`. Both call `integrityCheck()` in `server/src/services/system.ts`.
 
 ## What it does
 
-1. Loads every asset file from the database and lists every object under `asset-file/` in the assets bucket.
+1. Loads the id, size and status of every asset file that is not `pending_deletion` from the database and lists every object under `asset-file/` in the assets bucket.
 2. Keeps an asset file as healthy only if its object exists, the object's size equals the `size` recorded from the cloud storage listing, **and** the row's status is `up_to_date`.
-3. Sets every other asset file to `outdated`, saves them, and pushes one `asset/update-content` job per file. The worker downloads the content from the cloud storage again, uploads it, rebuilds the WebP thumbnail and sets `up_to_date`.
+3. Sets every other asset file to `outdated`, in batches of 1,000, and pushes one `asset/update-content` job per file. The worker downloads the content from the cloud storage again, uploads it, rebuilds the WebP thumbnail and sets `up_to_date`. A file marked `pending_deletion` is never revived: the deletion job removes it as planned.
 4. Recomputes `number_of_files` and `sample_file_ids` for every collection (`recomputeCollectionRollups`): the count of collection files in the collection and its descendants, and the first four collection files with a thumbnail, prioritising files in the collection itself, then descendant files by creation date. These are the four images in a collection's thumbnail mosaic. The triggers that maintain both columns do not follow tree moves, so this pass is the safety net for counters that drifted.
 5. Lists `asset-file/` and `downloads/` again and deletes orphan objects: an original or thumbnail whose asset file row no longer exists, and an archive whose download row is gone, `expired` or `failed`. Only objects last modified more than 24 hours ago are deleted, so a file whose upload is in progress is never touched. The count and the bytes freed are logged as `storage.orphans-removed` and shown on the [dashboard](../administration/dashboard.md).
 
@@ -58,4 +58,4 @@ npm run cli -- check-integrity
 
 This queues all assets found unhealthy, including the selected one. Check its resulting object and preview, not just its status: the current processing code absorbs some S3/thumbnail errors. Do not update by filename, which need not be unique, or bulk-refresh unsupported formats just because they lack thumbnails. Collection-file deletion alone does not refresh mosaics; the integrity pass recalculates them.
 
-The check also removes abandoned `settings/client-logo-temp/` objects from the main bucket after 24 hours. It never removes the current processed `settings/client-logo.webp` object.
+The check also removes abandoned `settings/client-logo-temp/` and `settings/auth-background-temp/` uploads from the main bucket after 24 hours. It never removes the processed `settings/client-logo.webp` or `settings/auth-background.webp` objects.

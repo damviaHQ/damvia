@@ -3,7 +3,7 @@ title: Troubleshooting
 description: The failures a new instance meets first, what they mean, and the fix.
 sidebar:
   order: 6
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-27
 ---
 
 Symptoms are grouped by where you notice them. Server messages are quoted as they appear in the logs (Winston, plain text on stdout).
@@ -35,9 +35,19 @@ Symptoms are grouped by where you notice them. Server messages are quoted as the
 |---|---|---|
 | After sign-up the screen says the account must be approved | `approved` is `false`: the email domain is not in the authorized domains list. | An admin or a manager of the user's region approves them under `/admin/users`, or add the domain under `/admin/authorized-domains` for future sign-ups. The very first admin is promoted in SQL: see [First admin](../getting-started/first-admin.md). |
 | The verification or login email never arrives | SMTP settings are wrong, or the worker is off (all emails are queued jobs). | Check `SMTP_*`, check the worker is enabled, look at the `mailer/*` queues in `pgboss.job`. In development, open MailHog at `http://localhost:8025`. |
-| The approval request reaches nobody | `email/request-approval` only mails admins and managers **of the requester's region**. If that region has none, the job sends nothing. | Give each region at least one manager or admin. |
-| Everyone was logged out at once | `APP_SECRET` changed. | Expected: tokens are signed with it. |
-| A guest's invitation link says the link expired or shows the login page | The invitation's `expiresAt` has passed, or the token in `?dam_token=` was issued before an `APP_SECRET` change. | Re-invite the guest. |
+| The approval request reaches nobody | `email/request-approval` mails every admin and the managers of the requester's region, counting only accounts that are approved, verified and not suspended. With none, the job sends nothing. | Make sure at least one active admin exists, or give the region a manager. |
+| Sign-in succeeds but the next page shows the login screen again | The browser did not keep or send the `damvia_session` cookie: the client and the API are on unrelated domains with `SESSION_COOKIE_SAMESITE=lax`, `SESSION_COOKIE_SAMESITE=none` without HTTPS, or the proxy strips `Set-Cookie`. | Serve the client and the API from one domain, or set `SESSION_COOKIE_SAMESITE=none` with HTTPS on both. See [Reverse proxy](../deployment/reverse-proxy.md#the-session-cookie-must-reach-the-api). |
+| Every call fails with a CORS error, or mutations get `403 Origin not allowed` | The client's origin is not the origin of `APP_URL` (another hostname, `http` instead of `https`, a missing port). | Set `APP_URL` to the exact address users open, restart the server. |
+| Users are signed out after a few hours | `SESSION_IDLE_HOURS` (12 by default) passed without a request, or `SESSION_MAX_HOURS` since sign-in. | Expected. Raise the values if the instance's policy allows. |
+| `Too many attempts` for everyone at once | The API sees every visitor with the proxy's address, so they share one rate limit. | Make the proxy set `X-Forwarded-For` and set `TRUST_PROXY` to the number of proxies. See [Reverse proxy](../deployment/reverse-proxy.md#forward-the-client-address). |
+| `Too many attempts` for one account | 5 wrong passwords in a row locked the account for 1 to 60 minutes. | Wait, reset the password, or have an admin or manager call `user.resume`. |
+| `This account is suspended` | An admin or manager suspended the account. | `user.resume` lifts it. |
+| A password is refused as found in a data breach | The Have I Been Pwned check matched it. | Choose another password. On a server without internet access the check is skipped silently; `PASSWORD_BREACH_CHECK=false` turns it off. |
+| An existing user's password stopped working after the upgrade | The account still had a pre-scrypt SHA-512 hash, which the security migration cleared. | The user resets their password once, or signs in with an email link. |
+| A user with two-step verification cannot finish signing in after `APP_SECRET` changed | The stored authenticator secret is encrypted with a key derived from `APP_SECRET`. | Restore the old secret, or have an admin call `user.resetMfa` for each enrolled user; they enrol again. |
+| A user lost their authenticator and recovery codes | Codes can only come from the enrolled authenticator or the ten recovery codes. | An admin calls `user.resetMfa`; the user signs in and enrols again. |
+| A guest's invitation link says the link is invalid or expired | The invitation's `expiresAt` has passed, the invitation was deleted, or a newer invitation email was sent (only the latest link works). An old `?dam_token=` link also stops working 180 days after it was issued or after an `APP_SECRET` change. | Send the invitation email again. |
+| A login or approval link says it is invalid or expired | The link was already used, or it is older than 15 minutes (login) or 7 days (approval). | Request a new login email. |
 
 ## Downloads
 

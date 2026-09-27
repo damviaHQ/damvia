@@ -3,10 +3,10 @@ title: Licenses
 description: Define usage licenses, attach them to folders, and understand how access checks and download terms work.
 sidebar:
   order: 5
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-27
 ---
 
-A license describes under which terms, where and for how long a set of files may be used. Licence dates and allowed regions apply to every non-admin user, including owners, group members and invitees. Admins are exempt. The client displays an acceptance checkbox; this is not a server-side record of acceptance.
+A license describes under which terms, where and for how long a set of files may be used. Licence dates and allowed regions apply to every non-admin user, including owners, group members and invitees. Admins are exempt. Downloading licensed files requires accepting the usage terms, and Damvia records when that happened.
 
 ## Fields of a license
 
@@ -40,7 +40,7 @@ The server checks two things before returning content: the user must have access
 
 1. Content without a licence remains subject to the collection’s ordinary access rules.
 2. Licensed content requires the user’s region in `allowed_region_ids`.
-3. Optional start and end dates are inclusive, using the PostgreSQL session’s current date. A licence ending today remains valid throughout today.
+3. Optional start and end dates are inclusive, using the PostgreSQL session’s current date. A licence ending today remains valid throughout today. Admins receive the `license-expiring` email 30, 7 and 1 days before an end date (`LICENSE_EXPIRY_NOTICE_DAYS`), so a licence can be renewed before files stop being downloadable.
 
 Collection listings check the linked asset folder's licence and file listings check each file's licence. Search, favourites, copies and new downloads use the same rules. Archive jobs check access again before preparing files, so a revoked or expired selection is not exported.
 
@@ -70,11 +70,11 @@ To restrict who may see one file, set a licence on the folder it comes from. To 
 An administrator cannot reproduce a licence problem by looking. Admins are exempt from the licence check, so a file hidden from a member by its region or its dates is still perfectly visible to an admin. When someone reports that a file disappeared, compare the licence on that file's origin folder with the region of the person who reported it, rather than opening the collection yourself.
 :::
 
-## Client acceptance is not server enforcement
+## Acceptance is required and recorded
 
-The single-file and multi-file download dialogs show the applicable licence names, scopes and details and require the user to tick an acceptance checkbox before continuing. This is a client-side acknowledgement only: Damvia does not store an acceptance record and the download API does not receive one.
+The single-file, multi-file and phone download screens show the applicable licence names, scopes and details and ask the user to agree to the usage terms. The download request carries that agreement: the server refuses a download of licensed files without it, and stores the acceptance time and the licences on the download. See [Downloads](./downloads.md#usage-terms-are-accepted-and-recorded).
 
-The server separately enforces visibility. A file hidden by its licence is not offered to the requester and cannot be added to a new download. A queued archive checks access again before it is built.
+Licence details are rendered as formatted text in those screens. Damvia keeps only paragraphs, headings, emphasis, lists, quotes and `http`, `https` or `mailto` links, both when the licence is saved and when it is shown.
 
 ## Regions show how many licenses cover them
 

@@ -3,7 +3,7 @@ title: Insights
 description: The admin analytics screen at /admin/analytics with views, downloads, active users, searches and shares over a date range, what each figure counts, and how long events are kept.
 sidebar:
   order: 13
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-27
 ---
 
 Insights, at `/admin/analytics`, tells an admin which files are used, by whom, and what people look for without finding it. The [dashboard](./dashboard.md) answers "is the instance healthy right now"; Insights answers "what happened over the last 30 days". It is rendered for the `admin` role only, and every figure comes from the `analytics` router, gated by `userAdmin`.
@@ -27,7 +27,7 @@ Storage totals and “No recorded downloads” describe the current library inde
 | `login` | The client loads the current user (`user.me`), which every sign-in path does: password, magic link, invitation link and a returning session | At most one per user per 30 minutes of inactivity. The same moment is stored in `users.last_login_at` and shown as "Last Login" in [Users](./users-and-approval.md) |
 | `asset_view` | A user opens a file in the preview dialog | Sent by the browser, at most once per file per 30 minutes per tab. Thumbnails in a grid are not views. The server checks that the caller can see the file |
 | `asset_download` | A download is requested, direct or by email | One event per file of the archive, so a 300-file archive counts 300 files and 1 request. Recorded in the same transaction as the download: a refused request records nothing |
-| `search` | A search returns its first page | The term is trimmed and lowercased. The same user repeating the same term within 1 minute counts once, which absorbs the facet request and page changes. The number of results is stored with it |
+| `search` | A search returns its first page | The term is trimmed and lowercased. The same user repeating the same term within 1 minute counts once, which absorbs the facet request and page changes. The number of results is stored with it. `ANALYTICS_SEARCH_MODE=anonymous` stores the term without the searcher (distinct searchers and audiences then stay empty, and repeats within a minute count once whoever typed them); `off` stores no search |
 | `collection_share` | An invitation to a collection is created | One per invitation |
 | `favorite` | A file is added to favorites | Removing a favorite records nothing |
 
@@ -57,7 +57,7 @@ A **search spike** is a day with at least 5 more searches than the daily average
 
 The attention list evaluates all terms before limiting the display, so an uncommon term with missing content is still surfaced even when it falls outside the 50 most popular searches.
 
-Select a term to see its daily chart and contactable users. The audience includes approved, email-verified non-guest accounts that searched that exact term in the selected period. Deleted accounts still contribute to event totals but cannot be contacted. Up to 200 users are shown and exported; the full contactable count is displayed alongside that limit.
+Select a term to see its daily chart and contactable users. The audience includes approved, email-verified non-guest accounts that searched that exact term in the selected period. Deleted accounts still contribute to event totals but cannot be contacted: deleting an account removes the person from every event. Up to 200 users are shown and exported; the full contactable count is displayed alongside that limit.
 
 Use **Find matching content** to open the portal search with the term prefilled, or **Manage assets** to review the asset tree. Missing content may need to be added in the connected cloud storage, exposed through collections, or made searchable in [Records](./records.md).
 

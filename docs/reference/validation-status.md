@@ -3,7 +3,7 @@ title: Validation status
 description: What was checked locally, which versions were inspected, and which integration tests remain unexecuted.
 sidebar:
   order: 8
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-27
 ---
 
 The documentation was reviewed against application commit `b860246` on 16 September 2026, then updated for `f8eb687`, which adds hexadecimal brand colours without `#`, and for the storage plan, dashboard and orphan cleanup change. It now includes the access, credential and storage changes tested on an isolated PostgreSQL database. The table distinguishes those tests from integrations still requiring a staging instance.
@@ -11,8 +11,8 @@ The documentation was reviewed against application commit `b860246` on 16 Septem
 | Component | Observed version | Verification |
 |---|---|---|
 | Local Node | 22.14.0 | Used for local checks. Both packages now declare `engines.node >=22.12.0` (pg-boss 12, commander 15 and Vitest 5 need it). The website lockfile includes `undici` requiring Node >=22.19.0, so use an up-to-date Node 22 for CI/deployment. |
-| Server | Fastify 5.12, tRPC 11.19.0, TypeORM 1.1, zod 4, TypeScript 6 | TypeScript compilation and 34 security regression tests passed against an isolated PostgreSQL instance, including fresh login tokens, API responses, direct exports, revoked-access exports, the storage plan reservation, plan and disk alert emails, orphan cleanup and the dashboard access rules including the hosting-contact-only disk figure. Buckets, cloud storage and email transport are stubbed; the real `asset/update-content` and archive callbacks run. |
-| Client | Vue 3.5.43, Vite 8.3.0, Tailwind 4.3.3, Reka UI 2.10.4, tRPC 11.19.0 | Production and design-reference builds and the recorded browser regressions passed. `npm run typecheck` also passed in the existing development checkout on 20 September 2026; this was not a clean dependency installation. Dated UI/a11y audit reports are retained as unpublished engineering records rather than evergreen public reference. |
+| Server | Fastify 5.12, tRPC 11.19.0, TypeORM 1.1, zod 4, TypeScript 6 | TypeScript compilation and the 449 tests of the 58 server suites passed on 27 September 2026 against an isolated PostgreSQL instance, covering fresh login tokens, API responses, direct exports, revoked-access exports, the storage plan reservation, plan and disk alert emails, orphan cleanup and the dashboard access rules including the hosting-contact-only disk figure. Buckets, cloud storage and email transport are stubbed; the real `asset/update-content` and archive callbacks run. |
+| Client | Vue 3.5.43, Vite 8.3.0, Tailwind 4.3.3, Reka UI 2.10.4, tRPC 11.19.0 | Production and design-reference builds passed. On 27 September 2026, 205 Vitest unit tests and the 175 Playwright tests (all screens against a mocked API, including the axe accessibility checks) passed. `npm run typecheck` also passed in the existing development checkout on 20 September 2026; this was not a clean dependency installation. Dated UI/a11y audit reports are retained as unpublished engineering records rather than evergreen public reference. |
 | Queue | pg-boss 12.33 | Actual registered archive callbacks tested for access denial and a temporary failure followed by a successful retry. Queue registration and delivery are stubbed in the suite; the retirement of a pg-boss 10 schema is covered by `test/pgboss-legacy.cjs` and was exercised by booting the server against a real pg-boss 10 database. |
 | PostgreSQL | 15 in development Compose | Migrations applied to an empty test database and the access migration checked against existing fixture rows. No production restore drill. |
 | Documentation | Astro 7.3.2, Starlight 0.42.1 | Built locally with current Markdown; generated internal routes and anchors checked. |
@@ -33,7 +33,7 @@ node --test scripts/docs.test.mjs
 
 From `server/`, run `SECURITY_TEST_DATABASE_URL=postgresql://.../damvia_security_test npm test` against a disposable PostgreSQL 15 database. The suites clear fixture tables, run migrations and test access, credentials, synchronisation, search, downloads, sign-up and concurrent requests. They never load `server/.env` or send email. The database name must end in `_test`.
 
-From `client/`, run `npm run typecheck`, `npm test` and `npm run build` after building the server once. The type check must report zero errors; a Vite build alone is not a type check. For isolated component validation run `npm run ui:check` and `npm run test:ui`.
+From `client/`, run `npm run typecheck`, `npm test` and `npm run build` after building the server once. The type check must report zero errors; a Vite build alone is not a type check. Then run `npm run ui:check` and `npm run test:ui` for the component type check and the Playwright suite.
 
 The website build must use the corrected renderer and schema, with the documentation submodule advanced to the intended code version. It then runs the generated-HTML checker. See the repository's `docs/README.md` for publication wiring. Local edits to the adjacent application checkout do not update the website's pinned submodule by themselves.
 

@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-23
+lastUpdated: 2026-09-27
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -27,11 +27,11 @@ findById: publicProcedure
 	}),
 ```
 
-`ctx` is `{ req, res, user }`; `user` is the `User` entity loaded from the JWT or `null`. Each router file is `export default router({ ... })`, mounted under its key in `router/index.ts`, which also declares the only top-level procedure, `env`. Prefer plain objects built by local `format*` helpers. `user.update` returns public profile fields. Product mutations return product entities. Renaming a procedure is a client change too, since the client is compiled against `AppRouter`.
+`ctx` is `{ req, res, user, session }`; `session` is the `UserSession` found from the `damvia_session` cookie and `user` its `User`, both `null` without a live session. Each router file is `export default router({ ... })`, mounted under its key in `router/index.ts`, which also declares the only top-level procedure, `env`. Prefer plain objects built by local `format*` helpers. `user.update` returns public profile fields. Product mutations return product entities. Renaming a procedure is a client change too, since the client is compiled against `AppRouter`.
 
 ## Four predicates gate access
 
-`authMiddleware(...predicates)` throws `UNAUTHORIZED` when `ctx.user` is `null` or any predicate returns false. `authMiddleware()` with no predicate only requires a logged-in user.
+`authMiddleware(...predicates)` throws `UNAUTHORIZED` when there is no session or any predicate returns false. `authMiddleware()` with no predicate only requires a logged-in user. It also throws `FORBIDDEN` for a user whose role is in `MFA_REQUIRED_ROLES` and who has not enrolled, except on the procedures in `MFA_ENROLMENT_PATHS`: `user.me`, `auth.logout`, `auth.mfaSetup`, `auth.mfaEnable` and `auth.sessions`. Sessions opened by single sign-on are exempt.
 
 | Predicate | Passes when |
 |---|---|
@@ -44,7 +44,7 @@ Per-object rules (own region for managers, `collection.canEdit(user)`, visibilit
 
 ## Errors carry a code, and validation errors carry field errors
 
-Common explicit `TRPCError` codes are `UNAUTHORIZED` (only from `authMiddleware`), `NOT_FOUND`, `BAD_REQUEST` and `FORBIDDEN`. When zod rejects the input, tRPC raises `BAD_REQUEST` with a `ZodError` cause, and the `errorFormatter` in `trpc/index.ts` rewrites it to `message: 'Invalid request.'` and adds `data.fieldErrors` (the result of `error.cause.flatten().fieldErrors`, an object of field name to array of messages).
+Common explicit `TRPCError` codes are `UNAUTHORIZED` (from `authMiddleware`, and from `auth.verifyMfa` for an expired challenge), `NOT_FOUND`, `BAD_REQUEST`, `FORBIDDEN` and `TOO_MANY_REQUESTS` (rate limits and sign-in lockout). When zod rejects the input, tRPC raises `BAD_REQUEST` with a `ZodError` cause, and the `errorFormatter` in `trpc/index.ts` rewrites it to `message: 'Invalid request.'` and adds `data.fieldErrors` (the result of `error.cause.flatten().fieldErrors`, an object of field name to array of messages).
 
 On the client, `extractErrors(error)` in `client/src/services/server.ts` returns `{ message, fieldErrors }` with the first message of each field, ready for a form.
 
@@ -52,7 +52,8 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 
 - Base URL: `VITE_API_ENDPOINT`, default `http://localhost:3000/trpc`.
 - A query is `GET /trpc/<router>.<procedure>?input=<JSON>`; a mutation is `POST /trpc/<router>.<procedure>` with the JSON input as body. Nested routers use dots: `collection.invitation.create`. The `httpLink` sends one request per call, no batching.
-- The `authorization` header carries the raw JWT, with no `Bearer` prefix. The token is what `user.login` returns (or what a `?dam_token=` link sets), signed with `APP_SECRET`, valid 180 days.
+- Authentication is the HttpOnly `damvia_session` cookie set by the sign-in procedures; the client sends it with `credentials: 'include'`. A script calls `auth.login` and keeps the cookie. The `authorization` header is read only by `auth.upgradeLegacyToken`, which exchanges a JWT issued before server-side sessions (signed with `APP_SECRET`, with the account's current `authVersion`) for a session once.
+- Requests other than `GET`, `HEAD` and `OPTIONS` with an `Origin` header other than the origin of `APP_URL` or `API_URL` get `403` before reaching tRPC.
 - There is no OpenAPI document. Types flow from `AppRouter` (`export type AppRouter = typeof appRouter` in `router/index.ts`) to the client through `RouterInput` and `RouterOutput`, `inferRouterInputs<AppRouter>` and `inferRouterOutputs<AppRouter>` in `client/src/services/server.ts`.
 
 ## Every procedure
@@ -63,26 +64,54 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `env` | query | public | `passwordLessAuthentication`, `appName`, regions list, for the login screen |
+| `env` | query | public | `passwordLessAuthentication`, `appName`, regions list and `sso` (`{ label, only }` or `null`), for the login screen |
 
-### `user`
+### `auth`
+
+The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitation`, and `user.create` and `user.resetPassword`) return `{ status: 'signed_in' }` after setting the session cookie, `{ status: 'email_sent' }`, or `{ status: 'mfa_required', challenge }` when the account has two-step verification. The challenge is a 5-minute token signed with `APP_SECRET` that only `verifyMfa` accepts. Rate limits and lockout are listed in [Accounts and links](../administration/accounts-and-links.md#sign-in-attempts-are-limited).
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `create` | mutation | public | Sign-up |
-| `login` | mutation | public | Password login returning the JWT, or pushes `mailer/log-in` when passwordless or `magicLink` |
-| `sendResetPasswordEmail` | mutation | public | Pushes `mailer/password-reset` |
-| `resetPassword` | mutation | public | Sets a new password given the email and the reset token |
+| `login` | mutation | public | Password sign-in. With passwordless mode or `magicLink`, pushes `mailer/log-in` for an existing, non-suspended account and always answers `email_sent`. Unknown email and wrong password give the same `NOT_FOUND` in the same time; 5 wrong passwords lock the account for 1 minute, doubling up to 60 |
+| `verifyMfa` | mutation | public | Takes the `challenge` and a TOTP or recovery code; opens the session with the method of the first factor |
+| `exchangeLink` | mutation | public | Consumes a single-use `?link=` token from a `login` or `user-approved` email |
+| `exchangeInvitation` | mutation | public | Takes `invitationId.secret` from an `invitation` email while the invitation exists and has not expired; also returns `collectionId`. The session ends with the invitation |
+| `upgradeLegacyToken` | mutation | public | Exchanges a pre-session JWT from the `authorization` header for a session with method `legacy` |
+| `logout` | mutation | public | Deletes the current session and clears the cookie |
+| `sessions` | query | login | The caller's sessions: `method`, `userAgent`, `createdAt`, `lastSeenAt`, `current` |
+| `revokeSession` | mutation | login | Ends one of the caller's sessions |
+| `revokeOtherSessions` | mutation | login | Ends every session of the caller but the current one |
+| `mfaSetup` | mutation | login | Stores a pending, encrypted TOTP secret and returns it with its `otpauth` URI and a QR code SVG |
+| `mfaEnable` | mutation | login | Checks a first code, turns two-step verification on, returns ten recovery codes once, ends the caller's other sessions |
+| `mfaDisable` | mutation | login | Turns it off given a code; `FORBIDDEN` when the caller's role is in `MFA_REQUIRED_ROLES` |
+| `mfaRegenerateRecoveryCodes` | mutation | login | Replaces the recovery codes given a code |
+
+### `user`
+
+"Managed" below means any account for an admin, and members and guests of the caller's region for a manager.
+
+| Procedure | Kind | Auth | Purpose |
+|---|---|---|---|
+| `create` | mutation | public | Sign-up; opens a session. Passwords are 12 to 128 characters, not the email, and not in the breach list unless `PASSWORD_BREACH_CHECK=false` |
+| `sendResetPasswordEmail` | mutation | public | Pushes `mailer/password-reset` for an existing, non-suspended account; the job creates the token. Always answers the same |
+| `resetPassword` | mutation | public | Sets a new password given the email and the reset token, ends every session of the account, clears the lockout, then signs in |
 | `resendVerificationEmail` | mutation | login | Resends the caller’s verification email; no token is returned |
-| `me` | query | login | Current user. Also stamps `users.last_login_at` and inserts a `login` activity event when the previous stamp is older than 30 minutes |
+| `me` | query | login | Current user, with `mfaEnabled`, `mfaSetupRequired` and `hasPassword`. Also stamps `users.last_login_at` and inserts a `login` activity event when the previous stamp is older than 30 minutes |
 | `updateProfile` | mutation | login | Own name/company; changing email requires admin |
 | `verifyEmail` | mutation | login | Consumes `?verificationCode=` |
 | `removeAccount` | mutation | login | Deletes own account (`FORBIDDEN` for any other id) |
 | `findById` | query | `userManagerOrAdmin` | One user (managers: own region) |
-| `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user; `maintenanceContact` is applied by admins on admin profiles only |
-| `list` | query | `userManagerOrAdmin` | Users (managers: own region), with `lastLoginAt`; `maintenanceContact` is only returned to admins |
-| `approve` | mutation | `userManagerOrAdmin` | Approves and pushes `email/user-approved` |
-| `remove` | mutation | `userManagerOrAdmin` | Deletes a user; managers can delete only members and guests in their region |
+| `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user; `maintenanceContact` is applied by admins on admin profiles only. Only admins change region or another user's email; an email change by an admin ends that user's sessions and clears their reset and email-link tokens |
+| `list` | query | `userManagerOrAdmin` | Users (managers: own region), with `lastLoginAt`, `suspendedAt` and `mfaEnabled`; `maintenanceContact` is only returned to admins |
+| `approve` | mutation | `userManagerOrAdmin` | Approves a verified account (`BAD_REQUEST` before verification) and pushes `email/user-approved` |
+| `remove` | mutation | `userManagerOrAdmin` | Deletes a user with their personal collections, invitations and downloads; their public collections lose their owner. Managers can delete only members and guests in their region |
+| `resendVerificationEmailFor` | mutation | `userManagerOrAdmin` | Resends the verification email of a managed, unverified user |
+| `sendPasswordResetFor` | mutation | `userManagerOrAdmin` | Pushes `mailer/password-reset` for a managed, non-suspended user |
+| `suspend` | mutation | `userManagerOrAdmin` | Sets `suspendedAt` on a managed user, deletes their email-link tokens and sessions. Refused on oneself |
+| `resume` | mutation | `userManagerOrAdmin` | Clears `suspendedAt` and the lockout of a managed user |
+| `revokeSessions` | mutation | `userManagerOrAdmin` | Ends every session of a managed user |
+| `resetMfa` | mutation | `userAdmin` | Removes a user's two-step verification enrolment and ends their sessions |
+| `accessReview` | query | `userManagerOrAdmin` | CSV of every user (managers: own region, admins and managers included): `email`, `name`, `company`, `role`, `region`, `groups`, `approved`, `email_verified`, `mfa`, `mfa_required`, `suspended_at`, `last_login_at`, `created_at`; formula-like cells are prefixed with `'` |
 
 ### `group`, `region`, `authorizedDomain`
 
@@ -94,7 +123,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 | `group.moveUsersAndRegions` | mutation | `userAdmin` | Re-points `user_groups` and `regions.default_group_id` from one group to another |
 | `region.list` | query | `userAdmin` | Regions |
 | `region.create`, `region.update`, `region.remove` | mutation | `userAdmin` | CRUD |
-| `region.moveUsers` | mutation | `userAdmin` | Moves every user of one region to another |
+| `region.moveUsers` | mutation | `userAdmin` | Moves every user of one region to another; `NOT_FOUND` when either region does not exist |
 | `authorizedDomain.list` | query | `userAdmin` | Domains allowed to sign up |
 | `authorizedDomain.create`, `authorizedDomain.remove` | mutation | `userAdmin` | CRUD |
 
@@ -299,8 +328,8 @@ Every procedure requires `userAdmin`. Writes re-run the entity stage of the enri
 | `settings.processClientLogo` | mutation | `userAdmin` | Validates/processes caller-owned staged `uploadId` and replaces the permanent WebP logo |
 | `settings.removeClientLogo` | mutation | `userAdmin` | Removes the uploaded client logo; layouts fall back to Damvia |
 | `settings.getAuthBackgroundImage` | query | public | Presigned URL of `settings/auth-background.webp`, if present |
-| `settings.getAuthBackgroundUploadUrl` | query | `userAdmin` | Presigned PUT for the temporary background |
-| `settings.processAuthBackgroundImage` | mutation | `userAdmin` | Converts the temporary upload to WebP (quality 80) at `settings/auth-background.webp` |
+| `settings.getAuthBackgroundUpload` | mutation | `userAdmin` | Presigned POST policy for one staged upload: JPEG, PNG or WebP, up to 20 MB, valid 10 minutes |
+| `settings.processAuthBackgroundImage` | mutation | `userAdmin` | Checks the staged upload (format, 20 MB, 40 million pixels), converts it to WebP (quality 80) at `settings/auth-background.webp` and always deletes the staged object |
 | `settings.removeAuthBackgroundImage` | mutation | `userAdmin` | Deletes the background |
 
 ### `dashboard`
@@ -312,6 +341,16 @@ Every procedure requires `userAdmin`. Writes re-run the entity stage of the enri
 | `summary` | query | `userAdmin` | `storage` (used and quota bytes, percent, `measuredAt`, `alertLevel`, `quotaReachedAt`, `serverContactEmails` (the `SERVER_ALERT_EMAILS` list, shown as the contact to raise the plan), and `disk` only when the caller's email is in `SERVER_ALERT_EMAILS`, else `null`: total and free bytes, `blockedFiles`, orphan figures), asset files by status, users (total, `pendingApproval`, `maintenanceContacts`, by role), `recentUsers`, `recentInvitations`, `recentFiles`, `recentDownloads`, `jobs` (`measuring`, `downloading` count, read from `pgboss.job`), downloads of the last 7 days by status |
 | `retryPendingAssets` | mutation | `userAdmin` | Queues `asset/update-content` for every `creating` or `outdated` file; returns `{ queued }`. `BAD_REQUEST` while an `asset/update-content` job is `created`, `retry` or `active` in `pgboss.job`; an advisory lock serialises concurrent calls |
 | `measureStorage` | mutation | `userAdmin` | Pushes one `storage/measure-usage` job. `BAD_REQUEST` while one is `created`, `retry` or `active`; an advisory lock serialises concurrent calls |
+
+### `audit`
+
+Admin only. Reads the append-only `audit_log`; see [Audit log](../administration/audit-log.md). Entries are written with `recordAudit(em, entry)` from `services/audit.ts`, and `authMiddleware` records every successful admin or manager mutation (`admin.change`) and every refusal of a signed-in user (`access.denied`) itself. Procedures listed in `EXPLICITLY_AUDITED` (`trpc/index.ts`) write a detailed entry instead of the generic one.
+
+| Procedure | Kind | Auth | Purpose |
+|---|---|---|---|
+| `list` | query | admin | `{ actor?, action?, targetType?, targetId?, from?, to?, page, pageSize ≤ 100 }` → `{ items, total }`, newest first; user targets carry `targetLabel` (current email) |
+| `actions` | query | admin | Distinct action names, for the filter |
+| `export` | mutation | admin | Same filters, up to 50,000 rows as a formula-safe CSV string; records `audit.exported` |
 
 ### `analytics`
 

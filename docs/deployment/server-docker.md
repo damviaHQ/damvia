@@ -3,7 +3,7 @@ title: Server with Docker
 description: Build the server image from the repository's Dockerfile and run it with the worker enabled.
 sidebar:
   order: 2
-lastUpdated: 2026-09-20
+lastUpdated: 2026-09-27
 ---
 
 `server/Dockerfile` builds on Node 22 (Debian Bookworm; the server needs 22.12 or newer) and includes the media tools, compiled server and sources. The CLI still runs from TypeScript. See [Validation status](../reference/validation-status.md) for completed checks.
@@ -22,6 +22,7 @@ COPY package-lock.json .
 RUN npm ci
 COPY . .
 RUN npm run build
+USER node
 CMD ["npm", "start"]
 ```
 
@@ -30,6 +31,7 @@ CMD ["npm", "start"]
 - `libheif1` comes from `bookworm-backports`: HEIC thumbnails go through ImageMagick, and the libheif in bookworm itself refuses the files iPhones produce. Drop the backport and HEIC pictures get no thumbnail.
 - LibreOffice increases image size; measure the built image for your architecture. It is needed for office document previews; removing it from the `apt-get` line only loses those previews.
 - `mailconfig.json` is copied with the sources, so the file fallback works inside the container when `MAILCONFIG` is unset.
+- The server runs as the unprivileged `node` user (uid 1000), not as root. It writes only to the system temp directory. A file mounted into the container, such as `mailconfig.json` or a secret, must be readable by uid 1000.
 
 ## Build
 
@@ -56,6 +58,20 @@ docker run -d --name damvia-server \
 
 Run one server container with `ENABLE_WORKER=true`: `npm start` does not set it, unlike `npm run dev`. Without it the process can publish jobs but does not process them or register scheduled jobs. See [Worker and scaling](./worker-and-scaling.md).
 
+To keep secrets out of the environment file, mount them as files and point to them with the `_FILE` suffix. Any variable accepts it, and a value set directly wins over the file:
+
+```bash
+docker run -d --name damvia-server \
+  --env-file /srv/damvia/server.env \
+  -e ENABLE_WORKER=true \
+  -e APP_SECRET_FILE=/run/secrets/app_secret \
+  -v /srv/damvia/secrets/app_secret:/run/secrets/app_secret:ro \
+  -p 127.0.0.1:3000:3000 \
+  damvia-server:latest
+```
+
+One trailing newline is removed from the file. With Docker Swarm or Kubernetes secrets, the mounted files land under `/run/secrets/` in the same way.
+
 The complete variable list is in [Environment variables](../reference/environment-variables.md). Inside a Docker network, `DATABASE_URL` and an internal `SMTP_HOST` use service names rather than `localhost`. S3 URLs must use an endpoint reachable both from the container and browsers, see [Reverse proxy](./reverse-proxy.md).
 
 ## Startup sequence and health
@@ -76,7 +92,7 @@ File contents are downloaded to the system temp directory before upload, downloa
 
 ## Logs
 
-Winston writes to stdout in the format `timestamp level: message {json}`. Use `docker logs` or your platform's collector; there is no log file.
+Winston writes to stdout in the format `timestamp level: message {json}`. Use `docker logs` or your platform's collector; there is no log file. Each request adds one `http.response` line (`REQUEST_LOG=false` turns it off). Right after start, `security.configuration` warnings name any setting that leaves traffic or files unprotected: plain-HTTP public URLs in production, an SMTP relay without `SMTP_REQUIRE_TLS`, or a bucket without default encryption. See [Server configuration](../configuration/server-env.md).
 
 ## docker-compose for production
 
