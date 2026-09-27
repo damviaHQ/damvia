@@ -16,44 +16,42 @@ import { randomBytes } from 'node:crypto'
 import { hashToken } from './credentials'
 import { IsNull } from "typeorm"
 import { URL } from "url"
-import { Liquid } from 'liquidjs'
 import { CollectionInvitation } from "../entity/collection-invitation"
 import { Download } from "../entity/download"
 import { User, UserRole } from "../entity/user"
-import { apiURL, appURL, dataSource, logger, mailTransporter, mailConfig, serverAlertEmails } from "../env"
+import { apiURL, appURL, dataSource, logger, mailTransporter, serverAlertEmails } from "../env"
+import { emailSender, renderEmail } from "../mail/render"
 import { formatBytes } from "./storage"
 import { createLoginToken } from "./login-token"
 import { LoginTokenPurpose } from "../entity/login-token"
 
-const engine = new Liquid()
+export async function sendTemplate(key: string, to: string | string[], values: Record<string, unknown>) {
+	const [email, sender] = await Promise.all([renderEmail(key, values), emailSender()])
+	await mailTransporter().sendMail({
+		from: sender.from,
+		replyTo: sender.replyTo,
+		to: Array.isArray(to) ? to.join(', ') : to,
+		subject: email.subject,
+		html: email.html,
+		text: email.text,
+	})
+}
 
-async function renderTemplate(template: string, context: object): Promise<string> {
-	return engine.parseAndRender(template, context)
+export function formatMailDate(date: Date | string): string {
+	return new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(date))
 }
 
 export async function sendEmailVerificationEmail(user: User) {
 	const url = new URL(appURL())
 	url.searchParams.set('verificationCode', user.emailVerificationCode ?? '')
-	const config = mailConfig()['email-verification']
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: user.email,
-		subject: config.subject,
-		text: await renderTemplate(config.body, { url: url.toString() })
-	})
+	await sendTemplate('email-verification', user.email, { url: url.toString() })
 }
 
 export async function sendLogInEmail(user: User) {
 	const url = new URL(appURL())
 	url.pathname = 'login'
 	url.searchParams.set('link', await createLoginToken(user.id, LoginTokenPurpose.LOGIN))
-	const config = mailConfig()['login']
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: user.email,
-		subject: config.subject,
-		text: await renderTemplate(config.body, { url: url.toString() })
-	})
+	await sendTemplate('login', user.email, { url: url.toString() })
 }
 
 // The token is created here, not by the request, so it never sits in the job
@@ -69,13 +67,7 @@ export async function sendResetPasswordEmail(user: User | null) {
 	url.pathname = 'password-update'
 	url.searchParams.set('email', user.email)
 	url.searchParams.set('token', token)
-	const config = mailConfig()['reset-password']
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: user.email,
-		subject: config.subject,
-		text: await renderTemplate(config.body, { url: url.toString() })
-	})
+	await sendTemplate('reset-password', user.email, { url: url.toString() })
 }
 
 export async function sendRequestApprovalEmail(requester: User) {
@@ -93,12 +85,9 @@ export async function sendRequestApprovalEmail(requester: User) {
 		return
 	}
 
-	const config = mailConfig()['request-approval']
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: managers.map((m) => m.email).join(', '),
-		subject: await renderTemplate(config.subject, { requester: { name: requester.name } }),
-		text: await renderTemplate(config.body, { requester: { name: requester.name }, url: url.toString() })
+	await sendTemplate('request-approval', managers.map((m) => m.email), {
+		requester: { name: requester.name, email: requester.email, company: requester.company },
+		url: url.toString(),
 	})
 }
 
@@ -106,13 +95,7 @@ export async function sendUserApprovedEmail(user: User) {
 	const url = new URL(appURL())
 	url.pathname = 'login'
 	url.searchParams.set('link', await createLoginToken(user.id, LoginTokenPurpose.APPROVED))
-	const config = mailConfig()['user-approved']
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: user.email,
-		subject: config.subject,
-		text: await renderTemplate(config.body, { user: { name: user.name }, url: url.toString() })
-	})
+	await sendTemplate('user-approved', user.email, { user: { name: user.name }, url: url.toString() })
 }
 
 export async function sendDownloadReady(download: Download) {
@@ -122,14 +105,8 @@ export async function sendDownloadReady(download: Download) {
 	}
 
 	// Through the API, which checks the download and its owner on every click.
-	const link = `${apiURL()}/v1/downloads/${download.id}`
-	const config = mailConfig()['download-ready']
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: user.email,
-		subject: config.subject,
-		text: await renderTemplate(config.body, { link })
-	})
+	const url = `${apiURL()}/v1/downloads/${download.id}`
+	await sendTemplate('download-ready', user.email, { url, expiresAt: formatMailDate(download.expiresAt) })
 }
 
 export async function sendInvitation(invitation: CollectionInvitation) {
@@ -141,12 +118,11 @@ export async function sendInvitation(invitation: CollectionInvitation) {
 	await dataSource.getRepository(CollectionInvitation).update(invitation.id, { tokenHash: hashToken(secret) })
 	url.searchParams.set('invite', `${invitation.id}.${secret}`)
 
-	const config = mailConfig()['invitation']
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: invitation.email,
-		subject: config.subject,
-		text: await renderTemplate(config.body, { url: url.toString() })
+	await sendTemplate('invitation', invitation.email, {
+		url: url.toString(),
+		collection: { name: invitation.collection?.name ?? '' },
+		inviter: { name: invitation.invitedBy?.name ?? '' },
+		expiresAt: formatMailDate(invitation.expiresAt),
 	})
 }
 
@@ -157,26 +133,14 @@ export async function sendStorageAlert(level: number, usage: { usedBytes: number
 		return false
 	}
 
-	const config = mailConfig()['storage-alert']
-	if (!config) {
-		logger.warn('storage.alert-template-missing', { level })
-		return false
-	}
-
 	const url = new URL(appURL())
 	url.pathname = '/admin'
-	const context = {
+	await sendTemplate('storage-alert', admins.map((admin) => admin.email), {
 		severity: level >= 100 ? 'full' : level >= 90 ? 'critical' : 'warning',
 		percent: Math.round(usage.percent),
 		used: formatBytes(usage.usedBytes),
 		quota: formatBytes(usage.quotaBytes),
 		url: url.toString(),
-	}
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: admins.map((admin) => admin.email).join(', '),
-		subject: await renderTemplate(config.subject, context),
-		text: await renderTemplate(config.body, context),
 	})
 	logger.info('storage.alert-sent', { level, recipients: admins.length })
 	return true
@@ -188,24 +152,11 @@ export async function sendDiskAlert(level: number, disk: { totalBytes: number, f
 		return false
 	}
 
-	const config = mailConfig()['disk-alert']
-	if (!config) {
-		logger.warn('storage.disk-alert-template-missing', { level })
-		return false
-	}
-
-	const context = {
+	await sendTemplate('disk-alert', recipients, {
 		severity: level >= 100 ? 'full' : level >= 90 ? 'critical' : 'warning',
 		percent: Math.round(disk.percent),
 		free: formatBytes(disk.freeBytes),
 		total: formatBytes(disk.totalBytes),
-		appUrl: appURL(),
-	}
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: recipients.join(', '),
-		subject: await renderTemplate(config.subject, context),
-		text: await renderTemplate(config.body, context),
 	})
 	logger.info('storage.disk-alert-sent', { level, recipients: recipients.length })
 	return true
@@ -215,19 +166,12 @@ export type ExpiringLicense = { name: string, date: string, days: number }
 
 export async function sendLicenseExpiryNotice(licenses: ExpiringLicense[]): Promise<boolean> {
 	const admins = await dataSource.getRepository(User).findBy({ role: UserRole.ADMIN, approved: true, emailVerified: true, suspendedAt: IsNull() })
-	const config = mailConfig()['license-expiring']
-	if (!admins.length || !config) {
-		logger.warn('license.expiry-no-recipient', { admins: admins.length, template: !!config })
+	if (!admins.length) {
+		logger.warn('license.expiry-no-recipient', { admins: 0 })
 		return false
 	}
 	const url = new URL(appURL())
 	url.pathname = '/admin/licenses'
-	const context = { licenses, url: url.toString() }
-	await mailTransporter().sendMail({
-		from: config.from,
-		to: admins.map((admin) => admin.email).join(', '),
-		subject: await renderTemplate(config.subject, context),
-		text: await renderTemplate(config.body, context),
-	})
+	await sendTemplate('license-expiring', admins.map((admin) => admin.email), { licenses, url: url.toString() })
 	return true
 }

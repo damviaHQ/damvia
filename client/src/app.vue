@@ -23,6 +23,8 @@ import LayoutAuth from "@/layouts/LayoutAuth.vue"
 import LayoutRouter from "@/layouts/LayoutRouter.vue"
 import { extractErrors, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
+import { accentVariables } from "@/lib/brand-color"
+import { useQuery } from "@tanstack/vue-query"
 import { watch } from "vue"
 import { useRoute } from "vue-router"
 import { toast } from "vue-sonner"
@@ -31,6 +33,21 @@ import "vue3-treeselect-ts/dist/style.css"
 const route = useRoute()
 const globalStore = useGlobalStore()
 provideGlobalToast()
+
+// The portal and its dialogs take the brand accent; the admin keeps the
+// Damvia colours, as it never carries the dv-client class.
+const { data: brandTheme } = useQuery({ queryKey: ['brand-theme'], queryFn: () => trpc.settings.getBrandTheme.query(), staleTime: 5 * 60 * 1000 })
+watch(() => brandTheme.value?.accentColor, (accent) => {
+  const variables = Object.entries(accentVariables(accent)).map(([name, value]) => `${name}:${value};`).join('')
+  let style = document.getElementById('dv-brand-accent')
+  if (!variables) return style?.remove()
+  if (!style) {
+    style = document.createElement('style')
+    style.id = 'dv-brand-accent'
+    document.head.appendChild(style)
+  }
+  style.textContent = `.dv-theme.dv-neutral.dv-client{${variables}}`
+}, { immediate: true })
 
 watch(
   route,

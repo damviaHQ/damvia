@@ -3,7 +3,7 @@ title: Configuration
 description: Damvia is configured almost entirely through environment variables; this group explains them by concern.
 sidebar:
   order: 1
-lastUpdated: 2026-09-16
+lastUpdated: 2026-09-27
 ---
 
 Runtime configuration is read from environment variables and the mail templates. Restoring an instance also requires its database and main S3 bucket: that bucket holds collection thumbnails, page images and videos, and the login background. Keep configuration, secrets and application version alongside those backups; see [Backups](../deployment/backups.md).
@@ -12,7 +12,7 @@ Runtime configuration is read from environment variables and the mail templates.
 |---|---|
 | [Server configuration](./server-env.md) | The server's `.env`, group by group: application URLs and secret, database, storage, mail, cloud sync, PIM. |
 | [Client configuration](./client-env.md) | The client's build-time variables: API endpoint and brand colours. |
-| [Email templates](./email-templates.md) | The `mailconfig.json` format, the nine templates and the variables each can use. |
+| [Email templates](./email-templates.md) | The branded layout, the ten emails, the variables each can use and what templates cannot do. |
 | [Branding](./branding.md) | Everything that changes the look: app name, colours, login background, logo and favicon. |
 
 The exhaustive table with defaults is [Environment variables](../reference/environment-variables.md). Provider setup (Dropbox app, Azure registration, SMTP, buckets) is in [Integrations](../integrations/index.md).

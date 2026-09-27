@@ -144,6 +144,7 @@ export const defaults: Record<string, unknown> = {
   'env': env,
   'user.me': user,
   'settings.getClientLogo': { imageUrl: null },
+  'settings.getBrandTheme': { accentColor: null, brandName: null },
   'collection.tree': [],
   'collection.ListPrivateCollections': [],
   'collection.findById': collection,

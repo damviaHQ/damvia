@@ -3,7 +3,7 @@ title: Local setup
 description: Run the full stack on one machine with docker-compose for the services and npm for the server and client.
 sidebar:
   order: 2
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-27
 ---
 
 This procedure targets a local development instance. Compilation and documentation checks have been run on macOS; a complete cloud-connected installation has not been exercised. Use the [acceptance checklist](../deployment/acceptance-checklist.md) to validate your instance.
@@ -48,7 +48,7 @@ The template's defaults already match the compose stack (database, MinIO, MailHo
 - `APP_SECRET`: any long random string, for example `openssl rand -hex 32`.
 - `PRODUCT_MATCHING_REGEX` if your file names encode record keys (product references, for example); otherwise leave the example, it is harmless.
 
-Leave `MAILCONFIG` empty: the server then reads `server/mailconfig.json`, whose templates are fine for a first run. The full list is in [Environment variables](../reference/environment-variables.md).
+Emails use built-in wording until an admin changes it under **Admin → Emails**, and MailHog at `http://localhost:8025` shows every message. The full list of variables is in [Environment variables](../reference/environment-variables.md).
 
 ## 4. Start the server
 

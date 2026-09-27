@@ -12,8 +12,14 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-// Loads the compiled configuration without a database, for tests of pure
-// functions that live in modules importing env.
-process.env.DOTENV_CONFIG_PATH = '/dev/null'
-process.env.APP_SECRET = 'pure-tests-only-random-fixture-secret-20260919'
-module.exports = require('../../dist/env')
+import { MigrationInterface, QueryRunner } from 'typeorm'
+
+export class BrandName1792627200000 implements MigrationInterface {
+  async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE brand_settings ADD COLUMN brand_name varchar(120)`)
+  }
+
+  async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE brand_settings DROP COLUMN brand_name`)
+  }
+}

@@ -45,7 +45,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `index.ts` | Process startup described above |
 | `server.ts` | Fastify instance, cookie, helmet, CORS and origin check, request log, tRPC plugin, `/v1/downloads/:downloadId` |
 | `load-env.ts` | Loads `.env` with dotenv, then `loadFileVariables()` fills each `NAME` from the file named by `NAME_FILE` |
-| `env.ts` | `logger` (winston, console transport, `timestamp` + `splat` + `simple` format), `dataSource`, S3 clients, mail transporter, `assetUpdater()` selection, `mailConfig()`, session, cookie, proxy and MFA settings |
+| `env.ts` | `logger` (winston, console transport, `timestamp` + `splat` + `simple` format), `dataSource`, S3 clients, mail transporter, `assetUpdater()` selection, session, cookie, proxy and MFA settings |
 | `worker.ts` | pg-boss instance, `createQueue` helper, every queue definition |
 | `cli.ts` | `commander` program: `check-integrity`, the source commands and `metadata:backfill` |
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
@@ -90,5 +90,5 @@ Everything is logged with `logger` from `server/src/env.ts`: `logger.info('serve
 | A background job | An exported `createQueue` call in `server/src/worker.ts`, plus a row in [Background jobs](../reference/background-jobs.md); see [Writing a background job](./background-jobs.md) |
 | An admin screen | A view in `client/src/views/admin/`, a route with `meta: { layout: 'admin', roles: [...] }` in `client/src/router/index.ts`, the link in `LayoutAdmin.vue`, and a page in `docs/administration/` |
 | A phone screen | A view in `client/src/mobile/views/` and `meta.mobile: () => import(...)` on its route. Move shared behaviour into a composable or `utils/` first; never import a desktop component. Update [Phones](../administration/phones.md) |
-| A mail template | A key in `server/mailconfig.json` (`subject` and `body`, rendered with liquidjs by `renderTemplate` in `services/mailer.ts`), a `send*` function there, usually a queue in `worker.ts`, and the table in [Email templates](../configuration/email-templates.md) |
+| A mail template | An entry in `EMAIL_DEFINITIONS` (`server/src/mail/catalogue.ts`: trigger, recipients, variables, sample values, default content), a `send*` function in `services/mailer.ts` that calls `sendTemplate`, usually a queue in `worker.ts`, and the table in [Email templates](../configuration/email-templates.md). `mail/render.ts` renders it with the hardened Liquid engine into `mail/layout.ts` |
 | A storage provider | See [Storage drivers](./storage-drivers.md) |

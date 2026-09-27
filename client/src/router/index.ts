@@ -60,6 +60,8 @@ const router = createRouter({
 		{ name: 'admin-audit-log', path: '/admin/audit-log', component: () => import('@/views/admin/admin-audit-log.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Audit log' } },
 		{ name: 'admin-users', path: '/admin/users', component: () => import('@/views/admin/admin-users.vue'), meta: { layout: 'admin', title: 'Users', roles: ['admin', 'manager'], mobile: () => import('@/mobile/views/MobileUsers.vue') } },
 		{ name: 'admin-settings', path: '/admin/settings', component: () => import('@/views/admin/admin-settings.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Settings' } },
+		{ name: 'admin-emails', path: '/admin/emails', component: () => import('@/views/admin/admin-emails.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Emails' } },
+		{ name: 'admin-email', path: '/admin/emails/:key', component: () => import('@/views/admin/admin-email-edit.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Edit email' } },
 		{ name: 'admin-assets', path: '/admin/assets/:id?', component: () => import('@/views/admin/admin-assets.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Assets' } },
 		{ name: 'admin-asset-types', path: '/admin/asset-types', component: () => import('@/views/admin/admin-asset-types.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Asset types' } },
 		{ name: 'admin-enrichment-overview', path: '/admin/data-enrichment', component: () => import('@/views/admin/admin-enrichment-overview.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Setup guide' } },

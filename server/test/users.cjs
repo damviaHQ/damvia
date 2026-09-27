@@ -121,8 +121,7 @@ test('the verification job mails the account its own link to the client', async 
     await state.processors.get('mailer/email-verification')([{ id: randomUUID(), name: 'mailer/email-verification', data: { userId: user.id } }])
     assert.equal(state.sentMails.length, 1)
     const [mail] = state.sentMails
-    const template = env.mailConfig()['email-verification']
-    assert.deepEqual([mail.to, mail.from, mail.subject], [user.email, template.from, template.subject])
+    assert.deepEqual([mail.to, mail.subject], [user.email, 'Confirm your email address'])
     const link = new URL(mail.text.match(/https?:\/\/\S+/)[0])
     assert.equal(link.origin, new URL(env.appURL()).origin)
     assert.equal(link.searchParams.get('verificationCode'), 'abc123def456')

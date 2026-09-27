@@ -16,7 +16,10 @@ import { IsNull } from "typeorm"
 import { z } from "zod"
 import { adminClientLogoEnabled, AUTH_BACKGROUND_KEY, AUTH_BACKGROUND_MIME_TYPES, createAuthBackgroundUpload, createLogoUpload, getClientLogo, removeClientLogo, LOGO_MIME_TYPES, processAuthBackground, processClientLogo } from "../../services/branding"
 import { defaultRelatedRecords, relatedRecordsSettings } from "../../services/catalogue"
+import { BrandSettings } from "../../entity/brand-settings"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
+import { HEX_COLOR } from "../../mail/color"
+import { recordAudit } from "../../services/audit"
 import { ReadinessDefinition } from "../../entity/readiness-definition"
 import { rerunEntityStage, rerunFamilyStage, rerunReadinessStage } from "../../services/enrichment"
 import { dataSource, logger, mainS3, mainS3Bucket } from "../../env"
@@ -27,6 +30,25 @@ export default router({
     .use(authMiddleware(userManagerOrAdmin))
     .query(() => ({ useClientLogo: adminClientLogoEnabled() })),
   getClientLogo: publicProcedure.query(() => getClientLogo()),
+  // The portal reads it before sign-in, to colour the login page too.
+  getBrandTheme: publicProcedure.query(async () => {
+    const brand = await dataSource.getRepository(BrandSettings).findOneBy({ id: 1 })
+    return { accentColor: brand?.accentColor ?? null, brandName: brand?.brandName ?? null }
+  }),
+  updateBrandTheme: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({
+      accentColor: z.string().regex(HEX_COLOR).transform((value) => value.toLowerCase()).nullable().optional(),
+      brandName: z.string().trim().max(120).transform((value) => value || null).nullable().optional(),
+    }).refine((input) => input.accentColor !== undefined || input.brandName !== undefined, 'Nothing to update'))
+    .mutation(async ({ ctx, input }) => {
+      await dataSource.transaction(async (em) => {
+        const before = await em.getRepository(BrandSettings).findOneByOrFail({ id: 1 })
+        await em.getRepository(BrandSettings).update({ id: 1 }, input)
+        await recordAudit(em, { actorId: ctx.user.id, action: 'brand.updated', targetType: 'brand_settings', before: { accentColor: before.accentColor, brandName: before.brandName }, after: input, req: ctx.req })
+      })
+      return input
+    }),
   getEnrichment: publicProcedure
     .use(authMiddleware(userAdmin))
     .query(async () => {

@@ -13,7 +13,8 @@ Symptoms are grouped by where you notice them. Server messages are quoted as the
 | Message | Cause | Fix |
 |---|---|---|
 | `Provide a valid asset updater` | `ASSET_UPDATER` is not `dropbox` or `onedrive`. | Set it. There is no "no sync" mode; a driver is mandatory. |
-| `Failed to read mailconfig.json` then exit | `MAILCONFIG` is unset and `server/mailconfig.json` is missing or unreadable from the process working directory's parent of `dist/` (the server reads `../mailconfig.json` relative to the compiled `env.js`). | Set `MAILCONFIG` to the base64 of your JSON, or keep `mailconfig.json` next to `package.json`. |
+| `MAILCONFIG is ignored` warning at startup | The variable from before emails were edited in the admin is still set. | Enter any customised wording under **Admin → Emails**, then remove `MAILCONFIG`. |
+| An email shows no logo | No logo is uploaded, or `API_URL/v1/branding/email-logo.png` is not reachable from the internet. | Upload a logo in **Admin → Settings**, and check that `API_URL` is the public address of the API. |
 | `failed to start asset updater` then exit | The driver's `initialize()` failed: for Dropbox, the refresh token could not be exchanged (`Failed to refresh Dropbox token`). | Check `DROPBOX_APP_KEY`, `DROPBOX_APP_SECRET`, `DROPBOX_REFRESH_TOKEN`. See [Dropbox](../integrations/dropbox.md). |
 | Connection refused on Postgres | `DATABASE_URL` unset and nothing listens on `localhost:5432`, or wrong credentials. | Start `docker-compose up -d` in `server/`, or set `DATABASE_URL`. |
 | `TypeError: Invalid URL` at first S3 use | `MAIN_S3_URL` or `ASSETS_S3_URL` missing or not a URL. | Use the `http://key:secret@host:port/bucket` form. |

@@ -19,7 +19,9 @@ Contributor reference, kept in the repository and not published on the documenta
 | `server/src/asset-updater/google-drive.ts` | `integrations/google-drive.md` |
 | `server/src/asset-updater/base.ts`, `services/asset.ts` (upsert, deletion, thumbnails, record assignment, source adoption) | `administration/assets-tree.md`, `administration/records.md`, `integrations/sources.md` |
 | `server/src/services/image-processor.ts` | `administration/assets-tree.md`, `getting-started/index.md` (system packages) |
-| `server/src/services/mailer.ts`, `server/mailconfig.json` | `configuration/email-templates.md`, `integrations/smtp.md` |
+| `server/src/services/mailer.ts`, `server/src/mail/` (catalogue, renderer, layout) | `configuration/email-templates.md`, `integrations/smtp.md` |
+| `client/src/views/admin/admin-emails.vue`, `admin-email-edit.vue`, `server/src/trpc/router/email-template.ts` | `administration/emails.md` |
+| Accent colour (`brand_settings`, `client/src/lib/brand-color.ts`) | `configuration/branding.md` |
 | `server/src/services/user.ts`, `trpc/router/user.ts`, `trpc/router/authorized-domain.ts` | `administration/users-and-approval.md`, `introduction/roles-and-access.md`, `getting-started/first-admin.md` |
 | `server/src/trpc/index.ts` (auth predicates, MFA enrolment gate) | `introduction/roles-and-access.md`, `contributing/api.md` |
 | `server/src/trpc/router/audit.ts`, `services/audit.ts`, `entity/audit-log.ts`, `trpc/index.ts` (`EXPLICITLY_AUDITED`), `client/src/views/admin/admin-audit-log.vue` | `administration/audit-log.md`, `contributing/api.md`, `contributing/data-model.md`, `reference/background-jobs.md` |

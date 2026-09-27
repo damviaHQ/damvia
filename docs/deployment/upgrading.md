@@ -102,7 +102,6 @@ Rolling back drops the new tables and columns: sessions, suspensions and two-ste
 - Set `STORAGE_QUOTA` to the customer's plan, below the disk size, to enable the alerts and the pause of the cloud sync. See [Server configuration](../configuration/server-env.md).
 - Click "Measure now" on the dashboard as soon as the upgraded server is running with `STORAGE_QUOTA`. Until the first measurement the stored usage is 0, so up to one plan's worth of files can still download on top of what the buckets already hold.
 - Files stored before the upgrade stay. If they already exceed the plan, the dashboard shows more than 100 % and new downloads wait until space is freed or the plan is raised.
-- Add the `storage-alert` and `disk-alert` templates to `mailconfig.json` or to the `MAILCONFIG` variable; the samples are in `server/mailconfig.json`. Until they are added, the alerts are skipped, the worker logs `storage.alert-template-missing` or `storage.disk-alert-template-missing` every 30 minutes, and the alert is sent at the first measurement after the template is added and the server restarted.
 - Designate at least one admin for the `storage-alert` emails: tick "Receives storage and maintenance emails" on their profile in Users. Nobody receives them until then.
 - Set `SERVER_ALERT_EMAILS` to the hosting contact to receive disk alerts and see the server disk on the dashboard. Customer admins never see it.
 - The daily integrity check now deletes orphan objects older than 24 hours. Objects left behind by earlier crashes disappear at the next 05:00 UTC run or with `npm run cli -- check-integrity`.
@@ -184,6 +183,17 @@ The count of products on a collection is kept by two triggers that run once per 
 
 Two stages join the enrichment pass, `families` and `readiness`, plus `product-rules`. Rolling any of these back drops the tables and columns; the collections and records themselves are untouched, their product membership and scores are lost. See [Product catalogue](../administration/catalogue.md).
 
+## Emails in this upgrade
+
+Emails are now branded HTML, with their wording edited under **Admin → Emails** instead of in a file.
+
+- **`MAILCONFIG` and `server/mailconfig.json` are no longer read.** Every email uses the new built-in wording until an admin changes it. If you had customised the wording, copy it into **Admin → Emails** before or right after the upgrade, then remove `MAILCONFIG`: startup logs a warning while it is set.
+- **Set the sender** under **Admin → Emails**. Sender addresses used to be in the templates; until set, emails leave from `APP_NAME` at `no-reply@` followed by the `APP_URL` host, which your mail provider may refuse. See [SMTP](../integrations/smtp.md).
+- **Emails show the client logo** from `API_URL/v1/branding/email-logo.png`, a public address. The PNG copy of an existing logo is made at the first email.
+- **Set the brand name** under **Admin → Settings**. Emails and the browser tab otherwise keep `APP_NAME`, which is often the long default name.
+- **Choose an accent colour** under **Admin → Settings**. It colours the email buttons and, from this release, the buttons and links of the client portal. Without one, emails and the portal keep the neutral dark colour.
+- The `email-templates` migration creates `brand_settings`, `email_settings` (one row each) and `email_templates` (empty). Rolling it back drops them and the customised wording.
+
 ## Migrations that exist
 
 | Migration | What it did |
@@ -224,6 +234,8 @@ Two stages join the enrichment pass, `families` and `readiness`, plus `product-r
 | `1790553600000-records` | Renames `products` to `records` (`product_key` to `record_key`, `primary_key_name` to `key_column_name`), `product_attributes` to `record_attributes`, `asset_files.product_id` and `product_view` to `record_id` and `record_view`, `asset_types.is_related_to_products` to `is_related_to_records`; rewrites the `product_attribute.` prefix of `list_display_items` to `record_attribute.`; creates the single-row `enrichment_settings` table holding the record label. Renames only; rolling back reverses them |
 | `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |
 | `1790467200000-asset-type-rules` | `asset_type_rules` table; `asset_type_source` and `asset_type_rule_id` on `asset_folders`. Existing typed folders whose type differs from their parent's, and typed roots, are marked `manual`; the others `inherited`. Rolling back drops the table and the three columns and loses nothing the previous version reads |
+| `1792627200000-brand-name` | `brand_name` on `brand_settings`, null, so the name stays `APP_NAME` until an admin sets one. Rolling back drops it |
+| `1792540800000-email-templates` | `brand_settings` (accent colour) and `email_settings` (sender and footer), one row each, and `email_templates`, empty: a row exists only for an email whose wording was changed. Rolling back drops the three tables and the customised wording |
 | `1792454400000-download-license-acceptance` | `license_accepted_at` and `license_ids` on `downloads`, empty for earlier downloads. Rolling back drops them |
 | `1792281600000-audit-log` | `audit_log` table with an append-only trigger (`audit_log_append_only`). Starts empty: nothing before the upgrade is recorded. Rolling back drops the table and every entry; export it first if you need it |
 | `1792195200000-security-hardening` | `user_sessions` and `login_tokens` tables; `token_hash` on `collection_invitations`; `failed_login_count`, `locked_until`, `mfa_secret`, `mfa_enabled_at`, `mfa_recovery_codes`, `mfa_last_step`, `oidc_subject` (unique) and `suspended_at` on `users`. Clears unsalted SHA-512 password hashes. Rolling back drops the tables and columns; the cleared hashes are not restored |

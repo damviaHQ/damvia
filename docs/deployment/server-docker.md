@@ -30,8 +30,7 @@ CMD ["npm", "start"]
 - `npm start` runs `node dist/index.js` with `NODE_ENV=production`.
 - `libheif1` comes from `bookworm-backports`: HEIC thumbnails go through ImageMagick, and the libheif in bookworm itself refuses the files iPhones produce. Drop the backport and HEIC pictures get no thumbnail.
 - LibreOffice increases image size; measure the built image for your architecture. It is needed for office document previews; removing it from the `apt-get` line only loses those previews.
-- `mailconfig.json` is copied with the sources, so the file fallback works inside the container when `MAILCONFIG` is unset.
-- The server runs as the unprivileged `node` user (uid 1000), not as root. It writes only to the system temp directory. A file mounted into the container, such as `mailconfig.json` or a secret, must be readable by uid 1000.
+- The server runs as the unprivileged `node` user (uid 1000), not as root. It writes only to the system temp directory. A file mounted into the container, such as a secret, must be readable by uid 1000.
 
 ## Build
 

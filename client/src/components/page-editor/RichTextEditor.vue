@@ -52,6 +52,11 @@ watch(() => props.modelValue, (value) => {
 
 onBeforeUnmount(() => editor.value?.destroy())
 
+function insertText(text: string) {
+  editor.value?.chain().focus().insertContent(text).run()
+}
+defineExpose({ insertText })
+
 function toggleLink() {
   const previous = editor.value?.getAttributes("link").href ?? ""
   const href = window.prompt("Link address", previous)

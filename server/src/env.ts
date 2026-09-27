@@ -15,7 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import './load-env'
 import "reflect-metadata"
 import { Client as MinioClient } from 'minio'
-import { readFile, statfs } from "node:fs/promises"
+import { statfs } from "node:fs/promises"
 import { join } from "node:path"
 import { createTransport, Transporter } from 'nodemailer'
 import { DataSource } from "typeorm"
@@ -413,19 +413,8 @@ export function assetUpdaterFor(sourceKey: string): AssetUpdater {
   return updater
 }
 
-type MailTemplateConfig = { from: string, subject: string, body: string }
-let _mailConfig: Record<string, MailTemplateConfig> | null = null
-if (process.env.MAILCONFIG) {
-  _mailConfig = JSON.parse(Buffer.from(process.env.MAILCONFIG, 'base64').toString('utf-8'))
-} else {
-  readFile(join(__dirname, '..', 'mailconfig.json'), 'utf-8')
-    .then((data) => _mailConfig = JSON.parse(data))
-    .catch((error) => {
-      logger.error('Failed to read mailconfig.json', { error })
-      process.exit(1)
-    })
-}
-export function mailConfig(): Record<string, MailTemplateConfig> {
-  if (!_mailConfig) throw new Error('Mail configuration is not loaded')
-  return _mailConfig
+// Templates moved to Admin → Emails. The retired variable is only looked up
+// to warn, so it stays out of .env.template.
+if (process.env['MAILCONFIG']) {
+  logger.warn('MAILCONFIG is ignored: email templates are now edited in Admin → Emails. Remove the variable.')
 }

@@ -135,14 +135,15 @@ test('storage alerts go to designated admins once per crossing and the level fal
         assert.equal(row.alertLevel, 0)
         assert.equal(row.usedBytes, '700')
         assert(row.measuredAt instanceof Date)
-        const previousConfig = env.mailConfig
-        env.mailConfig = () => ({})
+        // A mail server that refuses the alert leaves the level unclaimed for the next run.
+        const previousTransporter = env.mailTransporter
+        env.mailTransporter = () => ({ sendMail: async () => { throw new Error('Fixture SMTP down') } })
         try {
             state.bucketObjects = [{ name: 'asset-file/a', size: 1000, lastModified: new Date() }]
-            await storageService.measureStorageUsage()
+            await assert.rejects(storageService.measureStorageUsage(), /Fixture SMTP down/)
             assert.equal(sentMails.length, 2)
             assert.equal((await storageRow()).alertLevel, 0)
-        } finally { env.mailConfig = previousConfig }
+        } finally { env.mailTransporter = previousTransporter }
         await storageService.measureStorageUsage()
         assert.equal(sentMails.length, 3)
         assert.match(sentMails[2].subject, /full/)

@@ -1,61 +1,67 @@
 ---
 title: SMTP
-description: Configure outgoing email with any SMTP provider; Postmark is the one the code is tuned for.
+description: Send Damvia's emails through any SMTP provider or your own mail server, switch providers, and why Loops is not a drop-in relay.
 sidebar:
   order: 6
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-27
 ---
 
-Damvia sends plain-text emails through Nodemailer over SMTP. There is no HTTP mail API integration and no HTML. Every message is sent by a worker job, so a working SMTP setup also needs a process with `ENABLE_WORKER=true`.
+Damvia sends its emails through Nodemailer over SMTP. Damvia renders every message itself (the branded HTML and its plain-text version), so the provider only relays it. Any service or server that accepts SMTP works, and switching provider means changing four variables and restarting. Every message is sent by a worker job, so a working setup also needs a process with `ENABLE_WORKER=true`.
 
 ## Variables
 
 | Variable | Default | Notes |
 |---|---|---|
 | `SMTP_HOST` | `localhost` | |
-| `SMTP_PORT` | `1025` | Nodemailer picks TLS mode from the port: 465 is implicit TLS, 587 and 25 start plain and upgrade with STARTTLS when the server offers it. |
+| `SMTP_PORT` | `1025` | Nodemailer picks TLS from the port: 465 is implicit TLS, 587 and 25 start plain and upgrade with STARTTLS when the server offers it. |
 | `SMTP_USER` | unset | Authentication is only configured when **both** user and password are set. |
 | `SMTP_PASS` | unset | |
+| `SMTP_REQUIRE_TLS` | `false` | `true` refuses to send when the server does not offer STARTTLS. |
 
 The defaults match MailHog from `server/docker-compose.yml`, which accepts anything on port 1025 and shows it at `http://localhost:8025`.
 
-Sender addresses and subjects are not variables; they are in the mail templates. See [Email templates](../configuration/email-templates.md).
+The sender name, sender address and reply-to address are not variables: admins set them under **Admin → Emails**. See [Emails](../administration/emails.md).
 
-## Postmark
+## Choose a provider
 
-The transport adds the header `X-PM-Message-Stream: outbound` to every message. On Postmark this selects the default transactional stream; other providers ignore the header. A Postmark setup:
+| Provider | `SMTP_HOST` | `SMTP_PORT` | `SMTP_USER` / `SMTP_PASS` |
+|---|---|---|---|
+| Postmark | `smtp.postmarkapp.com` | `587` | The server API token, as both user and password |
+| Amazon SES | `email-smtp.<region>.amazonaws.com` | `587` | SMTP credentials generated in SES, not the IAM access keys |
+| Brevo | `smtp-relay.brevo.com` | `587` | The SMTP login and SMTP key from the Brevo account |
+| Mailgun | `smtp.mailgun.org` (`smtp.eu.mailgun.org` for EU) | `587` | The domain's SMTP user and password |
+| Resend | `smtp.resend.com` | `465` | `resend` and an API key |
+| SendGrid | `smtp.sendgrid.net` | `587` | `apikey` and an API key |
+| Your own server (Postfix, Exchange, Microsoft 365, Google Workspace relay) | Its hostname | `587`, or `25` inside a private network | An account allowed to send for the sender address, or none if the relay trusts the server's IP |
 
-```bash
-SMTP_HOST=smtp.postmarkapp.com
-SMTP_PORT=587
-SMTP_USER=<server API token>
-SMTP_PASS=<server API token>
-```
+These values come from each provider's documentation and are not tested by Damvia's test suite; check the provider's current SMTP page. Whatever the provider:
 
-Postmark uses the same server token as both user and password. The `from` addresses in the templates must belong to a verified sender signature or domain.
+1. Verify the sender domain with the provider and publish the SPF and DKIM records it gives you, plus a DMARC record. Without them, sign-in and verification emails are often filtered as spam.
+2. Set the sender address under **Admin → Emails** to an address on that domain.
+3. Restart the API and the worker with the new `SMTP_*` values.
+4. Use **Send me a test** on any email in **Admin → Emails**. A refusal shows the mail server's message, for example an authentication or sender error.
 
-## Other providers
+### Switching provider
 
-Any SMTP relay works, for example Amazon SES (`email-smtp.<region>.amazonaws.com:587` with SMTP credentials), Mailgun, Brevo, or a company mail server. The requirements are the same: the relay must accept the `from` addresses in the templates, and it should sign with SPF and DKIM so verification links are not filtered.
+Emails are not stored at the provider: templates, branding and the sender all stay in Damvia. To move, verify the domain with the new provider, change the `SMTP_*` variables, restart, and send a test. Messages queued during the switch are retried by the worker (see below), so nothing needs to be exported.
+
+### Postmark
+
+The transport adds the header `X-PM-Message-Stream: outbound` to every message, which sends it through Postmark's default transactional stream. Other providers ignore the header.
+
+### Loops is not a drop-in relay
+
+[Loops](https://loops.so) offers SMTP at `smtp.loops.so`, but its relay does not deliver the message it receives. The body must be a JSON object naming a template built in the Loops editor (`transactionalId`) and its data variables, and Loops renders its own template. Pointing `SMTP_*` at Loops therefore fails: Damvia sends finished HTML, not that JSON, and the branding and wording edited in Damvia would not be used. Loops' [SMTP documentation](https://loops.so/docs/smtp) describes the format.
+
+To send through Loops, Damvia would need a Loops sender that maps each of the ten emails to a Loops transactional ID and passes the variables in [Email templates](../configuration/email-templates.md). The design, logo and wording would then be managed in Loops, not in Damvia. This sender does not exist today.
 
 ## Which emails are sent
 
-| Event | Template |
-|---|---|
-| Sign-up, resend verification | `email-verification` |
-| Login without password | `login` |
-| Password reset request | `reset-password` |
-| Unapproved user verified their email | `request-approval`, to the admins and managers of the user's region |
-| User approved | `user-approved` |
-| Email-type download ready | `download-ready` |
-| Guest invited to a collection | `invitation` |
+The ten emails, their triggers and recipients are listed in [Email templates](../configuration/email-templates.md). Damvia sends no digest, newsletter or sync-error email; sync errors are in the server logs.
 
-There is no digest, newsletter or notification email beyond these seven, and no email is sent to admins on sync errors; use the server logs for that.
+## When delivery fails
 
-## Testing
+1. Watch the server log for a `job` line with `status: failed` and a `mailer/…` or `email/…` queue. Nodemailer's message (authentication, connection, sender rejected) is included.
+2. On success nothing is logged; check the inbox or the provider's activity log.
 
-1. With the worker running, request a password reset from the login page for an existing account.
-2. Watch the server log for a `job` line with `status: failed` and queue `mailer/password-reset` if delivery fails; Nodemailer's error message (authentication, connection, sender rejected) is included.
-3. On success nothing is logged; check the inbox or the provider's activity log.
-
-Failed mail jobs use backoff with two retries after the initial attempt in installed pg-boss 12. Mail is sent with nodemailer 10 over plain SMTP; nothing changes for `SMTP_*`. Restarting after correcting SMTP can deliver jobs still eligible for retry; it does not revive permanently failed jobs. Inspect their state and trigger a fresh application action after checking provider logs for prior delivery.
+Failed mail jobs are retried with backoff, twice after the first attempt. Restarting after correcting SMTP can deliver jobs still eligible for retry; it does not revive jobs that failed permanently. Check the provider's logs for earlier deliveries, then trigger the action again from the application. Storage and disk alerts are sent directly by the storage check, not queued; a failed alert is tried again at the next check, every 30 minutes.

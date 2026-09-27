@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
+import { contrast, HEX_COLOR, textOn } from "@/lib/brand-color"
 import { computed, onMounted, ref, watch } from 'vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 const queryClient = useQueryClient()
@@ -68,6 +69,42 @@ async function removeLogo() {
 
 const toast = useGlobalToast()
 const store = useGlobalStore()
+
+const DEFAULT_ACCENT = '#171717'
+const { data: brandTheme } = useQuery({ queryKey: ['brand-theme'], queryFn: () => trpc.settings.getBrandTheme.query() })
+const accent = ref(DEFAULT_ACCENT)
+const isSavingAccent = ref(false)
+const brandNameInput = ref('')
+const isSavingBrandName = ref(false)
+watch(brandTheme, () => {
+  accent.value = brandTheme.value?.accentColor ?? DEFAULT_ACCENT
+  brandNameInput.value = brandTheme.value?.brandName ?? ''
+}, { immediate: true })
+async function saveBrandName() {
+  isSavingBrandName.value = true
+  try {
+    await trpc.settings.updateBrandTheme.mutate({ brandName: brandNameInput.value.trim() || null })
+    await queryClient.invalidateQueries({ queryKey: ['brand-theme'] })
+    await store.fetchEnv()
+    toast.success('Brand name saved')
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
+  } finally { isSavingBrandName.value = false }
+}
+const accentValid = computed(() => HEX_COLOR.test(accent.value))
+const accentPreview = computed(() => accentValid.value ? accent.value : DEFAULT_ACCENT)
+// Links in the portal and emails sit on white; under 3:1 they are hard to see.
+const accentTooLight = computed(() => accentValid.value && contrast(accent.value, '#ffffff') < 3)
+async function saveAccent(value: string | null) {
+  isSavingAccent.value = true
+  try {
+    await trpc.settings.updateBrandTheme.mutate({ accentColor: value })
+    await queryClient.invalidateQueries({ queryKey: ['brand-theme'] })
+    toast.success(value ? 'Accent colour saved' : 'Accent colour reset')
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
+  } finally { isSavingAccent.value = false }
+}
 const { data: enrichment, status: enrichmentStatus, refetch: refetchEnrichment } = useQuery({ queryKey: ['enrichment-settings'], queryFn: () => trpc.settings.getEnrichment.query() })
 const recordLabel = ref({ recordLabelSingular: '', recordLabelPlural: '', viewsEnabled: false, viewSeparator: '.', viewDigits: 2, thumbnailView: '00', hideRecordsWithoutMedia: false, familyAttributeName: null as string | null, cardTitleAttributeName: null as string | null })
 const viewExample = computed(() => {
@@ -197,6 +234,20 @@ const removeBackgroundImage = async () => {
     <div class="settings-sections">
       <AdminPageHeader />
 
+      <section class="dv-panel branding-settings" aria-labelledby="brand-name-heading">
+        <h2 id="brand-name-heading">Brand name</h2>
+        <p>Shown in the browser tab, and in every email: as the sender, at the top when there is no logo, and in the footer.</p>
+        <form class="brand-name-form" @submit.prevent="saveBrandName">
+          <div class="record-label-field">
+            <Label for="brandName">Name</Label>
+            <Input id="brandName" v-model="brandNameInput" maxlength="120" :placeholder="store.env?.appName ?? 'Your brand'" />
+          </div>
+          <p class="branding-note">Leave empty to use the name your hosting provider set.</p>
+          <div class="flex flex-wrap gap-3">
+            <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingBrandName || brandNameInput.trim() === (brandTheme?.brandName ?? '')">{{ isSavingBrandName ? 'Saving…' : 'Save name' }}</Button>
+          </div>
+        </form>
+      </section>
       <section class="dv-panel branding-settings">
         <h2>Brand Logo</h2>
         <p>Your logo appears in the client portal and on login pages. Your hosting provider controls whether it also appears in the admin sidebar.</p>
@@ -211,6 +262,29 @@ const removeBackgroundImage = async () => {
             <Button v-if="logo?.exists" class="dv-button" variant="outline" :disabled="isSavingLogo" @click="removeLogo">Remove logo</Button>
           </div>
         </template>
+      </section>
+      <section class="dv-panel branding-settings" aria-labelledby="accent-heading">
+        <h2 id="accent-heading">Accent colour</h2>
+        <p>Colours buttons and links in the client portal and in every email. The administration keeps its own colours.</p>
+        <form class="accent-form" @submit.prevent="saveAccent(accent.toLowerCase())">
+          <div class="accent-fields">
+            <input v-model="accent" type="color" class="accent-swatch" aria-label="Pick the accent colour" />
+            <div class="record-label-field">
+              <Label for="accentHex">Hex code</Label>
+              <Input id="accentHex" v-model.trim="accent" maxlength="7" placeholder="#171717" :aria-invalid="!accentValid" class="accent-hex" />
+            </div>
+            <div class="accent-sample" aria-hidden="true">
+              <span class="accent-sample-button" :style="{ background: accentPreview, color: textOn(accentPreview) }">Download</span>
+              <span class="accent-sample-link" :style="{ color: accentPreview }">View collection</span>
+            </div>
+          </div>
+          <p v-if="!accentValid" class="admin-form-error">Enter a colour as # followed by six hexadecimal digits, such as #0044f4.</p>
+          <p v-else-if="accentTooLight" class="branding-note accent-warning" role="status">This colour is light: buttons get dark text, and links may be hard to read on white.</p>
+          <div class="flex flex-wrap gap-3">
+            <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingAccent || !accentValid">{{ isSavingAccent ? 'Saving…' : 'Save colour' }}</Button>
+            <Button v-if="brandTheme?.accentColor" type="button" class="dv-button" variant="outline" :disabled="isSavingAccent" @click="saveAccent(null)">Use the default</Button>
+          </div>
+        </form>
       </section>
       <div class="dv-panel branding-settings">
         <h2>Login background</h2>
@@ -371,5 +445,14 @@ const removeBackgroundImage = async () => {
 .record-label-field { display:grid; gap:8px; align-content:start; }
 .branding-settings .record-label-field p { margin-top:0; }
 .branding-settings :deep(.dv-button) { height:auto; padding:9px 14px; box-shadow:none; border-radius:0; }
+.brand-name-form { display:grid; gap:12px; margin-top:20px; max-width:420px; }
+.branding-settings .brand-name-form .branding-note { margin:0; }
+.accent-fields { display:flex; flex-wrap:wrap; align-items:flex-end; gap:16px; margin:20px 0 12px; }
+.accent-swatch { width:44px; height:40px; padding:0; border:1px solid var(--dv-color-line); background:none; cursor:pointer; }
+.accent-hex { width:130px; font-family:var(--dv-font-mono, ui-monospace, monospace); }
+.accent-sample { display:flex; align-items:center; gap:16px; padding:10px 16px; border:1px solid var(--dv-color-line); background:white; }
+.accent-sample-button { padding:8px 14px; border-radius:6px; font-size:var(--dv-size-caption); font-weight:600; }
+.accent-sample-link { font-size:var(--dv-size-caption); text-decoration:underline; }
+.branding-settings .accent-warning { margin-bottom:16px; }
 @media(max-width:600px) { .branding-settings { padding:20px; } .record-label-fields { grid-template-columns:1fr; } }
 </style>

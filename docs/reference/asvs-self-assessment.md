@@ -205,7 +205,7 @@ Update a verdict when its evidence changes, recount the summary table, and set `
 | 5.2.2 | Unstructured data is sanitised | Met | CSV cells neutralise formulas (`csvCell()`, `server/test/audit.cjs`) |
 | 5.2.3 | Input to mail systems is sanitised | Met | Plain-text mail via nodemailer; addresses validated by zod |
 | 5.2.4 | No `eval` or dynamic code execution | Met | None in `server/src` or `client/src` |
-| 5.2.5 | Protection against template injection | Met | Liquid templates come from `MAILCONFIG`; user values are passed as data |
+| 5.2.5 | Protection against template injection | Met | Email templates are written by admins and rendered by a Liquid engine that cannot read files (`include`, `render` and `layout` fail), refuses unknown filters, limits render time and memory, and HTML-escapes every value, `raw` included. Message HTML is sanitised on save. User values are passed as data (`server/src/mail/render.ts`) |
 | 5.2.6 | Protection against SSRF | Met | Outbound calls go to configured hosts only (cloud source, OIDC issuer, Have I Been Pwned) |
 | 5.2.7 | User SVG is sanitised or not scriptable | Met | SVG logos rasterised to WebP from a buffer (`processClientLogo()`, `server/test/branding.cjs`) |
 | 5.2.8 | Markdown, CSS and similar content is sanitised | Met | Styles and classes stripped by the sanitiser |

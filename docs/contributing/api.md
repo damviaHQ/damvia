@@ -331,6 +331,22 @@ Every procedure requires `userAdmin`. Writes re-run the entity stage of the enri
 | `settings.getAuthBackgroundUpload` | mutation | `userAdmin` | Presigned POST policy for one staged upload: JPEG, PNG or WebP, up to 20 MB, valid 10 minutes |
 | `settings.processAuthBackgroundImage` | mutation | `userAdmin` | Checks the staged upload (format, 20 MB, 40 million pixels), converts it to WebP (quality 80) at `settings/auth-background.webp` and always deletes the staged object |
 | `settings.removeAuthBackgroundImage` | mutation | `userAdmin` | Deletes the background |
+| `settings.getBrandTheme` | query | public | `{ accentColor, brandName }`, each null when unset. Public so the login page takes the colour before sign-in |
+| `settings.updateBrandTheme` | mutation | `userAdmin` | Sets or clears the accent colour (`#rrggbb`, stored lower case) and the brand name (up to 120 characters, empty clears it); a field left out is kept, and at least one is required. Audited as `brand.updated` |
+
+### `emailTemplate`
+
+Every procedure requires `userAdmin`. A `key` is one of the keys in `server/src/mail/catalogue.ts`; any other is a validation error. `content` is `{ subject, preheader, heading, bodyHtml, buttonLabel }`; `bodyHtml` is sanitised with the page-text rules before anything else, and content that fails to render is a `BAD_REQUEST` naming the Liquid error.
+
+| Procedure | Kind | Purpose |
+|---|---|---|
+| `list` | query | Every email with its group, trigger, recipients, effective subject, `customised`, `updatedAt` and the editor's name |
+| `get` | query | One email: its variables (the global ones first) and blocks, current and default content, `hasButton`, `customised` |
+| `update` | mutation | Saves the content as the email's row; audited as `email_template.updated` with the previous content |
+| `reset` | mutation | Deletes the row so the default applies; audited as `email_template.reset` |
+| `preview` | mutation | `{ subject, html }` of unsaved content, rendered with the catalogue's sample values and the current branding. A mutation so the draft travels in the POST body: a long message in a GET URL exceeds Node's 16 KB header limit, and a reverse proxy's lower one |
+| `sendTest` | mutation | Sends unsaved content to the caller's address with `[Test]` before the subject; 10 per admin per 15 minutes; a refused send is `BAD_GATEWAY` with the mail server's message |
+| `getSettings`, `updateSettings` | query, mutation | Sender name, address, reply-to and footer; `getSettings` also returns the effective `From`. Updates are audited as `email_settings.updated` |
 
 ### `dashboard`
 

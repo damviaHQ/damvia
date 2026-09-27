@@ -86,7 +86,7 @@ Leave `SERVER_ALERT_EMAILS` empty and the server never sends nor shows a disk fi
 
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` configure Nodemailer. Authentication is only sent when both user and password are set, so leave both empty for an unauthenticated relay such as MailHog. Port `465` uses implicit TLS. On any other port, set `SMTP_REQUIRE_TLS=true` for a relay outside the host: sending then fails unless the server upgrades the connection with STARTTLS, instead of sending sign-in links in clear text. Startup logs a `security.configuration` warning when a non-local relay runs without it. The server adds the header `X-PM-Message-Stream: outbound` to every email, which Postmark uses to pick the message stream and other providers ignore.
 
-`MAILCONFIG` holds the templates as base64 JSON. It exists so a container can carry the templates without a mounted file; leaving it empty falls back to `server/mailconfig.json`. See [Email templates](./email-templates.md).
+The sender, the wording of each email and the branding are edited in the admin, not in variables. See [Emails](../administration/emails.md) and [SMTP](../integrations/smtp.md) for choosing a provider. `MAILCONFIG`, which used to hold the templates, is no longer read; startup logs a warning while it is still set.
 
 ## Configure one source or several
 

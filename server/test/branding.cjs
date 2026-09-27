@@ -20,9 +20,9 @@ const { Readable } = require('node:stream')
 const sharp = require('sharp')
 const { Client } = require('minio')
 const harness = require('./lib/helpers.cjs')
-const { env, caller, makeUser, forbidden } = harness
+const { env, caller, makeUser, forbidden, server } = harness
 const storageService = require('../dist/services/storage')
-const { LOGO_KEY, LOGO_TEMP_PREFIX, MAX_LOGO_BYTES, AUTH_BACKGROUND_KEY, AUTH_BACKGROUND_TEMP_PREFIX, MAX_AUTH_BACKGROUND_BYTES } = require('../dist/services/branding')
+const { LOGO_KEY, EMAIL_LOGO_KEY, LOGO_TEMP_PREFIX, MAX_LOGO_BYTES, AUTH_BACKGROUND_KEY, AUTH_BACKGROUND_TEMP_PREFIX, MAX_AUTH_BACKGROUND_BYTES } = require('../dist/services/branding')
 let admin, member, manager, guest
 before(async () => ({ admin, member, manager, guest } = await harness.setup()))
 after(() => harness.teardown())
@@ -73,9 +73,12 @@ test('logo uploads validate bytes, rasterise SVG, replace the previous object an
             const entry = objects.get(key)
             return { size: entry.size ?? entry.buffer.length, versionId: entry.versionId }
         },
-        getObject: async (_bucket, key) => Readable.from([objects.get(key).buffer]),
+        getObject: async (_bucket, key) => {
+            if (!objects.has(key)) throw notFound()
+            return Readable.from([objects.get(key).buffer])
+        },
         putObject: async (_bucket, key, buffer, _size, metadata) => {
-            assert.equal(metadata['Content-Type'], 'image/webp')
+            assert.equal(metadata['Content-Type'], key === EMAIL_LOGO_KEY ? 'image/png' : 'image/webp')
             objects.set(key, { buffer, versionId: String(++revision) })
         },
         removeObject: async (_bucket, key, options) => {
@@ -107,7 +110,17 @@ test('logo uploads validate bytes, rasterise SVG, replace the previous object an
         const png = stage(await sharp({ create: { width: 80, height: 40, channels: 4, background: '#ff0000' } }).png().toBuffer())
         await caller(admin).settings.processClientLogo({ uploadId: png.uploadId })
         assert(deleted.some(item => item.key === LOGO_KEY && item.versionId === firstVersion))
-        assert.equal(objects.size, 1)
+        // Emails get a PNG copy, served from a public, stable address.
+        assert.deepEqual([...objects.keys()].sort(), [EMAIL_LOGO_KEY, LOGO_KEY].sort())
+        assert.equal((await sharp(objects.get(EMAIL_LOGO_KEY).buffer).metadata()).format, 'png')
+        const served = await server.inject({ method: 'GET', url: '/v1/branding/email-logo.png' })
+        assert.equal(served.statusCode, 200)
+        assert.equal(served.headers['content-type'], 'image/png')
+        assert.equal(served.headers['cross-origin-resource-policy'], 'cross-origin')
+        // A logo from before emails carried one gets its PNG on first request.
+        objects.delete(EMAIL_LOGO_KEY)
+        assert.equal((await server.inject({ method: 'GET', url: '/v1/branding/email-logo.png' })).statusCode, 200)
+        assert(objects.has(EMAIL_LOGO_KEY))
         const retained = objects.get(LOGO_KEY).buffer
         const jpeg = await sharp({ create: { width: 20, height: 20, channels: 3, background: 'red' } }).jpeg().toBuffer()
         for (const bytes of [Buffer.from('<html>not an image</html>'), jpeg, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="100000" height="100000"/>')]) {
@@ -130,8 +143,24 @@ test('logo uploads validate bytes, rasterise SVG, replace the previous object an
         await storageService.removeOrphanObjects()
         assert(!objects.has(abandoned.key))
         assert(objects.has(LOGO_KEY))
+        // A failed PNG copy never leaves emails on the previous logo.
+        const staleEmailLogo = objects.get(EMAIL_LOGO_KEY).buffer
+        const put = env.mainS3().putObject
+        const failing = env.mainS3
+        env.mainS3 = () => ({ ...failing(), putObject: async (bucket, key, ...rest) => {
+            if (key === EMAIL_LOGO_KEY) throw Object.assign(new Error('fixture write refused'), { code: 'AccessDenied' })
+            return put(bucket, key, ...rest)
+        } })
+        const replaced = stage(await sharp({ create: { width: 60, height: 30, channels: 4, background: '#00ff00' } }).png().toBuffer())
+        await caller(admin).settings.processClientLogo({ uploadId: replaced.uploadId })
+        assert(!objects.has(EMAIL_LOGO_KEY))
+        env.mainS3 = failing
+        const regenerated = await server.inject({ method: 'GET', url: '/v1/branding/email-logo.png' })
+        assert.equal(regenerated.statusCode, 200)
+        assert.notDeepEqual(regenerated.rawPayload, staleEmailLogo)
         await caller(admin).settings.removeClientLogo()
         assert.equal(objects.size, 0)
+        assert.equal((await server.inject({ method: 'GET', url: '/v1/branding/email-logo.png' })).statusCode, 404)
     } finally { env.mainS3 = previousS3 }
 })
 

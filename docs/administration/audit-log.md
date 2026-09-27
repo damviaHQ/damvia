@@ -48,6 +48,9 @@ An entry is written in the same transaction as the change it describes where the
 | `invitation.created`, `invitation.removed` | A guest invitation was sent or withdrawn. |
 | `license.accepted` | A user accepted the usage terms before a download, with the licences. |
 | `download.link_opened` | A download link was followed and redirected to the file. |
+| `email_template.updated`, `email_template.reset` | An admin changed the wording of an email, or restored its default, with the previous and new content. |
+| `email_settings.updated` | The sender name, address, reply-to or footer changed. |
+| `brand.updated` | The brand name or accent colour changed. |
 
 ## Filter and export
 

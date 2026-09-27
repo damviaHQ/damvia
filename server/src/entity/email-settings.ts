@@ -12,8 +12,28 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-// Loads the compiled configuration without a database, for tests of pure
-// functions that live in modules importing env.
-process.env.DOTENV_CONFIG_PATH = '/dev/null'
-process.env.APP_SECRET = 'pure-tests-only-random-fixture-secret-20260919'
-module.exports = require('../../dist/env')
+import { Column, Entity, PrimaryColumn, UpdateDateColumn } from "typeorm"
+
+@Entity('email_settings')
+export class EmailSettings {
+	@PrimaryColumn({ type: 'int' })
+	id: number
+
+	// Empty falls back to APP_NAME.
+	@Column({ type: 'varchar', length: 120, nullable: true })
+	senderName: string | null
+
+	// Empty falls back to no-reply at the APP_URL host.
+	@Column({ type: 'varchar', length: 254, nullable: true })
+	senderAddress: string | null
+
+	@Column({ type: 'varchar', length: 254, nullable: true })
+	replyTo: string | null
+
+	// Printed under every email, such as the company name and postal address.
+	@Column({ type: 'text', default: '' })
+	footerText: string
+
+	@UpdateDateColumn()
+	updatedAt: Date
+}

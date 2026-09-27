@@ -16,9 +16,12 @@ import { TRPCError } from '@trpc/server'
 import { randomUUID } from 'node:crypto'
 import { Readable } from 'node:stream'
 import sharp from 'sharp'
-import { dataSource, mainS3, mainS3Bucket, logger } from '../env'
+import { BrandSettings } from '../entity/brand-settings'
+import { apiURL, dataSource, mainS3, mainS3Bucket, logger } from '../env'
 
 export const LOGO_KEY = 'settings/client-logo.webp'
+// Outlook shows neither WebP nor SVG, so emails carry a PNG copy.
+export const EMAIL_LOGO_KEY = 'settings/client-logo-email.png'
 export const LOGO_TEMP_PREFIX = 'settings/client-logo-temp/'
 export const MAX_LOGO_BYTES = 5 * 1024 * 1024
 export const LOGO_MIME_TYPES = ['image/svg+xml', 'image/png', 'image/webp'] as const
@@ -26,6 +29,11 @@ export const LOGO_MIME_TYPES = ['image/svg+xml', 'image/png', 'image/webp'] as c
 export function adminClientLogoEnabled(): boolean {
     // The hyphenated spelling is supported for dotenv/container configuration.
     return (process.env['ADMIN-CLIENT-LOGO'] ?? process.env.ADMIN_CLIENT_LOGO ?? 'false') === 'true'
+}
+
+export async function brandName(fallback = 'Damvia'): Promise<string> {
+    const brand = await dataSource.getRepository(BrandSettings).findOneBy({ id: 1 })
+    return brand?.brandName?.trim() || process.env.APP_NAME?.trim() || fallback
 }
 
 export async function getClientLogo() {
@@ -80,12 +88,15 @@ export async function processClientLogo(userId: string, uploadId: string) {
                 if (['NotFound', 'NoSuchKey', 'NoSuchObject'].includes(error.code)) return null
                 throw error
             })
+            // Emails must never show the previous logo; the copy is made again on demand.
+            await removeEmailLogo()
             // One permanent key, replaced atomically only after successful validation.
             await mainS3().putObject(mainS3Bucket(), LOGO_KEY, output, output.length, {
                 'Content-Type': 'image/webp', 'Cache-Control': 'no-cache',
             })
             // Versioned buckets would otherwise retain the previous logo's bytes.
             if (previous?.versionId) await mainS3().removeObject(mainS3Bucket(), LOGO_KEY, { versionId: previous.versionId })
+            await writeEmailLogo(output).catch(error => logger.warn('branding.email-logo-write-failed', { code: error.code }))
         })
     } catch (error) {
         logger.warn('branding.logo-upload-failed', { code: error.code })
@@ -108,8 +119,59 @@ export async function removeClientLogo() {
         })
         if (!previous) return
         await mainS3().removeObject(mainS3Bucket(), LOGO_KEY, previous?.versionId ? { versionId: previous.versionId } : undefined)
+        await removeEmailLogo()
     })
     return { success: true }
+}
+
+// Twice the 160px the email shows, for sharp high-density screens.
+async function writeEmailLogo(logo: Buffer): Promise<Buffer> {
+    const png = await sharp(logo).resize({ width: 320, height: 96, fit: 'inside', withoutEnlargement: true }).png().toBuffer()
+    await mainS3().putObject(mainS3Bucket(), EMAIL_LOGO_KEY, png, png.length, { 'Content-Type': 'image/png' })
+    return png
+}
+
+const isMissing = (error: { code?: string }) => ['NotFound', 'NoSuchKey', 'NoSuchObject'].includes(error.code ?? '')
+
+// Versioned buckets would otherwise keep the previous logo's bytes.
+async function removeEmailLogo() {
+    const previous = await mainS3().statObject(mainS3Bucket(), EMAIL_LOGO_KEY).catch(error => {
+        if (isMissing(error)) return null
+        throw error
+    })
+    if (previous) await mainS3().removeObject(mainS3Bucket(), EMAIL_LOGO_KEY, previous.versionId ? { versionId: previous.versionId } : undefined)
+}
+
+// A stable public address: a presigned link would stop working in the inbox
+// after an hour. The version makes mail clients fetch a replaced logo again.
+export async function emailLogoUrl(): Promise<string | null> {
+    try {
+        const logo = await mainS3().statObject(mainS3Bucket(), LOGO_KEY)
+        return `${apiURL()}/v1/branding/email-logo.png?v=${new Date(logo.lastModified).getTime() || 0}`
+    } catch (error) {
+        if (!isMissing(error)) logger.warn('branding.email-logo-unavailable', { code: error.code })
+        return null
+    }
+}
+
+// Logos uploaded before emails carried them get their PNG on first use.
+export async function readEmailLogo(): Promise<Buffer | null> {
+    const read = async (key: string) => {
+        const chunks: Buffer[] = []
+        for await (const chunk of await mainS3().getObject(mainS3Bucket(), key)) chunks.push(Buffer.from(chunk))
+        return Buffer.concat(chunks)
+    }
+    try {
+        return await read(EMAIL_LOGO_KEY)
+    } catch (error) {
+        if (!isMissing(error)) throw error
+    }
+    try {
+        return await writeEmailLogo(await read(LOGO_KEY))
+    } catch (error) {
+        if (isMissing(error)) return null
+        throw error
+    }
 }
 
 export const AUTH_BACKGROUND_KEY = 'settings/auth-background.webp'

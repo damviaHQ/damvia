@@ -23,6 +23,7 @@ import {Download, DownloadStatus} from "./entity/download";
 import { userCollectionFilesQuery } from "./services/collection"
 import { recordAudit } from "./services/audit"
 import { registerOidcRoutes } from "./oidc-routes"
+import { readEmailLogo } from "./services/branding"
 
 const server = fastify({ routerOptions: { maxParamLength: 5000 }, logger: false, bodyLimit: 5242880, trustProxy: trustProxy() })
 
@@ -107,6 +108,20 @@ server.get<{ Params: { downloadId: string } }>(
 		res.redirect(downloadURL)
 	},
 )
+
+// Emails show the client logo from here; mail clients and webmail proxies load
+// it from other sites, so it is public and cross-origin.
+server.get('/v1/branding/email-logo.png', async (_req, res) => {
+	const logo = await readEmailLogo().catch((error) => {
+		logger.error('branding.email-logo-failed', { code: error.code })
+		return null
+	})
+	if (!logo) return res.code(404).send()
+	res.header('Content-Type', 'image/png')
+	res.header('Cache-Control', 'public, max-age=3600')
+	res.header('Cross-Origin-Resource-Policy', 'cross-origin')
+	return res.send(logo)
+})
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const DOWNLOAD_REDIRECT_SECONDS = 5 * 60

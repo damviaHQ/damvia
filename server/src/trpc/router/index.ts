@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { Region } from "../../entity/region"
 import { analyticsRetentionDays, analyticsSearchMode, auditLogIp, auditRetentionDays, dataSource, oidcSettings, passwordBreachCheck, passwordLessAuth, sessionIdleHours, sessionMaxHours } from "../../env"
+import { brandName } from "../../services/branding"
 import { publicProcedure, router } from "../index"
 import analyticsRouter from "./analytics"
 import assetRouter from "./asset"
@@ -27,6 +28,7 @@ import catalogueRouter from "./catalogue"
 import collectionRouter from "./collection"
 import dashboardRouter from "./dashboard"
 import downloadRouter from "./download"
+import emailTemplateRouter from "./email-template"
 import enrichmentRouter from "./enrichment"
 import entityCsvRouter from "./entity-csv"
 import entityResolutionRouter from "./entity-resolution"
@@ -75,13 +77,14 @@ const appRouter = router({
 	menuItem: menuItemRouter,
 	page: pageRouter,
 	settings: settingsRouter,
+	emailTemplate: emailTemplateRouter,
 	dashboard: dashboardRouter,
 	env: publicProcedure.query(async () => {
 		const regions = await dataSource.getRepository(Region).find()
 		const enrichment = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })
 		return {
 			passwordLessAuthentication: passwordLessAuth(),
-			appName: process.env.APP_NAME ?? 'Damvia - Open Source Digital Asset Management',
+			appName: await brandName('Damvia - Open Source Digital Asset Management'),
 			regions: regions.map((region) => ({ id: region.id, name: region.name })),
 			recordLabel: { singular: enrichment.recordLabelSingular, plural: enrichment.recordLabelPlural },
 			viewsEnabled: enrichment.viewsEnabled,

@@ -1,66 +1,70 @@
 ---
 title: Email templates
-description: The nine transactional emails, the JSON that defines them, and the variables each template can use.
+description: The ten emails Damvia sends, when each goes out, the variables it can use, and how its wording is rendered safely.
 sidebar:
   order: 4
 lastUpdated: 2026-09-27
 ---
 
-Every email Damvia sends is plain text rendered from a template with [LiquidJS](https://liquidjs.com). The templates live in one JSON document, either the file `server/mailconfig.json` or the `MAILCONFIG` environment variable holding the same JSON encoded in base64.
+Every email Damvia sends uses one branded layout, carrying the client logo and accent colour, and has wording admins edit under **Admin → Emails**. This page is the reference for the templates themselves: when each is sent, to whom, and what it can say. The editing workflow is in [Emails](../administration/emails.md).
 
-## The file format
+## What every email looks like
 
-```json
-{
-  "email-verification": {
-    "from": "\"Acme DAM\" <hello@acme.com>",
-    "subject": "Please Verify Your Email Address",
-    "body": "Hello,\n\nPlease verify your email address by clicking the link below:\n\n{{ url }}"
-  },
-  "login": { "from": "...", "subject": "...", "body": "..." }
-}
-```
+Each message is sent as HTML with a plain-text alternative, both built from the same content:
 
-Each key is a template name; each template has `from`, `subject` and `body`. Every `body` is a Liquid template. The `request-approval`, `storage-alert`, `disk-alert` and `license-expiring` subjects are rendered with Liquid; the other six subjects and every `from` are used literally. Bodies are plain text (`\n` for new lines), not HTML. All ten keys should be present: the sender reads `mailConfig()[name]` without a fallback and fails the job otherwise, except `storage-alert`, `disk-alert` and `license-expiring`, whose absence skips the alert, logs `storage.alert-template-missing` or `storage.disk-alert-template-missing`, and tries again at the next measurement, every 30 minutes, until the template is added. When `MAILCONFIG` is set, `server/mailconfig.json` is not read at all, so new templates must be added to the variable.
+- the client logo above the message, or the brand name in text when no logo is uploaded;
+- a short accent-coloured bar, the heading, and the message;
+- a button in the accent colour, followed by the same link in plain text for mail clients that block buttons;
+- the footer line from the sender settings, then `Sent by <brand name> · <APP_URL host>`.
 
-## The nine templates
+The layout is table-based with inline styles, 560 pixels wide, and narrows on phones. It declares a light colour scheme so a dark-mode inbox does not invert the logo. The button text is white, unless the accent colour is too light for white text (contrast under 3:1), in which case it is near-black.
 
-| Key | Sent when | Recipient | Variables |
+The logo is served from `API_URL/v1/branding/email-logo.png`, a PNG copy made when the logo is uploaded, because Outlook shows neither WebP nor SVG. The address is public and stable, so it keeps working in old emails; a presigned storage link would stop after an hour. A `?v=` suffix changes when the logo is replaced, so inboxes fetch the new one. `API_URL` must therefore be reachable from the internet for the logo to show.
+
+## The ten templates
+
+Each template has a subject, a preview text (the grey line most inboxes show after the subject), a heading, a message and, where the email has a link, a button label. An email whose template was never edited uses the built-in wording, which improves with Damvia releases.
+
+| Key | Sent when | Recipients | Variables |
 |---|---|---|---|
-| `email-verification` | A user signs up, or asks to resend the verification | The user | `url`: `APP_URL/?verificationCode=...` |
-| `login` | Login in passwordless mode, or with the magic-link option. Sent only to an existing account that is not suspended | The user | `url`: `APP_URL/login?link=...`, a single-use link valid 15 minutes |
-| `reset-password` | "Forgot password", or an admin or manager sends a reset. Not sent to a suspended account | The user | `url`: `APP_URL/password-update?email=...&token=...`, valid one hour. The token is created when the email is sent; a newer request replaces it |
-| `request-approval` | A user verifies their email while still unapproved | Every admin, plus the managers of the user's region, in one message; only approved, verified and not suspended accounts | `requester.name`; `url`: `APP_URL/admin/users/{id}`, which opens that user. `requester.name` is also available in `subject`. |
-| `user-approved` | An admin or manager approves the user | The user | `user.name`; `url`: `APP_URL/login?link=...`, a single-use link valid 7 days |
-| `download-ready` | An "email" download's archive is built | The requesting user | `link`: `API_URL/v1/downloads/{id}`, which checks the download and its owner at each click before redirecting to the archive |
-| `invitation` | A guest is invited to a collection | The invited email | `url`: `APP_URL/login?invite=...`. Signs the guest in and opens the collection while the invitation exists and has not expired. Each sending creates a new link; links from earlier emails stop working |
-| `storage-alert` | Storage usage crosses 80, 90, 95 or 100 % of `STORAGE_QUOTA` (once per crossing) | The admins designated with "Receives storage and maintenance emails", in one message; nothing is sent and `storage.alert-no-recipient` is logged when none is designated | `severity`: `warning` (80), `critical` (90, 95) or `full` (100); `percent`: integer; `used` and `quota`: sizes such as `1.2 TB`; `url`: `APP_URL/admin`. All are also available in `subject`. |
-| `license-expiring` | A licence's end date is 30, 7 or 1 days away (`LICENSE_EXPIRY_NOTICE_DAYS`), daily at 06:00 UTC | Every approved, verified, non-suspended admin, in one message; a missing template logs `license.expiry-no-recipient` and skips the notice | `licenses`: list of `{ name, date (YYYY-MM-DD), days }`; `url`: `APP_URL/admin/licenses`. Also available in `subject`. |
-| `disk-alert` | The server disk crosses 80, 90, 95 or 100 % (once per crossing) | `SERVER_ALERT_EMAILS`, in one message; nothing is sent when unset | `severity`, `percent`, `free` and `total` (sizes), `appUrl`: `APP_URL`, to tell instances apart. All are also available in `subject`. |
+| `email-verification` | A user signs up, asks to resend the verification, or an admin changes their address | The user | `url`: `APP_URL/?verificationCode=...` |
+| `login` | Sign-in without password, or with the magic-link option. Only to an existing account that is not suspended | The user | `url`: `APP_URL/login?link=...`, single use, valid 15 minutes |
+| `reset-password` | "Forgot password", or an admin or manager sends a reset. Not to a suspended account | The user | `url`: `APP_URL/password-update?email=...&token=...`, valid one hour. The token is created when the email is sent; a newer request replaces it |
+| `request-approval` | A user verifies their email while still unapproved | Every admin, plus the managers of the user's region, in one message; only approved, verified, non-suspended accounts | `requester.name`, `requester.email`, `requester.company`; `url`: `APP_URL/admin/users/{id}` |
+| `user-approved` | An admin or manager approves the user | The user | `user.name`; `url`: `APP_URL/login?link=...`, single use, valid 7 days |
+| `invitation` | A guest is invited to a collection with "send an email" | The invited address | `collection.name`, `inviter.name` (empty if that account was deleted), `expiresAt`; `url`: `APP_URL/login?invite=...`. Each sending creates a new link; links from earlier emails stop working |
+| `download-ready` | An emailed download's archive is built | The requesting user | `expiresAt`; `url`: `API_URL/v1/downloads/{id}`, which checks the download and its owner at each click |
+| `storage-alert` | Storage use crosses 80, 90, 95 or 100 % of `STORAGE_QUOTA`, once per crossing | Admins marked "Receives storage and maintenance emails"; nothing is sent, and `storage.alert-no-recipient` is logged, when none is | `severity` (`warning`, `critical` or `full`), `percent`, `used`, `quota`; `url`: `APP_URL/admin` |
+| `disk-alert` | The server disk crosses 80, 90, 95 or 100 %, once per crossing | `SERVER_ALERT_EMAILS`; nothing is sent when unset | `severity`, `percent`, `free`, `total`. No button |
+| `license-expiring` | A licence's end date is 30, 7 or 1 days away (`LICENSE_EXPIRY_NOTICE_DAYS`), daily at 06:00 UTC | Every approved, verified, non-suspended admin | `licenses` (list of `{ name, date, days }`), `licenses.size`, the `licenseList` block; `url`: `APP_URL/admin/licenses` |
 
-Only the variables listed are available; any other `{{ name }}` renders empty. Every link that signs someone in is a credential. The server stores only a hash of it, but anyone holding the email can use it: a `login` or `user-approved` link once, before it expires; an `invitation` link for as long as the invitation lasts.
+Every template can also use `appName`, the brand name from **Settings → Brand name** (`APP_NAME` when empty, then `Damvia`), and `appUrl` (`APP_URL`). See [Branding](./branding.md). Dates in `expiresAt` read like `4 October 2026`.
 
-## Loading order
+Every link that signs someone in is a credential. The server stores only its hash, but anyone holding the email can use it: a `login` or `user-approved` link once before it expires, an `invitation` link for as long as the invitation lasts.
 
-1. If `MAILCONFIG` is set, it is base64-decoded and JSON-parsed synchronously at startup. A decoding error crashes the process immediately.
-2. Otherwise the server reads `mailconfig.json` from the parent directory of the compiled `env.js`, which is `server/` both in development (`src/env.ts`) and in the Docker image (`dist/env.js`). If the read fails, it logs `Failed to read mailconfig.json` and exits.
+## Writing with variables
 
-To produce the variable from a file:
+Wording is written with [LiquidJS](https://liquidjs.com) syntax. `{{ user.name }}` prints a value; filters and conditions work in every field:
 
-```bash
-base64 -i mailconfig.json | tr -d '\n'
+```liquid
+{{ inviter.name | default: "Someone" }} shared “{{ collection.name }}” with you
+{% if licenses.size == 1 %}A licence ends soon{% else %}{{ licenses.size }} licences end soon{% endif %}
 ```
 
-On Linux, `base64 -w0 mailconfig.json`. Paste the result as `MAILCONFIG=...`.
+A variable that the template does not list prints nothing. A **block** such as `{{ licenseList }}` is laid out by Damvia (here, a bulleted list of licences with their end dates) and placed where it is written; put it on its own line in the message.
 
-## Editing templates on a running instance
+## What a template cannot do
 
-Templates are read once at startup. Restart the server after changing the file or the variable. Because emails are sent by the worker, the process that must restart is the one with `ENABLE_WORKER=true`.
+Templates are written by admins, and the values they print come partly from other people (a user's name, a collection name). The renderer therefore:
 
-:::tip
-In development, MailHog at `http://localhost:8025` shows every message with its rendered subject and body, which is the fastest way to check a template.
-:::
+- **escapes every value** printed into the HTML, so a name such as `<script>` shows as text. The `raw` filter does not turn escaping off. Subjects are plain text and are not escaped;
+- **keeps only the formatting the editor produces** in the message: paragraphs, headings, bold, italic, lists, quotes, links (`http`, `https`, `mailto`) and rules. Styles, images, scripts and event attributes are removed when the template is saved, and again once values are filled in, so a value used as a link address (for example a name set to `javascript:…`) loses its link;
+- **treats the preview text, heading and button label as text**: a tag typed into them shows as text, without its attributes;
+- **refuses `{% include %}`, `{% render %}` and `{% layout %}`**: a template cannot read files from the server;
+- **refuses unknown filters and runaway loops**, with a render and memory limit.
 
-## Sender address and deliverability
+A template that fails to render is refused when saved, with the error shown in the editor, so a broken template never stops an email from being sent.
 
-`from` should be an address your SMTP provider is allowed to send for; with Postmark, a verified sender signature or domain. The server adds `X-PM-Message-Stream: outbound` to every message so Postmark routes it through the transactional stream. See [SMTP](../integrations/smtp.md).
+## Moving from `mailconfig.json` or `MAILCONFIG`
+
+Before this change, templates were plain text in `server/mailconfig.json` or in the base64 `MAILCONFIG` variable. Both are no longer read: the file is gone and the variable only logs a warning at startup. Customised wording must be entered again under **Admin → Emails**; see [Upgrading](../deployment/upgrading.md).

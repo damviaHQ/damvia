@@ -51,7 +51,7 @@ const state = {
     processors: new Map(),
     tempFiles: [],
 }
-env.mainS3 = () => ({ presignedGetObject: async () => 'https://example.test/fixture', removeObjects: async () => {}, listObjects: () => Readable.from([]) })
+env.mainS3 = () => ({ presignedGetObject: async () => 'https://example.test/fixture', removeObjects: async () => {}, listObjects: () => Readable.from([]), statObject: async () => { throw Object.assign(new Error('missing'), { code: 'NoSuchKey' }) } })
 const storage = {
     presignedGetObject: async () => 'https://example.test/fixture',
     fGetObject: async (_bucket, _key, path) => writeFile(path, 'fixture-original'),

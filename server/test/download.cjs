@@ -217,9 +217,8 @@ test('the ready mail sends the owner the API link of their download, rendered fr
     await runJob('mailer/download-ready', { downloadId: download.id })
     assert.equal(state.sentMails.length, 1)
     const [mail] = state.sentMails
-    const template = env.mailConfig()['download-ready']
-    assert.deepEqual([mail.to, mail.from, mail.subject], [owner.email, template.from, template.subject])
-    const links = mail.text.match(/https?:\/\/\S+/g)
-    assert.deepEqual(links, [`${env.apiURL()}/v1/downloads/${download.id}`])
-    assert.equal(mail.text, template.body.replace('{{ link }}', links[0]))
+    assert.deepEqual([mail.to, mail.subject], [owner.email, 'Your download is ready'])
+    const link = `${env.apiURL()}/v1/downloads/${download.id}`
+    assert.equal(mail.text.match(/https?:\/\/\S+/)[0], link)
+    assert(mail.html.includes(`href="${link}"`))
 })

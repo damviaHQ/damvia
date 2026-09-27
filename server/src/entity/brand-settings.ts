@@ -12,8 +12,22 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-// Loads the compiled configuration without a database, for tests of pure
-// functions that live in modules importing env.
-process.env.DOTENV_CONFIG_PATH = '/dev/null'
-process.env.APP_SECRET = 'pure-tests-only-random-fixture-secret-20260919'
-module.exports = require('../../dist/env')
+import { Column, Entity, PrimaryColumn, UpdateDateColumn } from "typeorm"
+
+@Entity('brand_settings')
+export class BrandSettings {
+	@PrimaryColumn({ type: 'int' })
+	id: number
+
+	// A #rrggbb colour for buttons and links in emails and the client portal.
+	// Empty keeps the Damvia defaults.
+	@Column({ type: 'varchar', length: 7, nullable: true })
+	accentColor: string | null
+
+	// The name emails and the browser tab show. Empty falls back to APP_NAME.
+	@Column({ type: 'varchar', length: 120, nullable: true })
+	brandName: string | null
+
+	@UpdateDateColumn()
+	updatedAt: Date
+}

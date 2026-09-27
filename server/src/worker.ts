@@ -238,7 +238,7 @@ export const mailerInvitationQueue = createQueue<{ invitationId: string }>({
 	name: 'mailer/invitation',
 	processor: (data) =>
 		dataSource.getRepository(CollectionInvitation)
-			.findOne({ where: { id: data.invitationId }, relations: { collection: true, user: true } })
+			.findOne({ where: { id: data.invitationId }, relations: { collection: true, user: true, invitedBy: true } })
 			.then(ifFound('mailer/invitation', sendInvitation))
 })
 

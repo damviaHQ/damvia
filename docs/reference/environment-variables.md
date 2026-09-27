@@ -18,7 +18,7 @@ Any variable can also be read from a file, the way Docker and Kubernetes mount s
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `APP_NAME` | `Damvia - Open Source Digital Asset Management` | Returned by the public `env` query; the client uses it as the document title. |
+| `APP_NAME` | `Damvia - Open Source Digital Asset Management` | The brand name when none is set in **Settings → Brand name**: the document title, and in emails the sender name, header and footer (`Damvia` there when unset). Also the issuer of two-step verification entries. See [Branding](../configuration/branding.md). |
 | `ADMIN_CLIENT_LOGO` | `false` | Host-only: `true` uses the uploaded client logo in the admin sidebar when available; otherwise Damvia. Cannot be changed through the DAM admin. `ADMIN-CLIENT-LOGO` is an accepted alias and takes precedence when both are set. Restart the server after changing it. |
 | `APP_URL` | `http://localhost:5173` | Public URL of the client. Every link in an email is built from it, and expired download links redirect to `APP_URL/link-expired`. |
 | `API_URL` | `http://localhost:3000` | Public URL of this server. Download links are `API_URL/v1/downloads/{id}`. |
@@ -95,7 +95,7 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 | `SMTP_USER` | unset | SMTP login. Authentication is only enabled when **both** `SMTP_USER` and `SMTP_PASS` are set. |
 | `SMTP_PASS` | unset | SMTP password. |
 | `SMTP_REQUIRE_TLS` | `false` | `true` refuses to send unless the server upgrades the connection with STARTTLS. Recommended for any relay outside the host. Port `465` always uses implicit TLS. |
-| `MAILCONFIG` | unset | Base64-encoded JSON of the mail templates. When unset, the server reads `server/mailconfig.json` and exits with an error if the file is unreadable. See [Email templates](../configuration/email-templates.md). |
+| `MAILCONFIG` | unset | No longer read. Email templates are edited under **Admin → Emails**; startup logs a warning while the variable is set. Remove it. See [Email templates](../configuration/email-templates.md). |
 
 ### Cloud storage sync
 

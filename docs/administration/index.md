@@ -29,6 +29,7 @@ The [Dashboard](./dashboard.md) is the first place to check storage, source sync
 - [Roles and access](../introduction/roles-and-access.md): exact visibility and edit rules.
 - [Accounts and links](./accounts-and-links.md): sessions, invitations, signed URLs and revocation limits.
 - [Audit log](./audit-log.md): who changed what, sign-ins, refusals, and how long entries are kept.
+- [Emails](./emails.md): the sender, and the wording of every email with a live preview.
 
 Managers only receive the Users area and can act only on users in their own region. All other administration areas require an admin. The server enforces those permissions even if somebody opens an admin URL directly.
 
@@ -63,7 +64,8 @@ Collections organise references to assets. Copying a file into another collectio
 |---|---|---|
 | Dashboard | `/admin` | admin |
 | Insights | `/admin/analytics` | admin |
-| Settings: branding and record label | `/admin/settings`, the last entry of the admin menu | admin |
+| Settings: branding, accent colour and record label | `/admin/settings` | admin |
+| Emails: sender and wording | `/admin/emails`, `/admin/emails/<key>`, the last entry of the admin menu | admin |
 | Menu, collections and pages | `/admin/menu-items`, `/admin/collections`, `/admin/pages` | admin |
 | Assets, types and licences | `/admin/assets`, `/admin/asset-types`, `/admin/licenses` | admin |
 | Folder rules, a tab of Asset types | `/admin/asset-types?tab=folder-rules`; `/admin/folder-rules` redirects | admin |
