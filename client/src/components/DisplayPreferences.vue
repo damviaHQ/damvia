@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useRecordLabel } from '@/composables/useRecordLabel'
 import { useGlobalStore } from '@/stores/globalStore'
@@ -61,6 +62,8 @@ const masonrySize = computed(() => store.displayDetails[group.value.id]?.masonry
 const masonrySizeLabel = computed(() => MASONRY_SIZES.find(size => size.id === masonrySize.value)?.label ?? '')
 const displays = computed(() => groups.value.map(item => store.displayPreferences[item.id] ?? item.defaultDisplay))
 const sharedDisplay = computed(() => displays.value.every(value => value === displays.value[0]) ? displays.value[0] : null)
+// Only offered where the listing holds a group of variants.
+const hasVariants = computed(() => props.files.some(file => file.variantGroup))
 const triggerTitle = computed(() => `Display preferences — ${sharedDisplay.value ? viewLabels[sharedDisplay.value] : 'mixed'}${props.restricted ? ' · Hidden for some people' : ''}`)
 
 
@@ -126,6 +129,13 @@ function toggleColumn(id: string) {
           <p class="mt-3 text-[11px] leading-4 text-neutral-500">Pictures keep their own proportions and always fill the width. Their details appear on hover.</p>
         </TabsContent>
       </Tabs>
+      <label v-if="hasVariants" class="flex cursor-pointer items-start justify-between gap-3 border-t border-neutral-100 px-4 py-3">
+        <span>
+          <span class="block text-xs font-medium text-neutral-800">Group variants</span>
+          <span class="mt-0.5 block text-[11px] leading-4 text-neutral-500">One card for the formats, languages and durations of a file.</span>
+        </span>
+        <Switch aria-label="Group variants" :model-value="store.groupVariants" @update:model-value="store.setGroupVariants($event as boolean)" />
+      </label>
       <div class="flex items-center justify-between gap-3 border-t border-neutral-100 px-4 py-3">
         <span class="text-[11px] text-neutral-500">Saved in this browser</span>
         <button type="button" class="flex cursor-pointer items-center gap-1.5 rounded-md text-xs text-neutral-600 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring" @click="store.resetDisplayPreference(group.id)"><RotateCcw class="size-3" aria-hidden="true" />Reset</button>

@@ -28,6 +28,7 @@ import { userCollectionFilesQuery } from "../../services/collection"
 import { loadViewableMetadata } from "../../services/file-metadata"
 import { formatCollectionFile } from "./collection"
 import { readinessFor } from "../../services/record-readiness"
+import { loadVariantGroups } from "../../services/variant-grouping"
 import { authMiddleware, publicProcedure, router, userApproved } from "../index"
 import { SIGNED_URL_SECONDS } from "../../services/signed-url"
 
@@ -135,6 +136,7 @@ export default router({
 				.getMany() : []
 			const uniqueFiles = [...new Map(linkedFiles.map(file => [file.assetFileId, file])).values()]
 			const metadata = await loadViewableMetadata(uniqueFiles.map(file => file.assetFileId))
+			const variantGroups = await loadVariantGroups(ctx.user, uniqueFiles.map(file => file.assetFileId))
 			const attributes = fields.flatMap(field => {
 				const value = record.metaData[field.name] ?? null
 				const values = field.valueType === 'multi_select' && value ? value.split('|').filter(Boolean) : [value]
@@ -144,7 +146,7 @@ export default router({
 				...rest,
 				cardTitleField: fields.some(field => field.name === enrichment.cardTitleAttributeName) ? enrichment.cardTitleAttributeName : null,
 				collectionFiles: await Promise.all(uniqueFiles.map(async file => ({
-					...await formatCollectionFile({ file, recordAttributes: fields, metadata }),
+					...await formatCollectionFile({ file, recordAttributes: fields, metadata, variantGroups }),
 					record: { id: record.id, attributes },
 				}))),
 				thumbnailURL: await presign(thumbnailStorageKey),

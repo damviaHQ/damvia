@@ -233,3 +233,31 @@ test('search pills remove individual filters, retain sort and share display pref
   await page.goto('/collections/campaign')
   await expect(page.locator('.collection-list-files_table').getByRole('columnheader', { name: 'Colour', exact: true })).toBeVisible()
 })
+
+test('a collection shows a group of variants as one card until the reader switches grouping off', async ({ page, mockTrpc }) => {
+  const group = { id: 'launch', displayName: 'Launch', memberCount: 2, status: 'up_to_date', coverFileId: null }
+  const files = source.files.map((file, index) => ({ ...file, variantGroup: index < 2 ? { ...group, cover: index === 1 } : null }))
+  await mockTrpc({ 'collection.findById': { ...source, files } })
+  await page.goto('/collections/campaign')
+  const preview = (name: string) => page.getByRole('button', { name: `Preview ${name}`, exact: true })
+  await expect(page.getByRole('button', { name: 'Show the 2 variants of Launch', exact: true })).toHaveCount(1)
+  await expect(preview(files[1].name)).toBeVisible()
+  await expect(preview(files[0].name)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
+  const toggle = page.getByRole('dialog', { name: 'Display preferences' }).getByRole('switch', { name: 'Group variants' })
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+  await toggle.click()
+  await expect(preview(files[0].name)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Show the 2 variants of Launch', exact: true })).toHaveCount(0)
+  await page.reload()
+  await expect(preview(files[0].name)).toBeVisible()
+  await expect(preview(files[1].name)).toBeVisible()
+})
+
+test('Group variants is not offered where no file belongs to a group', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc)
+  await page.goto('/collections/campaign')
+  await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Display preferences' })).toBeVisible()
+  await expect(page.getByRole('switch', { name: 'Group variants' })).toHaveCount(0)
+})

@@ -48,6 +48,7 @@ import { useRoute } from "vue-router"
 const PER_PAGE = 300
 const PRODUCT_PAGE_SIZE = 48
 const route = useRoute()
+const globalStore = useGlobalStore()
 const isProductSearch = computed(() => route.query.kind === "products")
 const { form, terms, recordInput, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange, setMetadataRange } = useSearchState()
 providePageFilter()
@@ -79,8 +80,8 @@ const { data: collection } = useQuery({
 })
 const { status, data: search, error, isPlaceholderData } = useQuery({
   enabled: filesEnabled,
-  queryKey: computed(() => ["search", form.value]),
-  queryFn: () => trpc.collection.search.query({ ...form.value, collapseVariants: true }),
+  queryKey: computed(() => ["search", form.value, globalStore.groupVariants]),
+  queryFn: () => trpc.collection.search.query({ ...form.value, collapseVariants: globalStore.groupVariants }),
   // Changing a filter refines the current results instead of blanking the page.
   placeholderData: keepPreviousData,
 })
@@ -174,7 +175,6 @@ const chips = computed<FilterChip[]>(() =>
   })
 )
 
-const globalStore = useGlobalStore()
 const selectable = computed<SelectionItem[]>(() => isProductSearch.value
   ? (productSearch.value?.products ?? []).map(product => ({ type: "record", id: product.id }))
   : results.value.map(file => ({ type: "file", id: file.id })))

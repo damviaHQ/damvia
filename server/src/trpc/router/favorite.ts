@@ -21,6 +21,7 @@ import { UserCollectionFavorite } from "../../entity/user-collection-favorite"
 import { UserFavorite } from "../../entity/user-favorite"
 import { dataSource } from "../../env"
 import { loadViewableMetadata } from "../../services/file-metadata"
+import { loadVariantGroups } from "../../services/variant-grouping"
 import { authMiddleware, publicProcedure, router, userApproved, userMember } from "../index"
 import { formatCollectionFile, formatCollection } from "./collection"
 
@@ -65,11 +66,13 @@ export default router({
 				.getMany()
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 			const metadata = await loadViewableMetadata(files.map((file) => file.assetFileId))
+			const variantGroups = await loadVariantGroups(ctx.user, files.map((file) => file.assetFileId))
 
 			return Promise.all(files.map((file) => formatCollectionFile({
 				file,
 				recordAttributes,
 				metadata,
+				variantGroups,
 			})))
 		}),
 	add: publicProcedure

@@ -153,9 +153,9 @@ A sub-collection starts on **Same as parent** and follows the nearest collection
 
 Hiding a tool changes what the page shows, not what people can reach. A hidden **Filter** stops narrowing the page. The scoped search still opens from its address, and it only ever returns what that person can already see. **Share collection** is not in the list: only admins and the owner can share, and they always see it.
 
-## Variants show as one card in search
+## Variants show as one card
 
-When an asset type groups its variants, search shows the formats, languages and durations of one creative as a single stacked card that opens on every version, with **Download all**. Collections and pages keep listing every file. See [Variants](./variants.md).
+When an asset type groups its variants, search shows the formats, languages and durations of one creative as a single stacked card that opens on every version, with **Download all**, in search, collections and pages alike. Each reader can switch off **Group variants** in **Display preferences** to list every file. See [Variants](./variants.md).
 
 ## Known operational limits
 

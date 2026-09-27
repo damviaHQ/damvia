@@ -53,8 +53,8 @@ const { data: collection } = useQuery({
 // Same key as the results view, so the counts come from the one request.
 const { data: search } = useQuery({
   enabled: filesEnabled,
-  queryKey: computed(() => ["search", form.value]),
-  queryFn: () => trpc.collection.search.query({ ...form.value, collapseVariants: true }),
+  queryKey: computed(() => ["search", form.value, globalStore.groupVariants]),
+  queryFn: () => trpc.collection.search.query({ ...form.value, collapseVariants: globalStore.groupVariants }),
   // Keep the previous counts while the next results load, so the rows do not disappear.
   placeholderData: keepPreviousData,
 })

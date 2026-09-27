@@ -151,7 +151,11 @@ test('search collapses a group into its cover only when asked, counts it once, f
     const member = caller(fixtures.member)
     const scope = { collectionId: collection.id, searchScope: 'current' }
     const flat = await member.collection.search(scope)
-    assert.deepEqual([flat.total, flat.results.every(f => f.variantGroup === null)], [4, true])
+    // Unfolded, every member still names its group so the reader can fold it.
+    assert.deepEqual([flat.total, flat.results.filter(f => f.variantGroup).length], [4, 3])
+    const listed = await member.collection.findById(collection.id)
+    assert.deepEqual(listed.files.filter(f => f.variantGroup).map(f => f.variantGroup.memberCount), [3, 3, 3])
+    assert.equal(listed.files.find(f => f.name === 'solo.jpg').variantGroup, null)
     const collapsed = await member.collection.search({ ...scope, collapseVariants: true })
     assert.deepEqual(collapsed.results.map(f => f.name).sort(), ['launch_1x1_de.jpg', 'solo.jpg'])
     assert.equal(collapsed.total, 2)

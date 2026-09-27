@@ -112,6 +112,18 @@ describe('global store', () => {
     expect(reloaded.displayPreferences).toEqual({})
   })
 
+  test('variants are grouped until the reader switches it off, and clearing turns it back on', () => {
+    const store = useGlobalStore()
+    expect(store.groupVariants).toBe(true)
+    store.setGroupVariants(false)
+    setActivePinia(createPinia())
+    const reloaded = useGlobalStore()
+    expect(reloaded.groupVariants).toBe(false)
+    reloaded.clearDisplayPreferences()
+    expect(reloaded.groupVariants).toBe(true)
+    expect(localStorage.getItem('dam_group_variants')).toBeNull()
+  })
+
   test('a stored masonry size survives a reload and an unknown one is dropped', () => {
     localStorage.setItem('dam_display_details', JSON.stringify({
       'type-1': { masonrySize: 4, columns: ['size'] },

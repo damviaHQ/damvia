@@ -22,6 +22,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { useSearchState } from "@/composables/useSearchState"
 import { trpc } from "@/services/server"
+import { useGlobalStore } from "@/stores/globalStore"
 import { clearRecentSearches, listRecentSearches, rememberSearch, type RecentSearch } from "@/utils/recentSearches"
 import type { MobileFile } from "../composables"
 import { usePreviewQuery, useMobileSelection } from "../composables"
@@ -34,6 +35,7 @@ const PAGE_SIZE = 48
 const route = useRoute()
 const router = useRouter()
 const toast = useGlobalToast()
+const globalStore = useGlobalStore()
 const labels = useRecordLabel()
 const selection = useMobileSelection()
 const { form, terms, recordInput, hasQuery, filters, isScoped, setScope, clearFilters, setExactMatch } = useSearchState()
@@ -72,9 +74,9 @@ function openFilters() {
 
 const fileSearch = useInfiniteQuery({
   enabled: computed(() => !products.value && searched.value),
-  queryKey: computed(() => ["mobile-search", baseForm.value]),
+  queryKey: computed(() => ["mobile-search", baseForm.value, globalStore.groupVariants]),
   initialPageParam: 1,
-  queryFn: ({ pageParam }) => trpc.collection.search.query({ ...baseForm.value, page: pageParam, perPage: PAGE_SIZE, collapseVariants: true, silent: pageParam > 1 }),
+  queryFn: ({ pageParam }) => trpc.collection.search.query({ ...baseForm.value, page: pageParam, perPage: PAGE_SIZE, collapseVariants: globalStore.groupVariants, silent: pageParam > 1 }),
   getNextPageParam: (last) => last.nextPage ?? undefined,
   placeholderData: keepPreviousData,
 })

@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { beforeEach, describe, expect, test } from 'vitest'
-import { collectionDisplayGroup, fileDisplayGroup, fileProperties, productDisplayGroup, readDisplayDetails, type DisplayFile, type DisplayProduct } from '@/utils/displayPreferences'
+import { collapseVariants, collectionDisplayGroup, fileDisplayGroup, fileProperties, productDisplayGroup, readDisplayDetails, type DisplayFile, type DisplayProduct } from '@/utils/displayPreferences'
 
 const photo = { id: 'photo', name: 'Photography', defaultDisplay: 'list', listDisplayItems: ['size', 'format'], recordAttributes: [{ id: 'colour', name: 'colour', displayName: 'Colour' }] }
 const file = (value: object) => ({ name: 'a.jpg', assetType: photo, record: null, metadata: [], ...value }) as unknown as DisplayFile
@@ -56,6 +56,13 @@ describe('display preferences', () => {
     ], 'Products')
     expect(group).toMatchObject({ id: 'record', name: 'Products', defaultDisplay: 'grid', defaultColumns: [] })
     expect(group.properties).toEqual([{ id: 'season', label: 'Season' }, { id: 'format', label: 'format' }])
+  })
+
+  test('a group of variants folds into one card, at its first place and shown by its cover', () => {
+    const member = (id: string, group: string | null, cover = false) => ({ id, variantGroup: group ? { id: group, cover } : null })
+    const files = [member('a', null), member('b1', 'b'), member('c', null), member('b2', 'b', true), member('d1', 'd'), member('d2', 'd')]
+    expect(collapseVariants(files).map(file => file.id)).toEqual(['a', 'b2', 'c', 'd1'])
+    expect(collapseVariants([])).toEqual([])
   })
 
   test('saved details are read back only when well formed', () => {

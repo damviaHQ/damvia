@@ -19,7 +19,7 @@ import { RouterOutput } from "@/services/server.ts"
 import { registerPageListing } from "@/composables/usePageListings"
 import { usePageFilter } from "@/composables/usePageFilter"
 import { useGlobalStore } from "@/stores/globalStore"
-import type { DisplayView } from "@/utils/displayPreferences"
+import { collapseVariants, type DisplayView } from "@/utils/displayPreferences"
 import { computed } from "vue"
 
 type Collection = RouterOutput["collection"]["findById"]
@@ -48,7 +48,11 @@ registerPageListing(computed(() => ({ files: rawFiles.value })))
 // Narrowing happens here, above the choice between grid, masonry and list, so
 // the three views obey the same filter without knowing it exists.
 const pageFilter = usePageFilter()
-const visibleFiles = computed(() => pageFilter.filterFiles(rawFiles.value))
+// Filtered before folding, so a group stays when only one of its variants matches.
+const visibleFiles = computed(() => {
+  const files = pageFilter.filterFiles(rawFiles.value)
+  return globalStore.groupVariants ? collapseVariants(files) : files
+})
 const hiddenByFilter = computed(() => pageFilter.isActive.value && !visibleFiles.value.length)
 
 const fileDisplayPreference = computed<DisplayView>(() => {

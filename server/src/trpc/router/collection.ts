@@ -61,6 +61,7 @@ export type FormatCollectionOptions = {
 	userVisibleCollections?: Collection[],
 	recordAttributes?: RecordAttribute[],
 	metadata?: Map<string, ViewableMetadata[]>,
+	variantGroups?: Map<string, VariantGroupSummary>,
 	sampleFiles?: CollectionFile[],
 }
 
@@ -93,6 +94,7 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 				file,
 				recordAttributes: opts.recordAttributes,
 				metadata: opts.metadata,
+				variantGroups: opts.variantGroups,
 			})))
 			: undefined,
 		page: collection.page ? await formatPage(collection.page, opts.user) : null,
@@ -176,6 +178,7 @@ export type FormatCollectionFileOptions = {
 }
 
 export async function formatCollectionFile({ file, recordAttributes, metadata, variantGroups }: FormatCollectionFileOptions) {
+	const variantGroup = variantGroups?.get(file.assetFile.id)
 	const attributes = recordAttributes
 		? Object
 			.entries(file.assetFile.record?.metaData ?? {})
@@ -210,7 +213,8 @@ export async function formatCollectionFile({ file, recordAttributes, metadata, v
 		} : null,
 		recordView: file.assetFile.recordView,
 		metadata: metadata ? metadata.get(file.assetFile.id) ?? [] : null,
-		variantGroup: variantGroups?.get(file.assetFile.id) ?? null,
+		// The reader folds a group into the card of its cover.
+		variantGroup: variantGroup ? { ...variantGroup, cover: variantGroup.coverFileId === file.assetFile.id } : null,
 		size: parseInt(file.assetFile.size, 10),
 		collectionId: file.collectionId,
 		updatedAt: file.assetFile.updatedAt,
@@ -310,7 +314,7 @@ export default router({
 			}
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 			const metadata = await loadViewableMetadata([...results, ...rangeResults].map((file) => file.assetFileId))
-			const variantGroups = input.collapseVariants ? await loadVariantGroups(ctx.user, results.map((file) => file.assetFileId)) : undefined
+			const variantGroups = await loadVariantGroups(ctx.user, results.map((file) => file.assetFileId))
 
 			return {
 				total,
@@ -417,6 +421,7 @@ export default router({
 
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 			const metadata = await loadViewableMetadata(collection.files.map((file) => file.assetFileId))
+			const variantGroups = await loadVariantGroups(ctx.user, collection.files.map((file) => file.assetFileId))
 			return {
 				...await formatCollection({
 					collection,
@@ -424,6 +429,7 @@ export default router({
 					userVisibleCollections,
 					recordAttributes,
 					metadata,
+					variantGroups,
 					sampleFiles,
 				}),
 				...await formatActionBar(collection, ctx.user),
@@ -450,7 +456,8 @@ export default router({
 			const files = await filesQuery.getMany()
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 			const metadata = await loadViewableMetadata(files.map((file) => file.assetFileId))
-			return Promise.all(files.map((file) => formatCollectionFile({ file, recordAttributes, metadata })))
+			const variantGroups = await loadVariantGroups(ctx.user, files.map((file) => file.assetFileId))
+			return Promise.all(files.map((file) => formatCollectionFile({ file, recordAttributes, metadata, variantGroups })))
 		}),
 	create: publicProcedure
 		.use(authMiddleware(userApproved, userMember))

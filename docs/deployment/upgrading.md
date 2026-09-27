@@ -124,7 +124,7 @@ Back up first and apply the migration with application writers stopped. Validate
 ## Variants in this upgrade
 
 - No asset type groups its variants until an admin ticks **Group variants** on it; nothing changes for readers before that.
-- Search now asks for grouped results, so on a type that groups its variants a search shows one card per creative and totals count a group once.
+- Search, collections, pages, favourites and product pages show one card per creative on a type that groups its variants, and search totals count a group once. Each reader can switch this off with **Group variants** in **Display preferences**.
 
 ## File metadata in this upgrade
 

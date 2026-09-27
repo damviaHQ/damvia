@@ -3,10 +3,10 @@ title: Variants
 description: Show the formats, languages and durations of one creative as a single card, name what differs between them and correct the grouping by hand.
 sidebar:
   order: 14
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-27
 ---
 
-Twelve formats of one banner are twelve files in the cloud storage. With variant grouping, search shows them as one stacked card, and readers open the card to see, filter and download every version. Grouping reads file names only; nothing is renamed or moved in the cloud storage.
+Twelve formats of one banner are twelve files in the cloud storage. With variant grouping, search, collections, pages, favourites and product pages show them as one stacked card, and readers open the card to see, filter and download every version. Grouping reads file names only; nothing is renamed or moved in the cloud storage.
 
 ## Turn grouping on for an asset type
 
@@ -33,7 +33,9 @@ An axis is shared by every group whose values it already holds, so naming it onc
 
 ## What readers see
 
-Search shows one card per group, with its cover, a stacked outline and a **n variants** button; collections and pages keep showing every file. The button opens the group: each member with its preview, its value on each axis, its type, its status and a download link, and **Download all**, which opens the usual download dialog with the group as the selection. Members a reader cannot see, because of a collection, group or licence rule, are neither listed, counted nor downloaded.
+Every file listing (search, collections, page blocks, favourites and product pages) shows one card per group, with its cover, a stacked outline and a **n variants** button. The card stands where the first member of the group would have been; a page filter is applied first, so a group stays on screen when only one of its variants matches. The button opens the group: each member with its preview, its value on each axis, its type, its status and a download link, and **Download all**, which opens the usual download dialog with the group as the selection. Members a reader cannot see, because of a collection, group or licence rule, are neither listed, counted nor downloaded.
+
+Readers who prefer every file on its own switch off **Group variants** in **Display preferences**. The switch appears only where the listing holds a group, applies to every listing including search on the phone, and is saved in the browser. It is on by default.
 
 ## Name the axes and set the rules
 

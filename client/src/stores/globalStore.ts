@@ -55,6 +55,13 @@ export const useGlobalStore = defineStore('global', () => {
 	)
 
 	const displayDetails = ref(readDisplayDetails())
+	// On unless the reader switched it off: the admin turned grouping on per asset type.
+	const groupVariants = ref(localStorage.getItem('dam_group_variants') !== 'false')
+
+	function setGroupVariants(value: boolean) {
+		groupVariants.value = value
+		localStorage.setItem('dam_group_variants', String(value))
+	}
 
 	// Only Save persists the available dimensions; selected values stay in the view.
 	const pageFilters = ref<string[]>(readPageFilters())
@@ -108,6 +115,8 @@ export const useGlobalStore = defineStore('global', () => {
 		localStorage.removeItem('dam_display_preferences')
 		displayDetails.value = {}
 		localStorage.removeItem('dam_display_details')
+		groupVariants.value = true
+		localStorage.removeItem('dam_group_variants')
 	}
 
 	function fetchUser() {
@@ -184,6 +193,8 @@ export const useGlobalStore = defineStore('global', () => {
 		env,
 		displayPreferences,
 		displayDetails,
+		groupVariants,
+		setGroupVariants,
 		pageFilters,
 		pageFiltersChanged,
 		savePageFilters,

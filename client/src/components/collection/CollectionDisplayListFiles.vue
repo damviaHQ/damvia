@@ -317,7 +317,7 @@ const table = useTable<typeof features, File>({
                         >
                           {{ cell.row.original.name }}
                         </button>
-                        <button v-if="cell.row.original.variantGroup" type="button" class="ml-2 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-800 hover:bg-neutral-300" :aria-label="`Show the ${cell.row.original.variantGroup.memberCount} variants of ${cell.row.original.variantGroup.displayName}`" @click.stop="openGroupId = cell.row.original.variantGroup.id">{{ cell.row.original.variantGroup.memberCount }} variants</button>
+                        <button v-if="globalStore.groupVariants && cell.row.original.variantGroup" type="button" class="ml-2 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-800 hover:bg-neutral-300" :aria-label="`Show the ${cell.row.original.variantGroup.memberCount} variants of ${cell.row.original.variantGroup.displayName}`" @click.stop="openGroupId = cell.row.original.variantGroup.id">{{ cell.row.original.variantGroup.memberCount }} variants</button>
                         <div v-if="copiedCellId === `${cell.row.id}-filename`"
                              class="absolute -top-8 left-0 text-xs text-neutral-500 bg-white px-2 py-1 rounded shadow-xs border border-neutral-200 z-20 copied-indicator animate-in fade-in-0 duration-150">
                           copied

@@ -109,3 +109,23 @@ export function readDisplayDetails(): Record<string, DisplayDetails> {
     }))
   } catch { return {} }
 }
+
+type VariantFile = { variantGroup?: { id: string; cover?: boolean } | null }
+// One card per group of variants, at the place of its first member and shown
+// by its cover when the cover is on the list.
+export function collapseVariants<T extends VariantFile>(files: T[]): T[] {
+  const shown = new Map<string, T>()
+  for (const file of files) {
+    const id = file.variantGroup?.id
+    if (!id) continue
+    if (!shown.has(id) || file.variantGroup?.cover) shown.set(id, file)
+  }
+  const placed = new Set<string>()
+  return files.flatMap(file => {
+    const id = file.variantGroup?.id
+    if (!id) return [file]
+    if (placed.has(id)) return []
+    placed.add(id)
+    return [shown.get(id)!]
+  })
+}
