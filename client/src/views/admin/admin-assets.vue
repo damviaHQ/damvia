@@ -20,6 +20,7 @@ import Loader from "@/components/Loader.vue"
 import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/select"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
+import { resolveAssetFolderPath } from "@/utils/assetFolderPath"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -43,15 +45,17 @@ import {
   Folder,
   FolderOpen,
   GripVertical,
+  Navigation,
   Server,
 } from "@lucide/vue"
 import type { AcceptableValue } from "reka-ui"
 import { computed, ref, watch } from "vue"
-import { useRoute } from "vue-router"
+import { useRoute, useRouter } from "vue-router"
 
 export type Asset = RouterOutput["asset"]["tree"][number]
 
 const route = useRoute()
+const router = useRouter()
 const queryClient = useQueryClient()
 const toast = useGlobalToast()
 const isEditModalOpen = ref(false)
@@ -155,6 +159,23 @@ const breadcrumbItems = computed<PathBreadcrumbItem[]>(() => [
   })),
 ])
 
+const sourceRoot = computed(() => assets.value?.find((item) => item.id === assetPath.value[0]?.id))
+const pastedPath = ref("")
+
+function goToPath() {
+  if (!sourceRoot.value) return
+  const result = resolveAssetFolderPath(sourceRoot.value, pastedPath.value)
+  if (!result) return
+  if (result.missing.length) {
+    const reached = result.folder.id === sourceRoot.value.id ? sourceRoot.value.name : result.folder.name
+    toast.error(`No folder "${result.missing[0]}" in ${reached}`)
+    if (result.folder.id === route.params.id || result.folder.id === sourceRoot.value.id) return
+  } else {
+    pastedPath.value = ""
+  }
+  router.push({ name: "admin-assets", params: { id: result.folder.id } })
+}
+
 function onSubmit() {
   trpc.asset.update
     .mutate({
@@ -215,7 +236,11 @@ function getFileExtension(filename: string): string {
     <ResizablePanel :default-size="77">
       <div class="asset-browser__main">
         <div class="asset-browser__breadcrumb">
-          <PathBreadcrumb :items="breadcrumbItems" />
+          <PathBreadcrumb :items="breadcrumbItems" class="flex-1" />
+          <form v-if="sourceRoot" class="asset-browser__goto" @submit.prevent="goToPath">
+            <Input v-model="pastedPath" aria-label="Folder path" :placeholder="`Paste a path in ${sourceRoot.name}`" />
+            <Button type="submit" variant="outline" class="dv-button" :disabled="!pastedPath.trim()"><Navigation /> Go</Button>
+          </form>
         </div>
         <div v-if="isAssetLoading && route.params.id">
           <Loader :text="true" />
@@ -384,7 +409,9 @@ function getFileExtension(filename: string): string {
 .asset-browser__handle:hover { background:var(--dv-action-soft); color:var(--dv-action-primary); }
 .asset-browser__handle :deep(svg) { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 .asset-browser__main { width:100%; height:100%; overflow-y:auto; padding:20px clamp(24px,3.2vw,52px) 56px; }
-.asset-browser__breadcrumb { min-height:24px; margin-bottom:16px; color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
+.asset-browser__breadcrumb { display:flex; align-items:center; gap:16px; min-height:24px; margin-bottom:16px; color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
+.asset-browser__goto { display:flex; flex:0 1 380px; gap:8px; min-width:220px; }
+.asset-browser__goto :deep(svg) { width:var(--dv-icon-compact); height:var(--dv-icon-compact); }
 .asset-settings { display:grid; grid-template-columns:minmax(210px,.75fr) minmax(430px,1.5fr); gap:28px; align-items:end; padding:22px; }
 .asset-settings__intro { display:flex; align-items:flex-start; gap:12px; align-self:center; }
 .asset-settings__icon { width:36px; height:36px; border-radius:var(--dv-radius-graphic); }
@@ -444,6 +471,8 @@ function getFileExtension(filename: string): string {
 @media(max-width:760px) {
   .asset-browser__sidebar, .asset-browser__handle { display:none; }
   .asset-browser__main { padding:24px 20px 44px; }
+  .asset-browser__breadcrumb { flex-wrap:wrap; }
+  .asset-browser__goto { flex-basis:100%; }
   .asset-settings__fields { grid-template-columns:1fr; }
   .asset-grid--folders, .asset-grid--files, .asset-grid--sources { grid-template-columns:1fr; }
   .asset-card--file { display:grid; grid-template-columns:112px minmax(0,1fr); }

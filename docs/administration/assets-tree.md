@@ -3,7 +3,7 @@ title: Assets tree
 description: Inspect mirrored cloud folders, assign asset types and licences, and diagnose files that have not finished processing.
 sidebar:
   order: 7
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-27
 ---
 
 The Assets area is Damvia's mirror of the configured cloud sources. Administrators inspect it and classify folders; source files are added, moved, renamed and removed in Dropbox, OneDrive or Google Drive.
@@ -14,6 +14,8 @@ Open `/admin/assets`. Each configured source appears at the root with its latest
 
 - **Asset Type** controls record linkage, search defaults and file presentation.
 - **Licence** controls where and when non-admin users may see the files.
+
+To jump straight to a deep folder, paste its path in the field next to the breadcrumb, for example `SS26/SELL-OUT/PRODUCT VIDEOS/PAMPA FAMILY/9_16`, and press **Go**. The path is read inside the source you are in. Leading and trailing slashes, quotes, backslashes, letter case, the source name and the provider folders above the source root are all ignored, and a `dropbox.com/home/…` link works too. When part of the path does not exist, Damvia opens the deepest folder it found and names the first missing one.
 
 Choose values and press **Save** to apply them to that folder, all descendant folders and all files below it. New folders inherit from their parent; every source run refreshes each file from its current folder.
 
