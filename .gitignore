@@ -22,5 +22,21 @@ dist-ssr
 *.iml
 .env.*
 !.env.template
-/server/plans
 server/damvia.code-workspace
+
+# Local agent and assistant files
+CLAUDE.md
+.claude/
+GATES.md
+AGENTS.md
+
+# Test output
+test-results/
+playwright-report/
+coverage/
+
+# Backups and dumps
+*.bak
+*.orig
+*.dump
+docker-backups/
