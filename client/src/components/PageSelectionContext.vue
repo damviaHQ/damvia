@@ -23,6 +23,7 @@ const props = defineProps<{
   selectedCount: number
   selectableCount: number
   selectionLabel: string
+  copyPath?: boolean
 }>()
 defineEmits<{ toggle: [] }>()
 const isHovered = ref(false)
@@ -46,7 +47,7 @@ const selectionText = computed(() => {
       <ChevronRight aria-hidden="true" class="mx-2 size-4 shrink-0 text-neutral-500" />
     </template>
     <div class="collection__path flex min-w-0 items-center">
-      <PathBreadcrumb :items="items" />
+      <PathBreadcrumb :items="items" :copy-path="copyPath" />
     </div>
   </div>
 </template>

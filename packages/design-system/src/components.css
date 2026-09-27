@@ -73,7 +73,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>. */
 .dv-breadcrumb .dv-breadcrumb__current { color: var(--dv-text-primary, hsl(var(--foreground))); }
 .dv-breadcrumb .dv-breadcrumb__separator { color: inherit; }
 .dv-breadcrumb__list { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--dv-space-2, 8px); min-width: 0; margin: 0; padding: 0; overflow: hidden; list-style: none; color: var(--dv-text-secondary, inherit); font-size:var(--dv-size-body); }
-.dv-breadcrumb__item { display: inline-flex; align-items: center; min-width: 0; flex: 0 1 auto; }
+.dv-breadcrumb__item { display: inline-flex; align-items: center; min-width: 0; flex: 0 100 auto; }
+.dv-breadcrumb__item--current { flex-shrink: 1; }
 .dv-breadcrumb__link, .dv-breadcrumb__current { display: inline-flex; align-items: center; min-width: 0; padding: 4px 0; border: 0; border-radius: var(--dv-radius-control, 0); background: transparent; color: inherit; font: inherit; line-height: 1.4; text-decoration: none; }
 .dv-breadcrumb__link { cursor: pointer; font-weight:500; }
 .dv-breadcrumb__link:hover { color: var(--dv-text-primary, currentColor); }

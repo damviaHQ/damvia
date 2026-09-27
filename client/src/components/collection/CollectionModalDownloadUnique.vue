@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useCopyPath } from "@/composables/useCopyPath"
 import { useFileFavorites } from "@/composables/useFileFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { useRecordLabel } from "@/composables/useRecordLabel"
@@ -194,6 +195,11 @@ const breadcrumbItems = computed<PathBreadcrumbItem[]>(() => collectionPath.valu
   label: item.name,
   to: { name: 'collection', params: { id: item.id } },
 })))
+
+const copyPath = useCopyPath()
+const copyFilePath = () => {
+  if (currentFile.value && !props.recordId) copyPath([...collectionPath.value.map(item => item.name), currentFile.value.name])
+}
 
 const hasCollectionPath = computed(() => {
   const path = collectionPath.value
@@ -370,13 +376,14 @@ watch(() => props.modelValue, (newValue) => {
         <h2 id="gallery-modal-title" class="flex items-center">
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger class="flex items-center">
+              <TooltipTrigger class="flex items-center" :class="currentFile && !recordId && 'cursor-pointer'" @click="copyFilePath">
                 <span class="block text-[16px] font-semibold leading-6 truncate max-w-[300px] md:max-w-[400px]">
                   {{ truncateFileName(title) }}
                 </span>
               </TooltipTrigger>
               <TooltipContent>
                 <p>{{ title }}</p>
+                <p v-if="currentFile && !recordId" class="opacity-70">Click to copy the path</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -388,7 +395,7 @@ watch(() => props.modelValue, (newValue) => {
 
       <div class="flex items-center gap-2">
         <div v-if="hasCollectionPath" class="gallery-modal__breadcrumb [&_.dv-breadcrumb]:min-w-0 [&_.dv-breadcrumb]:max-w-full [font-size:0.875rem] [max-width:calc(100%_-_50px)] flex items-center">
-          <PathBreadcrumb :items="breadcrumbItems" :head-items="2" :tail-items="3" tone="light"
+          <PathBreadcrumb :items="breadcrumbItems" :head-items="2" :tail-items="3" tone="light" copy-path
             @navigate="$emit('update:modelValue', null)" />
         </div>
 

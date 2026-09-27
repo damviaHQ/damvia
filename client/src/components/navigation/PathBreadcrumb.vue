@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useCopyPath } from '@/composables/useCopyPath'
 import { collapseBreadcrumb, type BreadcrumbEllipsisNode, type BreadcrumbNode } from '@/utils/breadcrumb'
 import { computed, nextTick, onBeforeUnmount, ref, type ComponentPublicInstance } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
@@ -41,6 +42,7 @@ const props = withDefaults(defineProps<{
   headItems?: number
   tailItems?: number
   tone?: 'light' | 'dark'
+  copyPath?: boolean
 }>(), {
   headItems: 1,
   tailItems: 2,
@@ -56,6 +58,11 @@ const isEllipsis = (item: PathBreadcrumbItem | BreadcrumbEllipsisNode): item is 
 const itemTo = (item: PathBreadcrumbItem | BreadcrumbEllipsisNode) => 'to' in item ? item.to : undefined
 const navigate = (item: PathBreadcrumbItem | BreadcrumbEllipsisNode) => {
   if (!isEllipsis(item)) emit('navigate', item)
+}
+
+const copySegments = useCopyPath()
+const copyFullPath = () => {
+  if (props.copyPath) copySegments(props.items.map(item => item.label))
 }
 
 const labelElements = new Map<string, HTMLElement>()
@@ -103,7 +110,10 @@ onBeforeUnmount(() => labelResizeObserver?.disconnect())
   <Breadcrumb class="dv-breadcrumb min-w-0" :data-tone="tone">
     <BreadcrumbList class="dv-breadcrumb__list -m-1.5 flex-nowrap gap-2 p-1.5 text-body leading-5 sm:gap-2">
       <template v-for="(item, index) in collapsed.visibleItems" :key="item.id">
-        <BreadcrumbItem class="dv-breadcrumb__item min-w-0 gap-0">
+        <BreadcrumbItem
+          class="dv-breadcrumb__item gap-0"
+          :class="index === collapsed.visibleItems.length - 1 ? 'dv-breadcrumb__item--current min-w-0' : isEllipsis(item) ? 'shrink-0' : 'min-w-10'"
+        >
           <template v-if="isEllipsis(item)">
             <DropdownMenu>
               <DropdownMenuTrigger class="dv-breadcrumb__ellipsis" :aria-label="`Show ${collapsed.hiddenItems.length} hidden path items`">
@@ -134,7 +144,16 @@ onBeforeUnmount(() => labelResizeObserver?.disconnect())
                     :data-breadcrumb-label-id="item.id"
                   >{{ item.label }}</span>
                 </router-link>
-                <BreadcrumbPage v-else class="dv-breadcrumb__current font-semibold" :tabindex="isLabelTruncated(item.id) ? 0 : undefined">
+                <BreadcrumbPage
+                  v-else
+                  class="dv-breadcrumb__current font-semibold"
+                  :class="copyPath && 'cursor-pointer'"
+                  :role="copyPath ? 'button' : undefined"
+                  :title="copyPath ? 'Copy path' : undefined"
+                  :tabindex="copyPath || isLabelTruncated(item.id) ? 0 : undefined"
+                  @click="copyFullPath"
+                  @keydown.enter.prevent="copyFullPath"
+                >
                   <span
                     :ref="element => setLabelElement(item.id, element)"
                     class="dv-breadcrumb__label"

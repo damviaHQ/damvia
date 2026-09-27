@@ -175,7 +175,7 @@ async function removeSelectedRecords() {
       </DropdownMenu>
     </MainPageTools>
     <MainPageTools area="context">
-      <PageSelectionContext :items="breadcrumbItems" :selected-count="selection.length"
+      <PageSelectionContext :items="breadcrumbItems" copy-path :selected-count="selection.length"
         :selectable-count="selectable.length" selection-label="Select all items in this collection" @toggle="toggleSelection" />
     </MainPageTools>
     <MainPageTools area="filters">
