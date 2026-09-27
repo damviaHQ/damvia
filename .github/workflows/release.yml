@@ -1,0 +1,28 @@
+name: Release
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  # A CycloneDX software bill of materials for the server and the client,
+  # attached to the release so deployers can check what they run.
+  sbom:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - run: npm ci --prefix server --ignore-scripts
+      - run: npm ci --prefix client --ignore-scripts
+      - run: npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-file damvia-server-sbom.cdx.json
+        working-directory: server
+      - run: npx --yes @cyclonedx/cyclonedx-npm@6.0.1 --omit dev --output-file damvia-client-sbom.cdx.json
+        working-directory: client
+      - run: gh release upload "$TAG" server/damvia-server-sbom.cdx.json client/damvia-client-sbom.cdx.json --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}

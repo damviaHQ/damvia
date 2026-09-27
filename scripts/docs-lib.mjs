@@ -93,7 +93,7 @@ export function checkSource(root) {
     } catch (error) { errors.push(`${file}: ${error.message}`); }
   }
   const envDoc = readFileSync(path.join(docsRoot, 'reference/environment-variables.md'), 'utf8');
-  const sourceFiles = ['server/src', 'client/src'].flatMap(dir => walk(path.join(root, dir))).concat(readdirSync(path.join(root, 'client'), { withFileTypes: true }).filter(entry => entry.isFile()).map(entry => path.join(root, 'client', entry.name))).filter(file => /\.(?:ts|js|mjs|vue)$/.test(file));
+  const sourceFiles = ['server/src', 'client/src'].flatMap(dir => walk(path.join(root, dir))).concat(readdirSync(path.join(root, 'client'), { withFileTypes: true }).filter(entry => entry.isFile() && !['playwright.config.ts', 'vitest.config.ts'].includes(entry.name)).map(entry => path.join(root, 'client', entry.name))).filter(file => /\.(?:ts|js|mjs|vue)$/.test(file));
   const vars = new Set();
   for (const file of sourceFiles) {
     for (const match of readFileSync(file, 'utf8').matchAll(/(?:process\.env|import\.meta\.env)\.([A-Z][A-Z\d_]*)/g)) vars.add(match[1]);
