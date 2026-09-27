@@ -19,9 +19,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { planDropboxEntries, WHOLE_DROPBOX_ROOT } = require('../dist/asset-updater/dropbox-entries')
+const { dropbox: { folder, file } } = require('./lib/drivers.cjs')
 
-const folder = (id, p) => ({ '.tag': 'folder', id, name: p.split('/').pop(), path_lower: p.toLowerCase(), path_display: p })
-const file = (id, p, size = 10, hash = 'h') => ({ '.tag': 'file', id, name: p.split('/').pop(), path_lower: p.toLowerCase(), path_display: p, size, content_hash: hash })
 const listing = [
     file('f-nested', '/Marketing/Nested/photo.JPG', 10, 'hash-1'),
     folder('d-nested', '/Marketing/Nested'),

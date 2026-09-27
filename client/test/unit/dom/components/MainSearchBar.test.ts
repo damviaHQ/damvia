@@ -19,7 +19,7 @@ import { h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 
-vi.mock('@/services/server.ts', () => ({ trpc: { env: { query: vi.fn().mockResolvedValue({ appName: 'Damvia', recordLabel: { singular: 'Product', plural: 'Products' } }) }, assetType: { list: { query: vi.fn().mockResolvedValue([{ id: 't1', name: 'Packshot', includeInSearchByDefault: true }]) } } } }))
+vi.mock('@/services/server', () => ({ trpc: { env: { query: vi.fn().mockResolvedValue({ appName: 'Damvia', recordLabel: { singular: 'Product', plural: 'Products' } }) }, assetType: { list: { query: vi.fn().mockResolvedValue([{ id: 't1', name: 'Packshot', includeInSearchByDefault: true }]) } } } }))
 
 const { useGlobalStore } = await import('@/stores/globalStore')
 const { default: MainSearchBar } = await import('@/components/layout-main/MainSearchBar.vue')

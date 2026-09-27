@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { csvSafe, formatRecordValue, joinMulti, normaliseValue, splitMulti, valueError, type ValueField } from '@/utils/recordValues'
+import { csvSafe, fieldLabel, formatRecordValue, isSelect, joinMulti, normaliseValue, RECORD_VALUE_TYPES, splitMulti, valueError, type ValueField } from '@/utils/recordValues'
 
 const field = (valueType: ValueField['valueType'], options: string[] = []): ValueField => ({ name: 'f', displayName: 'Field', valueType, options })
 
@@ -50,5 +50,13 @@ describe('record values', () => {
 
   test('an exported cell never starts a formula', () => {
     expect(['=SUM(A1)', '+1', '-1', '@x', 'plain'].map(csvSafe)).toEqual(["'=SUM(A1)", "'+1", "'-1", "'@x", 'plain'])
+  })
+
+  test('only the two select types offer options, and a field shows its display name first', () => {
+    expect(RECORD_VALUE_TYPES.filter(isSelect)).toEqual(['single_select', 'multi_select'])
+    expect(fieldLabel({ name: 'colour', displayName: 'Colour' })).toBe('Colour')
+    expect(fieldLabel({ name: 'colour', displayName: '' })).toBe('colour')
+    expect(fieldLabel({ name: 'colour', displayName: null })).toBe('colour')
+    expect(fieldLabel({ name: 'colour' })).toBe('colour')
   })
 })

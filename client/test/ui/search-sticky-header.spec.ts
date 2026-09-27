@@ -1,23 +1,30 @@
-import { expect, test } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-for (const width of [1440, 390]) {
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { files as sampleFiles } from './lib/fixtures'
+import { expect, test } from './lib/trpc'
+
+// Forty results, enough to scroll the search page under its tools.
+const files = Array.from({ length: 40 }, (_, index) => ({ ...sampleFiles[index % sampleFiles.length], id: `file-${index}` }))
+const search = (results: typeof files, facets: Record<string, unknown>) => ({ total: results.length, page: 1, totalPages: 1, results, facets })
+
+for (const width of [1440, 768]) {
   for (const display of ['grid', 'list']) {
-    test(`shared search tools stay above scrolled results (${width}px, ${display})`, async ({ page }) => {
-      const errors: string[] = []
-      page.on('pageerror', error => errors.push(error.message))
+    test(`shared search tools stay above scrolled results (${width}px, ${display})`, async ({ page, mockTrpc, shot }) => {
       await page.setViewportSize({ width, height: 900 })
       await page.addInitScript(display => localStorage.setItem('dam_display_preferences', JSON.stringify({ photo: display })), display)
-      const source = responses['collection.findById'] as any
-      const files = Array.from({ length: 40 }, (_, index) => ({ ...source.files[index % source.files.length], id: `file-${index}` }))
-      await page.route('**/trpc/**', async route => {
-        const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-        const data = name === 'collection.search'
-          ? { total: files.length, page: 1, totalPages: 1, results: files, facets: { fileTypes: { image: files.length }, assetTypes: { photo: files.length }, productViews: {}, attributes: {} } }
-          : responses[name] ?? []
-        await route.fulfill({ json: { result: { data } } })
-      })
-      await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+      await mockTrpc({ 'collection.search': search(files, { fileTypes: { image: files.length }, assetTypes: { photo: files.length }, productViews: {}, attributes: {} }) })
       await page.goto('/search')
       const main = page.locator('main')
       const toolbar = page.getByRole('banner', { name: 'Page tools' })
@@ -33,41 +40,16 @@ for (const width of [1440, 390]) {
       await expect.poll(() => main.evaluate(element => element.scrollTop)).toBe(450)
       expect((await toolbar.boundingBox())!.y).toBe(toolbarBox.y)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-      if (width === 390) {
-        const left = page.getByRole('button', { name: 'Show filters to the left' })
-        const right = page.getByRole('button', { name: 'Show filters to the right' })
-        await expect(left).toBeDisabled()
-        await expect(right).toBeEnabled()
-        const first = (await page.locator('#search-file-type').boundingBox())!
-        const last = (await page.getByRole('button', { name: /^File size/ }).boundingBox())!
-        expect(Math.abs(first.y - last.y)).toBeLessThanOrEqual(1)
-        await right.click()
-        await expect(left).toBeEnabled()
-        await right.click()
-        await expect(right).toBeDisabled()
-        await left.click()
-        await expect(right).toBeEnabled()
-      }
-      await page.screenshot({ path: `/tmp/damvia-search-sticky-${width}-${display}.png` })
+      await shot(`search-sticky-${width}-${display}`)
       await preferences.click()
       await expect(page.getByRole('dialog')).toBeVisible()
       await page.keyboard.press('Escape')
-      expect(errors).toEqual([])
     })
   }
 }
 
-test('select all stays reachable in the sticky header while scrolling', async ({ page }) => {
-  const source = responses['collection.findById'] as any
-  const files = Array.from({ length: 40 }, (_, i) => ({ ...source.files[i % source.files.length], id: `file-${i}` }))
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.search'
-      ? { total: files.length, page: 1, totalPages: 1, results: files, facets: { fileTypes: { image: files.length }, assetTypes: { photo: files.length }, extensions: { jpg: files.length }, productViews: {}, attributes: {} } }
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
-  })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+test('select all stays reachable in the sticky header while scrolling', async ({ page, mockTrpc }) => {
+  await mockTrpc({ 'collection.search': search(files, { fileTypes: { image: files.length }, assetTypes: { photo: files.length }, extensions: { jpg: files.length }, productViews: {}, attributes: {} }) })
   await page.goto('/search?q=file')
   const toolbar = page.locator('#client-page-context')
   const selectAll = toolbar.getByRole('checkbox', { name: 'Select all results on this page', exact: true })
@@ -92,16 +74,8 @@ test('select all stays reachable in the sticky header while scrolling', async ({
   await expect(selectAll).not.toBeChecked()
 })
 
-test('the toolbar dropdowns align to the right and share one baseline and height', async ({ page }) => {
-  const source = responses['collection.findById'] as any
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.search'
-      ? { total: 8, page: 1, totalPages: 1, results: source.files, facets: { assetTypes: { photo: 8 }, fileTypes: { image: 8 }, extensions: { jpg: 6, png: 2 }, productViews: {}, attributes: {} } }
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
-  })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+test('the toolbar dropdowns align to the right and share one baseline and height', async ({ page, mockTrpc }) => {
+  await mockTrpc({ 'collection.search': search(sampleFiles, { assetTypes: { photo: 8 }, fileTypes: { image: 8 }, extensions: { jpg: 6, png: 2 }, productViews: {}, attributes: {} }) })
   await page.goto('/search?q=sand')
   await expect(page.getByText('8 results', { exact: true })).toBeVisible()
   const boxes = []

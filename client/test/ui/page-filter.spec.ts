@@ -1,9 +1,25 @@
-import { expect, test, type Page } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { type Page } from '@playwright/test'
+import { collection as source } from './lib/fixtures'
+import { addFilter } from './lib/page'
+import { expect, test, type MockTrpc } from './lib/trpc'
 
 // A page holding two asset types, three formats and two colours, so every facet
 // has something to narrow and sorting has something to reorder.
-const shot = (index: number, name: string, mimeType: string, type: 'photo' | 'render', colour: string, size: number) => ({
+const sample = (index: number, name: string, mimeType: string, type: 'photo' | 'render', colour: string, size: number) => ({
   id: `file-${index}`,
   name,
   size: String(size),
@@ -23,103 +39,107 @@ const shot = (index: number, name: string, mimeType: string, type: 'photo' | 're
 })
 
 const files = [
-  shot(0, 'Chair front.jpg', 'image/jpeg', 'photo', 'Sand', 3_000_000),
-  shot(1, 'Chair side.png', 'image/png', 'photo', 'Black', 900_000),
-  shot(2, 'Living room.jpg', 'image/jpeg', 'render', 'Sand', 12_000_000),
-  shot(3, 'Catalogue.pdf', 'application/pdf', 'render', 'Black', 400_000),
+  sample(0, 'Chair front.jpg', 'image/jpeg', 'photo', 'Sand', 3_000_000),
+  sample(1, 'Chair side.png', 'image/png', 'photo', 'Black', 900_000),
+  sample(2, 'Living room.jpg', 'image/jpeg', 'render', 'Sand', 12_000_000),
+  sample(3, 'Catalogue.pdf', 'application/pdf', 'render', 'Black', 400_000),
 ]
 
 const children = [
-  { ...(responses['collection.findById'] as any), id: 'child-chairs', name: 'Chair campaign', numberOfFiles: 4, files: [], children: [], page: null },
-  { ...(responses['collection.findById'] as any), id: 'child-tables', name: 'Table campaign', numberOfFiles: 2, files: [], children: [], page: null },
+  { ...source, id: 'child-chairs', name: 'Chair campaign', numberOfFiles: 4, files: [], children: [], page: null },
+  { ...source, id: 'child-tables', name: 'Table campaign', numberOfFiles: 2, files: [], children: [], page: null },
 ]
 
-async function fixture(page: Page) {
-  const source = responses['collection.findById'] as any
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const id = new URL(route.request().url()).searchParams.get('input')
+function fixture(mockTrpc: MockTrpc) {
+  return mockTrpc({
     // The second collection holds a single file, to prove the values reset on the way in.
-    const other = id?.includes('child-tables')
-    const data = name === 'collection.findById'
-      ? other
-        ? { ...source, id: 'child-tables', name: 'Table campaign', files: [files[3]], children: [], page: null }
-        : { ...source, files, children, page: null }
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
+    'collection.findById': (id: string) => id === 'child-tables'
+      ? { ...source, id: 'child-tables', name: 'Table campaign', files: [files[3]], children: [], page: null }
+      : { ...source, files, children, page: null },
   })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: new URL(test.info().project.use.baseURL!).hostname, path: '/' }])
 }
 
 const cards = (page: Page) => page.locator('article:has(button[aria-label^="Preview "])')
-const funnel = (page: Page) => page.getByRole('button', { name: 'Filters', exact: true })
-
-// The funnel offers the page's filters; only the ticked ones reach the bar.
-async function activate(page: Page, ...names: string[]) {
-  await funnel(page).click()
-  const picker = page.getByRole('dialog', { name: 'Filters' })
-  for (const name of names) await picker.getByRole('checkbox', { name, exact: true }).click()
-  await page.keyboard.press('Escape')
-}
-
-test('nothing shows until a filter is chosen, and a choice stays across reloads and collections', async ({ page }) => {
-  await fixture(page)
+test('hover opens filter values and allows direct selection', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc)
   await page.goto('/collections/campaign')
-  const bar = page.getByRole('search', { name: 'Filter this page' })
-  const name = page.getByRole('textbox', { name: 'Filter by name' })
-  await expect(bar).toHaveCount(0)
-
-  // The funnel lists what this page can be filtered by, and nothing is on by default.
-  await funnel(page).click()
-  const picker = page.getByRole('dialog', { name: 'Filters' })
-  for (const choice of ['Name', 'Asset type', 'File type', 'Format', 'Colour']) {
-    await expect(picker.getByRole('checkbox', { name: choice, exact: true })).not.toBeChecked()
-  }
-  await picker.getByRole('checkbox', { name: 'Name', exact: true }).click()
+  await page.getByRole('button', { name: 'Add filter', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: 'Add filter', exact: true })
+  await picker.getByRole('button', { name: 'Format', exact: true }).hover()
+  await expect(page.getByRole('dialog', { name: 'Format', exact: true })).toBeVisible()
+  await picker.getByRole('button', { name: 'Asset type', exact: true }).hover()
+  await expect(page.getByRole('dialog', { name: 'Format', exact: true })).toHaveCount(0)
+  const values = page.getByRole('dialog', { name: 'Asset type', exact: true })
+  await values.getByRole('checkbox', { name: 'Renders' }).click()
+  await expect(cards(page)).toHaveCount(2)
+  await expect(page.getByRole('button', { name: 'Asset type, Renders' })).toBeVisible()
+  await expect(values).toBeVisible()
+  await values.getByRole('checkbox', { name: 'Photography' }).click()
+  await expect(cards(page)).toHaveCount(4)
+  await values.getByRole('checkbox', { name: 'Renders' }).click()
+  await expect(cards(page)).toHaveCount(2)
   await page.keyboard.press('Escape')
-
-  // Only the ticked one is drawn: the other facets stay off the bar.
-  await expect(bar).toBeVisible()
-  await expect(name).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Asset type,/ })).toHaveCount(0)
-
-  await page.reload()
-  await expect(name).toBeVisible()
-  await page.goto('/collections/child-tables')
-  await expect(name).toBeVisible()
-  // The values describe the collection being read, so they do not travel with it.
-  await expect(name).toHaveValue('')
-
-  await page.goto('/collections/campaign')
-  await activate(page, 'Name')
-  await expect(bar).toHaveCount(0)
-  await page.reload()
-  await expect(bar).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Add filter', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Asset type, Photography' })).toBeVisible()
 })
 
-test('taking a filter off the bar takes its values with it', async ({ page }) => {
-  await fixture(page)
+test('name is always visible and Save persists dimensions without values', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc)
   await page.goto('/collections/campaign')
-  await activate(page, 'Asset type')
+  const name = page.getByRole('textbox', { name: 'Filter by name' })
+  await expect(name).toBeVisible()
+  await addFilter(page, 'Asset type')
+  await page.reload()
+  await expect(page.getByRole('button', { name: /^Asset type,/ })).toHaveCount(0)
+  await addFilter(page, 'Asset type')
+  await page.getByRole('button', { name: /^Asset type,/ }).click()
+  await page.getByRole('checkbox', { name: 'Renders' }).click()
+  await page.keyboard.press('Escape')
+  await name.fill('Living')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+  await name.fill('Chair')
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('dam_page_filters')!))).toEqual(['assetTypes'])
+  await page.reload()
+  await expect(name).toHaveValue('')
+  await expect(page.getByRole('button', { name: 'Asset type, Any' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+  await addFilter(page, 'Format')
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Remove Format filter' }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+  await expect(cards(page)).toHaveCount(4)
+  await page.goto('/collections/child-tables')
+  await expect(name).toBeVisible()
+  await expect(name).toHaveValue('')
+})
+
+test('Clear resets values and removing a filter also clears its values', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc)
+  await page.goto('/collections/campaign')
+  await addFilter(page, 'Asset type')
   await page.getByRole('button', { name: /^Asset type,/ }).click()
   await page.getByRole('checkbox', { name: 'Renders' }).click()
   await page.keyboard.press('Escape')
   await expect(cards(page)).toHaveCount(2)
-  // The funnel says how many values that filter is holding.
-  await funnel(page).click()
-  await expect(page.getByRole('dialog', { name: 'Filters' }).getByRole('checkbox', { name: 'Asset type', exact: true })).toBeChecked()
+  await page.getByRole('button', { name: 'Clear', exact: true }).click()
+  await expect(cards(page)).toHaveCount(4)
+  await expect(page.getByRole('button', { name: 'Asset type, Any' })).toBeVisible()
+  await page.getByRole('button', { name: /^Asset type,/ }).click()
+  await page.getByRole('checkbox', { name: 'Renders' }).click()
   await page.keyboard.press('Escape')
-
-  await activate(page, 'Asset type')
-  await expect(page.getByRole('search', { name: 'Filter this page' })).toHaveCount(0)
-  // A filter nobody can see must not keep narrowing the page.
+  await page.getByRole('button', { name: 'Remove Asset type filter' }).click()
+  await expect(page.getByRole('button', { name: /^Asset type,/ })).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: 'Filter by name' })).toBeVisible()
   await expect(cards(page)).toHaveCount(4)
 })
 
-test('orientation filters files by their dimensions', async ({ page }) => {
-  await fixture(page)
+test('orientation filters files by their dimensions', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc)
   await page.goto('/collections/campaign')
-  await activate(page, 'Orientation')
+  await addFilter(page, 'Orientation')
   await page.getByRole('button', { name: /^Orientation,/ }).click()
   await page.getByRole('checkbox', { name: 'Portrait' }).click()
   await page.keyboard.press('Escape')
@@ -132,10 +152,10 @@ test('orientation filters files by their dimensions', async ({ page }) => {
   await expect(cards(page)).toHaveCount(4)
 })
 
-test('a name narrows the files and the sub-collections at once, and empty sections go away', async ({ page }) => {
-  await fixture(page)
+test('a name narrows the files and the sub-collections at once, and empty sections go away', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc)
   await page.goto('/collections/campaign')
-  await activate(page, 'Name')
+  await addFilter(page, 'Name')
   await expect(cards(page)).toHaveCount(4)
   await expect(page.getByRole('link', { name: 'Open Chair campaign' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Open Table campaign' })).toBeVisible()
@@ -157,10 +177,10 @@ test('a name narrows the files and the sub-collections at once, and empty sectio
   await expect(cards(page)).toHaveCount(4)
 })
 
-test('a selected filter narrows the files and can be cleared, in grid, masonry and list alike', async ({ page }) => {
-  await fixture(page)
+test('a selected filter narrows the files and can be cleared, in grid, masonry and list alike', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc)
   await page.goto('/collections/campaign')
-  await activate(page, 'Asset type')
+  await addFilter(page, 'Asset type')
 
   await page.getByRole('button', { name: /^Asset type,/ }).click()
   await page.getByRole('checkbox', { name: 'Renders' }).click()
@@ -187,8 +207,8 @@ test('a selected filter narrows the files and can be cleared, in grid, masonry a
   await expect(page.getByRole('button', { name: 'Asset type, Any' })).toBeVisible()
 })
 
-test('a list column header sorts, and size sorts by its bytes rather than its text', async ({ page }) => {
-  await fixture(page)
+test('a list column header sorts, and size sorts by its bytes rather than its text', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc)
   await page.goto('/collections/campaign')
   await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
   await page.getByRole('dialog', { name: 'Display preferences' }).getByRole('tab', { name: 'List', exact: true }).click()
@@ -217,25 +237,26 @@ test('a list column header sorts, and size sorts by its bytes rather than its te
   expect(await names()).toEqual(['Catalogue.pdf', 'Chair side.png', 'Chair front.jpg', 'Living room.jpg'])
 })
 
-for (const width of [1440, 900, 390]) {
-  test(`filter overflow is confined to the horizontal rail at ${width}px`, async ({ page }) => {
+for (const width of [1440, 900, 768]) {
+  test(`filters wrap without horizontal overflow at ${width}px`, async ({ page, mockTrpc }) => {
     await page.setViewportSize({ width, height: 700 })
-    await fixture(page)
+    await fixture(mockTrpc)
     await page.goto('/collections/campaign')
-    await activate(page, 'Name', 'Asset type', 'File type', 'Format', 'Colour')
-    const rail = page.locator('.filter-rail-viewport')
+    await addFilter(page, 'Name', 'Asset type', 'File type', 'Format', 'Colour')
+    const rail = page.locator('.filter-rail')
     await expect(rail).toBeVisible()
     const dimensions = await page.evaluate(() => {
       const measure = (el: Element) => ({ x: el.scrollWidth - el.clientWidth, y: el.scrollHeight - el.clientHeight })
       return {
         document: measure(document.documentElement),
         main: measure(document.querySelector('main')!),
-        rail: measure(document.querySelector('.filter-rail-viewport')!),
+        rail: measure(document.querySelector('.filter-rail')!),
       }
     })
     expect(dimensions.document).toEqual({ x: 0, y: 0 })
     expect(dimensions.main.x).toBe(0)
     expect(dimensions.rail.y).toBe(0)
-    if (width < 1000) expect(dimensions.rail.x).toBeGreaterThan(0)
+    expect(dimensions.rail.x).toBe(0)
+    if (width < 1000) expect((await rail.boundingBox())!.height).toBeGreaterThan(50)
   })
 }

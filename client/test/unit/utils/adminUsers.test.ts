@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { canApproveUser, canDeleteUser, canEditUser, csvCell, filterUsers, userState, usersCsv, type AdminUser, type UserFilters } from '@/utils/adminUsers.ts'
+import { canApproveUser, canDeleteUser, canEditUser, canManageAccount, csvCell, filterUsers, userState, userStateLabels, usersCsv, type AdminUser, type UserFilters } from '@/utils/adminUsers'
 
 const base = { name: 'Alex', company: 'Studio', email: 'alex@example.test', regionId: 'eu', region: 'Europe', role: 'member', groups: [], approved: true, emailVerified: true, createdAt: '2026-09-01T00:00:00Z' }
 const users = [
@@ -63,5 +63,24 @@ describe('admin user helpers', () => {
     expect(csv).toContain('"\'=HYPERLINK(""bad"")"')
     expect(csv).toContain('"Retail"')
     expect(csv).not.toContain('maintenanceContact')
+  })
+
+  test('suspending, signing out and resets follow who may delete the account', () => {
+    const manager = viewer({ id: 'manager', role: 'manager', regionId: 'eu' })
+    const admin = viewer({ id: 'admin', role: 'admin', regionId: 'us' })
+    expect(canManageAccount(admin, users[0])).toBe(true)
+    expect(canManageAccount(admin, users[2])).toBe(true)
+    expect(canManageAccount(admin, { ...users[0], id: 'admin', role: role('admin') })).toBe(false)
+    expect(canManageAccount(manager, users[0])).toBe(true)
+    expect(canManageAccount(manager, users[2])).toBe(false)
+    expect(canManageAccount(manager, { ...users[0], role: role('admin') })).toBe(false)
+    expect(canManageAccount(manager, { ...users[0], id: 'manager', role: role('manager') })).toBe(false)
+    expect(canManageAccount(undefined, users[0])).toBe(false)
+    for (const user of users) expect(canManageAccount(manager, user)).toBe(canDeleteUser(manager, user))
+  })
+
+  test('every state has a label', () => {
+    expect(userStateLabels).toEqual({ active: 'Active', pending: 'Needs approval', unverified: 'Unverified' })
+    for (const user of users) expect(userStateLabels[userState(user)]).toBeTruthy()
   })
 })

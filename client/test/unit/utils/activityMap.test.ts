@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
 import geography from '@/assets/maps/world.json'
-import { clusterLocations, locateRegions, type Geography } from '@/utils/activityMap.ts'
+import { clusterLocations, locateRegions, type Geography } from '@/utils/activityMap'
 
 const world = geography as Geography[]
 const activity = (name: string, count = 3) => ({ name, activeUsers: count, downloads: count * 2, views: count * 4 })

@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { clearRecentSearches, listRecentSearches, RECENT_SEARCH_MAX_LENGTH, RECENT_SEARCHES_KEY, RECENT_SEARCHES_LIMIT, rememberSearch } from '@/utils/recentSearches.ts'
+import { clearRecentSearches, listRecentSearches, RECENT_SEARCH_MAX_LENGTH, RECENT_SEARCHES_KEY, RECENT_SEARCHES_LIMIT, rememberSearch } from '@/utils/recentSearches'
 
 function memoryStorage(initial: Record<string, string> = {}): Storage {
   const data = new Map(Object.entries(initial))

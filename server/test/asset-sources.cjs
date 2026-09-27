@@ -27,10 +27,10 @@ const { AssetFolder, AssetFile } = harness.entities
 const { upsertFolder, upsertFile, adoptUnassignedAssets, renameAssetSource, removeAssetSource, listAssetSourceKeys, staleAssetSourceKeys, summarizeAssetSources, registerAssetSources, recordAssetSourceRun, assetSourceStatuses, processDeletion } = harness.services.assets
 const OneDriveAssetUpdater = require('../dist/asset-updater/one-drive').default
 const DropboxAssetUpdater = require('../dist/asset-updater/dropbox').default
+const { oneDrive: { ref } } = require('./lib/drivers.cjs')
 before(async () => { await harness.setup() })
 after(() => harness.teardown())
 
-const ref = (id) => ({ driveId: 'drive', id })
 const oneDrive = (source, feed) => {
     const updater = new OneDriveAssetUpdater(source, 'tenant', 'client', 'secret', 'user@example.test', 'root:/Marketing:')
     const pages = [feed]

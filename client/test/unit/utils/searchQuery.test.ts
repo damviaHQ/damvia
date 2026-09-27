@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { activeFilters, clearFilterQuery, formatSizeRange, parseQueryParts, parseSearchQuery, patchSearchQuery, queryValueToArray, toggleQueryValue } from '@/utils/searchQuery.ts'
+import { activeFilters, applyFilterDraft, bytesToMegabytes, clearFilterQuery, filterDraft, formatDateRange, formatSizeRange, megabytesToBytes, parseQueryParts, parseSearchQuery, patchSearchQuery, queryValueToArray, queryValueToString, toSearchScope, toggleQueryValue } from '@/utils/searchQuery'
 
 describe('search query parsing', () => {
   test('query values become string arrays', () => {
@@ -102,5 +102,61 @@ describe('search query parsing', () => {
       { key: 'size', value: '2 to 50 MB', group: 'size' },
       { key: 'attributes[color]', value: 'red', group: 'attribute', attributeId: 'color' },
     ])
+  })
+})
+
+describe('filter drafts', () => {
+  const desktopUrl = {
+    q: 'AB-12 CD-34', from_collection: 'c1', search_scope: 'current_with_sub', kind: 'files', page: '3',
+    asset_types: ['t1', 't2'], extensions: 'pdf', size_min: '2', 'attributes[a1]': ['Red', 'Blue'],
+    'metadata[m1]': 'Paris', 'metadata_from[d1]': '2026-01-01', 'axes[x1]': 'L', sort: 'newest', exact_match: 'true',
+  }
+
+  test('a complex desktop search keeps every criterion through a draft and back', () => {
+    const draft = filterDraft(desktopUrl)
+    expect(draft).not.toHaveProperty('q')
+    expect(draft).not.toHaveProperty('from_collection')
+    const { page: _page, ...withoutPage } = desktopUrl
+    expect(applyFilterDraft(desktopUrl, draft)).toEqual(withoutPage)
+    expect(parseSearchQuery(applyFilterDraft(desktopUrl, draft), 'all')).toEqual({ ...parseSearchQuery(desktopUrl, 'all'), page: undefined })
+  })
+
+  test('applying replaces the filters but keeps terms and scope', () => {
+    const next = applyFilterDraft(desktopUrl, { file_types: 'image' })
+    expect(next).toEqual({ q: 'AB-12 CD-34', from_collection: 'c1', search_scope: 'current_with_sub', kind: 'files', file_types: 'image' })
+  })
+
+  test('only a known scope is accepted', () => {
+    expect(toSearchScope('current_with_sub')).toBe('current_with_sub')
+    expect(toSearchScope('all')).toBe('all')
+    for (const value of ['everywhere', '', null, undefined, 1, ['all']]) expect(toSearchScope(value)).toBeUndefined()
+  })
+
+  test('sizes travel in megabytes and come back rounded to two decimals', () => {
+    expect(megabytesToBytes('2')).toBe(2 * 1024 * 1024)
+    expect(megabytesToBytes(0.5)).toBe(524288)
+    expect(megabytesToBytes('1.5 MB')).toBe(1572864)
+    expect(megabytesToBytes('0')).toBe(0)
+    for (const value of ['-1', 'large', '', null, undefined, Number.NaN, Number.POSITIVE_INFINITY]) expect(megabytesToBytes(value)).toBeUndefined()
+    expect(bytesToMegabytes(undefined)).toBe('')
+    expect(bytesToMegabytes(0)).toBe('0')
+    expect(bytesToMegabytes(2 * 1024 * 1024)).toBe('2')
+    expect(bytesToMegabytes(1234567)).toBe('1.18')
+    expect(bytesToMegabytes(megabytesToBytes('12.34'))).toBe('12.34')
+  })
+
+  test('a repeated scalar param keeps its first value', () => {
+    expect(queryValueToString(['first', 'second'])).toBe('first')
+    expect(queryValueToString([null, 'second'])).toBe('second')
+    expect(queryValueToString('only')).toBe('only')
+    expect(queryValueToString(undefined)).toBeUndefined()
+    expect(queryValueToString(null)).toBeUndefined()
+    expect(queryValueToString([])).toBeUndefined()
+  })
+
+  test('a date range reads as a sentence whichever end is open', () => {
+    expect(formatDateRange({ from: '2026-01-01', to: '2026-12-31' })).toBe('2026-01-01 to 2026-12-31')
+    expect(formatDateRange({ from: '2026-01-01' })).toBe('From 2026-01-01')
+    expect(formatDateRange({ to: '2026-12-31' })).toBe('Until 2026-12-31')
   })
 })

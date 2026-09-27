@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
+const { readFileSync, rmSync } = require('node:fs')
 const { readdir } = require('node:fs/promises')
 const { Readable } = require('node:stream')
 const harness = require('./lib/helpers.cjs')
@@ -26,10 +27,10 @@ const { db, state, makeCollection } = harness
 const { AssetFolder, AssetFile } = harness.entities
 const { upsertFolder, upsertFile, tmpDir, adoptUnassignedAssets } = harness.services.assets
 const OneDriveAssetUpdater = require('../dist/asset-updater/one-drive').default
+const { oneDrive: { ref } } = require('./lib/drivers.cjs')
 before(async () => { await harness.setup() })
 after(() => harness.teardown())
 
-const ref = (id) => ({ driveId: 'drive', id })
 const updaterFor = (pages) => {
     const updater = new OneDriveAssetUpdater({ key: 'onedrive' }, 'tenant', 'client', 'secret', 'user@example.test', 'root')
     const queue = pages.map((value, i) => ({ value, '@odata.nextLink': i < pages.length - 1 ? `/next/${i + 1}` : undefined }))
@@ -162,7 +163,13 @@ test('files absent from a non-empty feed are legitimately marked for deletion', 
 test('a failing startup check is logged and never rejects, so the API keeps serving', async () => {
     const updater = updaterFor([])
     updater.graphClient = { api: () => ({ get: async () => { throw new Error('invalid_client') } }) }
-    await updater.initialize()
+    const logged = []
+    const original = harness.env.logger.error
+    harness.env.logger.error = (...args) => { logged.push(args) }
+    try {
+        assert.equal(await updater.initialize(), undefined)
+    } finally { harness.env.logger.error = original }
+    assert.deepEqual(logged, [['OneDrive drive check failed, the sync will retry every run', { error: 'invalid_client' }]])
 })
 
 test('a download failure surfaces the Graph error and leaves no temporary file behind', async () => {
@@ -177,6 +184,6 @@ test('a successful download streams the content into a temporary file', async ()
     const updater = updaterFor([])
     updater.graphClient = { api: () => ({ getStream: async () => Readable.from(['one', 'drive']) }) }
     const path = await updater.fetchFileContent({ externalId: 'x' })
-    assert.equal(require('node:fs').readFileSync(path, 'utf8'), 'onedrive')
-    require('node:fs').rmSync(path)
+    assert.equal(readFileSync(path, 'utf8'), 'onedrive')
+    rmSync(path)
 })

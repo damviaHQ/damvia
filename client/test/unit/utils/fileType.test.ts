@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { isExcel, isFontFile, isPdf, isPowerPoint, isPsd, isTextFile, isVectorFile, isVideoFile, isWord } from '@/utils/fileType.ts'
+import { fileTypeOf, isExcel, isFontFile, isPdf, isPowerPoint, isPsd, isTextFile, isVectorFile, isVideoFile, isWord } from '@/utils/fileType'
 
 const file = (name: string, mimeType = 'application/octet-stream') => ({ name, mimeType })
 
@@ -40,5 +40,19 @@ describe('file type predicates', () => {
     for (const sample of [file('photo.jpg', 'image/jpeg'), file('brief.pdf', 'application/pdf'), file('clip.mp4', 'video/mp4'), file('data.xlsx')]) {
       expect(predicates.filter(predicate => predicate(sample)).length).toBeLessThanOrEqual(1)
     }
+  })
+
+  test('a file falls in one search bucket, read from its mime type alone', () => {
+    expect(fileTypeOf({ mimeType: 'image/jpeg' })).toBe('image')
+    expect(fileTypeOf({ mimeType: 'IMAGE/PNG' })).toBe('image')
+    expect(fileTypeOf({ mimeType: 'video/quicktime' })).toBe('video')
+    expect(fileTypeOf({ mimeType: 'application/mp4' })).toBe('video')
+    for (const mimeType of ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-powerpoint']) {
+      expect(fileTypeOf({ mimeType })).toBe('document')
+    }
+    expect(fileTypeOf({ mimeType: 'application/zip' })).toBe('other')
+    expect(fileTypeOf({ mimeType: 'text/plain' })).toBe('other')
+    expect(fileTypeOf({ mimeType: null })).toBe('other')
+    expect(fileTypeOf({})).toBe('other')
   })
 })

@@ -14,10 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
-const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
-const { db, state, save, makeUser, makeCollection, makeFolder, makeFile } = harness
-const { CollectionFile, AssetType, DataRecord, RecordAttribute } = harness.entities
+const { db, save, makeUser, makeCollection, makeFolder, makeFile } = harness
+const { CollectionFile, AssetType, DataRecord, RecordAttribute, Group, UserGroup } = harness.entities
 const { caller } = harness
 let fixtures, root, child, color, related, unrelated, colorAttr, sizeAttr
 const names = result => result.results.map(file => file.name).sort()
@@ -224,4 +223,31 @@ test('a multi-select field filters and counts each of its options', async () => 
     assert.deepEqual((await searchAs({})).facets.attributes[tags.id], { eco: 2, sale: 1 })
     assert.deepEqual(names(await searchAs({ attributes: { [tags.id]: ['sale'] } })), ['notes.txt'])
     assert.deepEqual(names(await searchAs({ attributes: { [tags.id]: ['eco'] } })), ['blue-cap.png', 'notes.txt'])
+})
+
+async function linkedRecord(admin, key, values, collectionExtra = {}) {
+    await admin.record.create({ recordKey: key, values })
+    const [{ id }] = await db.query('SELECT id FROM records WHERE record_key = $1', [key])
+    const folder = await makeFolder()
+    const collection = await makeCollection({ assetFolderId: folder.id, ...collectionExtra })
+    const file = await makeFile(folder, { recordId: id })
+    await save(CollectionFile, { collectionId: collection.id, assetFileId: file.id })
+}
+
+test('A6 + B3: hidden fields are not searchable, and filter values come from visible files only', async () => {
+    const admin = caller(fixtures.admin)
+    const restricted = await save(Group, { name: 'Facet insiders' })
+    await admin.recordAttribute.create({ name: 'tone', displayName: 'Tone', valueType: 'text', facetable: true, viewable: true, searchable: true })
+    await admin.recordAttribute.create({ name: 'internal', displayName: 'Internal', valueType: 'text', facetable: false, viewable: false, searchable: true })
+    await linkedRecord(admin, 'FACET-OPEN', { tone: 'Openblue', internal: 'zzinternalcode' })
+    await linkedRecord(admin, 'FACET-HIDDEN', { tone: 'Secretred' }, { limitedToGroupIds: [restricted.id] })
+    const facets = await caller(fixtures.member).recordAttribute.listFacets()
+    const tone = facets.find(facet => facet.name === 'tone')
+    assert.deepEqual(tone.values, ['Openblue'])
+    assert.equal(facets.some(facet => facet.name === 'internal'), false)
+    const found = await caller(fixtures.member).collection.search({ page: 1, query: 'zzinternalcode' })
+    assert.equal(found.total, 0)
+    const insider = await makeUser()
+    await save(UserGroup, { userId: insider.id, groupId: restricted.id })
+    assert.deepEqual((await caller(insider).recordAttribute.listFacets()).find(facet => facet.name === 'tone').values, ['Openblue', 'Secretred'])
 })

@@ -1,18 +1,26 @@
-import { expect, test } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-test('account panels keep aligned controls, visible headings and contained navigation', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'assetType.list' ? ['Events', 'Products', 'Photography'].map((label, i) => ({ ...(responses[name] as any[])[0], id: `type-${i}`, name: label }))
-      : name === 'download.list' ? [{ id: 'download-1', createdAt: '2026-09-19', expiresAt: '2026-09-26', status: 'completed', fileCount: 12, url: 'https://example.test/download' }]
-      : name === 'collection.invitation.getUserInvitations' ? [{ id: 'invite-1', createdAt: '2026-09-19', expiresAt: '2099-09-26', email: 'alexandra.morgan@example.test', collection: { id: 'campaign', name: 'Autumn essentials campaign', public: true } }]
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { assetType, collection, user } from './lib/fixtures'
+import { expect, test } from './lib/trpc'
+
+test('account panels keep aligned controls, visible headings and contained navigation', async ({ page, mockTrpc, shot }) => {
+  await mockTrpc({
+    'assetType.list': ['Events', 'Products', 'Photography'].map((label, i) => ({ ...assetType, id: `type-${i}`, name: label })),
+    'download.list': [{ id: 'download-1', createdAt: '2026-09-19', expiresAt: '2026-09-26', status: 'completed', fileCount: 12, url: 'https://example.test/download' }],
+    'collection.invitation.getUserInvitations': [{ id: 'invite-1', createdAt: '2026-09-19', expiresAt: '2099-09-26', email: 'alexandra.morgan@example.test', collection: { id: 'campaign', name: 'Autumn essentials campaign', public: true } }],
   })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
   await page.goto('/collections/campaign')
   await page.getByRole('button', { name: 'My account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Display preferences', exact: true }).click()
@@ -25,7 +33,7 @@ test('account panels keep aligned controls, visible headings and contained navig
   }))
   expect(new Set(rows.map(row => row.x)).size).toBe(1)
   expect(await dialog.locator('aside').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
-  await page.screenshot({ path: '/tmp/damvia-account-display.png' })
+  await shot('account-display')
   for (const panel of ['Profile', 'Downloads', 'Links']) {
     await dialog.getByRole('tab', { name: panel, exact: true }).click()
     await expect(dialog.getByRole('heading', { name: panel, exact: true })).toBeVisible()
@@ -37,33 +45,26 @@ test('account panels keep aligned controls, visible headings and contained navig
     expect(hovered).not.toBe('rgba(0, 0, 0, 0)')
     if (panel === 'Links') expect(await dialog.locator('table').evaluate(element => element.scrollWidth <= element.parentElement!.clientWidth)).toBe(true)
     await expect(dialog.locator('[data-account-content]')).not.toContainText('Loading')
-    await page.screenshot({ path: `/tmp/damvia-account-${panel.toLowerCase()}.png` })
+    await shot(`account-${panel.toLowerCase()}`)
     if (panel === 'Profile') {
       await dialog.getByRole('button', { name: 'Delete account', exact: true }).click()
       await expect(page.getByRole('alertdialog')).toBeVisible()
-      await page.screenshot({ path: '/tmp/damvia-review-delete-account.png' })
+      await shot('review-delete-account')
       await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click()
     }
   }
-  expect(errors).toEqual([])
 })
 
-test('client dialogs and nested content have readable headings and contained layouts', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
+test('client dialogs and nested content have readable headings and contained layouts', async ({ page, mockTrpc, shot }) => {
   let editor = false
-  const collection = responses['collection.findById'] as any
   const license = { id: 'license', name: 'Campaign license', scopes: [], details: '<p>Approved campaign use only.</p><ul><li>Keep the original credits.</li></ul>' }
-  const files = collection.files.map((file: any) => ({ ...file, license }))
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.findById' ? { ...collection, files, canEdit: true, limitedToGroupIds: [], invitations: [], page: editor ? { id: 'page', blocks: [] } : null }
-      : name === 'user.me' ? { ...(responses[name] as object), role: 'admin', company: 'Studio' }
-      : name === 'collection.getFiles' ? { files, licenses: [license], recordCount: 0, columns: [], previewRows: [], previewPictures: [], viewsEnabled: false }
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
+  const files = collection.files.map(file => ({ ...file, license }))
+  await mockTrpc({
+    'collection.findById': () => ({ ...collection, files, canEdit: true, limitedToGroupIds: [], invitations: [], page: editor ? { id: 'page', blocks: [] } : null }),
+    'user.me': { ...user, role: 'admin', company: 'Studio' },
+    'collection.getFiles': { files, licenses: [license], recordCount: 0, columns: [], previewRows: [], previewPictures: [], viewsEnabled: false },
+    'collection.lastAddedFiles': files,
   })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
   await page.goto('/collections/campaign')
   await page.getByRole('button', { name: 'My account', exact: true }).click()
   const accountMenu = page.getByRole('menu')
@@ -72,10 +73,10 @@ test('client dialogs and nested content have readable headings and contained lay
     await expect(item).toHaveCSS('height', '36px')
     expect(await item.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   }
-  await page.screenshot({ path: '/tmp/damvia-account-menu.png' })
+  await shot('account-menu')
   await page.keyboard.press('Escape')
   const capture = async (name: string) => {
-    await page.screenshot({ path: `/tmp/damvia-review-${name}.png` })
+    await shot(`review-${name}`)
     for (const dialog of await page.getByRole('dialog').all()) {
       expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
     }
@@ -122,5 +123,4 @@ test('client dialogs and nested content have readable headings and contained lay
     await page.getByRole('button', { name: new RegExp(`^${block} `) }).click()
     await capture(`editor-${block.toLowerCase().replace(' ', '-')}`)
   }
-  expect(errors).toEqual([])
 })

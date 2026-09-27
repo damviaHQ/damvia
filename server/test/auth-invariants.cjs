@@ -16,8 +16,8 @@ const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const harness = require('./lib/helpers.cjs')
 const { appRouter, caller, makeUser } = harness
-const PUBLIC = ['env', 'user.create', 'user.login', 'user.sendResetPasswordEmail', 'user.resetPassword', 'settings.getClientLogo', 'settings.getAuthBackgroundImage']
-const ACCOUNT_MANAGEMENT = ['user.me', 'user.updateProfile', 'user.verifyEmail', 'user.removeAccount', 'user.resendVerificationEmail', 'recordAttribute.listFacets', 'collection.invitation.getUserInvitations']
+const PUBLIC = ['env', 'user.create', 'auth.login', 'auth.verifyMfa', 'auth.exchangeLink', 'auth.exchangeInvitation', 'auth.upgradeLegacyToken', 'auth.logout', 'user.sendResetPasswordEmail', 'user.resetPassword', 'settings.getClientLogo', 'settings.getAuthBackgroundImage']
+const ACCOUNT_MANAGEMENT = ['user.me', 'user.updateProfile', 'user.verifyEmail', 'user.removeAccount', 'user.resendVerificationEmail', 'user.exportMyData', 'auth.sessions', 'auth.revokeSession', 'auth.revokeOtherSessions', 'auth.mfaSetup', 'auth.mfaEnable', 'auth.mfaDisable', 'auth.mfaRegenerateRecoveryCodes', 'collection.invitation.getUserInvitations']
 const paths = Object.keys(appRouter._def.procedures)
 const call = (user, path) => path.split('.').reduce((node, key) => node[key], caller(user))(undefined)
 const unauthorized = async (user, path) => {

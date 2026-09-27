@@ -1,17 +1,22 @@
-import { expect, test } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-test('desktop collection preserves selection, previews, search and account controls', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'assetType.list'
-      ? [(responses[name] as any[])[0], { ...(responses[name] as any[])[0], id: 'video', name: 'Motion' }]
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
-  })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { assetType, collection, files as sampleFiles } from './lib/fixtures'
+import { expect, test, unauthorized } from './lib/trpc'
+
+test('desktop collection preserves selection, previews, search and account controls', async ({ page, mockTrpc, shot }) => {
+  await mockTrpc({ 'assetType.list': [assetType, { ...assetType, id: 'video', name: 'Motion' }] })
   await page.goto('/collections/campaign')
   await expect(page.locator('#client-page-context')).toContainText('Autumn essentials')
   const favorites = page.getByRole('link', { name: 'Favorites', exact: true })
@@ -46,7 +51,7 @@ test('desktop collection preserves selection, previews, search and account contr
   await expect(page.getByRole('checkbox').first()).toHaveAttribute('aria-checked', 'mixed')
   await expect(page.getByRole('checkbox').first().locator('[data-checkbox-indicator="mixed"]')).toBeVisible()
   await expect(page.getByRole('checkbox').first().locator('svg')).toHaveCSS('stroke-width', '3px')
-  await page.screenshot({ path: '/tmp/damvia-checkbox-rendered-weight.png' })
+  await shot('checkbox-rendered-weight')
   await page.getByRole('checkbox').first().focus()
   await page.keyboard.press('Space')
   await expect(page.getByRole('checkbox').first()).toBeChecked()
@@ -71,7 +76,7 @@ test('desktop collection preserves selection, previews, search and account contr
   await page.addStyleTag({ content: '.dv-theme { --dv-size-body: 14px; }' })
   await page.getByRole('checkbox').first().click()
   await expect(page.getByRole('button', { name: 'Select All in', exact: true })).toBeVisible()
-  await page.getByRole('searchbox', { name: 'Search files', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Search files', exact: true }).click()
   const options = page.locator('[data-search-options]')
   await expect(options).toBeVisible()
   await expect(options).toHaveCSS('border-radius', '0px')
@@ -83,8 +88,7 @@ test('desktop collection preserves selection, previews, search and account contr
   await page.keyboard.press('Space')
   await expect(mode).toHaveText('search multiple references of')
   await expect(mode).toHaveAttribute('aria-pressed', 'false')
-  await page.waitForTimeout(250)
-  expect(await options.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await expect.poll(() => options.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   await options.getByRole('button', { name: 'Asset types', exact: true }).click()
   const photography = options.getByRole('checkbox', { name: 'Photography', exact: true })
   await expect(photography).toBeVisible()
@@ -99,16 +103,21 @@ test('desktop collection preserves selection, previews, search and account contr
   await expect(options.getByRole('button', { name: 'Search scope', exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(options).toBeHidden()
-  await page.getByRole('searchbox', { name: 'Search files', exact: true }).fill('sand')
+  await page.getByRole('combobox', { name: 'Search files', exact: true }).fill('sand')
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/search\?.*q=sand/)
   await expect(page.getByRole('link', { name: 'Back to Autumn essentials', exact: true })).toBeVisible()
   await page.goBack()
   await expect(page.locator('#client-page-context')).toContainText('Autumn essentials')
   await page.getByRole('button', { name: /Preview / }).first().click()
-  await expect(page.getByRole('radio', { name: 'Original (HD)', exact: true })).toBeChecked()
-  await page.getByRole('radio', { name: 'PNG', exact: true }).click()
-  await expect(page.getByText('Image quality', { exact: true })).toBeVisible()
+  const format = page.getByRole('dialog').getByRole('combobox', { name: 'Image format', exact: true })
+  const quality = page.getByRole('dialog').getByRole('combobox', { name: 'Image quality', exact: true })
+  await expect(format).toHaveValue('original')
+  // The quality only matters once the picture is converted.
+  await expect(quality).toHaveCount(0)
+  await format.selectOption('png')
+  await expect(quality).toBeVisible()
+  await expect(quality).toHaveValue('medium')
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'My account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Display preferences', exact: true }).click()
@@ -119,16 +128,10 @@ test('desktop collection preserves selection, previews, search and account contr
   await page.getByRole('button', { name: 'My account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Profile', exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText('Manage your profile and account details.')
-  expect(errors).toEqual([])
 })
 
-test('neutral authentication uses shared controls and keeps account links accessible', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    await route.fulfill({ json: { result: { data: responses[name] ?? { exists: false, imageUrl: null } } } })
-  })
+test('neutral authentication uses shared controls and keeps account links accessible', async ({ page, mockTrpc }) => {
+  await mockTrpc({ 'user.me': unauthorized() })
   await page.goto('/login')
   await expect(page.getByRole('button', { name: 'Log in', exact: true })).toBeDisabled()
   await page.getByLabel('Your email').fill('alex@example.test')
@@ -139,25 +142,20 @@ test('neutral authentication uses shared controls and keeps account links access
   await page.getByRole('link', { name: 'Reset password', exact: true }).click()
   await expect(page.getByLabel('Email', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Reset password', exact: true })).toHaveCSS('background-color', 'rgb(38, 38, 38)')
-  expect(errors).toEqual([])
 })
 
 for (const tree of ['menu', 'collections'] as const) {
-  test(`${tree} tree shows the current collection and continuous ancestor lines`, async ({ page }) => {
-    const collection = { id: 'library', name: 'Library', public: true, children: [
+  test(`${tree} tree shows the current collection and continuous ancestor lines`, async ({ page, mockTrpc }) => {
+    const library = { id: 'library', name: 'Library', public: true, children: [
       { id: 'earlier', name: 'A — Earlier collection', public: true, children: [{ id: 'other', name: 'Other assets', children: [] }] },
       { id: 'campaigns', name: 'Campaigns', public: true, children: [{ id: 'campaign', name: 'Autumn essentials', public: true, children: [] }] },
     ] }
     const menu = (item: any): any => ({ id: `menu-${item.id}`, type: 'collection', hasAccess: true, collectionId: item.id, collectionName: item.name, children: item.children.map(menu) })
-    await page.route('**/trpc/**', async route => {
-      const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-      const data = name === 'collection.tree' ? (tree === 'collections' ? [collection] : [])
-        : name === 'menuItem.list' ? (tree === 'menu' ? [menu(collection)] : [])
-        : name === 'user.me' && tree === 'collections' ? { ...(responses['user.me'] as object), role: 'guest' }
-        : responses[name] ?? []
-      await route.fulfill({ json: { result: { data } } })
-    })
-    await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+    // Guests browse the collection tree, everyone else the menu.
+    await mockTrpc({
+      'collection.tree': tree === 'collections' ? [library] : [],
+      'menuItem.list': tree === 'menu' ? [menu(library)] : [],
+    }, { role: tree === 'collections' ? 'guest' : 'member' })
     await page.goto('/collections/campaign')
     const sidebar = page.locator('aside')
     const active = sidebar.getByRole('link', { name: 'Autumn essentials', exact: true })
@@ -178,15 +176,8 @@ for (const tree of ['menu', 'collections'] as const) {
   })
 }
 
-test('collection modals share field spacing and respond to one token change', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.findById' ? { ...(responses[name] as object), canEdit: true, canEditLimitedToGroupIds: true, limitedToGroupIds: [], invitations: [], parent: { id: 'library', name: 'Brand library', synchronized: true } } : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
-  })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+test('collection modals share field spacing and respond to one token change', async ({ page, mockTrpc, shot }) => {
+  await mockTrpc({ 'collection.findById': { ...collection, canEdit: true, canEditLimitedToGroupIds: true, limitedToGroupIds: [], invitations: [], parent: { id: 'library', name: 'Brand library', synchronized: true } } })
   await page.goto('/collections/campaign')
   await page.getByRole('button', { name: 'Collection actions', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Collection settings', exact: true }).click()
@@ -198,7 +189,7 @@ test('collection modals share field spacing and respond to one token change', as
   await expect(input).toHaveCSS('height', '40px')
   await expect(label).toHaveCSS('font-size', '14px')
   expect(await gap()).toBe(8)
-  await page.screenshot({ path: '/tmp/damvia-modal-standard.png' })
+  await shot('modal-standard')
   await page.addStyleTag({ content: '.dv-theme { --dv-field-gap: 12px; --dv-control-height: 48px; --dv-field-label-size: 15px; }' })
   await expect(input).toHaveCSS('height', '48px')
   await expect(label).toHaveCSS('font-size', '15px')
@@ -211,28 +202,21 @@ test('collection modals share field spacing and respond to one token change', as
   const expiryLabel = (await dialog.locator('label[for="expiresAt"]').boundingBox())!
   const expiryInput = (await dialog.getByLabel('Expiry date', { exact: true }).boundingBox())!
   expect(expiryInput.y - expiryLabel.y - expiryLabel.height).toBe(12)
-  expect(errors).toEqual([])
 })
 
-test('search page shows the panel with counts, the toolbar and the not-found terms', async ({ page, context }) => {
+test('search page shows the panel with counts, the toolbar and the not-found terms', async ({ page, context, mockTrpc, shot }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  const files = (responses['collection.findById'] as any).files.map((file: any) => ({ ...file, assetTypeId: 'type-0' }))
+  const files = sampleFiles.map(file => ({ ...file, assetTypeId: 'type-0' }))
   const search = {
     total: 8, page: 1, totalPages: 1, previousPage: null, nextPage: null, results: files,
     facets: { assetTypes: { 'type-0': 5, 'type-1': 3 }, fileTypes: { image: 8 }, extensions: { jpg: 6, png: 2 }, recordViews: {}, attributes: { colour: { Red: 5, Blue: 3 } } },
   }
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.search' ? search
-      : name === 'collection.searchNotFound' ? ['zzz']
-      : name === 'recordAttribute.listFacets' ? [{ id: 'colour', name: 'colour', displayName: 'Colour', values: ['Red', 'Blue', 'Green'] }]
-      : name === 'assetType.list' ? ['Events', 'Products', 'Photography with a very long category name'].map((label, i) => ({ ...(responses[name] as any[])[0], id: `type-${i}`, name: label }))
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
+  await mockTrpc({
+    'collection.search': search,
+    'collection.searchNotFound': ['zzz'],
+    'recordAttribute.listFacets': [{ id: 'colour', name: 'colour', displayName: 'Colour', values: ['Red', 'Blue', 'Green'] }],
+    'assetType.list': ['Events', 'Products', 'Photography with a very long category name'].map((label, i) => ({ ...assetType, id: `type-${i}`, name: label })),
   })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
   await page.goto('/search?q=sand+zzz&from_collection=campaign&search_scope=current')
   const panel = page.locator('[data-search-panel]')
   await expect(panel.getByRole('link', { name: 'Back to Autumn essentials', exact: true })).toBeVisible()
@@ -309,21 +293,15 @@ test('search page shows the panel with counts, the toolbar and the not-found ter
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('zzz')
   await panel.getByRole('button', { name: 'Remove them', exact: true }).click()
   await expect(page).toHaveURL(/q=sand(&|$)/)
-  await page.screenshot({ path: '/private/tmp/claude-501/-Users-arnaud-Documents-Github-damvia/769748be-582c-42d5-a4c4-22d86d85089a/scratchpad/search-page.png' })
+  await shot('search-page')
   await expect(panel.getByRole('radio', { name: 'This collection only', exact: true })).toBeChecked()
   await panel.getByRole('radio', { name: 'All collections', exact: true }).click()
   await expect(page).toHaveURL(/search_scope=all/)
-  expect(errors).toEqual([])
 })
 
-test('breadcrumb ellipsis stays compact, centered and transparent', async ({ page }) => {
+test('breadcrumb ellipsis stays compact, centered and transparent', async ({ page, mockTrpc }) => {
   const parent = { id: 'marketing', name: 'Marketing Assets', parent: { id: 'brand', name: 'Brand', parent: { id: 'season', name: 'Season', parent: { id: 'root', name: 'MARKETING ASSETS', parent: null } } } }
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.findById' ? { ...(responses[name] as object), name: 'EVT-25028 Festival Aurora 2025', parent } : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
-  })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
+  await mockTrpc({ 'collection.findById': { ...collection, name: 'EVT-25028 Festival Aurora 2025', parent } })
   await page.goto('/collections/campaign')
   const currentLabel = page.locator('#client-page-context .dv-breadcrumb__current .dv-breadcrumb__label')
   await expect(currentLabel).toHaveText('EVT-25028 Festival Aurora 2025')

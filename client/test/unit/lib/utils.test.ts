@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
 import { ref } from 'vue'
-import { cn, valueUpdater } from '@/lib/utils.ts'
+import { cn, valueUpdater } from '@/lib/utils'
 
 describe('lib utils', () => {
   test('cn merges tailwind classes and drops falsy inputs', () => {

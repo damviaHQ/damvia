@@ -16,6 +16,8 @@ const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
 const { Readable } = require('node:stream')
+const sharp = require('sharp')
+const { Client } = require('minio')
 const harness = require('./lib/helpers.cjs')
 const { env, db, caller, makeUser, makeCollection, makeFolder, makeFile, save, forbidden } = harness
 const { CollectionFile } = harness.entities
@@ -31,7 +33,6 @@ function withStorage(run) {
     const previous = env.mainS3
     const objects = new Map()
     const removed = []
-    const { Client } = require('minio')
     const fixtureClient = new Client({ endPoint: 'localhost', accessKey: 'fixture', secretKey: 'fixture-secret' })
     const policies = []
     env.mainS3 = () => ({
@@ -184,7 +185,6 @@ test('a page only hands out addresses for files the reader can open', async () =
 })
 
 test('uploads are staged, re-encoded and attached to the page that asked for them', async () => {
-    const sharp = require('sharp')
     const { page } = await makePage(member)
     await withStorage(async ({ objects, removed, policies }) => {
         const created = await caller(member).page.createUpload({ pageId: page.id, kind: 'image', contentType: 'image/png' })

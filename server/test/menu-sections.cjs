@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 // See docs/administration/menu-and-pages.md.
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
+const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
 const { db, fixtures, caller, makeCollection, forbidden } = harness
 const { MenuItem } = require('../dist/entity/menu-item')
@@ -35,7 +36,7 @@ async function assertPathsConsistent() {
 }
 
 test('the migration leaves one default Library section at the root', async () => {
-    const found = await sections()
+    const found = (await sections()).filter(section => section.data.defaultForCollections)
     assert.equal(found.length, 1)
     assert.equal(found[0].parentId, null)
     assert.equal(found[0].data.label, 'Library')
@@ -168,7 +169,7 @@ test('menu moves require admin rights and reject cycles, missing targets and nes
         await assert.rejects(caller(fixtures.admin).menuItem.move({ id: link.id, parentId }), error => error.code === 'BAD_REQUEST')
     }
     await assert.rejects(caller(fixtures.admin).menuItem.move({ id: section.id, parentId: link.id }), error => error.code === 'BAD_REQUEST')
-    await assert.rejects(caller(fixtures.admin).menuItem.move({ id: link.id, parentId: require('node:crypto').randomUUID() }), error => error.code === 'NOT_FOUND')
+    await assert.rejects(caller(fixtures.admin).menuItem.move({ id: link.id, parentId: randomUUID() }), error => error.code === 'NOT_FOUND')
     const text = await caller(fixtures.admin).menuItem.create({ type: 'text', data: { text: 'No children' } })
     await assert.rejects(caller(fixtures.admin).menuItem.move({ id: link.id, parentId: text.id }), error => error.code === 'BAD_REQUEST')
     await assertPathsConsistent()

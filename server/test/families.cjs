@@ -17,10 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const harness = require('./lib/helpers.cjs')
-const { db, env, caller, makeCollection } = harness
+const { db, env, caller, makeCollection, productId } = harness
 let fixtures, admin
 
-const productId = async recordKey => (await db.query('SELECT id FROM records WHERE record_key = $1', [recordKey]))[0].id
 const familyOf = async recordKey => (await db.query('SELECT family_key, family_label FROM records WHERE record_key = $1', [recordKey]))[0]
 
 before(async () => {

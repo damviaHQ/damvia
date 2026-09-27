@@ -1,25 +1,30 @@
-import { expect, test, type Page } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-async function fixture(page: Page) {
-  const source = responses['collection.findById'] as any
-  const children = ['2026', '2025'].map((name, index) => ({
-    ...source, id: `year-${index}`, name, description: '', numberOfFiles: index ? 14 : 11,
-    files: [], children: [], synchronized: false, canEdit: true, parentId: 'campaign',
-  }))
-  await page.addInitScript(() => localStorage.setItem('dam_display_preferences', JSON.stringify({ photo: 'list', asset_folder: 'list' })))
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.findById' ? { ...source, children } : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
-  })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
-}
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-for (const width of [1440, 390]) {
-  test(`collection and file lists keep row spacing, column alignment and contained overflow at ${width}px`, async ({ page }) => {
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { collection as source } from './lib/fixtures'
+import { expect, test } from './lib/trpc'
+
+const children = ['2026', '2025'].map((name, index) => ({
+  ...source, id: `year-${index}`, name, description: '', numberOfFiles: index ? 14 : 11,
+  files: [], children: [], synchronized: false, canEdit: true, parentId: 'campaign',
+}))
+
+for (const width of [1440, 768]) {
+  test(`collection and file lists keep row spacing, column alignment and contained overflow at ${width}px`, async ({ page, mockTrpc, shot }) => {
     await page.setViewportSize({ width, height: 1000 })
-    await fixture(page)
+    await page.addInitScript(() => localStorage.setItem('dam_display_preferences', JSON.stringify({ photo: 'list', asset_folder: 'list' })))
+    await mockTrpc({ 'collection.findById': { ...source, children } })
     await page.goto('/collections/campaign')
     const collections = page.locator('.collection-list-collections_table')
     const files = page.locator('.collection-list-files_table')
@@ -56,6 +61,6 @@ for (const width of [1440, 390]) {
       await expect(page.getByRole('menu')).toHaveCount(0)
       await expect(firstRow.locator('.collection-list-collections__actions-container')).toHaveCSS('opacity', '0')
     }
-    await page.screenshot({ path: `/tmp/damvia-list-layout-${width}.png` })
+    await shot(`list-layout-${width}`)
   })
 }

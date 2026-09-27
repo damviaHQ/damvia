@@ -15,11 +15,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
+const { readFile, writeFile, rm } = require('node:fs/promises')
+const { tmpdir } = require('node:os')
+const { join } = require('node:path')
+const { deflateSync, crc32 } = require('node:zlib')
 const harness = require('./lib/helpers.cjs')
-const { db, state, save, makeUser, makeCollection, makeFolder, makeFile } = harness
+const { db, state, save, makeCollection, makeFolder, makeFile } = harness
 const { Collection, CollectionFile, AssetFolder, AssetFile, AssetType, License } = harness.entities
-const { upsertFolder, upsertFile, deleteFolder, deleteFile } = harness.services.assets
+const { upsertFolder, upsertFile, deleteFolder, deleteFile, resolveMimeType } = harness.services.assets
 const { synchronizeCollection } = harness.services.collections
+const { safeExtension, processImageThumbnail } = require('../dist/services/image-processor')
 let fixtures
 const queuedSyncs = () => state.queued.filter(job => job.name === 'collectionSynchronizationQueue').map(job => job.collectionId).sort()
 const queuedContent = () => state.queued.filter(job => job.name === 'assetUpdateContentQueue').map(job => job.assetFileId)
@@ -199,4 +204,49 @@ test('synchronizing a collection mirrors child folders with the same owner and f
     assert.equal(await db.getRepository(CollectionFile).countBy({ collectionId: collection.id }), 1)
     assert.deepEqual(queuedSyncs(), [keptId])
     await synchronizeCollection(db.manager, randomUUID())
+})
+
+test('a listing MIME type is kept only when the content cannot be identified and it is not active content', () => {
+    assert.equal(resolveMimeType({ ext: 'png', mime: 'image/png' }, 'text/html'), 'image/png')
+    assert.equal(resolveMimeType({ ext: 'webp', mime: 'image/webp' }, null), 'image/webp')
+    assert.equal(resolveMimeType(null, 'text/csv'), 'text/csv')
+    assert.equal(resolveMimeType(undefined, 'application/pdf'), 'application/pdf')
+    for (const active of ['text/html', 'TEXT/HTML', 'image/svg+xml', 'application/javascript', 'application/xml']) assert.equal(resolveMimeType(null, active), 'application/octet-stream')
+    assert.equal(resolveMimeType(null, null), 'application/octet-stream')
+    assert.equal(resolveMimeType(null, ''), 'application/octet-stream')
+})
+
+test('B2: conversions never go through a shell and odd extensions are replaced', async () => {
+    for (const file of ['../src/services/image-processor.ts', '../src/services/asset.ts']) {
+        const source = await readFile(require.resolve(file), 'utf8')
+        assert.doesNotMatch(source, /\bexec\(|execSync|shell:\s*true/, file)
+    }
+    assert.equal(safeExtension('pptx'), 'pptx')
+    assert.equal(safeExtension('pptx"; $(touch x)'), 'bin')
+    assert.equal(safeExtension(undefined), 'bin')
+})
+
+test('a synced image claiming more pixels than the limit gets no thumbnail instead of being decoded', async () => {
+    const chunk = (type, data) => {
+        const length = Buffer.alloc(4); length.writeUInt32BE(data.length)
+        const body = Buffer.concat([Buffer.from(type), data])
+        const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body) >>> 0)
+        return Buffer.concat([length, body, crc])
+    }
+    const header = Buffer.alloc(13)
+    header.writeUInt32BE(20000, 0); header.writeUInt32BE(20000, 4); header[8] = 8; header[9] = 0
+    // 400 million pixels announced by a file of a few bytes.
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.alloc(1))), chunk('IEND', Buffer.alloc(0))])
+    const path = join(tmpdir(), `bomb-${randomUUID()}.png`)
+    const thumbnailPath = join(tmpdir(), `thumb-${randomUUID()}`)
+    await writeFile(path, png)
+    try {
+        const started = Date.now()
+        const thumbnail = await processImageThumbnail({ name: 'bomb.png', mimeType: 'image/png', size: '20000000' }, path, async () => thumbnailPath)
+        assert.equal(thumbnail, null)
+        assert.ok(Date.now() - started < 5000, 'refused from the header, without decoding')
+    } finally {
+        await rm(path, { force: true })
+        await rm(thumbnailPath, { force: true })
+    }
 })

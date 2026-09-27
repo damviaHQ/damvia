@@ -18,8 +18,8 @@ const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
-const { db, state, save, caller, makeFolder, makeFile, forbidden } = harness
-const { AssetFolder, AssetFile, AssetType, AssetTypeRule } = harness.entities
+const { db, state, save, caller, makeFolder, makeFile, makeType, fileRow, waitFor, lockWaiters, forbidden } = harness
+const { AssetFolder, AssetTypeRule } = harness.entities
 const { upsertFolder } = harness.services.assets
 const { compileRule, resolveFolderAssetTypes, reresolveRule } = harness.services.assetTypeRules
 const { runEnrichmentPass } = harness.services.enrichment
@@ -27,9 +27,7 @@ let fixtures
 before(async () => { fixtures = await harness.setup() })
 after(() => harness.teardown())
 
-const makeType = name => save(AssetType, { name, defaultDisplay: 'grid', listDisplayItems: [] })
 const folderRow = id => db.getRepository(AssetFolder).findOneByOrFail({ id })
-const fileRow = id => db.getRepository(AssetFile).findOneByOrFail({ id })
 const typed = async id => { const f = await folderRow(id); return [f.assetTypeId, f.assetTypeSource, f.assetTypeRuleId] }
 const rule = (id, pattern, assetTypeId, createdAt = new Date(0)) => ({ id, regex: new RegExp(pattern, 'i'), assetTypeId, createdAt })
 let seq = 0
@@ -286,7 +284,7 @@ test('a hand-set type waits for a running pass instead of being overwritten by i
     await holder.query('SELECT pg_advisory_xact_lock($1)', [harness.services.assetTypeRules.ENRICHMENT_LOCK])
     let settled = false
     const update = caller(fixtures.admin).asset.update({ id: root.id, assetTypeId: type.id }).then(() => { settled = true })
-    await new Promise(resolve => setTimeout(resolve, 200))
+    await waitFor(async () => await lockWaiters(harness.services.assetTypeRules.ENRICHMENT_LOCK) === 1)
     assert.equal(settled, false)
     assert.deepEqual(await typed(root.id), [null, null, null])
     await holder.commitTransaction()

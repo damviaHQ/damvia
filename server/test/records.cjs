@@ -24,7 +24,6 @@ const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
 let fixtures, admin
 const changesOf = recordKey => db.getRepository(RecordChange).find({ where: { recordKey }, order: { createdAt: 'ASC' } })
 const field = name => db.getRepository(RecordAttribute).findOneByOrFail({ name })
-const metaOf = async id => (await db.query('SELECT hstore_to_json(meta_data) AS m FROM records WHERE id = $1', [id]))[0]?.m
 const code = error => error.code
 const rejects = (promise, expected) => assert.rejects(promise, error => code(error) === expected)
 
@@ -232,8 +231,15 @@ test('fields change type, seed their options, reorder, and take their values wit
 
     const tags = await field('tags')
     await admin.recordAttribute.update({ id: tags.id, facetable: true })
-    const facet = (await caller(fixtures.member).recordAttribute.listFacets()).find(f => f.name === 'tags')
-    assert.deepEqual(facet.values.sort(), ['Eco', 'New', 'Sale'])
+    // Filter values come from files the reader can open, one per option.
+    const listFacet = async () => (await caller(fixtures.member).recordAttribute.listFacets()).find(f => f.name === 'tags')
+    assert.deepEqual((await listFacet()).values, [])
+    const folder = await makeFolder()
+    const collection = await save(harness.entities.Collection, { name: 'Tagged', public: true, draft: false, assetFolderId: folder.id })
+    const [{ id: tagged }] = await db.query(`SELECT id FROM records WHERE meta_data -> 'tags' = 'Eco|Sale' LIMIT 1`)
+    const file = await makeFile(folder, { recordId: tagged })
+    await save(harness.entities.CollectionFile, { collectionId: collection.id, assetFileId: file.id })
+    assert.deepEqual((await listFacet()).values.sort(), ['Eco', 'Sale'])
     const holders = await db.query(`SELECT record_key FROM records WHERE meta_data ? 'tags' AND meta_data -> 'tags' <> '' ORDER BY record_key`)
     const removed = await admin.recordAttribute.remove(tags.id)
     assert.ok(removed.cleared >= holders.length)

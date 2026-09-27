@@ -19,9 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { planDriveItems } = require('../dist/asset-updater/one-drive-items')
+const { oneDrive: { ref } } = require('./lib/drivers.cjs')
 
 const ROOT = 'root-id'
-const ref = (id) => ({ driveId: 'drive', id })
 const page = [
     { id: ROOT, name: 'root', root: {}, folder: { childCount: 3 }, size: 900, parentReference: { driveId: 'drive' } },
     { id: 'nested', name: 'Nested', folder: { childCount: 1 }, size: 100, parentReference: ref('top') },

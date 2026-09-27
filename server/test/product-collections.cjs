@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const harness = require('./lib/helpers.cjs')
+const { Page } = require('../dist/entity/page')
+const { PageBlock } = require('../dist/entity/page-block')
 const { db, caller, makeCollection, makeUser, forbidden } = harness
 const { Collection, CollectionRecord } = harness.entities
 const { addRecords, createCataloguePage, refreshDynamicCollection, refreshAllDynamicCollections } = harness.services.productCollections
@@ -259,8 +261,6 @@ test('an administrator builds the first catalogue, a reader only pins what they 
 })
 
 test('a catalogue collection is born with the page that draws its products', async () => {
-    const { Page } = require('../dist/entity/page')
-    const { PageBlock } = require('../dist/entity/page-block')
     const blocksOf = async collectionId => {
         const page = await db.getRepository(Page).findOneByOrFail({ collectionId })
         return (await db.getRepository(PageBlock).findBy({ pageId: page.id }))
@@ -288,8 +288,6 @@ test('a catalogue collection is born with the page that draws its products', asy
 })
 
 test('turning the same collection into a catalogue twice at once does not race', async () => {
-    const { Page } = require('../dist/entity/page')
-    const { PageBlock } = require('../dist/entity/page-block')
     const collection = await makeCollection({ name: 'Raced', catalogueMode: 'products' })
     const pages = await Promise.all(Array.from({ length: 8 }, () => db.transaction(em => createCataloguePage(em, collection))))
     const [a, b] = pages
@@ -379,8 +377,6 @@ test('everything short of ready leaves the catalogue in one move', async () => {
 })
 
 test('adding products to a collection with a custom page appends a products block without replacing its content', async () => {
-    const { Page } = require('../dist/entity/page')
-    const { PageBlock } = require('../dist/entity/page-block')
     const collection = await makeCollection({ name: 'Custom catalogue' })
     const page = await harness.save(Page, { collectionId: collection.id })
     const text = await harness.save(PageBlock, { pageId: page.id, type: 'text', position: 0, size: 'full', data: { html: '<p>Introduction</p>' } })
@@ -393,7 +389,6 @@ test('adding products to a collection with a custom page appends a products bloc
 
 
 test('a personal collection accepts products and files in either order without choosing a type', async () => {
-    const { Page } = require('../dist/entity/page')
     const folder = await harness.makeFolder({ name: 'Personal collection files' })
     const file = await harness.makeFile(folder, { name: 'personal.jpg' })
     const library = await makeCollection({ name: 'Personal collection source' })

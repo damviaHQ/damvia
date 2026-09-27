@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { fillDownPlan, fillPlan, parseClipboard, pastePlan, rangeOf, toClipboard } from '@/utils/gridRange'
+import { fillDownPlan, fillPlan, inRange, parseClipboard, pastePlan, rangeOf, rangeSize, toClipboard } from '@/utils/gridRange'
 
 const grid = [['a', 'b'], ['c', 'd'], ['e', 'f'], ['g', 'h']]
 const valueAt = ({ row, column }: { row: number, column: number }) => grid[row][column]
@@ -42,5 +42,14 @@ describe('grid ranges', () => {
     expect(fillPlan(range, 0, valueAt).writes).toEqual([{ row: 0, column: 0, value: 'e' }])
     expect(fillPlan(range, 2, valueAt).writes).toEqual([])
     expect(fillDownPlan(rangeOf({ row: 0, column: 0 }, { row: 2, column: 1 }), valueAt).map(w => w.value)).toEqual(['a', 'b', 'a', 'b'])
+  })
+
+  test('a range holds its edges, and its size counts both ends', () => {
+    const range = rangeOf({ row: 3, column: 4 }, { row: 1, column: 2 })
+    expect(range).toEqual({ top: 1, bottom: 3, left: 2, right: 4 })
+    expect(rangeSize(range)).toEqual({ rows: 3, columns: 3 })
+    expect(rangeSize(rangeOf({ row: 5, column: 5 }, { row: 5, column: 5 }))).toEqual({ rows: 1, columns: 1 })
+    for (const [row, column] of [[1, 2], [3, 4], [2, 3], [1, 4], [3, 2]]) expect(inRange(range, row, column)).toBe(true)
+    for (const [row, column] of [[0, 2], [4, 2], [1, 1], [1, 5]]) expect(inRange(range, row, column)).toBe(false)
   })
 })

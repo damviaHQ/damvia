@@ -27,7 +27,7 @@ after(teardown)
 test('validation errors expose fieldErrors over HTTP', async () => {
     const response = await server.inject({
         method: 'POST',
-        url: '/trpc/user.login',
+        url: '/trpc/auth.login',
         payload: { email: 'not-an-email', password: 42 },
     })
     assert.equal(response.statusCode, 400)
@@ -43,7 +43,7 @@ test('validation errors expose fieldErrors over HTTP', async () => {
 test('valid input is not reported as a validation error', async () => {
     const response = await server.inject({
         method: 'POST',
-        url: '/trpc/user.login',
+        url: '/trpc/auth.login',
         payload: { email: 'nobody@example.test', password: 'wrong-password' },
     })
     assert.notEqual(response.json().error?.message, 'Invalid request.')

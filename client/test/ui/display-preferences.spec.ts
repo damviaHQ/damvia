@@ -1,33 +1,42 @@
-import { expect, test, type Page } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-async function fixture(page: Page, mixed = false, varied = false) {
-  const source = responses['collection.findById'] as any
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { collection as source } from './lib/fixtures'
+import { expect, test, type MockTrpc } from './lib/trpc'
+
+function fixture(mockTrpc: MockTrpc, mixed = false, varied = false) {
   const type = { ...source.files[0].assetType, recordAttributes: [{ id: 'colour', name: 'colour', displayName: 'Colour' }, { id: 'season', name: 'season', displayName: 'Season' }] }
   const shapes = [{ width: 800, height: 600 }, { width: 600, height: 900 }, { width: 1200, height: 400 }]
   // A thumbnail of the shape the file claims, so a cropped tile is detectable.
   const shaped = ({ width, height }: { width: number, height: number }, index: number) => 'data:image/svg+xml,' + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" fill="${['#e6e2dc', '#cfdbd4', '#ded5c9'][index % 3]}"/></svg>`)
-  const files = source.files.map((file: any, index: number) => ({ ...file, assetType: mixed && index === 0 ? null : type, assetTypeId: mixed && index === 0 ? null : type.id,
+  const files = source.files.map((file, index) => ({ ...file, assetType: mixed && index === 0 ? null : type, assetTypeId: mixed && index === 0 ? null : type.id,
     dimensions: varied ? shapes[index % shapes.length] : file.dimensions,
     ...(varied ? { thumbnailURL: shaped(shapes[index % shapes.length], index) } : {}),
     record: { attributes: [{ id: 'colour', name: 'colour', displayName: 'Colour', value: index % 2 ? 'Black' : 'Sand' }] }, recordView: 'Front' }))
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.findById' ? { ...source, files, children: [{ ...source, id: 'child', name: 'Summer', numberOfFiles: 8, files: [], children: [] }] }
-      : name === 'collection.search' ? { total: files.length, page: 1, totalPages: 1, results: files, facets: { fileTypes: { image: files.length }, assetTypes: { photo: files.length }, recordViews: {}, attributes: { colour: { Sand: 4 } } } }
-      : name === 'assetType.list' ? [type]
-      : name === 'recordAttribute.listFacets' ? [{ id: 'colour', name: 'colour', displayName: 'Colour', values: ['Sand', 'Black'] }]
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
+  return mockTrpc({
+    'collection.findById': { ...source, files, children: [{ ...source, id: 'child', name: 'Summer', numberOfFiles: 8, files: [], children: [] }] },
+    'collection.search': { total: files.length, page: 1, totalPages: 1, results: files, facets: { fileTypes: { image: files.length }, assetTypes: { photo: files.length }, recordViews: {}, attributes: { colour: { Sand: 4 } } } },
+    'assetType.list': [type],
+    'recordAttribute.listFacets': [{ id: 'colour', name: 'colour', displayName: 'Colour', values: ['Sand', 'Black'] }],
   })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: new URL(test.info().project.use.baseURL!).hostname, path: '/' }])
 }
 
-for (const width of [1440, 390]) {
-  test(`menu applies and persists attributes with keyboard support at ${width}px`, async ({ page }) => {
+for (const width of [1440, 768]) {
+  test(`menu applies and persists attributes with keyboard support at ${width}px`, async ({ page, mockTrpc, shot }) => {
     await page.setViewportSize({ width, height: 900 })
-    await fixture(page)
+    await fixture(mockTrpc)
     await page.goto('/collections/campaign')
     const trigger = page.getByRole('button', { name: 'Display preferences', exact: true })
     await trigger.focus()
@@ -49,7 +58,7 @@ for (const width of [1440, 390]) {
     expect(box.x).toBeGreaterThanOrEqual(0)
     expect(box.x + box.width).toBeLessThanOrEqual(width)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    await page.screenshot({ path: `/tmp/damvia-display-list-${width}.png` })
+    await shot(`display-list-${width}`)
     await page.keyboard.press('Escape')
     await expect(menu).toBeHidden()
     await expect(trigger).toBeFocused()
@@ -65,9 +74,9 @@ for (const width of [1440, 390]) {
   })
 }
 
-for (const width of [1440, 390]) test(`masonry fills the width with even gaps at ${width}px`, async ({ page }) => {
+for (const width of [1440, 768]) test(`masonry fills the width with even gaps at ${width}px`, async ({ page, mockTrpc, shot }) => {
   await page.setViewportSize({ width, height: 900 })
-  await fixture(page, false, true)
+  await fixture(mockTrpc, false, true)
   await page.goto('/collections/campaign')
   await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
   const menu = page.getByRole('dialog', { name: 'Display preferences' })
@@ -116,7 +125,7 @@ for (const width of [1440, 390]) test(`masonry fills the width with even gaps at
   await expect(overlay).toHaveCSS('opacity', '0')
   await preview.first().hover()
   await expect(overlay).toHaveCSS('opacity', '1')
-  await page.screenshot({ path: `/tmp/damvia-display-masonry-${width}.png` })
+  await shot(`display-masonry-${width}`)
 
   // Nothing moves on hover, so closing a preview cannot leave a card stuck.
   await expect(card).toHaveCSS('scale', 'none')
@@ -144,9 +153,9 @@ for (const width of [1440, 390]) test(`masonry fills the width with even gaps at
   expect(layout.rightGutter).toBeLessThanOrEqual(3)
 })
 
-for (const width of [1440, 390]) test(`collection properties stay independent of the file view at ${width}px`, async ({ page }) => {
+for (const width of [1440, 768]) test(`collection properties stay independent of the file view at ${width}px`, async ({ page, mockTrpc }) => {
   await page.setViewportSize({ width, height: 900 })
-  await fixture(page)
+  await fixture(mockTrpc)
   await page.goto('/collections/campaign')
   await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
   const menu = page.getByRole('dialog', { name: 'Display preferences' })
@@ -165,22 +174,16 @@ for (const width of [1440, 390]) test(`collection properties stay independent of
   await expect(collections).toHaveCount(0)
 })
 
-test('a page listing chosen collections offers their display preferences', async ({ page }) => {
+test('a page listing chosen collections offers their display preferences', async ({ page, mockTrpc }) => {
   // The reported case: the page shows collections picked by hand, so the
   // collection's own children are empty and the popover used to see nothing.
-  const source = responses['collection.findById'] as any
   const chosen = { id: 'chosen', name: 'SKYRNR Trail', description: 'Trail campaign', numberOfFiles: 12, files: [], children: [] }
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.findById'
-      ? {
-        ...source, files: [], children: [],
-        page: { id: 'page-1', blocks: [{ id: 'block-1', type: 'collections', size: 'full', data: { title: 'Test', collectionsId: ['chosen'] } }], assets: { collections: { chosen } } },
-      }
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
+  await mockTrpc({
+    'collection.findById': {
+      ...source, files: [], children: [],
+      page: { id: 'page-1', blocks: [{ id: 'block-1', type: 'collections', size: 'full', data: { title: 'Test', collectionsId: ['chosen'] } }], assets: { collections: { chosen } } },
+    },
   })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: new URL(test.info().project.use.baseURL!).hostname, path: '/' }])
   await page.goto('/collections/campaign')
   await expect(page.getByRole('link', { name: 'SKYRNR Trail' }).first()).toBeVisible()
 
@@ -191,8 +194,8 @@ test('a page listing chosen collections offers their display preferences', async
   await expect(page.locator('.collection-list-collections_table')).toBeVisible()
 })
 
-test('mixed files offer product columns and malformed saved details recover', async ({ page }) => {
-  await fixture(page, true)
+test('mixed files offer product columns and malformed saved details recover', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc, true)
   await page.addInitScript(() => localStorage.setItem('dam_display_details', '{broken'))
   await page.goto('/collections/campaign')
   await page.getByRole('button', { name: 'Display preferences', exact: true }).click()
@@ -202,8 +205,8 @@ test('mixed files offer product columns and malformed saved details recover', as
   await expect(page.locator('.collection-list-files_table').getByRole('columnheader', { name: 'Colour', exact: true })).toBeVisible()
 })
 
-test('search pills remove individual filters, retain sort and share display preferences', async ({ page }) => {
-  await fixture(page)
+test('search pills remove individual filters, retain sort and share display preferences', async ({ page, mockTrpc, shot }) => {
+  await fixture(mockTrpc)
   await page.goto('/search?asset_types=photo&attributes[colour]=Sand&sort=newest')
   const removeColour = page.getByRole('button', { name: 'Remove filter Colour: Sand', exact: true })
   await expect(removeColour).toBeVisible()
@@ -215,9 +218,9 @@ test('search pills remove individual filters, retain sort and share display pref
   await menu.getByRole('tab', { name: 'List', exact: true }).click()
   await expect(page.locator('.collection-list-files_table')).toBeVisible()
   await menu.getByRole('button', { name: 'Colour', exact: true }).click()
-  await page.screenshot({ path: '/tmp/damvia-display-search.png' })
+  await shot('display-search')
   await page.keyboard.press('Escape')
-  await page.screenshot({ path: '/tmp/damvia-filter-pills.png' })
+  await shot('filter-pills')
   await removeColour.click()
   await expect(page).not.toHaveURL(/colour/)
   await expect(page).toHaveURL(/asset_types=photo/)

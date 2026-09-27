@@ -1,5 +1,18 @@
-import { expect, test, type Page } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { expect, test } from './lib/trpc'
 
 // The picker is shared by the page editor, the admin collection dialogs and the
 // menu editor, so it is exercised here through the page editor alone.
@@ -11,25 +24,11 @@ const subject = {
   page: { id: 'page-1', name: null, blocks: [listBlock], assets: { uploads: {}, files: {}, collections: {}, pages: {} } },
 }
 
-async function fixture(page: Page) {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    let data: unknown = responses[name] ?? []
-    if (name === 'collection.findById') data = subject
-    if (name === 'collection.tree') data = [parent]
-    await route.fulfill({ json: { result: { data } } })
-  })
-  return { errors }
-}
-
 // A global style set the padding on every option, which overrode the padding
 // the library applies one step per level, so every collection looked like a
 // root and the tree could not be read.
-test('the collection picker indents a child under its parent', async ({ page }) => {
-  const { errors } = await fixture(page)
+test('the collection picker indents a child under its parent', async ({ page, mockTrpc }) => {
+  await mockTrpc({ 'collection.findById': subject, 'collection.tree': [parent] })
   await page.goto('/collections/campaign/edit')
 
   const block = page.locator('[data-block-index="0"]')
@@ -47,13 +46,12 @@ test('the collection picker indents a child under its parent', async ({ page }) 
   const parentBox = await parentOption.locator('.vue-treeselect__label').boundingBox()
   const childBox = await childOption.locator('.vue-treeselect__label').boundingBox()
   expect(childBox!.x).toBeGreaterThan(parentBox!.x + 10)
-  expect(errors).toEqual([])
 })
 
 // Collections chosen from elsewhere in the library used to render as blank
 // cards, because they were read from the collection tree, which is built
 // without the sample files a card previews.
-test('a collection chosen from elsewhere shows its preview', async ({ page }) => {
+test('a collection chosen from elsewhere shows its preview', async ({ page, mockTrpc }) => {
   const preview = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Crect width=%2240%22 height=%2240%22 fill=%22%23c33%22/%3E%3C/svg%3E'
   const chosen = {
     id: 'outside', name: 'Outside collection', numberOfFiles: 3, draft: false, canEdit: false,
@@ -67,44 +65,22 @@ test('a collection chosen from elsewhere shows its preview', async ({ page }) =>
       assets: { uploads: {}, files: {}, collections: { outside: chosen }, pages: {} },
     },
   }
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    let data: unknown = responses[name] ?? []
-    if (name === 'collection.findById') data = withChoice
-    if (name === 'collection.tree') data = [parent]
-    await route.fulfill({ json: { result: { data } } })
-  })
+  await mockTrpc({ 'collection.findById': withChoice, 'collection.tree': [parent] })
 
   await page.goto('/collections/campaign')
   await expect(page.getByText('Outside collection')).toBeVisible()
   await expect(page.locator(`img[src="${preview}"]`)).toBeVisible()
-  expect(errors).toEqual([])
 })
 
 // Choosing a collection used to leave the block empty until the page was
 // saved, because its card was only resolved when the page was read back.
-test('a collection appears in the block as soon as it is chosen', async ({ page }) => {
+test('a collection appears in the block as soon as it is chosen', async ({ page, mockTrpc }) => {
   const preview = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22%3E%3Crect width=%2240%22 height=%2240%22 fill=%22%2339c%22/%3E%3C/svg%3E'
   const card = {
     id: 'child', name: 'Child collection', numberOfFiles: 2, draft: false, canEdit: false,
     thumbnailURL: null, sampleFiles: [{ id: 'sample-1', name: 'One.jpg', thumbnailURL: preview }],
   }
-  const saves: any[] = []
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    let data: unknown = responses[name] ?? []
-    if (name === 'collection.findById') data = subject
-    if (name === 'collection.tree') data = [parent]
-    if (name === 'page.collectionPreviews') data = { child: card }
-    if (name === 'page.save') saves.push(route.request().postDataJSON())
-    await route.fulfill({ json: { result: { data } } })
-  })
+  const api = await mockTrpc({ 'collection.findById': subject, 'collection.tree': [parent], 'page.collectionPreviews': { child: card } })
 
   await page.goto('/collections/campaign/edit')
   const block = page.locator('[data-block-index="0"]')
@@ -118,24 +94,14 @@ test('a collection appears in the block as soon as it is chosen', async ({ page 
 
   await expect(block.getByText('Child collection')).toBeVisible()
   await expect(block.locator(`img[src="${preview}"]`)).toBeVisible()
-  expect(saves).toEqual([])
-  expect(errors).toEqual([])
+  expect(api.count('page.save')).toBe(0)
 })
 
 // Picking the collection the page belongs to would put a card on the page
 // leading back to itself.
-test('the collection being edited cannot be chosen as one of its own cards', async ({ page }) => {
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    let data: unknown = responses[name] ?? []
-    if (name === 'collection.findById') data = subject
-    // The page's own collection sits in the tree, with a child of its own.
-    if (name === 'collection.tree') data = [{ ...subject, children: [child] }]
-    await route.fulfill({ json: { result: { data } } })
-  })
+test('the collection being edited cannot be chosen as one of its own cards', async ({ page, mockTrpc }) => {
+  // The page's own collection sits in the tree, with a child of its own.
+  await mockTrpc({ 'collection.findById': subject, 'collection.tree': [{ ...subject, children: [child] }] })
 
   await page.goto('/collections/campaign/edit')
   const block = page.locator('[data-block-index="0"]')
@@ -149,12 +115,11 @@ test('the collection being edited cannot be chosen as one of its own cards', asy
   // Its children stay reachable, which is why it is disabled and not removed.
   await itself.locator('.vue-treeselect__option-arrow-container').click()
   await expect(page.locator('.vue-treeselect__option', { hasText: 'Child collection' }).first()).toBeVisible()
-  expect(errors).toEqual([])
 })
 
 // Clearing a custom selection otherwise means noticing the small cross in the
 // field, and it is not obvious that emptying it restores the default.
-test('a custom selection can be handed back to the sub-collections', async ({ page }) => {
+test('a custom selection can be handed back to the sub-collections', async ({ page, mockTrpc }) => {
   const card = {
     id: 'child', name: 'Child collection', numberOfFiles: 0, draft: false, canEdit: false,
     thumbnailURL: null, sampleFiles: [],
@@ -167,16 +132,7 @@ test('a custom selection can be handed back to the sub-collections', async ({ pa
       assets: { uploads: {}, files: {}, collections: { child: card }, pages: {} },
     },
   }
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    let data: unknown = responses[name] ?? []
-    if (name === 'collection.findById') data = chosen
-    if (name === 'collection.tree') data = [parent]
-    await route.fulfill({ json: { result: { data } } })
-  })
+  await mockTrpc({ 'collection.findById': chosen, 'collection.tree': [parent] })
 
   await page.goto('/collections/campaign/edit')
   const block = page.locator('[data-block-index="0"]')
@@ -190,5 +146,4 @@ test('a custom selection can be handed back to the sub-collections', async ({ pa
 
   await expect(reset).toHaveCount(0)
   await expect(block.getByText('Child collection')).toHaveCount(0)
-  expect(errors).toEqual([])
 })

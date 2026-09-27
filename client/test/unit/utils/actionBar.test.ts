@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { describeRule, editableSettings, emptyRule, isRestricted, type ActionBarRule } from '@/utils/actionBar'
+import { describeAudience, describeRule, editableSettings, emptyRule, isRestricted, type ActionBarRule } from '@/utils/actionBar'
 
 const names = {
   groups: new Map([['g1', 'Design'], ['g2', 'Sales'], ['g3', 'Legal']]),
@@ -47,5 +47,23 @@ describe('action bar rules', () => {
     expect(settings.search).toEqual(emptyRule())
     settings.filter.roles.push('member')
     expect(source.filter.roles).toEqual(['guest'])
+  })
+
+  test('an audience lists roles, then groups and people, and counts long lists', () => {
+    const names = {
+      groups: new Map([['g1', 'Design'], ['g2', 'Sales'], ['g3', 'Retail']]),
+      users: new Map([['u1', 'Ada'], ['u2', 'Grace'], ['u3', 'Linus']]),
+    }
+    const audience = (value: Partial<ActionBarRule>) => describeAudience({ ...emptyRule('only'), ...value }, names)
+    expect(audience({})).toBe('')
+    expect(audience({ roles: ['guest', 'manager'] })).toBe('Managers and Guests')
+    expect(audience({ roles: ['member'], groupIds: ['g1'] })).toBe('Members and Design')
+    expect(audience({ groupIds: ['g1', 'g2'], userIds: ['u1'] })).toBe('Design, Sales and Ada')
+    expect(audience({ groupIds: ['g1', 'g2', 'g3'] })).toBe('3 groups')
+    expect(audience({ userIds: ['u1', 'u2', 'u3'] })).toBe('3 people')
+    // Admins always see every action, so they are never named.
+    expect(audience({ roles: ['admin'] })).toBe('')
+    // A deleted group or person is left out rather than shown as an id.
+    expect(audience({ groupIds: ['gone'], userIds: ['u2'] })).toBe('Grace')
   })
 })

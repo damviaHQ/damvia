@@ -1,5 +1,19 @@
-import { expect, test } from '@playwright/test'
-import { fixture, importCsv } from './records-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { importCsv, recordsApi } from './lib/records'
+import { expect, test } from './lib/trpc'
 
 // A focus outline cut by a scrolling or clipping container hides where the
 // keyboard is. Each control of the records screen is focused in turn and its
@@ -31,8 +45,8 @@ const AUDIT = `(() => {
   return [...new Set(out)]
 })()`
 
-test('no focus outline of the records screen is cut by its container', async ({ page }) => {
-  await fixture(page)
+test('no focus outline of the records screen is cut by its container', async ({ page, mockTrpc }) => {
+  await mockTrpc(recordsApi, { role: 'admin' })
   await page.goto('/admin/data-enrichment/records')
   await page.locator('[data-cell="0-1"]').waitFor()
   await page.keyboard.press('Tab')
@@ -57,8 +71,8 @@ test('no focus outline of the records screen is cut by its container', async ({ 
   expect(await page.evaluate(AUDIT), 'fields panel').toEqual([])
 })
 
-test('no focus outline of the CSV import is cut by its container', async ({ page }) => {
-  await fixture(page)
+test('no focus outline of the CSV import is cut by its container', async ({ page, mockTrpc }) => {
+  await mockTrpc(recordsApi, { role: 'admin' })
   await page.goto('/admin/data-enrichment/records/import')
   await page.getByRole('button', { name: 'Choose a file' }).waitFor()
   expect(await page.evaluate(AUDIT), 'file').toEqual([])

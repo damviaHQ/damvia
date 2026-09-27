@@ -1,5 +1,20 @@
-import { expect, test, type Page } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { collection as source } from './lib/fixtures'
+import { addFilter } from './lib/page'
+import { expect, test, type MockTrpc } from './lib/trpc'
 
 // The Products block draws a catalogue collection with the same chrome files
 // already use: filters, selection, grid or list. See docs/administration/catalogue.md.
@@ -17,8 +32,7 @@ const product = (index: number, recordKey: string, season: string) => ({
 
 const fields = [{ name: 'season', displayName: 'Season', valueType: 'text', facetable: true, position: 0 }]
 
-function pageWithProductsBlock() {
-  const source = responses['collection.findById'] as any
+function pageWithProductsBlock(): any {
   return {
     ...source,
     files: [],
@@ -31,29 +45,25 @@ function pageWithProductsBlock() {
   }
 }
 
-async function fixture(page: Page, products: ReturnType<typeof product>[], total = products.length, collection = pageWithProductsBlock()) {
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const data = name === 'collection.findById' ? collection
-      : name === 'catalogue.list' ? { products, total, fields, cardTitleField: null }
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
+function fixture(mockTrpc: MockTrpc, products: ReturnType<typeof product>[], total = products.length, collection = pageWithProductsBlock()) {
+  return mockTrpc({
+    'collection.findById': collection,
+    'catalogue.list': { products, total, fields, cardTitleField: null },
   })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: new URL(test.info().project.use.baseURL!).hostname, path: '/' }])
 }
 
-test('a Products block draws the catalogue of the collection it is on', async ({ page }) => {
+test('a Products block draws the catalogue of the collection it is on', async ({ page, mockTrpc }) => {
   const products = [product(0, 'BOT-CIT-250', 'Autumn'), product(1, 'BOT-GIN-250', 'Autumn')]
-  await fixture(page, products)
+  await fixture(mockTrpc, products)
   await page.goto('/collections/campaign')
 
   await expect(page.getByRole('link', { name: 'BOT-CIT-250', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'BOT-GIN-250', exact: true })).toBeVisible()
 })
 
-test('a collection outgrowing one page of products points to the full catalogue', async ({ page }) => {
+test('a collection outgrowing one page of products points to the full catalogue', async ({ page, mockTrpc }) => {
   const products = Array.from({ length: 96 }, (_, i) => product(i, `SKU-${i}`, 'Autumn'))
-  await fixture(page, products, 240)
+  await fixture(mockTrpc, products, 240)
   await page.goto('/collections/campaign')
 
   const notice = page.getByRole('link', { name: /Showing 96 of 240 products/ })
@@ -61,24 +71,22 @@ test('a collection outgrowing one page of products points to the full catalogue'
   await expect(notice).toHaveAttribute('href', /\/catalogue\?collection=campaign/)
 })
 
-test('a field on the products narrows the block through the collection filter bar', async ({ page }) => {
+test('a field on the products narrows the block through the collection filter bar', async ({ page, mockTrpc }) => {
   const products = [product(0, 'BOT-CIT-250', 'Autumn'), product(1, 'BOT-GIN-250', 'Spring')]
-  await fixture(page, products)
+  await fixture(mockTrpc, products)
   await page.goto('/collections/campaign')
   await expect(page.getByRole('link', { name: 'BOT-CIT-250', exact: true })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Filters', exact: true }).click()
-  await page.getByRole('dialog', { name: 'Filters' }).getByRole('checkbox', { name: 'Season', exact: true }).click()
-  await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: /^Season,/ }).click()
+  await addFilter(page, 'Season')
+  await page.getByRole('button', { name: 'Season, Any' }).click()
   await page.getByRole('checkbox', { name: 'Autumn', exact: true }).check()
 
   await expect(page.getByRole('link', { name: 'BOT-CIT-250', exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'BOT-GIN-250', exact: true })).toHaveCount(0)
 })
 
-test('select all includes product blocks and selecting twice clears them', async ({ page }) => {
-  await fixture(page, [product(0, 'SKU-1', 'Autumn'), product(1, 'SKU-2', 'Spring')])
+test('select all includes product blocks and selecting twice clears them', async ({ page, mockTrpc }) => {
+  await fixture(mockTrpc, [product(0, 'SKU-1', 'Autumn'), product(1, 'SKU-2', 'Spring')])
   await page.goto('/collections/campaign')
   await page.getByRole('button', { name: 'Select All in', exact: true }).click()
   await expect(page.getByRole('checkbox', { name: 'Select SKU-1', exact: true })).toBeChecked()
@@ -89,15 +97,13 @@ test('select all includes product blocks and selecting twice clears them', async
   await expect(page.getByRole('checkbox', { name: 'Select SKU-1', exact: true })).not.toBeChecked()
 })
 
-
 for (const layout of ['automatic', 'products', 'files']) {
-  test(`a personal collection shows files and products with the ${layout} layout`, async ({ page }) => {
+  test(`a personal collection shows files and products with the ${layout} layout`, async ({ page, mockTrpc }) => {
     const products = [product(0, 'PERSONAL-001', 'Winter')]
-    const source = responses['collection.findById'] as any
     const collection = { ...pageWithProductsBlock(), public: false, ownerId: 'preview-user', synchronized: false, canEdit: true, files: source.files.slice(0, 1), numberOfRecords: 1 }
-    if (layout === 'automatic') collection.page = null as any
+    if (layout === 'automatic') collection.page = null
     if (layout === 'files') collection.page.blocks = [{ id: 'file-block', type: 'files', size: 'full', data: { title: '', layout: null, collectionId: null } }]
-    await fixture(page, products, 1, collection)
+    await fixture(mockTrpc, products, 1, collection)
     await page.goto('/collections/campaign')
     await expect(page.getByRole('link', { name: 'PERSONAL-001', exact: true })).toHaveCount(1)
     await expect(page.getByText(source.files[0].name, { exact: true })).toHaveCount(1)

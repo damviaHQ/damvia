@@ -1,5 +1,18 @@
-import { type Page } from '@playwright/test'
-import { responses } from './client-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { env } from './fixtures'
 
 // Sample catalogue for the admin Records screen: no real Damvia API is called.
 const picture = (fill: string) => 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="${fill}"/></svg>`)
@@ -56,37 +69,27 @@ const comparison = {
 }
 
 // Rows by block, as the grid asks for them; the second table is empty.
-function listFor(input: { offset?: number, tableId?: string }) {
+function listFor(input: { offset?: number, tableId?: string } = {}) {
   const rows = input.tableId === tables[1].id ? [] : records
   return { records: (input.offset ?? 0) === 0 ? rows : [], total: rows.length, keyColumnName: 'SKU' }
 }
 
-export async function fixture(page: Page) {
-  const errors: string[] = []
-  const calls: { name: string, input: unknown }[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  await page.route('**/trpc/**', async route => {
-    const url = new URL(route.request().url())
-    const name = url.pathname.split('/trpc/')[1]
-    const raw = route.request().method() === 'POST' ? route.request().postData() : url.searchParams.get('input')
-    calls.push({ name, input: raw ? JSON.parse(raw) : undefined })
-    const data = name === 'user.me' ? { ...(responses[name] as object), role: 'admin' }
-      : name === 'env' ? { ...(responses.env as object), recordLabel: { singular: 'Product', plural: 'Products' }, viewsEnabled: true }
-      : name === 'record.list' ? listFor(raw ? JSON.parse(raw) : {})
-      : name === 'recordTable.list' ? tables
-      : name === 'recordTable.create' ? { id: '00000000-0000-4000-8000-0000000000a3', name: 'Shoes', position: 2, recordCount: 0, fieldIds: [] }
-      : name === 'record.moveToTable' ? { moved: 1 }
-      : name === 'recordAttribute.list' ? fields
-      : name === 'record.get' ? detail
-      : name === 'record.history' ? history
-      : name === 'record.patch' ? { id: records[0].id, metaData: records[0].metaData, updatedAt: '2026-09-21T10:00:00Z' }
-      : name === 'record.compareCsv' ? comparison
-      : name === 'record.importCsv' ? { newRecords: ['WX9999-001'], updatedRecords: ['WX5678-100'], skipped: [], importBatchId: 'b' }
-      : name === 'enrichment.badges' ? { unmatched: 0, unnamedAxes: 0 }
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
-  })
-  await page.context().addCookies([{ name: 'dam_token', value: 'local-preview-fixture', domain: '127.0.0.1', path: '/' }])
-  return { errors, calls }
+// The answers of the admin Records screens, for an admin, with views on.
+// File metadata has no field yet.
+export const recordsApi = {
+  'env': { ...env, recordLabel: { singular: 'Product', plural: 'Products' }, viewsEnabled: true },
+  'record.list': listFor,
+  'recordTable.list': tables,
+  'recordTable.create': { id: '00000000-0000-4000-8000-0000000000a3', name: 'Shoes', position: 2, recordCount: 0, fieldIds: [] },
+  'record.moveToTable': { moved: 1 },
+  'recordAttribute.list': fields,
+  'recordAttribute.listAvailable': fields.map(field => field.name),
+  'recordAttribute.update': null,
+  'record.get': detail,
+  'record.history': history,
+  'record.patch': { id: records[0].id, metaData: records[0].metaData, updatedAt: '2026-09-21T10:00:00Z' },
+  'record.patchMany': null,
+  'record.compareCsv': comparison,
+  'metadataField.list': [],
+  'record.importCsv': { newRecords: ['WX9999-001'], updatedRecords: ['WX5678-100'], skipped: [], importBatchId: 'b' },
 }
-

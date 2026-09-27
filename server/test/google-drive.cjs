@@ -18,11 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 // hazard, and say which one in the commit message; never to make a refactor pass.
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { planDriveFiles, FOLDER_MIME } = require('../dist/asset-updater/google-drive-items')
+const { planDriveFiles } = require('../dist/asset-updater/google-drive-items')
+const { googleDrive: { folder, file } } = require('./lib/drivers.cjs')
 
 const ROOT = { id: 'root', name: 'Marketing' }
-const folder = (id, name, parent) => ({ id, name, mimeType: FOLDER_MIME, parents: [parent] })
-const file = (id, name, parent, extra = {}) => ({ id, name, mimeType: 'image/jpeg', parents: [parent], size: '10', md5Checksum: 'md5-' + id, ...extra })
 const listing = [
     file('photo', 'photo.jpg', 'nested'),
     folder('nested', 'Nested', 'top'),

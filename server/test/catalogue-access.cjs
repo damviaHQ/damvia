@@ -17,14 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 // See docs/administration/catalogue.md.
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
-const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
-const { db, env, state, save, caller, makeUser, makeCollection, makeFolder, makeFile, forbidden } = harness
+const { db, env, save, caller, makeUser, makeCollection, makeFolder, makeFile, productId, forbidden } = harness
 const { Group, UserGroup, CollectionFile, License } = harness.entities
 const { addRecords } = harness.services.productCollections
+const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
 let fixtures, admin, insider, group
-
-const productId = async recordKey => (await db.query('SELECT id FROM records WHERE record_key = $1', [recordKey]))[0].id
 const listed = async (user, input = {}) => (await caller(user).catalogue.list({ offset: 0, limit: 50, ...input }))
 const keysOf = async (user, input = {}) => (await listed(user, input)).products.map(product => product.recordKey).sort()
 const notFound = promise => assert.rejects(promise, error => error.code === 'NOT_FOUND')
@@ -304,7 +302,6 @@ test('related settings roll back and upgrade without changing records or members
 
 
 test('record details include each accessible asset type linked directly or through an attribute', async () => {
-    const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
     const record = await productId('CA-PUB')
     const folder = await makeFolder({ name: 'Record asset types' })
     const library = await makeCollection({ name: 'Related marketing assets' })

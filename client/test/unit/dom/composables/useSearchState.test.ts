@@ -12,13 +12,11 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, test } from 'vitest'
-import { useSearchState } from '@/composables/useSearchState.ts'
-
-const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+import { useSearchState } from '@/composables/useSearchState'
 
 async function setup(query: Record<string, any>) {
   const router = createRouter({ history: createMemoryHistory(), routes: [{ name: 'search', path: '/search', component: { render: () => h('div') } }] })
@@ -38,6 +36,26 @@ describe('useSearchState', () => {
     expect(state.filters.value.map((filter) => filter.value)).toEqual(['t1', 'x', 'y'])
   })
 
+  test('record filters reach the catalogue input and survive navigation', async () => {
+    const { router, state } = await setup({ kind: 'products', q: 'red, hat', from_collection: 'c1', search_scope: 'current', page: '3' })
+    state.toggleValue('attributes[color]', 'Red')
+    await flushPromises()
+    expect(state.recordInput.value).toEqual({
+      collectionId: 'c1', collectionOnly: true, search: undefined, searchTerms: ['red', 'hat'],
+      filters: [{ column: 'color', op: 'has_any', values: ['Red'] }],
+    })
+    expect(router.currentRoute.value.query.kind).toBe('products')
+    expect(state.form.value.page).toBeUndefined()
+    state.setExactMatch(true)
+    await flushPromises()
+    expect(state.recordInput.value.search).toBe('red, hat')
+    expect(state.recordInput.value.searchTerms).toBeUndefined()
+    state.clearFilters()
+    await flushPromises()
+    expect(state.recordInput.value.filters).toEqual([])
+    expect(router.currentRoute.value.query.kind).toBe('products')
+  })
+
   test('a repeated q param does not break the derived state', async () => {
     const { state } = await setup({ q: ['red hat', 'blue'], exact_match: 'true', page: ['2', '3'] })
     expect(state.terms.value).toEqual(['red hat'])
@@ -54,22 +72,22 @@ describe('useSearchState', () => {
   test('every change is a route push and resets the page', async () => {
     const { router, state } = await setup({ q: 'a', page: '2', file_types: 'image', 'attributes[a]': 'x' })
     state.toggleValue('file_types', 'video')
-    await settle()
+    await flushPromises()
     expect(router.currentRoute.value.query).toEqual({ q: 'a', file_types: ['image', 'video'], 'attributes[a]': 'x' })
     state.clearFilters()
-    await settle()
+    await flushPromises()
     expect(router.currentRoute.value.query).toEqual({ q: 'a' })
     state.setExactMatch(true)
-    await settle()
+    await flushPromises()
     expect(router.currentRoute.value.query).toEqual({ q: 'a', exact_match: 'true' })
     state.setExactMatch(false)
-    await settle()
+    await flushPromises()
     expect(router.currentRoute.value.query).toEqual({ q: 'a' })
     state.setTerms([])
-    await settle()
+    await flushPromises()
     expect(router.currentRoute.value.query).toEqual({})
     state.setPage(3)
-    await settle()
+    await flushPromises()
     expect(router.currentRoute.value.query).toEqual({ page: '3' })
   })
 })

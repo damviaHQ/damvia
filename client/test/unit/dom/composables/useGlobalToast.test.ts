@@ -22,7 +22,7 @@ vi.mock('vue-sonner', () => {
 })
 
 const { toast } = await import('vue-sonner')
-const { provideGlobalToast, useGlobalToast } = await import('@/composables/useGlobalToast.ts')
+const { provideGlobalToast, useGlobalToast } = await import('@/composables/useGlobalToast')
 
 const Child = defineComponent({
   setup() {

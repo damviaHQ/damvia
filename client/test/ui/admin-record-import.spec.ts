@@ -1,14 +1,26 @@
-import { expect, test } from '@playwright/test'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { readFileSync } from 'node:fs'
-import { fixture, importCsv, tables } from './records-fixtures'
+import { importCsv, recordsApi, tables } from './lib/records'
+import { expect, test } from './lib/trpc'
 
-const shot = (name: string) => process.env.RECORDS_SHOTS ? `${process.env.RECORDS_SHOTS}/${name}.png` : undefined
-
-test('a CSV is mapped, reviewed as changes and imported', async ({ page }) => {
-  const { errors, calls } = await fixture(page)
+test('a CSV is mapped, reviewed as changes and imported', async ({ page, mockTrpc, shot }) => {
+  const api = await mockTrpc(recordsApi, { role: 'admin' })
   await page.goto('/admin/data-enrichment/records/import')
   await expect(page.getByRole('heading', { name: 'Import products' })).toBeVisible()
-  await page.screenshot({ path: shot('import-file') })
+  await shot('import-file')
 
   await page.getByLabel('Choose a CSV or Excel file').setInputFiles({ name: 'catalogue.csv', mimeType: 'text/csv', buffer: Buffer.from(importCsv) })
   await expect(page.getByLabel('Table for catalogue')).toHaveValue(tables[0].id)
@@ -21,10 +33,10 @@ test('a CSV is mapped, reviewed as changes and imported', async ({ page }) => {
   await page.getByLabel('Import Colour into').selectOption('name')
   await expect(page.getByText('Name already goes into name.')).toBeVisible()
   await page.getByLabel('Import Colour into').selectOption('colour')
-  await page.screenshot({ path: shot('import-columns'), fullPage: true })
+  await shot('import-columns', { fullPage: true })
 
   await page.getByRole('button', { name: 'Compare with stored products' }).click()
-  await expect.poll(() => calls.find(call => call.name === 'record.compareCsv')?.input).toEqual({
+  await expect.poll(() => api.inputs('record.compareCsv')[0]).toEqual({
     tableId: tables[0].id,
     keyColumnName: 'SKU',
     data: [
@@ -44,25 +56,24 @@ test('a CSV is mapped, reviewed as changes and imported', async ({ page }) => {
   await expect(page.getByText('1 new · 0 of 1 change applied')).toBeVisible()
   await page.getByRole('checkbox', { name: 'Apply every change' }).click()
   await expect(page.getByRole('button', { name: 'Import 2 rows' })).toBeVisible()
-  await page.screenshot({ path: shot('import-review'), fullPage: true })
+  await shot('import-review', { fullPage: true })
   await page.getByRole('button', { name: /Not imported/ }).click()
   await expect(page.getByText('Price must be a number.')).toBeVisible()
   await expect(page.getByText('Linen shirt')).toHaveCount(0)
 
   await page.getByRole('button', { name: 'Import 2 rows' }).click()
   await expect(page.getByRole('heading', { name: 'Import finished' })).toBeVisible()
-  const imported = calls.find(call => call.name === 'record.importCsv')?.input as { tableId: string, data: { SKU: string }[] }
+  const imported = api.inputs('record.importCsv')[0] as { tableId: string, data: { SKU: string }[] }
   expect(imported.data.map(row => row.SKU)).toEqual(['WX5678-100', 'WX9999-001'])
   expect(imported.tableId).toBe(tables[0].id)
   await expect(page.getByText('1 product created, 1 updated. 2 rows were left out.')).toBeVisible()
-  await page.screenshot({ path: shot('import-done') })
-  expect(errors).toEqual([])
+  await shot('import-done')
 })
 
 // Each sheet of a workbook becomes a new table named after it, numbered when
 // a table has the name, and goes through its own columns and review.
-test('an Excel workbook imports each sheet into a table of its own', async ({ page }) => {
-  const { errors, calls } = await fixture(page)
+test('an Excel workbook imports each sheet into a table of its own', async ({ page, mockTrpc }) => {
+  const api = await mockTrpc(recordsApi, { role: 'admin' })
   await page.goto('/admin/data-enrichment/records/import')
   await page.getByLabel('Choose a CSV or Excel file').setInputFiles({ name: 'catalogue.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: readFileSync(new URL('./fixtures/two-sheets.xlsx', import.meta.url)) })
   await expect(page.getByText('2 sheets', { exact: true })).toBeVisible()
@@ -74,14 +85,13 @@ test('an Excel workbook imports each sheet into a table of its own', async ({ pa
   await expect(page.getByLabel('Import Colour into')).toHaveValue('colour')
   await expect(page.getByLabel('Import Size into')).toHaveValue('Size')
   await page.getByRole('button', { name: 'Compare with stored products' }).click()
-  await expect.poll(() => calls.find(call => call.name === 'record.compareCsv')?.input).toMatchObject({ data: [{ SKU: 'SH-001', colour: 'Sand', Size: '42' }, { SKU: 'SH-002', colour: 'Ink', Size: '43' }] })
+  await expect.poll(() => api.inputs('record.compareCsv')[0]).toMatchObject({ data: [{ SKU: 'SH-001', colour: 'Sand', Size: '42' }, { SKU: 'SH-002', colour: 'Ink', Size: '43' }] })
   await page.getByRole('button', { name: /^Import \d+ rows?$/ }).click()
-  await expect.poll(() => calls.find(call => call.name === 'recordTable.create')?.input).toEqual({ name: 'Shoes' })
-  await expect.poll(() => (calls.find(call => call.name === 'record.importCsv')?.input as { tableId?: string } | undefined)?.tableId).toBe('00000000-0000-4000-8000-0000000000a3')
+  await expect.poll(() => api.inputs('recordTable.create')[0]).toEqual({ name: 'Shoes' })
+  await expect.poll(() => api.inputs('record.importCsv')[0]?.tableId).toBe('00000000-0000-4000-8000-0000000000a3')
 
   await expect(page.getByText('Sheet 2 of 2')).toBeVisible()
   await page.getByRole('button', { name: 'Skip this sheet' }).click()
   await expect(page.getByRole('heading', { name: 'Import finished' })).toBeVisible()
-  expect(calls.filter(call => call.name === 'recordTable.create')).toHaveLength(1)
-  expect(errors).toEqual([])
+  expect(api.count('recordTable.create')).toBe(1)
 })

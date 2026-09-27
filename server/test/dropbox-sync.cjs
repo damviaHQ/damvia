@@ -25,11 +25,10 @@ const { db, state, makeCollection } = harness
 const { AssetFolder, AssetFile, Collection } = harness.entities
 const { upsertFolder, upsertFile, tmpDir, adoptUnassignedAssets } = harness.services.assets
 const DropboxAssetUpdater = require('../dist/asset-updater/dropbox').default
+const { dropbox: { folder, file } } = require('./lib/drivers.cjs')
 before(async () => { await harness.setup() })
 after(() => harness.teardown())
 
-const folder = (id, p) => ({ '.tag': 'folder', id, name: p.split('/').pop(), path_lower: p.toLowerCase(), path_display: p })
-const file = (id, p, size = 10, hash = 'h') => ({ '.tag': 'file', id, name: p.split('/').pop(), path_lower: p.toLowerCase(), path_display: p, size, content_hash: hash })
 const unauthorized = () => Object.assign(new Error('expired'), { status: 401 })
 
 const updaterFor = (pages, { rootPath = '', rootMeta = null, failFirstWith = null } = {}) => {

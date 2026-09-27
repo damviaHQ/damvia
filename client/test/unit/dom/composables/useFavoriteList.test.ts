@@ -12,7 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { computed, defineComponent, h } from 'vue'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
@@ -67,7 +67,7 @@ function fixture(initial = [{ id: 'a' }, { id: 'b' }]) {
 }
 
 describe('shared favorite updates', () => {
-  it('updates every observer immediately and prevents duplicate writes for the same item', async () => {
+  test('updates every observer immediately and prevents duplicate writes for the same item', async () => {
     const f = fixture()
     const first = f.observe()
     const second = f.observe()
@@ -84,7 +84,7 @@ describe('shared favorite updates', () => {
     expect(second.isFavorite('a')).toBe(false)
   })
 
-  it('keeps pending removals when another view mounts or invalidates the list', async () => {
+  test('keeps pending removals when another view mounts or invalidates the list', async () => {
     const f = fixture()
     const first = f.observe()
     await vi.waitFor(() => expect(first.isSuccess.value).toBe(true))
@@ -99,7 +99,7 @@ describe('shared favorite updates', () => {
     expect(second.isFavorite('a')).toBe(false)
   })
 
-  it('rolls back only the failed removal while another removal is still saving', async () => {
+  test('rolls back only the failed removal while another removal is still saving', async () => {
     const f = fixture()
     const first = f.observe()
     const second = f.observe()
@@ -119,7 +119,7 @@ describe('shared favorite updates', () => {
     expect(first.data.value).toEqual([{ id: 'a' }])
   })
 
-  it('adds immediately and restores the previous state when saving fails', async () => {
+  test('adds immediately and restores the previous state when saving fails', async () => {
     const f = fixture([])
     const first = f.observe()
     const second = f.observe()

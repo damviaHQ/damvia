@@ -1,8 +1,22 @@
-import { expect, test } from '@playwright/test'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { expect, test } from './lib/trpc'
+
+// The design system reference page: no API, the shared tokens and controls.
 for (const neutral of [false, true]) {
   test(`${neutral ? 'Neutral' : 'Damvia'} theme preserves production interactions`, async ({ page }) => {
-    const errors: string[] = []
-    page.on('pageerror', error => errors.push(error.message))
     await page.goto('/design-system.html')
     if (neutral) await page.getByRole('button', { name: 'Damvia brand theme', exact: true }).click()
     const primary = page.getByRole('button', { name: 'Download assets', exact: true })
@@ -35,9 +49,9 @@ for (const neutral of [false, true]) {
     await expect(toast).toHaveCSS('background-color', 'rgb(255, 255, 255)')
     await expect(toast.locator('.dv-toast__title')).toHaveCSS('color', neutral ? 'rgb(38, 38, 38)' : 'rgb(23, 35, 67)')
     await expect(page.locator('[data-sonner-toaster]')).toHaveCSS('position', 'fixed')
-    expect(errors).toEqual([])
   })
 }
+
 test('neutral reference fits mobile and respects reduced motion', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.emulateMedia({ reducedMotion: 'reduce' })

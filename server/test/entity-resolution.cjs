@@ -18,8 +18,8 @@ const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
-const { db, save, caller, makeCollection, makeFolder, makeFile, forbidden } = harness
-const { AssetFolder, AssetFile, AssetType, DataRecord, CollectionFile, RecordAttribute } = harness.entities
+const { db, save, caller, makeCollection, makeFile, typedFolder, makeRecord, fileRow, forbidden } = harness
+const { AssetFolder, AssetFile, DataRecord, CollectionFile, RecordAttribute } = harness.entities
 const { AssetTypeResolverStep } = require('../dist/entity/asset-type-resolver-step')
 const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
 const { AssetFileResolution } = require('../dist/entity/asset-file-resolution')
@@ -31,16 +31,13 @@ before(async () => { fixtures = await harness.setup() })
 after(() => harness.teardown())
 
 const LEGACY = '^([A-Z]{2,4}-[A-Za-z0-9]+)-C-?(\\w+)?'
-const makeType = (name, extra = {}) => save(AssetType, { name, isRelatedToRecords: true, defaultDisplay: 'grid', listDisplayItems: [], ...extra })
-const makeRecord = (key, metaData = {}) => save(DataRecord, { recordKey: key, keyColumnName: 'Code', metaData: { Code: key, ...metaData } })
-const fileRow = id => db.getRepository(AssetFile).findOneByOrFail({ id })
+const makeType = (name, extra = {}) => harness.makeType(name, { isRelatedToRecords: true, ...extra })
 const linksOf = assetFileId => db.getRepository(AssetEntityLink).find({ where: { assetFileId }, order: { strategy: 'ASC', recordKey: 'ASC' } })
 const statusOf = async assetFileId => (await db.getRepository(AssetFileResolution).findOneBy({ assetFileId }))?.status
 const step = (id, strategy, config, extra = {}) => ({ id, strategy, config, ...resolution.compileStep(strategy, config), ...extra })
 const childFolder = (parent, name) => save(AssetFolder, { name, status: 'up_to_date', externalId: randomUUID(), parentId: parent.id, parent, assetTypeId: parent.assetTypeId, assetTypeSource: 'inherited' })
 // The asset type stage of the pass keeps a folder's type only when it knows
 // where it came from, as the assets screen records it.
-const typedFolder = (name, type) => makeFolder({ name, assetTypeId: type.id, assetTypeSource: 'manual' })
 const catalogue = (keys, attributes = []) => ({ recordIds: new Map(keys.map(key => [key, `id-${key}`])), attributeValues: new Set(attributes.map(([name, value]) => resolution.attributeKey(name, value))) })
 
 test('a step is refused without a group, with a group it does not have, or with a pattern that hangs', () => {

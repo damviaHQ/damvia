@@ -12,34 +12,39 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { expect, test, type Page } from '@playwright/test'
-import { responses } from './client-fixtures'
+import { type Page } from '@playwright/test'
+import { files as sampleFiles } from './lib/fixtures'
+import { expect, serverError, test, type MockTrpc } from './lib/trpc'
 
-async function fixture(page: Page, options: { views?: boolean, noFiles?: boolean, fail?: boolean, products?: number, selectedProducts?: number, singleFile?: boolean, licensed?: boolean, mainView?: string } = {}) {
-  const base = responses['collection.findById'] as any
-  const files = options.noFiles ? [] : base.files.slice(0, options.singleFile ? 1 : 4).map((file: any, i: number) => ({ ...file, size: 2400000, recordView: ['00', '01', '01', null][i], license: options.licensed && i === 1 ? { id: 'licence', name: 'Studio usage', details: '<p>Approved use only.</p>', scopes: [] } : null }))
-  const calls: { name: string, input: any }[] = []
+type Options = { views?: boolean, noFiles?: boolean, fail?: boolean, products?: number, selectedProducts?: number, singleFile?: boolean, licensed?: boolean, mainView?: string }
+
+// Selects files of the collection, or products of the catalogue, then opens
+// the download of the selection.
+async function fixture(page: Page, mockTrpc: MockTrpc, options: Options = {}) {
+  const files = options.noFiles ? [] : sampleFiles.slice(0, options.singleFile ? 1 : 4).map((file, i) => ({ ...file, size: 2400000, recordView: ['00', '01', '01', null][i], license: options.licensed && i === 1 ? { id: 'licence', name: 'Studio usage', details: '<p>Approved use only.</p>', scopes: [] } : null }))
   let failed = false
-  await page.route('**/trpc/**', async route => {
-    const name = new URL(route.request().url()).pathname.split('/trpc/')[1]
-    const input = route.request().method() === 'POST' ? route.request().postDataJSON() : null
-    calls.push({ name, input })
-    if (name === 'collection.getFiles' && options.fail && !failed) {
+  const getFiles = (input: { items: { type: string, id: string }[] }) => {
+    if (options.fail && !failed) {
       failed = true
-      await route.fulfill({ status: 500, json: { error: { message: 'Could not load selection.', code: -32603, data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 } } } })
-      return
+      return serverError('Could not load selection.')
     }
-    const selectedRecordIds = input?.items?.filter((item: { type: string }) => item.type === 'record').map((item: { id: string }) => item.id) ?? []
-    const previewIndexes = selectedRecordIds.length ? selectedRecordIds.map((id: string) => Number(id.split('-').at(-1))) : Array.from({ length: Math.min(options.products ?? 12, 12) }, (_, i) => i)
-    const data = name === 'collection.getFiles' ? { files, licenses: [], allowDirectDownload: true, viewsEnabled: options.views ?? true, mainView: options.mainView ?? '00', recordCount: options.singleFile ? 0 : selectedRecordIds.length || (options.products ?? 12), columns: [{ id: 'recordKey', label: 'Reference' }, { id: 'name', label: 'Name' }, { id: 'season', label: 'Season' }, { id: 'picture', label: 'Picture' }], previewRows: previewIndexes.map((i: number) => [`0010${i}`, ['Botanical', 'Essentials', 'Studio'][i % 3], 'Autumn', '']), previewPictures: previewIndexes.map(() => files[0]?.thumbnailURL ?? null) }
-      : name === 'catalogue.list' ? { products: Array.from({ length: options.products ?? 2 }, (_, i) => ({ id: `product-${i}`, recordKey: `0010${i}`, metaData: { name: 'Botanical' }, thumbnailURL: files[0]?.thumbnailURL ?? null, visuals: [], visualCount: files.length, fileCount: files.length, readiness: { filled: 0, total: 0, ready: true }, family: null })), total: options.products ?? 2, fields: [], cardTitleField: null }
-      : name === 'catalogue.facets' ? { total: options.products ?? 2, attributes: [], assetTypes: [], fileTypes: [], extensions: [] }
-      : name === 'download.exportRecords' ? { filename: 'records.csv', mimeType: 'text/csv', content: Buffer.from('Reference,Season\r\n00100,Autumn').toString('base64') }
-      : name === 'download.create' ? { url: null }
-      : responses[name] ?? []
-    await route.fulfill({ json: { result: { data } } })
+    const selectedRecordIds = input.items.filter(item => item.type === 'record').map(item => item.id)
+    const previewIndexes = selectedRecordIds.length ? selectedRecordIds.map(id => Number(id.split('-').at(-1))) : Array.from({ length: Math.min(options.products ?? 12, 12) }, (_, i) => i)
+    return {
+      files, licenses: [], allowDirectDownload: true, viewsEnabled: options.views ?? true, mainView: options.mainView ?? '00',
+      recordCount: options.singleFile ? 0 : selectedRecordIds.length || (options.products ?? 12),
+      columns: [{ id: 'recordKey', label: 'Reference' }, { id: 'name', label: 'Name' }, { id: 'season', label: 'Season' }, { id: 'picture', label: 'Picture' }],
+      previewRows: previewIndexes.map(i => [`0010${i}`, ['Botanical', 'Essentials', 'Studio'][i % 3], 'Autumn', '']),
+      previewPictures: previewIndexes.map(() => files[0]?.thumbnailURL ?? null),
+    }
+  }
+  const api = await mockTrpc({
+    'collection.getFiles': getFiles,
+    'catalogue.list': { products: Array.from({ length: options.products ?? 2 }, (_, i) => ({ id: `product-${i}`, recordKey: `0010${i}`, metaData: { name: 'Botanical' }, thumbnailURL: files[0]?.thumbnailURL ?? null, visuals: [], visualCount: files.length, fileCount: files.length, readiness: { filled: 0, total: 0, ready: true }, family: null })), total: options.products ?? 2, fields: [], cardTitleField: null },
+    'catalogue.facets': { total: options.products ?? 2, attributes: [], assetTypes: [], fileTypes: [], extensions: [] },
+    'download.exportRecords': { filename: 'records.csv', mimeType: 'text/csv', content: Buffer.from('Reference,Season\r\n00100,Autumn').toString('base64') },
+    'download.create': { url: null },
   })
-  await page.context().addCookies([{ name: 'dam_token', value: 'fixture', domain: '127.0.0.1', path: '/' }])
   if (options.products) {
     await page.goto('/catalogue')
     for (let i = 0; i < (options.selectedProducts ?? options.products); i++) await page.getByRole('checkbox', { name: `Select 0010${i}`, exact: true }).check()
@@ -49,33 +54,39 @@ async function fixture(page: Page, options: { views?: boolean, noFiles?: boolean
     else await page.getByRole('button', { name: 'Select All in', exact: true }).click()
   }
   await page.getByTitle('Download selection', { exact: true }).click()
-  return calls
+  return api
 }
 
-test('record lists preview and export only chosen columns, with Excel and CSV choices', async ({ page }) => {
-  const calls = await fixture(page)
+test('record lists preview and export only chosen columns, with Excel and CSV choices', async ({ page, mockTrpc, shot }) => {
+  const api = await fixture(page, mockTrpc)
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tab', { name: 'Files' }).focus()
   await page.keyboard.press('ArrowRight')
   await expect(dialog.getByRole('tab', { name: 'Products' })).toHaveAttribute('aria-selected', 'true')
   await expect(dialog.getByLabel('Excel .xlsx')).toBeChecked()
-  await dialog.getByRole('button', { name: 'Clear', exact: true }).click()
+  const excel = (await dialog.getByLabel('Excel .xlsx').boundingBox())!
+  const csv = (await dialog.getByLabel('CSV .csv').boundingBox())!
+  expect(Math.abs(excel.y - csv.y)).toBeLessThan(2)
+  await expect(dialog.locator('.columns-heading button')).toHaveText('Remove all')
+  await dialog.getByRole('button', { name: 'Remove all', exact: true }).click()
+  await expect(dialog.locator('.columns-heading button')).toHaveText('Select all')
   await expect(dialog.getByRole('button', { name: 'Download Excel' })).toBeDisabled()
   await dialog.getByLabel('Reference', { exact: true }).check()
   await dialog.getByLabel('Season', { exact: true }).check()
+  await expect(dialog.locator('.columns-heading button')).toHaveText('Select all')
   await expect(dialog.getByRole('columnheader')).toHaveText(['Reference', 'Season'])
   await expect(dialog.locator('.list-preview .product-picture')).toHaveCount(12)
-  await page.screenshot({ path: '/tmp/damvia-download-list.png' })
+  await shot('download-list')
   await dialog.getByLabel('CSV .csv').check()
   const downloaded = page.waitForEvent('download')
   await dialog.getByRole('button', { name: 'Download CSV' }).click()
   expect((await downloaded).suggestedFilename()).toBe('products.csv')
-  expect(calls.find(call => call.name === 'download.exportRecords')?.input).toMatchObject({ columns: ['recordKey', 'season'], format: 'csv' })
+  expect(api.inputs('download.exportRecords')[0]).toMatchObject({ columns: ['recordKey', 'season'], format: 'csv' })
   await expect(dialog).toHaveCount(0)
 })
 
-test('Excel embeds the chosen picture column in the chosen order', async ({ page }) => {
-  const calls = await fixture(page, { products: 2 })
+test('Excel embeds the chosen picture column in the chosen order', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 2 })
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tab', { name: 'Products' }).click()
   await expect(dialog.getByRole('columnheader').first()).toHaveText('Picture')
@@ -91,11 +102,11 @@ test('Excel embeds the chosen picture column in the chosen order', async ({ page
   const downloaded = page.waitForEvent('download')
   await dialog.getByRole('button', { name: 'Download Excel' }).click()
   await downloaded
-  expect(calls.find(call => call.name === 'download.exportRecords')?.input).toMatchObject({ columns: ['season', 'picture', 'recordKey', 'name'], format: 'xlsx' })
+  expect(api.inputs('download.exportRecords')[0]).toMatchObject({ columns: ['season', 'picture', 'recordKey', 'name'], format: 'xlsx' })
 })
 
-test('dragging columns changes the preview and export order', async ({ page }) => {
-  const calls = await fixture(page, { products: 2 })
+test('dragging columns changes the preview and export order', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 2 })
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tab', { name: 'Products' }).click()
   await dialog.getByRole('button', { name: 'Drag Season to reorder' }).dragTo(dialog.getByRole('button', { name: 'Drag Reference to reorder' }))
@@ -103,11 +114,11 @@ test('dragging columns changes the preview and export order', async ({ page }) =
   const downloaded = page.waitForEvent('download')
   await dialog.getByRole('button', { name: 'Download Excel' }).click()
   await downloaded
-  expect(calls.find(call => call.name === 'download.exportRecords')?.input.columns).toEqual(['picture', 'season', 'recordKey', 'name'])
+  expect(api.inputs('download.exportRecords')[0].columns).toEqual(['picture', 'season', 'recordKey', 'name'])
 })
 
-test('excluded files stay in place and can be included again', async ({ page }) => {
-  const calls = await fixture(page)
+test('excluded files stay in place and can be included again', async ({ page, mockTrpc, shot }) => {
+  const api = await fixture(page, mockTrpc)
   const dialog = page.getByRole('dialog')
   await expect(dialog.locator('.download-options').getByRole('heading', { name: 'Views' })).toBeVisible()
   await expect(dialog.locator('.download-preview').getByRole('heading', { name: 'Views' })).toHaveCount(0)
@@ -117,11 +128,11 @@ test('excluded files stay in place and can be included again', async ({ page }) 
   await expect(dialog.getByLabel('01', { exact: true })).not.toBeChecked()
   await dialog.getByRole('button', { name: 'Select all' }).click()
   await dialog.getByLabel('00', { exact: true }).uncheck()
-  await expect(dialog.getByRole('heading', { name: '2 files' })).toBeVisible()
+  await expect(dialog.locator('.download-footer > span')).toContainText('2 files')
   const firstCard = dialog.locator('.download-file').filter({ has: page.getByLabel('Include Botanical — Front.jpg') })
   const position = await firstCard.boundingBox()
   await dialog.getByLabel('Include Botanical — Front.jpg').uncheck()
-  await expect(dialog.getByRole('heading', { name: '1 file' })).toBeVisible()
+  await expect(dialog.locator('.download-footer > span')).toContainText('1 file')
   await expect(firstCard).toHaveClass(/is-excluded/)
   expect(await firstCard.boundingBox()).toEqual(position)
   await expect(dialog.locator('.download-file')).toHaveCount(2)
@@ -133,15 +144,15 @@ test('excluded files stay in place and can be included again', async ({ page }) 
   await firstCard.getByText('Botanical — Front.jpg', { exact: true }).click()
   await expect(dialog.getByLabel('Include Botanical — Front.jpg')).toBeChecked()
   await expect(firstCard).not.toHaveClass(/is-excluded/)
-  await expect(dialog.getByRole('heading', { name: '1 file' })).toBeVisible()
-  await page.screenshot({ path: '/tmp/damvia-download-files.png' })
+  await expect(dialog.locator('.download-footer > span')).toContainText('1 file')
+  await shot('download-files')
   await dialog.getByRole('button', { name: 'Download files', exact: true }).click()
-  expect(calls.find(call => call.name === 'download.create')?.input.collectionFileIds).toEqual(['file-1'])
+  await expect.poll(() => api.inputs('download.create')[0]?.collectionFileIds).toEqual(['file-1'])
 })
 
-test('views follow settings and the dialog fits a phone', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 })
-  await fixture(page, { views: false })
+test('views follow settings and the dialog fits the narrowest desktop', async ({ page, mockTrpc, shot }) => {
+  await page.setViewportSize({ width: 768, height: 844 })
+  await fixture(page, mockTrpc, { views: false })
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('heading', { name: 'Views', exact: true })).toHaveCount(0)
   expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
@@ -149,34 +160,39 @@ test('views follow settings and the dialog fits a phone', async ({ page }) => {
   await expect(dialog.getByRole('button', { name: 'Download Excel' })).toBeInViewport()
   await expect(dialog.getByLabel('Excel .xlsx')).toBeInViewport()
   await expect(dialog.getByLabel('Reference', { exact: true })).toBeInViewport()
-  await page.screenshot({ path: '/tmp/damvia-download-mobile.png' })
+  await shot('download-mobile')
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
 })
 
-test('a failed load can be retried and records without media can still export', async ({ page }) => {
-  await fixture(page, { noFiles: true, fail: true })
+test('a failed load can be retried and records without media can still export', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { noFiles: true, fail: true })
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('alert')).toContainText('Could not load selection.')
+  await expect(dialog.getByRole('button', { name: 'Download Excel' })).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Try again' }).click()
+  await expect(dialog.getByRole('alert')).toHaveCount(0)
+  expect(api.count('collection.getFiles')).toBe(2)
+  // With no media, the list is the only thing to download.
   await expect(dialog.getByRole('button', { name: 'Download Excel' })).toBeEnabled()
-  await expect(dialog.getByRole('button', { name: 'Download files' })).toHaveCount(0)
-  await expect(dialog.getByRole('button', { name: 'Download all' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: /^Download (files|all)$/ })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: /^Download/ })).toHaveText(['Download Excel'])
 })
 
-test('a files-only selection has its own download action', async ({ page }) => {
-  const calls = await fixture(page, { products: 0 })
+test('a files-only selection has its own download action', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 0 })
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('button', { name: 'Download files' })).toBeEnabled()
   await expect(dialog.getByRole('button', { name: 'Download Excel' })).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Download all' })).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Download files' }).click()
-  expect(calls.find(call => call.name === 'download.create')?.input.recordExport).toBeUndefined()
+  await expect.poll(() => api.count('download.create')).toBe(1)
+  expect(api.inputs('download.create')[0].recordExport).toBeUndefined()
 })
 
 
-test('one product starts with the main view and the filename strip keeps the download selection', async ({ page }) => {
-  const calls = await fixture(page, { products: 1 })
+test('one product starts with the main view and the filename strip keeps the download selection', async ({ page, mockTrpc, shot }) => {
+  const api = await fixture(page, mockTrpc, { products: 1 })
   const dialog = page.getByRole('dialog', { name: '00100', exact: true })
   await expect(dialog).toHaveClass(/gallery-modal/)
   expect(await dialog.locator('.gallery-modal__header').evaluate(element => element.getBoundingClientRect().height)).toBeLessThan(50)
@@ -192,18 +208,20 @@ test('one product starts with the main view and the filename strip keeps the dow
   await expect(dialog.getByLabel('00', { exact: true })).toBeChecked()
   await expect(dialog.getByRole('button', { name: 'Preview Botanical — Front.jpg' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Preview view 01' })).toHaveCount(0)
+  await expect(dialog.locator('.product-views .view-actions button')).toHaveText('Select all')
   await dialog.getByRole('button', { name: 'Select all' }).click()
+  await expect(dialog.locator('.product-views .view-actions button')).toHaveText('Remove all')
   await expect(dialog.getByRole('button', { name: 'Download all views', exact: true })).toBeEnabled()
   await expect(dialog.getByLabel('Unnumbered')).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Download all views', exact: true })).toHaveCSS('background-color', 'rgb(38, 38, 38)')
-  await page.screenshot({ path: '/tmp/damvia-single-product-download.png' })
+  await shot('single-product-download')
   await dialog.getByRole('button', { name: 'Download all views', exact: true }).click()
-  expect(calls.find(call => call.name === 'collection.getFiles')?.input.items).toEqual([{ type: 'record', id: 'product-0' }])
-  expect(calls.find(call => call.name === 'download.create')?.input.collectionFileIds).toEqual(['file-0', 'file-1', 'file-2'])
+  expect(api.inputs('collection.getFiles')[0].items).toEqual([{ type: 'record', id: 'product-0' }])
+  await expect.poll(() => api.inputs('download.create')[0]?.collectionFileIds).toEqual(['file-0', 'file-1', 'file-2'])
 })
 
-test('single product arrows navigate the visible products, not their views', async ({ page }) => {
-  const calls = await fixture(page, { products: 3, selectedProducts: 1 })
+test('single product arrows navigate the visible products, not their views', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 3, selectedProducts: 1 })
   const dialog = page.getByRole('dialog')
   await expect(dialog).toHaveAccessibleName('00100')
   await expect(dialog.getByRole('button', { name: 'Next product' })).toBeVisible()
@@ -222,14 +240,14 @@ test('single product arrows navigate the visible products, not their views', asy
   await dialog.focus()
   await page.keyboard.press('ArrowLeft')
   await expect(page.getByRole('dialog', { name: '00102', exact: true })).toBeVisible()
-  const openedProducts = calls.filter(call => call.name === 'collection.getFiles').map(call => call.input.items[0].id)
+  const openedProducts = api.inputs('collection.getFiles').map(input => input.items[0].id)
   expect(openedProducts).toContain('product-1')
   expect(openedProducts.at(-1)).toBe('product-2')
 })
 
-test('single product copies all visible data or just one value', async ({ page }) => {
+test('single product copies all visible data or just one value', async ({ page, mockTrpc }) => {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
-  await fixture(page, { products: 1, mainView: '01' })
+  await fixture(page, mockTrpc, { products: 1, mainView: '01' })
   const dialog = page.getByRole('dialog', { name: '00100', exact: true })
   await expect(dialog.getByLabel('01', { exact: true })).toBeChecked()
   await expect(dialog.locator('.gallery-modal__preview-thumbnail')).toHaveAttribute('alt', 'Botanical — Front.jpg')
@@ -237,14 +255,16 @@ test('single product copies all visible data or just one value', async ({ page }
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('Reference: 00100\nName: Botanical\nSeason: Autumn')
   await dialog.getByRole('button', { name: 'Copy Season value' }).click()
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('Autumn')
-  await dialog.getByRole('button', { name: 'Remove all' }).click()
-  await expect(dialog.getByRole('button', { name: 'Download 0 files' })).toBeDisabled()
+  // Only the main view is chosen, so the toggle offers every view first.
+  await expect(dialog.getByRole('button', { name: 'Download 2 files', exact: true })).toBeEnabled()
   await dialog.getByRole('button', { name: 'Select all' }).click()
   await expect(dialog.getByRole('button', { name: 'Download all views' })).toBeEnabled()
+  await dialog.getByRole('button', { name: 'Remove all' }).click()
+  await expect(dialog.getByRole('button', { name: 'Download 0 files' })).toBeDisabled()
 })
 
-test('one product filters its views and requires only the included usage terms', async ({ page }) => {
-  const calls = await fixture(page, { products: 1, licensed: true })
+test('one product filters its views and requires only the included usage terms', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 1, licensed: true })
   const dialog = page.getByRole('dialog', { name: '00100', exact: true })
   await expect(dialog.getByRole('button', { name: 'Download 1 file', exact: true })).toBeEnabled()
   await dialog.getByRole('button', { name: 'Select all' }).click()
@@ -258,21 +278,21 @@ test('one product filters its views and requires only the included usage terms',
   await dialog.getByLabel('00', { exact: true }).check()
   await expect(dialog.getByRole('button', { name: 'Download 1 file', exact: true })).toBeEnabled()
   await dialog.getByRole('button', { name: 'Download 1 file', exact: true }).click()
-  expect(calls.find(call => call.name === 'download.create')?.input.collectionFileIds).toEqual(['file-0'])
+  await expect.poll(() => api.inputs('download.create')[0]?.collectionFileIds).toEqual(['file-0'])
 })
 
-test('multiple products can include files and an Excel list in one ZIP', async ({ page }) => {
-  const calls = await fixture(page, { products: 2 })
+test('multiple products can include files and an Excel list in one ZIP', async ({ page, mockTrpc, shot }) => {
+  const api = await fixture(page, mockTrpc, { products: 2 })
   const dialog = page.getByRole('dialog', { name: 'Download products', exact: true })
   await expect(dialog).toHaveClass(/download-dialog/)
-  const bounds = await dialog.boundingBox()
-  expect(bounds?.width).toBe(page.viewportSize()?.width)
-  expect(bounds?.height).toBe(page.viewportSize()?.height)
-  const sidebar = await dialog.locator('.download-options').boundingBox()
-  const settings = await dialog.locator('.download-section-body').boundingBox()
-  expect(sidebar && settings && bounds).toBeTruthy()
-  expect(Math.abs((sidebar!.x + sidebar!.width) - (bounds!.x + bounds!.width))).toBeLessThan(2)
-  expect(Math.abs((settings!.x - sidebar!.x) - ((sidebar!.x + sidebar!.width) - (settings!.x + settings!.width)))).toBeLessThan(2)
+  const bounds = (await dialog.boundingBox())!
+  expect(bounds.width).toBe(page.viewportSize()!.width)
+  expect(bounds.height).toBe(page.viewportSize()!.height)
+  const sidebar = (await dialog.locator('.download-options').boundingBox())!
+  const settings = (await dialog.locator('.download-section-body').boundingBox())!
+  // The options sit against the right edge, their content centred inside.
+  expect(Math.abs((sidebar.x + sidebar.width) - (bounds.x + bounds.width))).toBeLessThan(2)
+  expect(Math.abs((settings.x - sidebar.x) - ((sidebar.x + sidebar.width) - (settings.x + settings.width)))).toBeLessThan(2)
   await expect(dialog.getByRole('tab')).toHaveCount(2)
   await expect(dialog.getByRole('tab', { name: 'Files' })).toHaveAttribute('aria-selected', 'true')
   await expect(dialog.locator('.download-options > .download-section')).toHaveCount(1)
@@ -296,36 +316,32 @@ test('multiple products can include files and an Excel list in one ZIP', async (
   await expect(dialog.getByRole('button', { name: 'Download files' })).toBeEnabled()
   await expect(dialog.getByRole('button', { name: 'Download Excel' })).toBeEnabled()
   await expect(dialog.getByRole('button', { name: 'Download all' })).toBeEnabled()
-  await expect(dialog.getByRole('heading', { name: '3 files' })).toBeVisible()
+  await expect(dialog.locator('.download-preview .section-heading')).toHaveCount(0)
+  await expect(dialog.locator('.download-footer > span')).toContainText('3 files')
   await expect(dialog.getByRole('checkbox', { name: 'Files 4' })).toHaveCount(0)
   await expect(dialog.getByRole('checkbox', { name: 'Product list 2' })).toHaveCount(0)
-  expect(calls.find(call => call.name === 'collection.getFiles')?.input.items).toEqual([{ type: 'record', id: 'product-0' }, { type: 'record', id: 'product-1' }])
-  await page.screenshot({ path: '/tmp/damvia-multiple-products-download.png' })
+  expect(api.inputs('collection.getFiles')[0].items).toEqual([{ type: 'record', id: 'product-0' }, { type: 'record', id: 'product-1' }])
+  await shot('multiple-products-download')
   await dialog.getByRole('button', { name: 'Download all' }).click()
-  await expect.poll(() => calls.find(call => call.name === 'download.create')).toBeTruthy()
-  expect(calls.find(call => call.name === 'download.create')?.input.recordExport).toEqual({
+  await expect.poll(() => api.count('download.create')).toBe(1)
+  expect(api.inputs('download.create')[0].recordExport).toEqual({
     items: [{ type: 'record', id: 'product-0' }, { type: 'record', id: 'product-1' }],
     columns: ['picture', 'recordKey', 'name', 'season'], format: 'xlsx',
   })
-  expect(calls.find(call => call.name === 'download.create')?.input.collectionFileIds).toEqual(['file-0', 'file-1', 'file-2'])
+  await expect.poll(() => api.inputs('download.create')[0]?.collectionFileIds).toEqual(['file-0', 'file-1', 'file-2'])
 })
 
-test('a combined ZIP prepares in the background while navigation stays available', async ({ page }) => {
-  await fixture(page, { products: 2 })
+test('a combined ZIP prepares in the background while navigation stays available', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 2 })
   let releaseDownload!: () => void
   const waitForRelease = new Promise<void>(resolve => { releaseDownload = resolve })
-  let requestStarted = false
-  await page.route('**/trpc/download.create', async route => {
-    requestStarted = true
-    await waitForRelease
-    await route.fulfill({ json: { result: { data: { url: null } } } })
-  })
+  api.set({ 'download.create': async () => { await waitForRelease; return { url: null } } })
 
   const dialog = page.getByRole('dialog', { name: 'Download products', exact: true })
   await expect(dialog.getByRole('button', { name: 'Download all' })).toBeEnabled()
   await dialog.getByRole('button', { name: 'Download all' }).click()
   await expect(dialog).toHaveCount(0)
-  await expect.poll(() => requestStarted).toBe(true)
+  await expect.poll(() => api.count('download.create')).toBe(1)
   await expect(page.getByText('Preparing your download… You can keep browsing.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Preparing download — open downloads' })).toBeVisible()
 
@@ -339,23 +355,22 @@ test('a combined ZIP prepares in the background while navigation stays available
   await expect(page.getByText('Preparing your download… You can keep browsing.')).toHaveCount(0)
 })
 
-test('a ready archive appears in the top bar and opens downloads', async ({ page }) => {
-  const calls = await fixture(page, { products: 2 })
-  await expect.poll(() => calls.some(call => call.name === 'download.list')).toBe(true)
+test('a ready archive appears in the top bar and opens downloads', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 2 })
+  await expect.poll(() => api.count('download.list') > 0).toBe(true)
   let archiveReady = false
   const archive = {
     id: 'archive-1', status: 'ready', downloadType: 'email', fileCount: 1, recordCount: 2,
     url: '/archive.zip', createdAt: '2026-09-23T10:00:00Z', updatedAt: '2026-09-23T10:00:00Z', expiresAt: '2026-09-30T10:00:00Z',
   }
-  await page.route('**/trpc/download.list*', route => route.fulfill({ json: { result: { data: archiveReady ? [archive] : [] } } }))
-  await page.route('**/trpc/download.create', async route => {
-    archiveReady = true
-    await route.fulfill({ json: { result: { data: { url: null } } } })
+  api.set({
+    'download.list': () => archiveReady ? [archive] : [],
+    'download.create': () => { archiveReady = true; return { url: null } },
   })
 
   const dialog = page.getByRole('dialog', { name: 'Download products', exact: true })
   await dialog.getByLabel('Email me a link').check()
-  await dialog.getByRole('button', { name: 'Email all link' }).click()
+  await dialog.getByRole('button', { name: 'Email files and Excel' }).click()
   const readyButton = page.getByRole('button', { name: 'Download ready — open downloads' })
   await expect(readyButton).toBeVisible()
   await expect(readyButton).toHaveAttribute('title', 'Download ready')
@@ -373,18 +388,17 @@ test('a ready archive appears in the top bar and opens downloads', async ({ page
   await expect(readyButton).toBeVisible()
 })
 
-test('a direct ZIP also remains available from the top bar', async ({ page }) => {
-  const calls = await fixture(page, { products: 2 })
-  await expect.poll(() => calls.some(call => call.name === 'download.list')).toBe(true)
+test('a direct ZIP also remains available from the top bar', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 2 })
+  await expect.poll(() => api.count('download.list') > 0).toBe(true)
   let archiveReady = false
   const archive = {
     id: 'archive-direct', status: 'ready', downloadType: 'direct', fileCount: 1, recordCount: 2,
     url: '/archive.zip', createdAt: '2026-09-23T10:00:00Z', updatedAt: '2026-09-23T10:00:00Z', expiresAt: '2026-09-30T10:00:00Z',
   }
-  await page.route('**/trpc/download.list*', route => route.fulfill({ json: { result: { data: archiveReady ? [archive] : [] } } }))
-  await page.route('**/trpc/download.create', async route => {
-    archiveReady = true
-    await route.fulfill({ json: { result: { data: { url: '/archive.zip' } } } })
+  api.set({
+    'download.list': () => archiveReady ? [archive] : [],
+    'download.create': () => { archiveReady = true; return { url: '/archive.zip' } },
   })
   await page.route('**/archive.zip', route => route.fulfill({
     body: 'PK', headers: { 'content-type': 'application/zip', 'content-disposition': 'attachment; filename="archive.zip"' },
@@ -396,12 +410,9 @@ test('a direct ZIP also remains available from the top bar', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'Download ready — open downloads' })).toBeVisible()
 })
 
-test('a failed combined ZIP replaces the progress notification with an error', async ({ page }) => {
-  await fixture(page, { products: 2 })
-  await page.route('**/trpc/download.create', route => route.fulfill({
-    status: 500,
-    json: { error: { message: 'Could not prepare the download.', code: -32603, data: { code: 'INTERNAL_SERVER_ERROR', httpStatus: 500 } } },
-  }))
+test('a failed combined ZIP replaces the progress notification with an error', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 2 })
+  api.set({ 'download.create': serverError('Could not prepare the download.') })
 
   const dialog = page.getByRole('dialog', { name: 'Download products', exact: true })
   await dialog.getByRole('button', { name: 'Download all' }).click()
@@ -410,38 +421,45 @@ test('a failed combined ZIP replaces the progress notification with an error', a
   await expect(page.getByText('Preparing your download… You can keep browsing.')).toHaveCount(0)
 })
 
-test('multiple products start on the configured main view and can clear or select all views', async ({ page }) => {
-  await fixture(page, { products: 2, mainView: '01' })
+test('multiple products start on the configured main view and can clear or select all views', async ({ page, mockTrpc }) => {
+  await fixture(page, mockTrpc, { products: 2, mainView: '01' })
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByLabel('01', { exact: true })).toBeChecked()
   await expect(dialog.getByLabel('00', { exact: true })).not.toBeChecked()
   await expect(dialog.locator('.download-preview .download-file')).toHaveCount(2)
+  await expect(dialog.locator('.download-views .view-actions button')).toHaveText('Select all')
+  await dialog.getByRole('button', { name: 'Select all' }).click()
+  await expect(dialog.locator('.download-views .view-actions button')).toHaveText('Remove all')
   await dialog.getByRole('button', { name: 'Remove all' }).click()
   await expect(dialog.locator('.download-preview .download-file')).toHaveCount(0)
+  await expect(dialog.locator('.download-views .view-actions button')).toHaveText('Select all')
   await expect(dialog.getByRole('button', { name: 'Download files' })).toBeDisabled()
   await dialog.getByRole('button', { name: 'Select all' }).click()
   await expect(dialog.locator('.download-preview .download-file')).toHaveCount(3)
+  await dialog.getByLabel('00', { exact: true }).uncheck()
+  await expect(dialog.locator('.download-views .view-actions button')).toHaveText('Select all')
 })
 
-test('combined ZIP can contain a CSV list and only chosen files', async ({ page }) => {
-  const calls = await fixture(page, { products: 2 })
+test('combined ZIP can contain a CSV list and only chosen files', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 2 })
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tab', { name: 'Products' }).click()
   await dialog.getByLabel('CSV .csv').check()
   await dialog.getByRole('tab', { name: 'Files' }).click()
+  await dialog.getByLabel('Email me a link').check()
   await dialog.getByRole('button', { name: 'Select all' }).click()
   await dialog.getByLabel('Include Botanical — Front.jpg').uncheck()
-  await dialog.getByRole('button', { name: 'Download all' }).click()
-  await expect.poll(() => calls.find(call => call.name === 'download.create')).toBeTruthy()
-  expect(calls.find(call => call.name === 'download.create')?.input.recordExport).toEqual({
+  await dialog.getByRole('button', { name: 'Email files and CSV' }).click()
+  await expect.poll(() => api.count('download.create')).toBe(1)
+  expect(api.inputs('download.create')[0].recordExport).toEqual({
     items: [{ type: 'record', id: 'product-0' }, { type: 'record', id: 'product-1' }],
     columns: ['recordKey', 'name', 'season'], format: 'csv',
   })
-  expect(calls.find(call => call.name === 'download.create')?.input.collectionFileIds).toEqual(['file-0', 'file-2'])
+  await expect.poll(() => api.inputs('download.create')[0]?.collectionFileIds).toEqual(['file-0', 'file-2'])
 })
 
-test('a product without files still opens the single gallery and closes with Escape', async ({ page }) => {
-  await fixture(page, { products: 1, noFiles: true })
+test('a product without files still opens the single gallery and closes with Escape', async ({ page, mockTrpc }) => {
+  await fixture(page, mockTrpc, { products: 1, noFiles: true })
   const dialog = page.getByRole('dialog', { name: '00100', exact: true })
   await expect(dialog.getByText('No files for this product.')).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Download 0 files' })).toBeDisabled()
@@ -449,35 +467,35 @@ test('a product without files still opens the single gallery and closes with Esc
   await expect(dialog).toHaveCount(0)
 })
 
-test('a single selected file uses the same gallery without product view controls', async ({ page }) => {
-  const calls = await fixture(page, { singleFile: true })
+test('a single selected file uses the same gallery without product view controls', async ({ page, mockTrpc, shot }) => {
+  const api = await fixture(page, mockTrpc, { singleFile: true })
   const dialog = page.getByRole('dialog', { name: 'Campaign — Sand.jpg', exact: true })
   await expect(dialog).toHaveClass(/gallery-modal/)
   expect(await dialog.locator('.gallery-modal__header').evaluate(element => element.getBoundingClientRect().height)).toBeLessThan(50)
   await expect(dialog.locator('.gallery-modal__footer')).toBeVisible()
   await expect(dialog.getByRole('group', { name: 'Views to download' })).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Download', exact: true })).toBeEnabled()
-  await page.screenshot({ path: '/tmp/damvia-single-file-download.png' })
+  await shot('single-file-download')
   await dialog.getByRole('button', { name: 'Download', exact: true }).click()
-  expect(calls.find(call => call.name === 'download.create')?.input.collectionFileIds).toEqual(['file-0'])
+  await expect.poll(() => api.inputs('download.create')[0]?.collectionFileIds).toEqual(['file-0'])
 })
 
-test('single product controls and gallery remain usable on a phone', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 })
-  await fixture(page, { products: 1 })
+test('single product controls and gallery remain usable at the narrowest desktop width', async ({ page, mockTrpc, shot }) => {
+  await page.setViewportSize({ width: 768, height: 844 })
+  await fixture(page, mockTrpc, { products: 1 })
   const dialog = page.getByRole('dialog', { name: '00100', exact: true })
   expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   await dialog.getByRole('button', { name: 'Download 1 file' }).scrollIntoViewIfNeeded()
   await expect(dialog.getByRole('button', { name: 'Download 1 file' })).toBeInViewport()
-  await page.screenshot({ path: '/tmp/damvia-single-product-mobile.png' })
+  await shot('single-product-mobile')
 })
 
 
-test('single product views follow settings and a failed load can be retried', async ({ page }) => {
-  const calls = await fixture(page, { products: 1, views: false, fail: true })
+test('single product views follow settings and a failed load can be retried', async ({ page, mockTrpc }) => {
+  const api = await fixture(page, mockTrpc, { products: 1, views: false, fail: true })
   await page.getByRole('dialog').getByRole('button', { name: 'Try again' }).click()
   const dialog = page.getByRole('dialog', { name: '00100', exact: true })
   await expect(dialog.getByRole('group', { name: 'Views to download' })).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Download 4 files', exact: true }).click()
-  expect(calls.find(call => call.name === 'download.create')?.input.collectionFileIds).toHaveLength(4)
+  await expect.poll(() => api.inputs('download.create')[0]?.collectionFileIds).toHaveLength(4)
 })

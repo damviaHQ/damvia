@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { getFileExtension } from '@/utils/fileExtention.ts'
+import { getFileExtension } from '@/utils/fileExtention'
 
 describe('getFileExtension', () => {
   test('returns the upper-cased last extension', () => {

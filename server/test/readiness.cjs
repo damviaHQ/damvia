@@ -17,11 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const harness = require('./lib/helpers.cjs')
-const { db, env, save, caller, makeCollection, makeFolder, makeFile, forbidden } = harness
-const { addRecords } = harness.services.productCollections
+const { db, env, save, caller, makeCollection, makeFolder, makeFile, productId, forbidden } = harness
 let fixtures, admin, everything
-
-const productId = async recordKey => (await db.query('SELECT id FROM records WHERE record_key = $1', [recordKey]))[0].id
 const scoreOf = async recordKey => (await db.query('SELECT readiness_filled, readiness_total, readiness_ready FROM records WHERE record_key = $1', [recordKey]))[0]
 const fieldId = async name => (await admin.recordAttribute.list()).find(field => field.name === name).id
 const cardOf = async recordKey => (await caller(fixtures.member).catalogue.list({ offset: 0, limit: 50 }))

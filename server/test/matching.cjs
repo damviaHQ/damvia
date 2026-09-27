@@ -17,13 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const harness = require('./lib/helpers.cjs')
-const { db, save, makeFolder, makeFile } = harness
+const { db, save, makeFolder, makeFile, fileRow } = harness
 const { AssetFile, DataRecord } = harness.entities
 const { assignProductsToAssetFiles } = harness.services.assets
 before(() => harness.setup())
 after(() => harness.teardown())
 
-const fileRow = id => db.getRepository(AssetFile).findOneByOrFail({ id })
 
 test('group 1 gives the record key and group 2 the view; a name without a match is left alone', async () => {
     process.env.PRODUCT_MATCHING_REGEX = '^(.{6}-\\d{3})(?:\\.(\\d{2}))?'

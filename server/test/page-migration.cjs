@@ -16,6 +16,7 @@ const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
+const { parseBlockData } = require('../dist/page-blocks/schema')
 const { db } = harness
 
 before(() => harness.setup())
@@ -75,7 +76,6 @@ test('the layout migration converts existing pages without losing content', asyn
 })
 
 test('the converted payloads are what the block schemas accept', async () => {
-    const { parseBlockData } = require('../dist/page-blocks/schema')
     const blocks = await db.query('SELECT type, data FROM page_blocks')
     for (const block of blocks) {
         assert.doesNotThrow(() => parseBlockData(block.type, block.data), `${block.type} did not survive the migration`)

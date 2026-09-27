@@ -17,9 +17,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
+const { Readable } = require('node:stream')
 const harness = require('./lib/helpers.cjs')
-const { db, state, env, save, caller, makeCollection, makeFolder, makeFile, forbidden } = harness
-const { Collection, CollectionFile, CollectionInvitation, AssetFolder } = harness.entities
+const { db, state, env, save, caller, makeCollection, makeFolder, makeFile, collectionRow: row } = harness
+const { Collection, CollectionFile, CollectionInvitation, AssetFolder, Group } = harness.entities
 const { Page } = require('../dist/entity/page')
 const { MenuItem } = require('../dist/entity/menu-item')
 const { upsertFolder, deleteFolder } = harness.services.assets
@@ -27,11 +28,10 @@ const { synchronizeCollection, reparentSubtree, destroySynchronizedCollections, 
 let fixtures
 before(async () => {
     fixtures = await harness.setup()
-    env.mainS3 = () => ({ presignedGetObject: async () => 'https://example.test/fixture', removeObjects: async (_bucket, keys) => { state.removedKeys.push(...keys) }, listObjects: () => require('node:stream').Readable.from([]) })
+    env.mainS3 = () => ({ presignedGetObject: async () => 'https://example.test/fixture', removeObjects: async (_bucket, keys) => { state.removedKeys.push(...keys) }, listObjects: () => Readable.from([]) })
 })
 after(() => harness.teardown())
 
-const row = id => db.getRepository(Collection).findOneByOrFail({ id })
 const childOf = (parentId, assetFolderId) => db.getRepository(Collection).findOneByOrFail({ parentId, assetFolderId })
 const sync = id => db.transaction(em => synchronizeCollection(em, id))
 const menuItemsOf = collectionId => db.getRepository(MenuItem).findBy({ collectionId })
@@ -96,9 +96,15 @@ test('a custom child named like an incoming folder coexists with it instead of b
 })
 
 test('a collection whose folder is gone is skipped by the sync instead of failing forever', async () => {
-    const collection = await makeCollection({ assetFolderId: null })
-    await sync(collection.id)
-    await sync(randomUUID())
+    const collection = await makeCollection({ name: 'Kept name', assetFolderId: null })
+    await makeCollection({ parent: collection, name: 'Custom child' })
+    const before = await row(collection.id)
+    assert.equal(await sync(collection.id), undefined)
+    const after = await row(collection.id)
+    assert.deepEqual([after.name, after.updatedAt.getTime()], ['Kept name', before.updatedAt.getTime()])
+    assert.deepEqual((await db.getRepository(Collection).findBy({ parentId: collection.id })).map(child => child.name), ['Custom child'])
+    assert.deepEqual(await menuItemsOf(collection.id), [])
+    assert.equal(await sync(randomUUID()), undefined)
 })
 
 test('moving a folder re-parents its collection, descendants, custom children, menu items and counters', async () => {
@@ -449,4 +455,49 @@ test('a member moves only their own collections, and only under their own', asyn
     await caller(fixtures.member).collection.move({ id: mine.id, parentId: target.id })
     assert.equal((await row(mine.id)).parentId, target.id)
     await assertTreesConsistent()
+})
+
+test('collections expose their ancestor ids from the path and are editable by admins and owners', () => {
+    const collection = new Collection()
+    assert.equal(collection.parentCollectionIds, undefined)
+    collection.path = 'a.b.'
+    assert.deepEqual(collection.parentCollectionIds, ['a', 'b'])
+    collection.ownerId = 'owner'
+    assert.equal(collection.canEdit({ id: 'x', role: 'admin' }), true)
+    assert.equal(collection.canEdit({ id: 'owner', role: 'member' }), true)
+    assert.equal(collection.canEdit({ id: 'x', role: 'manager' }), false)
+})
+
+test('A1: editing a parent keeps the restrictions and draft state of its children', async () => {
+    const group = await save(Group, { name: 'Restricted' })
+    const parent = await makeCollection({ name: 'Parent' })
+    const restricted = await makeCollection({ parent, name: 'Restricted child', limitedToGroupIds: [group.id] })
+    const hidden = await makeCollection({ parent, name: 'Draft child', draft: true })
+    await caller(fixtures.admin).collection.update({ id: parent.id, name: 'Parent', description: 'New text' })
+    assert.deepEqual((await row(restricted.id)).limitedToGroupIds, [group.id])
+    assert.equal((await row(hidden.id)).draft, true)
+    assert.equal((await row(parent.id)).draft, false, 'an omitted draft flag keeps the current state')
+})
+
+test('A1: changes the editor asked for still reach the descendants', async () => {
+    const group = await save(Group, { name: 'Parent audience' })
+    const parent = await makeCollection({ name: 'Parent 2' })
+    const child = await makeCollection({ parent, name: 'Child' })
+    await caller(fixtures.admin).collection.update({ id: parent.id, name: 'Parent 2', draft: true, limitedToGroupIds: [group.id] })
+    const after = await row(child.id)
+    assert.equal(after.draft, true)
+    assert.deepEqual(after.limitedToGroupIds, [group.id])
+    assert.equal(after.canEditLimitedToGroupIds, false)
+    const [audit] = await db.query(`SELECT before, after FROM audit_log WHERE action = 'collection.access_changed' AND target_id = $1`, [parent.id])
+    assert.deepEqual([audit.before.draft, audit.after.draft, audit.after.limitedToGroupIds], [false, true, [group.id]])
+})
+
+test('moving a collection is recorded with the access it had and now has', async () => {
+    const group = await save(Group, { name: 'Move audience' })
+    const destination = await makeCollection({ name: 'Restricted destination', limitedToGroupIds: [group.id] })
+    const moving = await makeCollection({ name: 'Moving branch' })
+    await caller(fixtures.admin).collection.move({ id: moving.id, parentId: destination.id })
+    const [audit] = await db.query(`SELECT before, after FROM audit_log WHERE action = 'collection.moved' AND target_id = $1`, [moving.id])
+    assert.deepEqual([audit.before.parentId, audit.before.limitedToGroupIds], [null, []])
+    assert.deepEqual([audit.after.parentId, audit.after.limitedToGroupIds], [destination.id, [group.id]])
 })

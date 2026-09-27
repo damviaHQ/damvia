@@ -1,10 +1,22 @@
-import { expect, test } from '@playwright/test'
-import { fixture, records } from './records-fixtures'
+/* Damvia - Open Source Digital Asset Manager
+Copyright (C) 2024  Arnaud DE SAINT JEAN
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-const shot = (name: string) => process.env.RECORDS_SHOTS ? `${process.env.RECORDS_SHOTS}/${name}.png` : undefined
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
 
-test('cells are selected as a range, filled from the handle and pasted as a block', async ({ page }) => {
-  const { errors, calls } = await fixture(page)
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { records, recordsApi } from './lib/records'
+import { expect, test } from './lib/trpc'
+
+test('cells are selected as a range, filled from the handle and pasted as a block', async ({ page, mockTrpc, shot }) => {
+  const api = await mockTrpc(recordsApi, { role: 'admin' })
   await page.goto('/admin/data-enrichment/records')
   const grid = page.getByRole('grid')
   const at = (row: number, column: number) => grid.locator(`[data-cell="${row}-${column}"]`)
@@ -19,7 +31,7 @@ test('cells are selected as a range, filled from the handle and pasted as a bloc
   await page.mouse.up()
   await expect(at(1, 3)).toHaveAttribute('aria-selected', 'true')
   await expect(at(2, 2)).not.toHaveAttribute('aria-selected', 'true')
-  await page.screenshot({ path: shot('range-select') })
+  await shot('range-select')
 
   // Drag the fill handle of one cell down two rows.
   await at(0, 2).click()
@@ -29,9 +41,9 @@ test('cells are selected as a range, filled from the handle and pasted as a bloc
   await page.mouse.move(box!.x + 4, box!.y + 4)
   await page.mouse.down()
   await page.mouse.move(target!.x + 20, target!.y + 10, { steps: 6 })
-  await page.screenshot({ path: shot('range-fill') })
+  await shot('range-fill')
   await page.mouse.up()
-  await expect.poll(() => calls.find(call => call.name === 'record.patchMany')?.input).toEqual({ changes: [
+  await expect.poll(() => api.inputs('record.patchMany')[0]).toEqual({ changes: [
     { id: records[1].id, values: { name: 'Canvas tote' } },
     { id: records[2].id, values: { name: 'Canvas tote' } },
   ] })
@@ -44,15 +56,14 @@ test('cells are selected as a range, filled from the handle and pasted as a bloc
     data.setData('text/plain', 'Hat\t\r\nGlove\t\r\n')
     document.activeElement!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
   })
-  await expect.poll(() => calls.filter(call => call.name === 'record.patchMany').at(-1)?.input).toEqual({ changes: [
+  await expect.poll(() => api.last('record.patchMany')).toEqual({ changes: [
     { id: records[1].id, values: { name: 'Hat', colour: '' } },
     { id: records[2].id, values: { name: 'Glove' } },
   ] })
-  expect(errors).toEqual([])
 })
 
-test('a long value keeps its column width, and wrapped text shows its lines', async ({ page }) => {
-  await fixture(page)
+test('a long value keeps its column width, and wrapped text shows its lines', async ({ page, mockTrpc, shot }) => {
+  await mockTrpc(recordsApi, { role: 'admin' })
   await page.goto('/admin/data-enrichment/records')
   const story = page.getByRole('grid').locator('[data-cell="0-7"]')
   await story.waitFor()
@@ -63,5 +74,5 @@ test('a long value keeps its column width, and wrapped text shows its lines', as
   await page.keyboard.press('Escape')
   await expect.poll(async () => (await story.boundingBox())!.height).toBeGreaterThan(oneLine * 2)
   await story.scrollIntoViewIfNeeded()
-  await page.screenshot({ path: shot('range-wrap') })
+  await shot('range-wrap')
 })

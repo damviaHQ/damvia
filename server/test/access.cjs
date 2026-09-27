@@ -14,9 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
-const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
-const { db, state, save, makeUser, makeCollection, makeFolder, makeFile } = harness
+const { db, state, save, caller, makeUser, makeCollection, makeFolder, makeFile, forbidden } = harness
 const { User, Group, UserGroup, Collection, CollectionFile, CollectionInvitation } = harness.entities
 const { userCollectionsQuery, userCollectionFilesQuery } = harness.services.collections
 let fixtures, users, rows
@@ -110,4 +109,21 @@ test('guests never see public collections without a group or an invitation', asy
     assert.equal(await visible(guest, rows.limited), true)
     assert.equal(await visible(guest, rows.pub), false)
     assert.equal(await db.getRepository(User).countBy({ id: guest.id }), 1)
+})
+
+test('A7: guests view and download but cannot create, fill or share collections', async () => {
+    const guest = caller(fixtures.guest)
+    const shared = await makeCollection({ name: 'Guest visible' })
+    await forbidden(guest.collection.createUserCollection({ name: 'Mine' }))
+    await forbidden(guest.collection.addItems({ id: shared.id, items: [] }))
+    await forbidden(guest.collection.invitation.create({ collectionId: shared.id, email: 'friend@example.test', expiresAt: new Date(Date.now() + 86400000) }))
+    const own = await caller(fixtures.member).collection.createUserCollection({ name: 'Member collection' })
+    assert.ok(own.id)
+})
+
+test('B5: invitee emails reach editors only', async () => {
+    const shared = await makeCollection({ name: 'With invitations' })
+    await save(CollectionInvitation, { collectionId: shared.id, email: 'invitee@example.test', expiresAt: new Date(Date.now() + 86400000) })
+    assert.equal((await caller(fixtures.member).collection.findById(shared.id)).invitations, undefined)
+    assert.equal((await caller(fixtures.admin).collection.findById(shared.id)).invitations.length, 1)
 })

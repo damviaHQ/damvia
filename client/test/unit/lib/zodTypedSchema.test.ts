@@ -12,30 +12,30 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { describe, expect, it } from "vitest"
-import { z } from "zod"
-import { zodTypedSchema } from "@/lib/zodTypedSchema"
+import { describe, expect, test } from 'vitest'
+import { z } from 'zod'
+import { zodTypedSchema } from '@/lib/zodTypedSchema'
 
 const schema = zodTypedSchema(z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.email("Invalid email"),
-  address: z.object({ city: z.string().min(1, "City is required") }),
+  name: z.string().min(1, 'Name is required'),
+  email: z.email('Invalid email'),
+  address: z.object({ city: z.string().min(1, 'City is required') }),
 }))
 
-describe("zodTypedSchema", () => {
-  it("returns the parsed value when valid", async () => {
-    const result = await schema.parse({ name: "Ada", email: "ada@example.test", address: { city: "London" } })
+describe('zodTypedSchema', () => {
+  test('returns the parsed value when valid', async () => {
+    const result = await schema.parse({ name: 'Ada', email: 'ada@example.test', address: { city: 'London' } })
     expect(result.errors).toEqual([])
-    expect(result.value).toEqual({ name: "Ada", email: "ada@example.test", address: { city: "London" } })
+    expect(result.value).toEqual({ name: 'Ada', email: 'ada@example.test', address: { city: 'London' } })
   })
 
-  it("groups messages by dotted field path", async () => {
-    const result = await schema.parse({ name: "", email: "nope", address: { city: "" } })
+  test('groups messages by dotted field path', async () => {
+    const result = await schema.parse({ name: '', email: 'nope', address: { city: '' } })
     expect(result.value).toBeUndefined()
     expect(result.errors).toEqual([
-      { path: "name", errors: ["Name is required"] },
-      { path: "email", errors: ["Invalid email"] },
-      { path: "address.city", errors: ["City is required"] },
+      { path: 'name', errors: ['Name is required'] },
+      { path: 'email', errors: ['Invalid email'] },
+      { path: 'address.city', errors: ['City is required'] },
     ])
   })
 })

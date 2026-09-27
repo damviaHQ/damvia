@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { collapseBreadcrumb } from '@/utils/breadcrumb.ts'
+import { collapseBreadcrumb } from '@/utils/breadcrumb'
 
 const items = (count: number) => Array.from({ length: count }, (_, index) => ({ id: `c${index}`, label: `Level ${index}` }))
 

@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 // hazard, and say which one in the commit message; never to make a refactor pass.
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
-const { randomUUID } = require('node:crypto')
+const { randomUUID, generateKeyPairSync } = require('node:crypto')
 const { readdir, readFile, rm } = require('node:fs/promises')
 const { Readable } = require('node:stream')
 const harness = require('./lib/helpers.cjs')
@@ -27,13 +27,13 @@ const { AssetFolder, AssetFile, Collection } = harness.entities
 const { upsertFolder, upsertFile, tmpDir, adoptUnassignedAssets } = harness.services.assets
 const GoogleDriveAssetUpdater = require('../dist/asset-updater/google-drive').default
 const { parseServiceAccount } = require('../dist/asset-updater/google-drive')
-const { FOLDER_MIME } = require('../dist/asset-updater/google-drive-items')
+const { googleDrive: { folder, file }, FOLDER_MIME } = require('./lib/drivers.cjs')
 before(async () => { await harness.setup() })
 after(() => harness.teardown())
 
-const KEY = { client_email: 'dam@example.iam.gserviceaccount.com', private_key: '-----BEGIN PRIVATE KEY-----\nMIIBVQIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEA\n-----END PRIVATE KEY-----\n' }
-const folder = (id, name, parent) => ({ id, name, mimeType: FOLDER_MIME, parents: [parent] })
-const file = (id, name, parent, extra = {}) => ({ id, name, mimeType: 'image/jpeg', parents: [parent], size: '10', md5Checksum: 'md5-' + id, ...extra })
+// Generated per run so no key material is committed.
+const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } })
+const KEY = { client_email: 'dam@example.iam.gserviceaccount.com', private_key: privateKey }
 
 // A stub Drive client: files.list answers per parent id with optional pagination.
 const updaterFor = (byParent, { root = { id: 'root', name: 'Marketing', mimeType: FOLDER_MIME }, pageSize = 1000 } = {}) => {

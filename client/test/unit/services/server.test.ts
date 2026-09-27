@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCClientError } from '@trpc/client'
 import { describe, expect, test } from 'vitest'
-import { extractErrors } from '@/services/server.ts'
+import { extractErrors } from '@/services/server'
 
 describe('extractErrors', () => {
   test('plain errors carry the message and no field errors', () => {

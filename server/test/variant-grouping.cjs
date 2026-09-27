@@ -18,8 +18,8 @@ const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
-const { db, save, caller, makeCollection, makeFolder, makeFile, forbidden } = harness
-const { AssetFile, AssetType, CollectionFile } = harness.entities
+const { db, save, caller, makeCollection, makeFolder, makeFile, typedFolder, forbidden } = harness
+const { AssetFile, CollectionFile } = harness.entities
 const grouping = require('../dist/services/variant-grouping')
 const axes = require('../dist/services/variant-axes')
 const { runEnrichmentPass } = harness.services.enrichment
@@ -33,8 +33,7 @@ const none = () => ({ excluded: new Set(), forced: [], covers: new Map() })
 let counter = 0
 const file = (name, extra = {}) => ({ id: `f${String(++counter).padStart(4, '0')}`, name, folderId: 'folder', assetTypeId: 'type', hasThumbnail: true, mimeType: 'image/jpeg', width: 100, height: 100, spans: [], ...extra })
 const summary = groups => groups.map(g => [g.displayName, g.members.length, g.columns]).sort((a, b) => a[0].localeCompare(b[0]))
-const makeType = (name, extra = {}) => save(AssetType, { name, defaultDisplay: 'grid', listDisplayItems: [], groupVariants: true, ...extra })
-const typedFolder = (name, type) => makeFolder({ name, assetTypeId: type.id, assetTypeSource: 'manual' })
+const makeType = (name, extra = {}) => harness.makeType(name, { groupVariants: true, ...extra })
 const groupRows = () => db.query('SELECT g.id, g.display_name, g.member_count, g.cover_asset_file_id, g.prefix_key FROM variant_groups g ORDER BY g.display_name, g.prefix_key')
 
 test('the tokenizer drops the extension, splits on _ - space and dot, lowercases, turns a matched key into one token and refuses blocked words', () => {

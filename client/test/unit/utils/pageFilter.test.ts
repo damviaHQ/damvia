@@ -16,6 +16,7 @@ import { describe, expect, test } from 'vitest'
 import {
   availableGroups,
   emptyPageFilter,
+  fileExtensionOf,
   fileFacets,
   filterChipsOf,
   isPageFilterActive,
@@ -203,6 +204,13 @@ describe('page filter', () => {
     const current = state({ attributes: { 'attr-gone': ['Nothing'] } })
     const chips = filterChipsOf(current, fileFacets(files, current))
     expect(chips).toEqual([{ key: 'attribute:attr-gone', value: 'Nothing', label: 'Nothing', category: undefined }])
+  })
+
+  test('only a file name with a dot has an extension, and a product reference never does', () => {
+    expect(fileExtensionOf({ name: 'Chair front.jpg' })).toBe('JPG')
+    expect(fileExtensionOf({ name: 'archive.tar.gz' })).toBe('GZ')
+    expect(fileExtensionOf({ name: 'README' })).toBe('')
+    expect(fileExtensionOf({ name: 'WX5678.100', recordKey: 'WX5678.100' })).toBe('')
   })
 })
 
