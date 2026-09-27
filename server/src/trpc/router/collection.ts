@@ -38,13 +38,22 @@ import { loadViewableMetadata, ViewableMetadata } from "../../services/file-meta
 import { loadVariantGroups, VariantGroupSummary } from "../../services/variant-grouping"
 import { applySearchOrder, buildRangeQuery, buildSearchQuery, loadSearchContext, onePerFile, searchFacets } from "../../services/search"
 import { collectionSynchronizationQueue } from "../../worker"
-import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
+import { authMiddleware, publicProcedure, router, userAdmin, userApproved, userMember } from "../index"
 import invitationRouter, { formatInvitation } from "./collection/invitation"
 import { formatLicense } from "./license"
 import { formatPage } from "./page"
 import { splitMulti } from "../../services/record-values"
 
 import { resolveDownloadSelection } from "../../services/download-selection"
+import { downloadDelivery } from "../../services/download"
+import { DownloadType } from "../../entity/download"
+import { SIGNED_URL_SECONDS } from "../../services/signed-url"
+import { recordAudit } from "../../services/audit"
+import { recordSearchEvent } from "../../services/analytics"
+import { sanitizeBlockHtml } from "../../page-blocks/sanitize"
+import { IMAGE_MIME_TYPES, MAX_IMAGE_BYTES, readObject } from "../../services/page"
+import { randomUUID } from "node:crypto"
+import sharp from "sharp"
 
 export type FormatCollectionOptions = {
 	collection: Collection,
@@ -91,7 +100,8 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		parent: collection.parent && shouldDisplayParent
 			? await formatCollection({ collection: collection.parent, ...opts })
 			: undefined,
-		invitations: collection.invitations ? collection.invitations.map(formatInvitation) : undefined,
+		// Invitee emails are personal data: only editors, who manage them, see them.
+		invitations: collection.invitations && opts.user && collection.canEdit(opts.user) ? collection.invitations.map(formatInvitation) : undefined,
 		canEdit: opts.user ? collection.canEdit(opts.user) : undefined,
 		sampleFiles: await Promise.all(
 			collection.sampleFileIds
@@ -100,7 +110,7 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 				.map((file) => formatCollectionFile({ file }))
 		),
 		thumbnailURL: collection.hasThumbnail
-			? await mainS3().presignedGetObject(mainS3Bucket(), collection.thumbnailStorageKey)
+			? await mainS3().presignedGetObject(mainS3Bucket(), collection.thumbnailStorageKey, SIGNED_URL_SECONDS)
 			: null,
 		limitedToGroupIds: collection.limitedToGroupIds,
 		canEditLimitedToGroupIds: collection.canEditLimitedToGroupIds,
@@ -108,6 +118,18 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		orphanedReason: collection.orphanedReason,
 		orphanedFromName: collection.orphanedFromName,
 	}
+}
+
+const thumbnailStagingKey = (collectionId: string, uploadId: string) => `collections/staging/${collectionId}/${uploadId}`
+
+async function editableCollection(user: User, id: string) {
+	const collection = await userCollectionsQuery(user).andWhere('collection.id = :id', { id }).getOne()
+	if (!collection) {
+		throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+	} else if (!collection.canEdit(user)) {
+		throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+	}
+	return collection
 }
 
 // Names were unique per parent in the database until synchronized siblings were
@@ -197,14 +219,15 @@ export async function formatCollectionFile({ file, recordAttributes, metadata, v
 			width: file.assetFile.width,
 		},
 		thumbnailURL: file.assetFile.hasThumbnail
-			? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey)
+			? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey, SIGNED_URL_SECONDS)
 			: null,
-		fileURL: await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.originalStorageKey),
+		fileURL: await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.originalStorageKey, SIGNED_URL_SECONDS),
 		license: file.assetFile.license ? {
 			id: file.assetFile.license.id,
 			name: file.assetFile.license.name,
 			scopes: file.assetFile.license.scopes,
-			details: file.assetFile.license.details,
+			// Rendered as HTML in the download dialog; older rows were saved unsanitized.
+			details: file.assetFile.license.details && sanitizeBlockHtml(file.assetFile.license.details),
 			allowedRegionIds: file.assetFile.license.allowedRegionIds,
 			expired:
 				(file.assetFile.license.usageFrom && new Date(file.assetFile.license.usageFrom).toISOString().slice(0, 10) > new Date().toISOString().slice(0, 10)) ||
@@ -264,6 +287,8 @@ export default router({
 			variantAxes: z.record(z.string(), z.string().max(200).array().max(100).nullable()).nullable().optional(),
 			sort: z.enum(['relevance', 'name', 'newest']).optional().nullable(),
 			collapseVariants: z.boolean().optional(),
+			// Phones ask for smaller pages; the default suits the desktop grid.
+			perPage: z.number().int().min(1).max(300).optional(),
 			// Picking an image inside the page editor is not a library search.
 			silent: z.boolean().optional(),
 		}))
@@ -272,7 +297,7 @@ export default router({
 			const query = applySearchOrder(onePerFile(buildSearchQuery(ctx.user, input, context), buildSearchQuery(ctx.user, input, context), !!input.collapseVariants), input, context, input.sort)
 			const range = input.page === 1 ? buildRangeQuery(ctx.user, input, context) : null
 
-			const perPage = 300
+			const perPage = input.perPage ?? 300
 			const [[results, total], facets, [rangeResults, rangeTotal]] = await Promise.all([
 				query.offset(Math.max((input.page - 1) * perPage, 0)).limit(perPage).getManyAndCount(),
 				searchFacets(ctx.user, input, context),
@@ -281,14 +306,7 @@ export default router({
 			const totalPages = Math.ceil(total / perPage)
 			const searchTerm = input.query?.trim().toLowerCase()
 			if (searchTerm && input.page === 1 && !input.silent) {
-				await dataSource.query(`
-					INSERT INTO activity_events (user_id, type, collection_id, metadata)
-					SELECT $1, 'search', $2, $3::jsonb
-					WHERE NOT EXISTS (
-						SELECT 1 FROM activity_events
-						WHERE user_id = $1 AND type = 'search' AND metadata ->> 'query' = $4 AND created_at > now() - interval '1 minute'
-					)
-				`, [ctx.user.id, ['current', 'current_with_sub'].includes(input.searchScope ?? '') ? input.collectionId : null, JSON.stringify({ query: searchTerm, total }), searchTerm])
+				await recordSearchEvent(ctx.user.id, ['current', 'current_with_sub'].includes(input.searchScope ?? '') ? input.collectionId ?? null : null, searchTerm, total)
 			}
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
 			const metadata = await loadViewableMetadata([...results, ...rangeResults].map((file) => file.assetFileId))
@@ -310,6 +328,7 @@ export default router({
 		.use(authMiddleware(userApproved))
 		.input(z.object({
 			page: z.number().int().min(1).default(1),
+			perPage: z.number().int().min(1).max(300).optional(),
 			query: z.string().min(1).max(2000),
 			collectionId: z.uuid().nullable().optional(),
 			assetTypes: z.uuid().array().optional().nullable(),
@@ -325,7 +344,7 @@ export default router({
 		}))
 		.query(async ({ input, ctx }) => {
 			const context = await loadSearchContext(input)
-			const perPage = 300
+			const perPage = input.perPage ?? 300
 			const [results, total] = await buildRangeQuery(ctx.user, input, context)!
 				.offset((input.page - 1) * perPage).limit(perPage).getManyAndCount()
 			const recordAttributes = await dataSource.getRepository(RecordAttribute).find()
@@ -434,7 +453,7 @@ export default router({
 			return Promise.all(files.map((file) => formatCollectionFile({ file, recordAttributes, metadata })))
 		}),
 	create: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(
 			z.object({
 				name: z.string().min(1).max(80),
@@ -511,7 +530,7 @@ export default router({
 			return formatCollection({ collection, user: ctx.user })
 		}),
 	addItems: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(
 			z.object({
 				id: z.uuid(),
@@ -560,7 +579,7 @@ export default router({
 			})
 		}),
 	rename: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ id: z.uuid(), name: z.string().trim().min(1).max(80) }))
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
@@ -579,7 +598,7 @@ export default router({
 			return formatCollection({ collection, user: ctx.user })
 		}),
 	update: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(
 			z.object({
 				id: z.uuid(),
@@ -608,9 +627,10 @@ export default router({
 				await assertNameFree(collection.parentId, input.name, collection.id)
 			}
 
+			const previous = { draft: collection.draft, ownerId: collection.ownerId, limitedToGroupIds: [...collection.limitedToGroupIds] }
 			collection.name = input.name
 			collection.description = input.description ?? null
-			collection.draft = input.draft ?? false
+			collection.draft = input.draft ?? collection.draft
 			collection.hasThumbnail = input.hasThumbnail ?? collection.hasThumbnail
 			if (!collection.public && !collection.ownerId) {
 				collection.ownerId = ctx.user.id
@@ -627,15 +647,23 @@ export default router({
 				if (input.resetDescendantActionBars) {
 					await resetDescendantActionBars(em, collection)
 				}
-				const children = await em.getTreeRepository(Collection).findDescendants(collection)
-				await em.getRepository(Collection).update({
-					id: In(children.map((child) => child.id).filter((childId) => childId !== collection.id)),
-				}, {
-					draft: collection.draft,
-					ownerId: collection.ownerId,
-					limitedToGroupIds: collection.limitedToGroupIds,
-					canEditLimitedToGroupIds: collection.limitedToGroupIds.length === 0,
-				})
+				const accessBefore = { draft: previous.draft, ownerId: previous.ownerId, limitedToGroupIds: previous.limitedToGroupIds }
+				const accessAfter = { draft: collection.draft, ownerId: collection.ownerId, limitedToGroupIds: collection.limitedToGroupIds }
+				if (JSON.stringify(accessBefore) !== JSON.stringify(accessAfter)) {
+					await recordAudit(em, { actorId: ctx.user.id, action: 'collection.access_changed', targetType: 'collection', targetId: collection.id, before: accessBefore, after: accessAfter, req: ctx.req })
+				}
+				// Only what this save changed reaches the descendants: a description
+				// edit must not reopen a restricted child or publish a draft one.
+				// Group changes are propagated by the inherit/propagate triggers.
+				const changed = {
+					...(collection.draft !== previous.draft && { draft: collection.draft }),
+					...(collection.ownerId !== previous.ownerId && { ownerId: collection.ownerId }),
+				}
+				if (Object.keys(changed).length) {
+					const children = await em.getTreeRepository(Collection).findDescendants(collection)
+					const ids = children.map((child) => child.id).filter((childId) => childId !== collection.id)
+					if (ids.length) await em.getRepository(Collection).update({ id: In(ids) }, changed)
+				}
 				await syncCollectionMenuItems(em, collection, true)
 				if (!collection.hasThumbnail) {
 					await mainS3().removeObjects(mainS3Bucket(), [collection.thumbnailStorageKey])
@@ -649,7 +677,7 @@ export default router({
 	// Whom an editor can name in the action bar settings. Owners are often
 	// members, who cannot list groups or users anywhere else.
 	actionBarAudience: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.uuid())
 		.query(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input }).getOne()
@@ -668,25 +696,50 @@ export default router({
 			])
 			return {
 				groups: groups.map((group) => ({ id: group.id, name: group.name })),
-				users: users.map((user) => ({ id: user.id, name: user.name, email: user.email })),
+				// Owners are often members: they may pick a colleague, not read the directory.
+				users: users.map((user) => ({ id: user.id, name: user.name, email: ctx.user.role === UserRole.ADMIN ? user.email : undefined })),
 			}
 		}),
+	// The thumbnail goes to a staging key through a policy that only accepts a
+	// small image, then is re-encoded by this server before anyone can see it.
 	presignedThumbnailUploadUrl: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({
 			id: z.uuid(),
+			contentType: z.enum(IMAGE_MIME_TYPES),
 		}))
 		.query(async ({ input, ctx }) => {
-			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
-			if (!collection) {
-				throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
-			} else if (!collection.canEdit(ctx.user)) {
-				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
+			const collection = await editableCollection(ctx.user, input.id)
+			const uploadId = randomUUID()
+			const policy = mainS3().newPostPolicy()
+			policy.setBucket(mainS3Bucket())
+			policy.setKey(thumbnailStagingKey(collection.id, uploadId))
+			policy.setExpires(new Date(Date.now() + 10 * 60 * 1000))
+			policy.setContentType(input.contentType)
+			policy.setContentLengthRange(1, MAX_IMAGE_BYTES)
+			const { postURL, formData } = await mainS3().presignedPostPolicy(policy)
+			return { uploadId, url: postURL, fields: formData as Record<string, string> }
+		}),
+	finalizeThumbnailUpload: publicProcedure
+		.use(authMiddleware(userApproved, userMember))
+		.input(z.object({ id: z.uuid(), uploadId: z.uuid() }))
+		.mutation(async ({ input, ctx }) => {
+			const collection = await editableCollection(ctx.user, input.id)
+			const source = thumbnailStagingKey(collection.id, input.uploadId)
+			try {
+				const image = sharp(await readObject(source, MAX_IMAGE_BYTES), { limitInputPixels: 40_000_000, failOn: 'warning' })
+				const output = await image.rotate().resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+					.webp({ quality: 85 }).timeout({ seconds: 20 }).toBuffer()
+				await mainS3().putObject(mainS3Bucket(), collection.thumbnailStorageKey, output, output.length, { 'Content-Type': 'image/webp' })
+			} catch {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Upload a JPEG, PNG, WebP, GIF or AVIF image of up to 20 MB.' })
+			} finally {
+				await mainS3().removeObject(mainS3Bucket(), source).catch(() => undefined)
 			}
-			return mainS3().presignedPutObject(mainS3Bucket(), collection.thumbnailStorageKey, 24 * 60 * 60)
+			return { ok: true }
 		}),
 	removeRecords: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ id: z.uuid(), recordIds: z.uuid().array().min(1).max(500) }))
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
@@ -701,7 +754,7 @@ export default router({
 	// else, a buying sheet or an export. The keys that match nothing come back
 	// so the list can be corrected rather than silently shortened.
 	addRecordsByKey: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ id: z.uuid(), keys: z.string().min(1).max(200).array().min(1).max(5000) }))
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
@@ -727,7 +780,7 @@ export default router({
 	// catalogue included. Only whoever may edit the collection reads this: it
 	// carries the score, which is production information, not reader material.
 	recordPreview: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ id: z.uuid(), offset: z.number().int().min(0), limit: z.number().int().min(1).max(200) }))
 		.query(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
@@ -741,7 +794,7 @@ export default router({
 	// Taking a product out of the catalogue keeps its row: a rule would put it
 	// back at the next pass, and the builder would lose the decision.
 	setRecordsExcluded: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ id: z.uuid(), recordIds: z.uuid().array().min(1).max(500), excluded: z.boolean() }))
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
@@ -753,7 +806,7 @@ export default router({
 			return dataSource.transaction((em) => setRecordsExcluded(em, collection.id, input.recordIds, input.excluded))
 		}),
 	excludeNotReadyRecords: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ id: z.uuid() }))
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user).andWhere('collection.id = :id', { id: input.id }).getOne()
@@ -767,7 +820,7 @@ export default router({
 	// The rules of a collection driven by filters. Saving them rewrites the
 	// membership straight away; products picked by hand are left alone.
 	setRecordRules: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({
 			id: z.uuid(),
 			catalogueMode: z.enum(CATALOGUE_MODES).optional(),
@@ -821,7 +874,7 @@ export default router({
 			return formatCollection({ collection: saved, user: ctx.user })
 		}),
 	removeFiles: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.uuid().array())
 		.mutation(async ({ input, ctx }) => {
 			const collectionFiles = await userCollectionFilesQuery(ctx.user)
@@ -838,7 +891,7 @@ export default router({
 			await dataSource.getRepository(CollectionFile).remove(collectionFiles)
 		}),
 	remove: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.uuid())
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user)
@@ -857,7 +910,7 @@ export default router({
 			await cleanup()
 		}),
 	move: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ id: z.uuid(), parentId: z.uuid().nullable() }))
 		.mutation(async ({ input, ctx }) => {
 			const collection = await userCollectionsQuery(ctx.user)
@@ -886,7 +939,14 @@ export default router({
 			}
 			if (parent?.id !== collection.parentId) {
 				await assertNameFree(parent?.id, collection.name, collection.id)
-				await dataSource.transaction((em) => moveCollection(em, collection, parent))
+				const before = { parentId: collection.parentId, draft: collection.draft, limitedToGroupIds: [...collection.limitedToGroupIds] }
+				await dataSource.transaction(async (em) => {
+					await moveCollection(em, collection, parent)
+					// Moving can change who has access: record where it went and the rules it now has.
+					const moved = await em.getRepository(Collection).findOneByOrFail({ id: collection.id })
+					await recordAudit(em, { actorId: ctx.user.id, action: 'collection.moved', targetType: 'collection', targetId: collection.id, before,
+						after: { parentId: moved.parentId, draft: moved.draft, limitedToGroupIds: moved.limitedToGroupIds }, req: ctx.req })
+				})
 			}
 			return formatCollection({ collection, user: ctx.user })
 		}),
@@ -941,18 +1001,21 @@ export default router({
 				previewRows: selection.rows.slice(0, 12),
 				previewPictures: await Promise.all(selection.recordIds.slice(0, 12).map(id => {
 					const assetId = pictures.get(id)
-					return assetId ? assetsS3().presignedGetObject(assetsS3Bucket(), `asset-file/${assetId}-thumbnail`) : null
+					return assetId ? assetsS3().presignedGetObject(assetsS3Bucket(), `asset-file/${assetId}-thumbnail`, SIGNED_URL_SECONDS) : null
 				})),
 				viewsEnabled: selection.viewsEnabled,
 				mainView: selection.mainView,
 				files: await Promise.all(collectionFiles.map(file => formatCollectionFile({ file, recordAttributes }))),
 				licenses: await Promise.all(licenses.map(formatLicense)),
-				allowDirectDownload:
-					collectionFiles.reduce((total, file) => total + parseInt(file.assetFile.size, 10), 0) <= 2_000_000_000, // 2GB
+				allowDirectDownload: downloadDelivery(
+					DownloadType.DIRECT,
+					collectionFiles.reduce((total, file) => total + parseInt(file.assetFile.size, 10), 0),
+					collectionFiles.filter((file) => file.assetFile.mimeType?.startsWith('image/')).length,
+				) === DownloadType.DIRECT,
 			}
 		}),
 	ListPrivateCollections: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.query(async ({ ctx }) => {
 			const collections = await userCollectionsQuery(ctx.user)
 				.andWhere('collection.public IS FALSE', { public: false })
@@ -961,7 +1024,7 @@ export default router({
 			return buildTree({ collections, user: ctx.user })
 		}),
 	createUserCollection: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(
 			z.object({
 				name: z.string().min(1).max(80),

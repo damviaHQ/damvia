@@ -36,10 +36,25 @@ import {
 	DownloadImageFormat,
 	DownloadImageResolution,
 	DownloadStatus,
+	DownloadType,
 	DownloadVideoFormat,
 	DownloadVideoResolution
 } from "../entity/download"
 import { assetsS3, assetsS3Bucket, dataSource, logger } from "../env"
+
+// Direct downloads are built inside the request, so they stay small; anything
+// larger is prepared by the worker and delivered by email.
+export const DOWNLOAD_LIMITS = {
+	directBytes: 1_000_000_000,
+	directImages: 300,
+	totalBytes: 10_000_000_000,
+	files: 10_000,
+	activeExports: 5,
+}
+
+export function downloadDelivery(requested: DownloadType, totalSize: number, imageCount: number): DownloadType {
+	return totalSize <= DOWNLOAD_LIMITS.directBytes && imageCount <= DOWNLOAD_LIMITS.directImages ? requested : DownloadType.EMAIL
+}
 
 export type CreateDownloadArchiveOptions = {
 	em: EntityManager
@@ -62,6 +77,9 @@ export async function createDownloadArchive({ em, download }: CreateDownloadArch
 	const collectionFiles = await userCollectionFilesQuery(user, em)
 		.andWhere('collection_file.id IN (:...ids)', { ids: download.collectionFileIds }).getMany()
 	if (collectionFiles.length !== new Set(download.collectionFileIds).size) {
+		throw new DownloadAccessError()
+	}
+	if (collectionFiles.reduce((total, file) => total + Number(file.assetFile.size), 0) >= DOWNLOAD_LIMITS.totalBytes) {
 		throw new DownloadAccessError()
 	}
 	let recordList: Buffer | null = null

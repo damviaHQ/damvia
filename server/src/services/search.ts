@@ -107,12 +107,13 @@ export async function loadSearchContext(input: SearchInput): Promise<SearchConte
 	const metadataIds = activeMetadataIds(input)
 	const axes: { id: string }[] = await dataSource.query('SELECT a.id FROM variant_axes a WHERE NOT a.ignored AND EXISTS (SELECT 1 FROM variant_group_axes ga WHERE ga.variant_axis_id = a.id) ORDER BY a.created_at, a.id')
 	const [searchableAttributes, filterAttributes, facetableAttributes, searchableMetadata, filterMetadata, facetableMetadata] = await Promise.all([
-		repository.findBy({ searchable: true }),
-		ids.length ? repository.findBy({ id: In(ids) }) : Promise.resolve([]),
-		repository.findBy({ facetable: true }),
-		fields.existsBy({ searchable: true }),
-		metadataIds.length ? fields.findBy({ id: In(metadataIds), facetable: true }) : Promise.resolve([]),
-		fields.findBy({ facetable: true }),
+		// A hidden field is never searched or filtered: matching on it would reveal its values.
+		repository.findBy({ searchable: true, viewable: true }),
+		ids.length ? repository.findBy({ id: In(ids), facetable: true, viewable: true }) : Promise.resolve([]),
+		repository.findBy({ facetable: true, viewable: true }),
+		fields.existsBy({ searchable: true, viewable: true }),
+		metadataIds.length ? fields.findBy({ id: In(metadataIds), facetable: true, viewable: true }) : Promise.resolve([]),
+		fields.findBy({ facetable: true, viewable: true }),
 	])
 	return { searchableAttributes, filterAttributes, facetableAttributes, searchableMetadata, filterMetadata, facetableMetadata, facetableAxes: axes.map((axis) => axis.id) }
 }
@@ -122,7 +123,7 @@ function tokenMatch(context: SearchContext, parameter: string): string {
 	const parts = [
 		`asset_file.name ILIKE :${parameter}`,
 		...context.searchableAttributes.map((_, index) => `(record.meta_data -> :attribute${index}) ILIKE :${parameter}`),
-		...(context.searchableMetadata ? [`EXISTS (SELECT 1 FROM asset_file_metadata_values search_value INNER JOIN metadata_fields search_field ON search_field.id = search_value.metadata_field_id WHERE search_value.asset_file_id = asset_file.id AND search_field.searchable AND search_value.value_text ILIKE :${parameter})`] : []),
+		...(context.searchableMetadata ? [`EXISTS (SELECT 1 FROM asset_file_metadata_values search_value INNER JOIN metadata_fields search_field ON search_field.id = search_value.metadata_field_id WHERE search_value.asset_file_id = asset_file.id AND search_field.searchable AND search_field.viewable AND search_value.value_text ILIKE :${parameter})`] : []),
 	]
 	return `(${parts.join(' OR ')})`
 }
@@ -394,4 +395,59 @@ export async function searchFacets(user: User, input: SearchInput, context: Sear
 		),
 	])
 	return { assetTypes, fileTypes, extensions, recordViews, attributes: Object.fromEntries(attributes), metadata: Object.fromEntries(metadata), metadataRanges: Object.fromEntries(metadataRanges), variantAxes: Object.fromEntries(variantAxes.filter(([, counts]) => Object.keys(counts).length > 0)) }
+}
+
+// The values a search panel offers come only from files the user can open, so
+// a filter never reveals what is stored on restricted or unlicensed files.
+export async function visibleAttributeValues(user: User, attribute: RecordAttribute): Promise<string[]> {
+	const [sql, parameters] = userCollectionFilesQuery(user)
+		.select('record.meta_data -> :facetName', 'raw')
+		.setParameter('facetName', attribute.name)
+		.orderBy()
+		.getQueryAndParameters()
+	const split = attribute.valueType === 'multi_select' ? "string_to_array(rows.raw, '|')" : 'ARRAY[rows.raw]'
+	const rows: { value: string }[] = await dataSource.query(`
+		SELECT DISTINCT value FROM (${sql}) rows CROSS JOIN LATERAL unnest(${split}) AS value
+		WHERE value IS NOT NULL AND value <> '' ORDER BY value
+	`, parameters)
+	return rows.map((row) => row.value)
+}
+
+export async function visibleMetadataValues(user: User, field: MetadataField, limit: number): Promise<string[]> {
+	const rows = await userCollectionFilesQuery(user)
+		.innerJoin('asset_file_metadata_values', 'facet_value', 'facet_value.asset_file_id = asset_file.id AND facet_value.metadata_field_id = :facetField', { facetField: field.id })
+		.select('facet_value.value_text', 'value')
+		.groupBy('facet_value.value_text')
+		.orderBy('COUNT(DISTINCT asset_file.id)', 'DESC')
+		.addOrderBy('facet_value.value_text', 'ASC')
+		.limit(limit)
+		.getRawMany<{ value: string }>()
+	return rows.map((row) => row.value)
+}
+
+export async function visibleMetadataRange(user: User, field: MetadataField): Promise<{ min: Date | null, max: Date | null }> {
+	const bounds = await userCollectionFilesQuery(user)
+		.innerJoin('asset_file_metadata_values', 'facet_value', 'facet_value.asset_file_id = asset_file.id AND facet_value.metadata_field_id = :facetField', { facetField: field.id })
+		.select('min(facet_value.value_date)', 'min').addSelect('max(facet_value.value_date)', 'max')
+		.orderBy()
+		.getRawOne<{ min: Date | null, max: Date | null }>()
+	return { min: bounds?.min ?? null, max: bounds?.max ?? null }
+}
+
+export async function visibleAxisValues(user: User): Promise<Map<string, Set<string>>> {
+	const rows = await userCollectionFilesQuery(user)
+		.innerJoin('variant_group_members', 'facet_member', 'facet_member.asset_file_id = asset_file.id')
+		.innerJoin('variant_group_axes', 'facet_axis', 'facet_axis.variant_group_id = facet_member.variant_group_id')
+		.select('facet_axis.variant_axis_id', 'axis')
+		.addSelect('facet_member.axis_values[facet_axis.position + 1]', 'value')
+		.distinct(true)
+		.orderBy()
+		.getRawMany<{ axis: string, value: string | null }>()
+	const values = new Map<string, Set<string>>()
+	for (const row of rows) {
+		if (!row.value) continue
+		if (!values.has(row.axis)) values.set(row.axis, new Set())
+		values.get(row.axis)!.add(row.value)
+	}
+	return values
 }

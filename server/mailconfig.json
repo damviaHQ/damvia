@@ -43,5 +43,10 @@
     "from": "\"mycompany\" <support@mycompany>",
     "subject": "Server disk {{ severity }}: {{ percent }}% used on {{ appUrl }}",
     "body": "Hello,\n\nThe disk hosting {{ appUrl }} is {{ percent }}% full: {{ free }} free out of {{ total }}.\n\nCheck orphan objects, expired archives, temporary files and database size before the disk is full, or extend the volume."
+  },
+  "license-expiring": {
+    "from": "\"mycompany\" <support@mycompany>",
+    "subject": "{% if licenses.size == 1 %}A licence ends in {{ licenses[0].days }} day{% if licenses[0].days != 1 %}s{% endif %}{% else %}{{ licenses.size }} licences end soon{% endif %}",
+    "body": "Hello,\n\nThese usage licences end soon. After their end date, files under them can no longer be downloaded by non-admin users.\n\n{% for license in licenses %}- {{ license.name }}: ends {{ license.date }} ({{ license.days }} day{% if license.days != 1 %}s{% endif %} left)\n{% endfor %}\nRenew them or update the files' licence:\n{{ url }}"
   }
 }

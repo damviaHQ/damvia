@@ -241,10 +241,11 @@ async function existingIds(table: 'asset_files' | 'downloads', ids: string[]): P
 
 export async function removeOrphanObjects(): Promise<{ count: number, bytes: number }> {
 	const oldEnough = Date.now() - ORPHAN_MINIMUM_AGE
-	const [assetObjects, downloadObjects, logoTempObjects] = await Promise.all([
+	const [assetObjects, downloadObjects, logoTempObjects, backgroundTempObjects] = await Promise.all([
 		listBucket(assetsS3(), assetsS3Bucket(), 'asset-file/'),
 		listBucket(assetsS3(), assetsS3Bucket(), 'downloads/'),
         listBucket(mainS3(), mainS3Bucket(), 'settings/client-logo-temp/'),
+        listBucket(mainS3(), mainS3Bucket(), 'settings/auth-background-temp'),
 	])
 
 	const assetIdOf = (name: string) => name.slice('asset-file/'.length).replace(/-thumbnail$/, '')
@@ -268,7 +269,7 @@ export async function removeOrphanObjects(): Promise<{ count: number, bytes: num
 		}
 	})
 
-	const staleLogos = logoTempObjects.filter(object => object.lastModified.getTime() < oldEnough)
+	const staleLogos = [...logoTempObjects, ...backgroundTempObjects].filter(object => object.lastModified.getTime() < oldEnough)
     for (const object of staleLogos) {
         const details = await mainS3().statObject(mainS3Bucket(), object.name)
         await mainS3().removeObject(mainS3Bucket(), object.name, details.versionId ? { versionId: details.versionId } : undefined)

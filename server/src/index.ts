@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { assetUpdaters, dataSource, logger } from "./env"
 import { adoptUnassignedAssets, recordAssetSourceRun, registerAssetSources, staleAssetSourceKeys } from "./services/asset"
 import { runEnrichmentPass } from "./services/enrichment"
+import { logSecurityWarnings } from "./services/security-checks"
 import { cleanStaleTempDirectories } from "./services/storage"
 import { startQueues } from "./worker"
 import server from "./server"
@@ -73,6 +74,7 @@ async function checkAssetSources(configured: string[]) {
 async function run() {
 	await cleanStaleTempDirectories()
 	await dataSource.initialize()
+	await logSecurityWarnings()
 	await checkAssetSources(assetUpdaters().map((updater) => updater.key))
 	startAssetUpdater().catch((error) => {
 		logger.error('failed to start asset updater', { error })

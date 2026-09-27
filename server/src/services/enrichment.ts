@@ -95,15 +95,6 @@ export async function rerunReadinessStage(recordIds?: string[]): Promise<Readine
 	})
 }
 
-// Rules saved on a collection are applied at once; a record written elsewhere
-// reaches its dynamic collections at the next pass.
-export async function rerunProductRules() {
-	return dataSource.transaction(async (em) => {
-		await em.query('SELECT pg_advisory_xact_lock($1)', [ENRICHMENT_LOCK])
-		return refreshAllDynamicCollections(em)
-	})
-}
-
 // A pass holds the lock for its whole length; trying it tells whether one is
 // running without waiting for it.
 export async function isEnrichmentRunning(): Promise<boolean> {

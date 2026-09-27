@@ -30,18 +30,16 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, stored: string | null): Promise<boolean> {
     if (!stored) return false
-    if (/^[a-f0-9]{128}$/.test(stored)) {
-        const legacy = createHash('sha512').update(password).digest()
-        return timingSafeEqual(legacy, Buffer.from(stored, 'hex'))
-    }
     const parts = /^scrypt\$([a-f0-9]{32})\$([a-f0-9]{128})$/.exec(stored)
     if (!parts) return false
     return timingSafeEqual(await derive(password, parts[1]), Buffer.from(parts[2], 'hex'))
 }
 
-export function hashResetToken(token: string): string {
+export function hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex')
 }
+
+export const hashResetToken = hashToken
 
 export function validateAppSecret(value: string | undefined): string {
     if (!value || Buffer.byteLength(value.trim()) < 32 || value === 'Damvia App Secret') {

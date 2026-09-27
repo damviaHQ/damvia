@@ -22,6 +22,7 @@ import { linkedFilesOf } from "../../services/record-files"
 import { tableExists, tableFieldNames } from "../../services/record-tables"
 import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, locateRecord, moveRecords, patchEach, patchRecords, removeRecords, RecordRow } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
+import { SIGNED_URL_SECONDS } from "../../services/signed-url"
 
 const filter = z.object({
   column: z.string().min(1).max(200),
@@ -51,7 +52,7 @@ async function thumbnailView(): Promise<string | null> {
 }
 
 function presign(key: string | null): Promise<string | null> {
-  return key ? assetsS3().presignedGetObject(assetsS3Bucket(), key) : Promise.resolve(null)
+  return key ? assetsS3().presignedGetObject(assetsS3Bucket(), key, SIGNED_URL_SECONDS) : Promise.resolve(null)
 }
 
 async function formatRow(row: RecordRow) {

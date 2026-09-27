@@ -13,7 +13,22 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { config } from 'dotenv'
+import { readFileSync } from 'node:fs'
 
 // Loaded first by env.ts so every module sees the .env values. `quiet` stops
 // dotenv 17+ from printing a banner on each boot and inside the test runner.
 config({ quiet: true })
+
+// Any variable can come from a file instead, as Docker and Kubernetes secrets
+// are mounted: FOO_FILE=/run/secrets/foo sets FOO to the file's contents
+// without its trailing newline. A value set directly wins.
+export function loadFileVariables(environment: NodeJS.ProcessEnv, read = (path: string) => readFileSync(path, 'utf8')) {
+	for (const [name, path] of Object.entries(environment)) {
+		if (!name.endsWith('_FILE') || !path) continue
+		const target = name.slice(0, -'_FILE'.length)
+		if (environment[target] !== undefined && environment[target] !== '') continue
+		environment[target] = read(path).replace(/\r?\n$/, '')
+	}
+}
+
+loadFileVariables(process.env)

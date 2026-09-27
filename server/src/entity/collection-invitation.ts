@@ -54,6 +54,9 @@ export class CollectionInvitation {
 	@Column({ type: 'date' })
 	expiresAt: Date
 
+	@Column({ type: 'varchar', nullable: true, select: false })
+	tokenHash: string | null
+
 	@CreateDateColumn()
 	createdAt: Date
 

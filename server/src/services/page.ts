@@ -35,6 +35,7 @@ import {
 import { sanitizeBlockHtml } from "../page-blocks/sanitize"
 import { userCollectionFilesQuery, userCollectionsQuery } from "./collection"
 import { blockPrefix, collectPageGarbage, listPageObjects, removePageObjects, stagingKey } from "./page-storage"
+import { SIGNED_URL_SECONDS } from "./signed-url"
 
 export const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'] as const
 export const VIDEO_MIME_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'] as const
@@ -214,7 +215,7 @@ export async function finalizeBlockUpload({ pageId, uploadId, kind }: { pageId: 
 	return { s3key: target }
 }
 
-async function readObject(key: string, limit: number) {
+export async function readObject(key: string, limit: number) {
 	const stream = await mainS3().getObject(mainS3Bucket(), key)
 	const chunks: Buffer[] = []
 	let bytes = 0
@@ -267,7 +268,7 @@ export async function resolvePageAssets(user: User, blocks: PageBlock[]): Promis
 	}
 
 	await Promise.all([...uploadKeys].map(async (key) => {
-		assets.uploads[key] = await mainS3().presignedGetObject(mainS3Bucket(), key)
+		assets.uploads[key] = await mainS3().presignedGetObject(mainS3Bucket(), key, SIGNED_URL_SECONDS)
 	}))
 
 	if (fileIds.size) {
@@ -279,9 +280,9 @@ export async function resolvePageAssets(user: User, blocks: PageBlock[]): Promis
 				name: file.assetFile.name,
 				mimeType: file.assetFile.mimeType,
 				thumbnailURL: file.assetFile.hasThumbnail
-					? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey)
+					? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey, SIGNED_URL_SECONDS)
 					: null,
-				fileURL: await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.originalStorageKey),
+				fileURL: await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.originalStorageKey, SIGNED_URL_SECONDS),
 			}
 		}))
 	}
@@ -329,7 +330,7 @@ export async function resolveCollectionAssets(user: User, ids: string[]): Promis
 			draft: collection.draft,
 			canEdit: collection.canEdit(user),
 			thumbnailURL: collection.hasThumbnail
-				? await mainS3().presignedGetObject(mainS3Bucket(), collection.thumbnailStorageKey)
+				? await mainS3().presignedGetObject(mainS3Bucket(), collection.thumbnailStorageKey, SIGNED_URL_SECONDS)
 				: null,
 			sampleFiles: await Promise.all((collection.sampleFileIds ?? [])
 				.map((fileId) => samples.find((sample: CollectionFile) => sample.id === fileId))
@@ -338,7 +339,7 @@ export async function resolveCollectionAssets(user: User, ids: string[]): Promis
 					id: file.id,
 					name: file.assetFile.name,
 					thumbnailURL: file.assetFile.hasThumbnail
-						? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey)
+						? await assetsS3().presignedGetObject(assetsS3Bucket(), file.assetFile.thumbnailStorageKey, SIGNED_URL_SECONDS)
 						: null,
 				}))),
 			page: collection.page ? { id: collection.page.id } : null,

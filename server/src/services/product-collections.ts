@@ -16,7 +16,7 @@ import { EntityManager, IsNull, Not } from "typeorm"
 import { Collection } from "../entity/collection"
 import { Page } from "../entity/page"
 import { PageBlock, PageBlockType } from "../entity/page-block"
-import { CollectionRecord, CollectionRecordSource } from "../entity/collection-record"
+import { CollectionRecordSource } from "../entity/collection-record"
 import { User, UserRole } from "../entity/user"
 import { dataSource, logger } from "../env"
 import { userCollectionsQuery } from "./collection"
@@ -253,9 +253,4 @@ export async function refreshAllDynamicCollections(em: EntityManager) {
 		}
 	}
 	return { collections: collections.length, added, removed }
-}
-
-export async function collectionRecordIds(em: EntityManager, collectionId: string) {
-	const rows = await em.getRepository(CollectionRecord).findBy({ collectionId })
-	return rows.map((row) => row.recordId)
 }

@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import {loadEsm} from 'load-esm';
 import ffmpeg from "fluent-ffmpeg"
-import {exec} from "node:child_process"
+import {execFile} from "node:child_process"
 import {mkdir, mkdtemp, rm} from "node:fs/promises"
 import {tmpdir} from "node:os"
 import {join} from "node:path"
@@ -225,8 +225,7 @@ export async function extractDimensions(file: AssetFile, contentPath: string): P
 		if (isPsd) {
 			try {
 				return new Promise((resolve, reject) => {
-					const cmd = `magick identify -format "%[width]x%[height]" "${contentPath}"`;
-					exec(cmd, (error, stdout) => {
+					execFile('magick', ['identify', '-format', '%[width]x%[height]', `${contentPath}[0]`], (error, stdout) => {
 						if (error) {
 							resolve(null);
 							return;
@@ -597,7 +596,7 @@ export async function assignProductsToAssetFiles() {
 	}
 	const regexString = process.env.PRODUCT_MATCHING_REGEX
 	if (!regexString) {
-		console.error('PRODUCT_MATCHING_REGEX is not defined in the environment variables')
+		logger.error('PRODUCT_MATCHING_REGEX is not defined in the environment variables')
 		return
 	}
 	const regex = new RegExp(regexString)

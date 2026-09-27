@@ -136,10 +136,6 @@ export const dataSource = new DataSource({
   subscribers: [],
 })
 
-export function isProduction() {
-  return process.env.NODE_ENV === 'production'
-}
-
 function requireEnv(name: string): string {
   const value = process.env[name]
   if (!value) throw new Error(`${name} must be set`)
@@ -152,6 +148,8 @@ export function mailTransporter(): Transporter {
     _mailTransporter = createTransport({
       host: process.env.SMTP_HOST ?? 'localhost',
       port: parseInt(process.env.SMTP_PORT ?? '1025', 10),
+      secure: process.env.SMTP_PORT === '465',
+      requireTLS: process.env.SMTP_REQUIRE_TLS === 'true',
       auth: (process.env.SMTP_USER && process.env.SMTP_PASS) ? {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
@@ -165,6 +163,42 @@ export function mailTransporter(): Transporter {
   return _mailTransporter
 }
 
+// Days before a licence's end date on which admins are emailed.
+export function parseLicenseNoticeDays(raw: string | undefined): number[] {
+  if (raw !== undefined && raw.trim() === '') return []
+  const days = (raw ?? '30,7,1').split(',').map((value) => Number(value.trim()))
+  if (days.some((value) => !Number.isInteger(value) || value < 0)) throw new Error('LICENSE_EXPIRY_NOTICE_DAYS must be whole numbers of days, such as 30,7,1.')
+  return [...new Set(days)]
+}
+
+const configuredLicenseNoticeDays = parseLicenseNoticeDays(process.env.LICENSE_EXPIRY_NOTICE_DAYS)
+
+export function licenseNoticeDays(): number[] {
+  return configuredLicenseNoticeDays
+}
+
+// Audit entries are kept two years by default; 0 keeps them forever.
+export function auditRetentionDays(): number | null {
+  const days = parseInt(process.env.AUDIT_RETENTION_DAYS ?? '730', 10)
+  return days > 0 ? days : null
+}
+
+// named: searches are stored with the searcher; anonymous: without them, so
+// Insights keeps the terms but not who typed them; off: not stored.
+export function analyticsSearchMode(): 'named' | 'anonymous' | 'off' {
+  const value = (process.env.ANALYTICS_SEARCH_MODE ?? 'named').toLowerCase()
+  if (value !== 'named' && value !== 'anonymous' && value !== 'off') throw new Error('ANALYTICS_SEARCH_MODE must be named, anonymous or off.')
+  return value
+}
+
+export function auditLogIp(): boolean {
+  return process.env.AUDIT_LOG_IP !== 'false'
+}
+
+export function auditLogStream(): boolean {
+  return process.env.AUDIT_LOG_STREAM === 'true'
+}
+
 export function analyticsRetentionDays(): number | null {
   const days = parseInt(process.env.ANALYTICS_RETENTION_DAYS ?? '365', 10)
   return days > 0 ? days : null
@@ -172,6 +206,124 @@ export function analyticsRetentionDays(): number | null {
 
 export function passwordLessAuth() {
   return process.env.ENABLE_PASSWORD_LESS_AUTH === 'true'
+}
+
+function positiveInteger(name: string, fallback: number): number {
+  const raw = process.env[name]
+  if (raw === undefined || raw.trim() === '') return fallback
+  const value = Number(raw)
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} must be a positive whole number.`)
+  return value
+}
+
+const configuredSessionIdleHours = positiveInteger('SESSION_IDLE_HOURS', 12)
+const configuredSessionMaxHours = positiveInteger('SESSION_MAX_HOURS', 720)
+
+export function sessionIdleHours(): number {
+  return configuredSessionIdleHours
+}
+
+export function sessionMaxHours(): number {
+  return configuredSessionMaxHours
+}
+
+const roles = ['admin', 'manager', 'member', 'guest']
+
+export function parseMfaRequiredRoles(raw: string | undefined): string[] {
+  const values = (raw ?? '').split(',').map((role) => role.trim().toLowerCase()).filter(Boolean)
+  const unknown = values.filter((role) => !roles.includes(role))
+  if (unknown.length) throw new Error(`MFA_REQUIRED_ROLES contains unknown roles: ${unknown.join(', ')}`)
+  return values
+}
+
+const configuredMfaRequiredRoles = parseMfaRequiredRoles(process.env.MFA_REQUIRED_ROLES)
+
+export function mfaRequiredRoles(): string[] {
+  return configuredMfaRequiredRoles
+}
+
+export function passwordBreachCheck(): boolean {
+  return process.env.PASSWORD_BREACH_CHECK !== 'false'
+}
+
+export function sessionCookieSameSite(): 'lax' | 'none' {
+  const value = (process.env.SESSION_COOKIE_SAMESITE ?? 'lax').toLowerCase()
+  if (value !== 'lax' && value !== 'none') throw new Error('SESSION_COOKIE_SAMESITE must be lax or none.')
+  return value
+}
+
+export function secureCookies(): boolean {
+  return apiURL().startsWith('https:')
+}
+
+// How many reverse proxies sit in front of the API, so the client address used
+// for rate limiting and logs comes from X-Forwarded-For. `true` trusts any
+// chain and suits only a private network.
+export function parseTrustProxy(raw: string | undefined): boolean | number | string[] {
+  const value = (raw ?? '1').trim()
+  if (value === 'true') return true
+  if (value === 'false' || value === '0') return false
+  if (/^\d+$/.test(value)) return Number(value)
+  return value.split(',').map((entry) => entry.trim()).filter(Boolean)
+}
+
+export function trustProxy(): boolean | string[] | ((address: string, hop: number) => boolean) {
+  const value = parseTrustProxy(process.env.TRUST_PROXY)
+  return typeof value === 'number' ? (_address, hop) => hop < value : value
+}
+
+export function requestLogging(): boolean {
+  return process.env.REQUEST_LOG !== 'false'
+}
+
+export type OidcSettings = {
+  issuer: string
+  clientId: string
+  clientSecret: string
+  label: string
+  scopes: string
+  trustEmail: boolean
+  autoCreate: boolean
+  defaultRegion: string | null
+  groupsClaim: string | null
+  groupMap: Record<string, string>
+  only: boolean
+}
+
+// Single sign-on is on when the issuer, client id and client secret are set.
+export function parseOidcSettings(environment: NodeJS.ProcessEnv): OidcSettings | null {
+  const issuer = environment.OIDC_ISSUER?.trim()
+  const clientId = environment.OIDC_CLIENT_ID?.trim()
+  const clientSecret = environment.OIDC_CLIENT_SECRET
+  if (!issuer && !clientId) return null
+  if (!issuer || !clientId || !clientSecret) throw new Error('OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set together.')
+  let groupMap: Record<string, string> = {}
+  if (environment.OIDC_GROUP_MAP?.trim()) {
+    const parsed = JSON.parse(environment.OIDC_GROUP_MAP)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || !Object.values(parsed).every((value) => typeof value === 'string')) {
+      throw new Error('OIDC_GROUP_MAP must be a JSON object mapping identity provider groups to Damvia group names.')
+    }
+    groupMap = parsed
+  }
+  return {
+    issuer,
+    clientId,
+    clientSecret,
+    label: environment.OIDC_LABEL?.trim() || 'Single sign-on',
+    scopes: environment.OIDC_SCOPES?.trim() || 'openid email profile',
+    trustEmail: environment.OIDC_TRUST_EMAIL === 'true',
+    autoCreate: environment.OIDC_AUTO_CREATE === 'true',
+    defaultRegion: environment.OIDC_DEFAULT_REGION?.trim() || null,
+    groupsClaim: environment.OIDC_GROUPS_CLAIM?.trim() || null,
+    groupMap,
+    only: environment.OIDC_ONLY === 'true',
+  }
+}
+
+const configuredOidc = parseOidcSettings(process.env)
+
+export function oidcSettings(): OidcSettings | null {
+  return configuredOidc
 }
 
 export function secret() {
@@ -194,8 +346,8 @@ export function mainS3(): MinioClient {
       endPoint: s3URL.hostname,
       port: parseInt(s3URL.port || (s3URL.protocol === 'https:' ? '443' : '80'), 10),
       useSSL: s3URL.protocol === 'https:',
-      accessKey: s3URL.username,
-      secretKey: s3URL.password,
+      accessKey: decodeURIComponent(s3URL.username),
+      secretKey: decodeURIComponent(s3URL.password),
     })
   }
   return _mainS3
@@ -217,8 +369,8 @@ export function assetsS3(): MinioClient {
       endPoint: s3URL.hostname,
       port: parseInt(s3URL.port || (s3URL.protocol === 'https:' ? '443' : '80'), 10),
       useSSL: s3URL.protocol === 'https:',
-      accessKey: s3URL.username,
-      secretKey: s3URL.password,
+      accessKey: decodeURIComponent(s3URL.username),
+      secretKey: decodeURIComponent(s3URL.password),
     })
   }
   return _assetsS3

@@ -21,7 +21,8 @@ import { rerunEntityStage } from "../../services/enrichment"
 import { MAX_OPTIONS, MULTI_SELECT_SEPARATOR, optionsFromValues, validateValue } from "../../services/record-values"
 import { attachNewField, tableExists } from "../../services/record-tables"
 import { catalogueKeyColumnName, fieldIsLinked } from "../../services/records"
-import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
+import { visibleAttributeValues } from "../../services/search"
+import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
 export function formatRecordAttribute(attribute: RecordAttribute) {
 	return {
@@ -71,23 +72,15 @@ export default router({
 			return attributes.map(formatRecordAttribute)
 		}),
 	listFacets: publicProcedure
-		.use(authMiddleware())
-		.query(async () => {
-			const facets = await dataSource.getRepository(RecordAttribute).find({ where: { facetable: true }, order: { position: 'ASC', name: 'ASC' } })
-			// A multi-select value holds several options; each one is a facet value.
-			const facetValues: { name: string, value: string }[] = await dataSource.query(`
-				SELECT DISTINCT a.name, v.value
-				FROM record_attributes a
-				INNER JOIN records r ON exist(r.meta_data, a.name)
-				CROSS JOIN LATERAL unnest(CASE WHEN a.value_type = 'multi_select' THEN string_to_array(r.meta_data -> a.name, '|') ELSE ARRAY[r.meta_data -> a.name] END) AS v(value)
-				WHERE a.facetable IS TRUE
-			`)
-			return facets.map((facet) => ({
+		.use(authMiddleware(userApproved))
+		.query(async ({ ctx }) => {
+			const facets = await dataSource.getRepository(RecordAttribute).find({ where: { facetable: true, viewable: true }, order: { position: 'ASC', name: 'ASC' } })
+			return Promise.all(facets.map(async (facet) => ({
 				id: facet.id,
 				name: facet.name,
 				displayName: facet.displayName,
-				values: facetValues.filter((entry) => entry.name === facet.name).map((entry) => entry.value),
-			}))
+				values: await visibleAttributeValues(ctx.user, facet),
+			})))
 		}),
 	create: publicProcedure
 		.use(authMiddleware(userAdmin))

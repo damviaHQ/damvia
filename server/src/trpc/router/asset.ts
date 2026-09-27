@@ -21,6 +21,7 @@ import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { assetSourceStatuses } from "../../services/asset"
 import { ENRICHMENT_LOCK } from "../../services/asset-type-rules"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
+import { SIGNED_URL_SECONDS } from "../../services/signed-url"
 
 export async function formatAssetFolder(assetFolder: AssetFolder) {
 	return {
@@ -46,8 +47,8 @@ export async function formatAssetFile(file: AssetFile) {
 		recordView: file.recordView,
 		recordId: file.recordId,
 		licenseId: file.licenseId,
-		thumbnailURL: file.hasThumbnail ? await assetsS3().presignedGetObject(assetsS3Bucket(), file.thumbnailStorageKey) : null,
-		fileURL: await assetsS3().presignedGetObject(assetsS3Bucket(), file.originalStorageKey),
+		thumbnailURL: file.hasThumbnail ? await assetsS3().presignedGetObject(assetsS3Bucket(), file.thumbnailStorageKey, SIGNED_URL_SECONDS) : null,
+		fileURL: await assetsS3().presignedGetObject(assetsS3Bucket(), file.originalStorageKey, SIGNED_URL_SECONDS),
 	}
 }
 

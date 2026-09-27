@@ -12,16 +12,18 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { hashResetToken } from './credentials'
-import { In } from "typeorm"
+import { randomBytes } from 'node:crypto'
+import { hashToken } from './credentials'
+import { IsNull } from "typeorm"
 import { URL } from "url"
 import { Liquid } from 'liquidjs'
 import { CollectionInvitation } from "../entity/collection-invitation"
 import { Download } from "../entity/download"
 import { User, UserRole } from "../entity/user"
-import { appURL, assetsS3, assetsS3Bucket, dataSource, logger, mailTransporter, mailConfig, serverAlertEmails } from "../env"
+import { apiURL, appURL, dataSource, logger, mailTransporter, mailConfig, serverAlertEmails } from "../env"
 import { formatBytes } from "./storage"
-import { generateAuthToken } from "./user"
+import { createLoginToken } from "./login-token"
+import { LoginTokenPurpose } from "../entity/login-token"
 
 const engine = new Liquid()
 
@@ -44,7 +46,7 @@ export async function sendEmailVerificationEmail(user: User) {
 export async function sendLogInEmail(user: User) {
 	const url = new URL(appURL())
 	url.pathname = 'login'
-	url.searchParams.set('token', await generateAuthToken(user))
+	url.searchParams.set('link', await createLoginToken(user.id, LoginTokenPurpose.LOGIN))
 	const config = mailConfig()['login']
 	await mailTransporter().sendMail({
 		from: config.from,
@@ -54,9 +56,15 @@ export async function sendLogInEmail(user: User) {
 	})
 }
 
-export async function sendResetPasswordEmail(user: User, token: string) {
-	if (!user || !token || user.resetPasswordToken !== hashResetToken(token) ||
-		!user.resetPasswordExpiresAt || user.resetPasswordExpiresAt.getTime() <= Date.now()) return
+// The token is created here, not by the request, so it never sits in the job
+// queue. A newer request replaces the previous link.
+export async function sendResetPasswordEmail(user: User | null) {
+	if (!user || user.suspendedAt) return
+	const token = randomBytes(32).toString('hex')
+	await dataSource.getRepository(User).update(user.id, {
+		resetPasswordToken: hashToken(token),
+		resetPasswordExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+	})
 	const url = new URL(appURL())
 	url.pathname = 'password-update'
 	url.searchParams.set('email', user.email)
@@ -72,11 +80,14 @@ export async function sendResetPasswordEmail(user: User, token: string) {
 
 export async function sendRequestApprovalEmail(requester: User) {
 	const url = new URL(appURL())
-	url.pathname = `/admin/users/${requester.id}/edit`
+	url.pathname = `/admin/users/${requester.id}`
 
-	const managers = await dataSource.getRepository(User).findBy({
-		role: In([UserRole.MANAGER, UserRole.ADMIN]),
-		regionId: requester.regionId,
+	// Admins approve every region; managers only their own.
+	const managers = await dataSource.getRepository(User).find({
+		where: [
+			{ role: UserRole.ADMIN, approved: true, emailVerified: true, suspendedAt: IsNull() },
+			{ role: UserRole.MANAGER, regionId: requester.regionId, approved: true, emailVerified: true, suspendedAt: IsNull() },
+		],
 	})
 	if (!managers.length) {
 		return
@@ -94,7 +105,7 @@ export async function sendRequestApprovalEmail(requester: User) {
 export async function sendUserApprovedEmail(user: User) {
 	const url = new URL(appURL())
 	url.pathname = 'login'
-	url.searchParams.set('token', await generateAuthToken(user))
+	url.searchParams.set('link', await createLoginToken(user.id, LoginTokenPurpose.APPROVED))
 	const config = mailConfig()['user-approved']
 	await mailTransporter().sendMail({
 		from: config.from,
@@ -110,7 +121,8 @@ export async function sendDownloadReady(download: Download) {
 		return
 	}
 
-	const link = await assetsS3().presignedGetObject(assetsS3Bucket(), download.storageKey)
+	// Through the API, which checks the download and its owner on every click.
+	const link = `${apiURL()}/v1/downloads/${download.id}`
 	const config = mailConfig()['download-ready']
 	await mailTransporter().sendMail({
 		from: config.from,
@@ -122,9 +134,12 @@ export async function sendDownloadReady(download: Download) {
 
 export async function sendInvitation(invitation: CollectionInvitation) {
 	const url = new URL(appURL())
-	url.pathname = `/collections/${invitation.collectionId}`
+	url.pathname = 'login'
 	if (!invitation.user) throw new Error('Invitation has no user')
-	url.searchParams.set('dam_token', await generateAuthToken(invitation.user))
+	// Each email gets a fresh secret; links from earlier emails stop working.
+	const secret = randomBytes(32).toString('base64url')
+	await dataSource.getRepository(CollectionInvitation).update(invitation.id, { tokenHash: hashToken(secret) })
+	url.searchParams.set('invite', `${invitation.id}.${secret}`)
 
 	const config = mailConfig()['invitation']
 	await mailTransporter().sendMail({
@@ -193,5 +208,26 @@ export async function sendDiskAlert(level: number, disk: { totalBytes: number, f
 		text: await renderTemplate(config.body, context),
 	})
 	logger.info('storage.disk-alert-sent', { level, recipients: recipients.length })
+	return true
+}
+
+export type ExpiringLicense = { name: string, date: string, days: number }
+
+export async function sendLicenseExpiryNotice(licenses: ExpiringLicense[]): Promise<boolean> {
+	const admins = await dataSource.getRepository(User).findBy({ role: UserRole.ADMIN, approved: true, emailVerified: true, suspendedAt: IsNull() })
+	const config = mailConfig()['license-expiring']
+	if (!admins.length || !config) {
+		logger.warn('license.expiry-no-recipient', { admins: admins.length, template: !!config })
+		return false
+	}
+	const url = new URL(appURL())
+	url.pathname = '/admin/licenses'
+	const context = { licenses, url: url.toString() }
+	await mailTransporter().sendMail({
+		from: config.from,
+		to: admins.map((admin) => admin.email).join(', '),
+		subject: await renderTemplate(config.subject, context),
+		text: await renderTemplate(config.body, context),
+	})
 	return true
 }

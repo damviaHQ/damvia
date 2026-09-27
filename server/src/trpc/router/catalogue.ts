@@ -29,6 +29,7 @@ import { loadViewableMetadata } from "../../services/file-metadata"
 import { formatCollectionFile } from "./collection"
 import { readinessFor } from "../../services/record-readiness"
 import { authMiddleware, publicProcedure, router, userApproved } from "../index"
+import { SIGNED_URL_SECONDS } from "../../services/signed-url"
 
 // The reader side of the record database: products, their visuals and the
 // values an administrator made visible. Nothing here reaches a record the
@@ -66,7 +67,7 @@ async function readinessLabels() {
 }
 
 function presign(key: string | null): Promise<string | null> {
-	return key ? assetsS3().presignedGetObject(assetsS3Bucket(), key) : Promise.resolve(null)
+	return key ? assetsS3().presignedGetObject(assetsS3Bucket(), key, SIGNED_URL_SECONDS) : Promise.resolve(null)
 }
 
 async function formatVisual(visual: { id: string, view: string | null, thumbnailStorageKey: string }) {

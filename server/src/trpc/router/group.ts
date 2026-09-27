@@ -104,6 +104,15 @@ export default router({
 			if (usersCount > 0 || regionsCount > 0) {
 				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Group has users or is default for regions. Please move them first.' })
 			}
+			// Dropping the id from a collection could leave it with no group and so
+			// open it to every member: the admin merges the group instead.
+			const [{ count: collectionsCount }] = await dataSource.query(
+				`SELECT count(*)::int AS count FROM collections WHERE $1 = ANY(limited_to_group_ids) OR action_bar::text LIKE '%' || $1 || '%'`,
+				[group.id],
+			)
+			if (collectionsCount > 0) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Group still limits access to collections or their tools. Move it into another group first.' })
+			}
 
 			await dataSource.getRepository(Group).remove(group)
 		}),
@@ -121,9 +130,23 @@ export default router({
 				throw new TRPCError({ code: 'NOT_FOUND', message: 'One or both groups not found.' })
 			}
 
+			if (fromGroup.id === toGroup.id) return
+
 			await dataSource.transaction(async (em) => {
+				// A person already in both groups keeps a single membership.
+				await em.query('DELETE FROM user_groups f USING user_groups t WHERE f.group_id = $1 AND t.group_id = $2 AND t.user_id = f.user_id', [fromGroup.id, toGroup.id])
 				await em.getRepository(UserGroup).update({ groupId: fromGroup.id }, { groupId: toGroup.id })
 				await em.getRepository(Region).update({ defaultGroupId: fromGroup.id }, { defaultGroupId: toGroup.id })
+				// Collections and their tool rules follow the merge, so nobody gains or
+				// loses access through a stale id. Group triggers re-apply inheritance.
+				await em.query(`
+					UPDATE collections SET limited_to_group_ids = ARRAY(SELECT DISTINCT unnest(array_replace(limited_to_group_ids, $1, $2)))
+					WHERE $1 = ANY(limited_to_group_ids)
+				`, [fromGroup.id, toGroup.id])
+				await em.query(`
+					UPDATE collections SET action_bar = replace(action_bar::text, $1, $2)::jsonb
+					WHERE action_bar::text LIKE '%' || $1 || '%'
+				`, [fromGroup.id, toGroup.id])
 			})
 		}),
 })

@@ -17,6 +17,7 @@ import { z } from "zod"
 import { MetadataField } from "../../entity/metadata-field"
 import { dataSource } from "../../env"
 import { rerunEntityStage } from "../../services/enrichment"
+import { visibleMetadataRange, visibleMetadataValues } from "../../services/search"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
 export const METADATA_FACET_VALUES = 200
@@ -83,22 +84,20 @@ export default router({
 			return formatMetadataField(field)
 		}),
 	// What the search panel needs: facetable fields with their values (text) or
-	// their bounds (dates). Values are counted over the whole library.
+	// their bounds (dates), taken from the files this user can open.
 	listFacets: publicProcedure
 		.use(authMiddleware(userApproved))
-		.query(async () => {
-			const fields = await dataSource.getRepository(MetadataField).find({ where: { facetable: true }, order: { name: 'ASC' } })
+		.query(async ({ ctx }) => {
+			const fields = await dataSource.getRepository(MetadataField).find({ where: { facetable: true, viewable: true }, order: { name: 'ASC' } })
 			return Promise.all(fields.map(async (field) => {
 				if (field.valueType === 'date') {
-					const [bounds] = await dataSource.query('SELECT min(value_date) AS min, max(value_date) AS max FROM asset_file_metadata_values WHERE metadata_field_id = $1', [field.id])
-					return { id: field.id, name: field.name, displayName: field.displayName, valueType: field.valueType, values: [] as string[], min: bounds.min as Date | null, max: bounds.max as Date | null, truncated: false }
+					const bounds = await visibleMetadataRange(ctx.user, field)
+					return { id: field.id, name: field.name, displayName: field.displayName, valueType: field.valueType, values: [] as string[], min: bounds.min, max: bounds.max, truncated: false }
 				}
-				const values: { value_text: string }[] = await dataSource.query(`
-					SELECT value_text FROM asset_file_metadata_values WHERE metadata_field_id = $1 GROUP BY value_text ORDER BY count(*) DESC, value_text LIMIT $2
-				`, [field.id, METADATA_FACET_VALUES + 1])
+				const values = await visibleMetadataValues(ctx.user, field, METADATA_FACET_VALUES + 1)
 				return {
 					id: field.id, name: field.name, displayName: field.displayName, valueType: field.valueType,
-					values: values.slice(0, METADATA_FACET_VALUES).map((row) => row.value_text), min: null, max: null,
+					values: values.slice(0, METADATA_FACET_VALUES), min: null, max: null,
 					truncated: values.length > METADATA_FACET_VALUES,
 				}
 			}))

@@ -104,6 +104,13 @@ export class Download {
 	@Column()
 	expiresAt: Date
 
+	// When the requester agreed to the usage terms of the licences below.
+	@Column({ type: 'timestamptz', nullable: true })
+	licenseAcceptedAt: Date | null
+
+	@Column({ type: 'uuid', array: true, default: [] })
+	licenseIds: string[]
+
 	@CreateDateColumn()
 	createdAt: Date
 

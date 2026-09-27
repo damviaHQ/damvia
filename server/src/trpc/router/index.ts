@@ -14,12 +14,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { Region } from "../../entity/region"
-import { dataSource, passwordLessAuth } from "../../env"
+import { analyticsRetentionDays, analyticsSearchMode, auditLogIp, auditRetentionDays, dataSource, oidcSettings, passwordBreachCheck, passwordLessAuth, sessionIdleHours, sessionMaxHours } from "../../env"
 import { publicProcedure, router } from "../index"
 import analyticsRouter from "./analytics"
 import assetRouter from "./asset"
 import assetTypeRouter from "./asset-type"
 import assetTypeRuleRouter from "./asset-type-rule"
+import auditRouter from "./audit"
+import authRouter from "./auth"
 import authorizedDomainRouter from "./authorized-domain"
 import catalogueRouter from "./catalogue"
 import collectionRouter from "./collection"
@@ -45,6 +47,8 @@ import variantAxisRouter from "./variant-axis"
 import variantGroupRouter from "./variant-group"
 
 const appRouter = router({
+	audit: auditRouter,
+	auth: authRouter,
 	user: userRouter,
 	analytics: analyticsRouter,
 	group: groupRouter,
@@ -81,6 +85,19 @@ const appRouter = router({
 			regions: regions.map((region) => ({ id: region.id, name: region.name })),
 			recordLabel: { singular: enrichment.recordLabelSingular, plural: enrichment.recordLabelPlural },
 			viewsEnabled: enrichment.viewsEnabled,
+			sso: oidcSettings() ? { label: oidcSettings()!.label, only: oidcSettings()!.only } : null,
+			// What the privacy page states, so it matches this instance's configuration.
+			privacy: {
+				controller: process.env.PRIVACY_CONTROLLER?.trim() || null,
+				contact: process.env.PRIVACY_CONTACT?.trim() || null,
+				analyticsRetentionDays: analyticsRetentionDays(),
+				auditRetentionDays: auditRetentionDays(),
+				auditLogsAddress: auditLogIp(),
+				searchMode: analyticsSearchMode(),
+				sessionIdleHours: sessionIdleHours(),
+				sessionMaxHours: sessionMaxHours(),
+				passwordBreachCheck: passwordBreachCheck(),
+			},
 		}
 	})
 })

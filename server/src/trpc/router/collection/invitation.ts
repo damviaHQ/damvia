@@ -22,7 +22,8 @@ import { dataSource } from "../../../env"
 import { userCollectionsQuery } from "../../../services/collection"
 import { createGuestUser } from "../../../services/user"
 import { mailerInvitationQueue } from "../../../worker"
-import { authMiddleware, publicProcedure, router, userApproved } from "../../index"
+import { recordAudit } from "../../../services/audit"
+import { authMiddleware, publicProcedure, router, userApproved, userMember } from "../../index"
 
 export function formatInvitation(invitation: CollectionInvitation) {
 	return {
@@ -36,7 +37,7 @@ export function formatInvitation(invitation: CollectionInvitation) {
 
 export default router({
 	create: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(
 			z.object({
 				collectionId: z.uuid(),
@@ -67,13 +68,14 @@ export default router({
 				}
 				await em.save(invitation)
 				await em.getRepository(ActivityEvent).insert({ userId: ctx.user.id, type: ActivityEventType.COLLECTION_SHARE, collectionId: collection.id, metadata: { invitationId: invitation.id } })
+				await recordAudit(em, { actorId: ctx.user.id, action: 'invitation.created', targetType: 'collection', targetId: collection.id, after: { invitationId: invitation.id, email: invitation.email, expiresAt: invitation.expiresAt }, req: ctx.req })
 				if (input.sendEmail) {
 					await mailerInvitationQueue.push({ invitationId: invitation.id })
 				}
 			})
 		}),
 	remove: publicProcedure
-		.use(authMiddleware(userApproved))
+		.use(authMiddleware(userApproved, userMember))
 		.input(z.object({ id: z.uuid() }))
 		.mutation(async ({ input, ctx }) => {
 			const invitation = await dataSource.getRepository(CollectionInvitation).findOne({
@@ -86,7 +88,10 @@ export default router({
 				throw new TRPCError({ code: 'FORBIDDEN', message: 'This collection cannot be edited.' })
 			}
 
-			await dataSource.getRepository(CollectionInvitation).remove(invitation)
+			await dataSource.transaction(async (em) => {
+				await recordAudit(em, { actorId: ctx.user.id, action: 'invitation.removed', targetType: 'collection', targetId: invitation.collectionId, before: { invitationId: invitation.id, email: invitation.email, expiresAt: invitation.expiresAt }, req: ctx.req })
+				await em.getRepository(CollectionInvitation).remove(invitation)
+			})
 		}),
 	getUserInvitations: publicProcedure
 		.use(authMiddleware())

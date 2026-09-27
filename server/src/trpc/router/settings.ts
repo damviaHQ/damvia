@@ -12,17 +12,14 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { rm } from "node:fs/promises"
-import sharp from "sharp"
 import { IsNull } from "typeorm"
 import { z } from "zod"
-import { adminClientLogoEnabled, createLogoUpload, getClientLogo, removeClientLogo, LOGO_MIME_TYPES, processClientLogo } from "../../services/branding"
+import { adminClientLogoEnabled, AUTH_BACKGROUND_KEY, AUTH_BACKGROUND_MIME_TYPES, createAuthBackgroundUpload, createLogoUpload, getClientLogo, removeClientLogo, LOGO_MIME_TYPES, processAuthBackground, processClientLogo } from "../../services/branding"
 import { defaultRelatedRecords, relatedRecordsSettings } from "../../services/catalogue"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { ReadinessDefinition } from "../../entity/readiness-definition"
 import { rerunEntityStage, rerunFamilyStage, rerunReadinessStage } from "../../services/enrichment"
 import { dataSource, logger, mainS3, mainS3Bucket } from "../../env"
-import { tmpFile } from "../../services/asset"
 import { authMiddleware, publicProcedure, router, userAdmin, userManagerOrAdmin } from "../index"
 
 export default router({
@@ -115,49 +112,17 @@ export default router({
   removeClientLogo: publicProcedure
     .use(authMiddleware(userAdmin))
     .mutation(() => removeClientLogo()),
-  getAuthBackgroundUploadUrl: publicProcedure
+  getAuthBackgroundUpload: publicProcedure
     .use(authMiddleware(userAdmin))
-    .query(async () => {
-      const key = 'settings/auth-background-temp'
-      return mainS3().presignedPutObject(mainS3Bucket(), key, 24 * 60 * 60)
-    }),
+    .input(z.object({ contentType: z.enum(AUTH_BACKGROUND_MIME_TYPES) }))
+    .mutation(({ ctx, input }) => createAuthBackgroundUpload(ctx.user.id, input.contentType)),
   processAuthBackgroundImage: publicProcedure
     .use(authMiddleware(userAdmin))
-    .mutation(async () => {
-      const tempKey = 'settings/auth-background-temp'
-      const finalKey = 'settings/auth-background.webp'
-      const tempFilePath = await tmpFile()
-      const processedFilePath = await tmpFile()
-
-      try {
-        await mainS3().fGetObject(mainS3Bucket(), tempKey, tempFilePath)
-
-        await sharp(tempFilePath)
-          .resize({ height: 2000, fit: 'inside' })
-          .webp({ quality: 80 })
-          .toFile(processedFilePath)
-
-        await mainS3().fPutObject(mainS3Bucket(), finalKey, processedFilePath, {
-          'Content-Type': 'image/webp'
-        })
-
-        await mainS3().removeObject(mainS3Bucket(), tempKey)
-
-        return { success: true }
-      } catch (error) {
-        logger.error("Failed to process auth background image", { error })
-        throw new Error("Failed to process auth background image")
-      } finally {
-        // Clean up local temporary files
-        await Promise.all([
-          rm(tempFilePath).catch(() => { }),
-          rm(processedFilePath).catch(() => { })
-        ])
-      }
-    }),
+    .input(z.object({ uploadId: z.uuid() }))
+    .mutation(({ ctx, input }) => processAuthBackground(ctx.user.id, input.uploadId)),
   getAuthBackgroundImage: publicProcedure
     .query(async () => {
-      const authBackgroundStorageKey = 'settings/auth-background.webp'
+      const authBackgroundStorageKey = AUTH_BACKGROUND_KEY
       try {
         // Check if the object exists
         await mainS3().statObject(mainS3Bucket(), authBackgroundStorageKey)
@@ -179,7 +144,7 @@ export default router({
   removeAuthBackgroundImage: publicProcedure
     .use(authMiddleware(userAdmin))
     .mutation(async () => {
-      const key = 'settings/auth-background.webp'
+      const key = AUTH_BACKGROUND_KEY
       try {
         await mainS3().removeObject(mainS3Bucket(), key)
         return { success: true }

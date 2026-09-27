@@ -111,3 +111,54 @@ export async function removeClientLogo() {
     })
     return { success: true }
 }
+
+export const AUTH_BACKGROUND_KEY = 'settings/auth-background.webp'
+// No trailing slash: the listing also catches the fixed key older versions staged uploads under.
+export const AUTH_BACKGROUND_TEMP_PREFIX = 'settings/auth-background-temp'
+export const MAX_AUTH_BACKGROUND_BYTES = 20 * 1024 * 1024
+export const AUTH_BACKGROUND_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const
+
+export async function createAuthBackgroundUpload(userId: string, contentType: typeof AUTH_BACKGROUND_MIME_TYPES[number]) {
+    const uploadId = randomUUID()
+    const policy = mainS3().newPostPolicy()
+    policy.setBucket(mainS3Bucket())
+    policy.setKey(`${AUTH_BACKGROUND_TEMP_PREFIX}/${userId}/${uploadId}`)
+    policy.setExpires(new Date(Date.now() + 10 * 60 * 1000))
+    policy.setContentType(contentType)
+    policy.setContentLengthRange(1, MAX_AUTH_BACKGROUND_BYTES)
+    const { postURL, formData } = await mainS3().presignedPostPolicy(policy)
+    return { uploadId, url: postURL, fields: formData as Record<string, string> }
+}
+
+export async function processAuthBackground(userId: string, uploadId: string) {
+    const key = `${AUTH_BACKGROUND_TEMP_PREFIX}/${userId}/${uploadId}`
+    let staged: { versionId?: string | null } | null = null
+    try {
+        const object = await mainS3().statObject(mainS3Bucket(), key)
+        staged = object
+        if (object.size < 1 || object.size > MAX_AUTH_BACKGROUND_BYTES) throw new Error('size')
+        const stream = await mainS3().getObject(mainS3Bucket(), key, staged.versionId ? { versionId: staged.versionId } : {})
+        const chunks: Buffer[] = []
+        let bytes = 0
+        for await (const chunk of stream) {
+            bytes += chunk.length
+            if (bytes > MAX_AUTH_BACKGROUND_BYTES) { stream.destroy(); throw new Error('size') }
+            chunks.push(Buffer.from(chunk))
+        }
+        const image = sharp(Buffer.concat(chunks), { limitInputPixels: 40_000_000, failOn: 'warning' })
+        const metadata = await image.metadata()
+        if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '') || (metadata.pages ?? 1) > 1) throw new Error('format')
+        const output = await image.rotate().resize({ height: 2000, fit: 'inside', withoutEnlargement: true })
+            .webp({ quality: 80 }).timeout({ seconds: 20 }).toBuffer()
+        await mainS3().putObject(mainS3Bucket(), AUTH_BACKGROUND_KEY, output, output.length, { 'Content-Type': 'image/webp' })
+    } catch (error) {
+        logger.warn('branding.auth-background-upload-failed', { code: error.code })
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Upload a valid JPEG, PNG or WebP image (up to 20 MB and 40 million pixels).' })
+    } finally {
+        if (staged) await mainS3().removeObject(mainS3Bucket(), key, staged.versionId ? { versionId: staged.versionId } : undefined).catch(() => {
+            // The daily integrity check also removes abandoned staged uploads.
+            logger.warn('branding.auth-background-temp-cleanup-failed')
+        })
+    }
+    return { success: true }
+}

@@ -12,11 +12,10 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import {FastifyRequest} from 'fastify'
-import {sign, verify} from "jsonwebtoken"
+import {verify} from "jsonwebtoken"
 import {randomBytes} from 'node:crypto'
 import {hashPassword} from './credentials'
-import {EntityManager} from "typeorm"
+import {EntityManager, IsNull} from "typeorm"
 import {AuthorizedDomain} from "../entity/authorized-domain"
 import {Collection} from "../entity/collection"
 import {Download} from "../entity/download"
@@ -25,6 +24,8 @@ import {User, UserRole} from "../entity/user"
 import {dataSource, passwordLessAuth, secret} from "../env"
 import {mailerEmailVerificationQueue} from "../worker"
 import {removeDownloads} from "./download"
+import {removeCollections} from "./collection"
+import {anonymiseUser} from "./privacy"
 import {CollectionInvitation} from "../entity/collection-invitation"
 import {UserGroup} from "../entity/user-group";
 
@@ -92,43 +93,37 @@ export async function createGuestUser(opts: CreateGuestUserOptions) {
 	return user
 }
 
-export function generateAuthToken(user: User) {
-	return new Promise<string>((resolve, reject) => {
-		sign({ userId: user.id, authVersion: user.authVersion }, secret(), { expiresIn: '180d' }, (err: Error | null, token: string) => {
-			if (err) {
-				return reject(err)
-			}
-			resolve(token)
-		})
-	})
-}
-
-export async function getUserFromRequest(req: FastifyRequest): Promise<User | null> {
-	const authorization = req.headers.authorization
-	if (!authorization) {
-		return null
-	}
-
+// Sessions used to be 180-day JWTs kept in a JavaScript cookie. A browser
+// that still holds one trades it once for a server-side session; nothing
+// else accepts a JWT any more.
+export async function userFromLegacyToken(token: string | undefined): Promise<User | null> {
+	if (!token) return null
 	try {
-		const payload = verify(authorization, secret(), { algorithms: ['HS256'] })
+		const payload = verify(token, secret(), { algorithms: ['HS256'] })
 		if (typeof payload === 'string' || typeof payload.userId !== 'string' ||
 			!Number.isInteger(payload.authVersion)) return null
 		return await dataSource.getRepository(User).findOne({
-			where: { id: payload.userId, authVersion: payload.authVersion },
-			relations: { userGroups: { group: true } },
+			where: { id: payload.userId, authVersion: payload.authVersion, suspendedAt: IsNull() },
 		})
 	} catch {
 		return null
 	}
 }
 
+// Common collections the user owned are kept without an owner; their personal
+// collections go with them.
 export async function removeUser(user: User) {
-	await dataSource.transaction(async (em) => {
+	const cleanup = await dataSource.transaction(async (em) => {
 		await em.getRepository(CollectionInvitation).delete({ email: user.email })
 		await em.getRepository(Collection).update({ ownerId: user.id, public: true }, { ownerId: null })
+		const personal = await em.getRepository(Collection).findBy({ ownerId: user.id, public: false })
+		const removed = personal.length ? await removeCollections(em, personal.map((collection) => collection.id)) : null
 
 		const downloads = await em.getRepository(Download).findBy({ userId: user.id })
 		await removeDownloads({ em, downloads })
-		await em.getRepository(User).remove(user)
+		await anonymiseUser(em, user)
+		await em.getRepository(User).delete(user.id)
+		return removed
 	})
+	await cleanup?.()
 }

@@ -27,8 +27,9 @@ import {
 } from "../../entity/download"
 import {apiURL, dataSource} from "../../env"
 import { userCollectionFilesQuery } from "../../services/collection"
-import { createDownloadArchive } from "../../services/download"
+import { createDownloadArchive, DOWNLOAD_LIMITS, downloadDelivery } from "../../services/download"
 import { downloadCreateArchiveQueue } from "../../worker"
+import { recordAudit } from "../../services/audit"
 import { authMiddleware, publicProcedure, router, userApproved } from "../index"
 
 import { resolveDownloadSelection } from "../../services/download-selection"
@@ -94,7 +95,7 @@ export default router({
 		.use(authMiddleware(userApproved))
 		.input(
 			z.object({
-				collectionFileIds: z.uuid().array().min(1),
+				collectionFileIds: z.uuid().array().min(1).max(DOWNLOAD_LIMITS.files),
 				recordExport: z.object({
 					items: z.array(z.object({ id: z.uuid(), type: z.enum(['collection', 'file', 'record']) })).min(1).max(10000),
 					columns: z.string().array().min(1).max(500),
@@ -105,6 +106,7 @@ export default router({
 				videoFormat: z.enum(DownloadVideoFormat),
 				videoResolution: z.enum(DownloadVideoResolution),
 				downloadType: z.enum(DownloadType),
+				licenseAccepted: z.boolean().optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
@@ -114,8 +116,20 @@ export default router({
 
 			if (!collectionFiles.length) throw new TRPCError({ code: 'BAD_REQUEST', message: 'No files are available to download.' })
 			const totalSize = collectionFiles.reduce((total, file) => total + parseInt(file.assetFile.size, 10), 0)
-			if (totalSize >= 10_000_000_000) { // 10GB
+			if (totalSize >= DOWNLOAD_LIMITS.totalBytes) {
 				throw new TRPCError({ code: 'FORBIDDEN', message: "You cannot download more than 10GB." })
+			}
+			const licenseIds = [...new Set(collectionFiles.flatMap((file) => file.assetFile.license ? [file.assetFile.license.id] : []))]
+			if (licenseIds.length && !input.licenseAccepted) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Accept the usage terms to download these files.' })
+			}
+			const imageCount = collectionFiles.filter((file) => file.assetFile.mimeType?.startsWith('image/')).length
+			const type = downloadDelivery(input.downloadType, totalSize, imageCount)
+			if (type === DownloadType.EMAIL) {
+				const active = await dataSource.getRepository(Download).countBy({ userId: ctx.user.id, status: DownloadStatus.PREPARING })
+				if (active >= DOWNLOAD_LIMITS.activeExports) {
+					throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: 'Several downloads are already being prepared. Try again when one is ready.' })
+				}
 			}
 			const selectedRecords = input.recordExport
 				? await resolveDownloadSelection(dataSource.manager, ctx.user, input.recordExport.items, false)
@@ -125,7 +139,7 @@ export default router({
 			const download = new Download()
 			download.status = DownloadStatus.PREPARING
 			download.user = ctx.user
-			download.type = input.downloadType
+			download.type = type
 			download.collectionFileIds = collectionFiles.map((file) => file.id)
 			download.recordExport = input.recordExport && selectedRecords ? {
 				items: input.recordExport.items,
@@ -138,6 +152,8 @@ export default router({
 			download.videoFormat = input.videoFormat
 			download.videoResolution = input.videoResolution
 			download.expiresAt = new Date(Date.now() + (1000 * 60 * 60 * 24 * 7))
+			download.licenseIds = licenseIds
+			download.licenseAcceptedAt = licenseIds.length ? new Date() : null
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Download).save(download)
 				await em.getRepository(ActivityEvent).insert(collectionFiles.map((file) => ({
@@ -145,8 +161,11 @@ export default router({
 					type: ActivityEventType.ASSET_DOWNLOAD,
 					assetFileId: file.assetFileId,
 					collectionId: file.collectionId,
-					metadata: { downloadId: download.id, downloadType: download.type },
+					metadata: { downloadId: download.id, downloadType: download.type, ...(file.assetFile.license && { licenseId: file.assetFile.license.id, licenseAcceptedAt: download.licenseAcceptedAt!.toISOString() }) },
 				})))
+				if (licenseIds.length) {
+					await recordAudit(em, { actorId: ctx.user.id, action: 'license.accepted', targetType: 'download', targetId: download.id, after: { licenseIds, acceptedAt: download.licenseAcceptedAt }, req: ctx.req })
+				}
 				if (download.type === DownloadType.DIRECT) {
 					return createDownloadArchive({ em, download })
 				}

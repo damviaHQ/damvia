@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { EntityManager } from "typeorm"
-import { AssetEntityLink, EntityLinkStrategy } from "../entity/asset-entity-link"
+import { EntityLinkStrategy } from "../entity/asset-entity-link"
 import { ResolutionCandidate, ResolutionStatus } from "../entity/asset-file-resolution"
 import { AssetTypeResolverStep, ResolverStepConfig } from "../entity/asset-type-resolver-step"
 import { logger } from "../env"
@@ -504,9 +504,4 @@ export async function runEntityStage(em: EntityManager, extraCandidates: (file: 
 	result.linksUpdated = updates.length
 	result.filesUpdated = fileWrites.length
 	return result
-}
-
-export async function linkedLinks(em: EntityManager, assetFileIds: string[]): Promise<AssetEntityLink[]> {
-	if (!assetFileIds.length) return []
-	return em.getRepository(AssetEntityLink).createQueryBuilder('link').where('link.asset_file_id IN (:...ids)', { ids: assetFileIds }).getMany()
 }

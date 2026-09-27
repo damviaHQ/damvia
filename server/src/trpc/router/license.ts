@@ -19,12 +19,13 @@ import { AssetFolder } from "../../entity/asset-folder"
 import { License, LicenseScope } from "../../entity/license"
 import { dataSource } from "../../env"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
+import { sanitizeBlockHtml } from "../../page-blocks/sanitize"
 
 export function formatLicense(license: License) {
 	return {
 		id: license.id,
 		name: license.name,
-		details: license.details,
+		details: license.details && sanitizeBlockHtml(license.details),
 		usageFrom: license.usageFrom,
 		usageTo: license.usageTo,
 		scopes: license.scopes,
@@ -54,7 +55,7 @@ export default router({
 		.mutation(async ({ input }) => {
 			const license = new License()
 			license.name = input.name ?? ''
-			license.details = input.details ?? null
+			license.details = input.details ? sanitizeBlockHtml(input.details) : null
 			license.usageFrom = input.usageFrom ?? null
 			license.usageTo = input.usageTo ?? null
 			license.scopes = input.scopes
@@ -82,7 +83,7 @@ export default router({
 			}
 
 			license.name = input.name ?? license.name
-			license.details = input.details ?? null
+			license.details = input.details ? sanitizeBlockHtml(input.details) : null
 			license.usageFrom = input.usageFrom ?? null
 			license.usageTo = input.usageTo ?? null
 			license.scopes = input.scopes

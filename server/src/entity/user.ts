@@ -80,6 +80,30 @@ export class User {
 	@Column({ type: 'timestamptz', nullable: true })
 	lastLoginAt: Date | null
 
+	@Column({ default: 0 })
+	failedLoginCount: number
+
+	@Column({ type: 'timestamptz', nullable: true })
+	lockedUntil: Date | null
+
+	@Column({ type: 'varchar', nullable: true, select: false })
+	mfaSecret: string | null
+
+	@Column({ type: 'timestamptz', nullable: true })
+	mfaEnabledAt: Date | null
+
+	@Column({ type: 'text', array: true, default: '{}', select: false })
+	mfaRecoveryCodes: string[]
+
+	@Column({ type: 'bigint', nullable: true, select: false })
+	mfaLastStep: string | null
+
+	@Column({ type: 'varchar', nullable: true })
+	oidcSubject: string | null
+
+	@Column({ type: 'timestamptz', nullable: true })
+	suspendedAt: Date | null
+
 	@OneToMany(() => UserGroup, userGroup => userGroup.user, {cascade: true})
 	userGroups: UserGroup[];
 

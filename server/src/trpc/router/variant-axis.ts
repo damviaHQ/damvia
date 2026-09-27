@@ -18,6 +18,7 @@ import { VariantAxis } from "../../entity/variant-axis"
 import { VariantGroupingSettings } from "../../entity/variant-grouping-settings"
 import { dataSource } from "../../env"
 import { rerunVariantStage } from "../../services/enrichment"
+import { visibleAxisValues } from "../../services/search"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
 
 type AxisRow = { id: string, name: string | null, values: string[], recognizer: string | null, ignored: boolean, example_file_names: string[], groups: number, created_at: Date }
@@ -93,7 +94,12 @@ export default router({
 		}),
 	listFacets: publicProcedure
 		.use(authMiddleware(userApproved))
-		.query(async () => (await loadAxes()).filter((axis) => !axis.ignored && axis.groups > 0).map((axis) => ({ id: axis.id, label: axis.label, values: axis.values }))),
+		.query(async ({ ctx }) => {
+			const visible = await visibleAxisValues(ctx.user)
+			return (await loadAxes())
+				.filter((axis) => !axis.ignored && axis.groups > 0 && visible.has(axis.id))
+				.map((axis) => ({ id: axis.id, label: axis.label, values: axis.values.filter((value) => visible.get(axis.id)!.has(value)) }))
+		}),
 	settings: publicProcedure
 		.use(authMiddleware(userAdmin))
 		.query(async () => {

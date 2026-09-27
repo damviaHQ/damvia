@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
-import { ArrayContains } from "typeorm"
+import { ArrayContains, In } from "typeorm"
 import { z } from "zod"
 import { Group } from "../../entity/group"
 import { License } from "../../entity/license"
@@ -150,6 +150,10 @@ export default router({
 			toRegionId: z.uuid()
 		}))
 		.mutation(async ({ input }) => {
+			const found = await dataSource.getRepository(Region).countBy({ id: In([input.fromRegionId, input.toRegionId]) })
+			if (found < new Set([input.fromRegionId, input.toRegionId]).size) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Region not found.' })
+			}
 			await dataSource.getRepository(User).update(
 				{ regionId: input.fromRegionId },
 				{ regionId: input.toRegionId }

@@ -12,7 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { exec } from "node:child_process"
+import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
 import { readFile, writeFile, rm } from "node:fs/promises"
 import { join } from "node:path"
@@ -29,6 +29,24 @@ declare module 'libreoffice-convert' {
     ): void;
 }
 import * as libre from 'libreoffice-convert'
+
+
+// Arguments go straight to the program, never through a shell: file names come
+// from cloud storage and may contain quotes, $() or backticks.
+function run(command: string, args: string[], timeout?: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+        execFile(command, args, { timeout, maxBuffer: 16 * 1024 * 1024 }, (error, stdout) => error ? reject(error) : resolve(stdout))
+    })
+}
+
+// A synced image is decoded to draw its thumbnail. A file claiming more pixels
+// than this (sharp's own default, 16384 x 16384) is refused before decoding and
+// gets no thumbnail, so one crafted file cannot exhaust the worker's memory.
+export const THUMBNAIL_MAX_PIXELS = 268_402_689
+
+export function safeExtension(extension: string | undefined): string {
+    return extension && /^[a-z0-9]{1,10}$/.test(extension) ? extension : 'bin'
+}
 
 export const LIBREOFFICE_EXTENSIONS = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'pps', 'ppsx', 'potx', 'pot', 'html', 'htm', 'xml', 'json', 'md', 'yaml', 'yml', 'txt', 'css', 'js', 'ts', 'csv'];
 export const GHOSTSCRIPT_EXTENSIONS = ['pdf', 'eps', 'ai'];
@@ -181,22 +199,13 @@ export async function convertOfficeToPng(
                 
                 try {
                     const tempDir = await tmpDir();
-                    const tempInputPath = join(tempDir, `input_${randomUUID()}.${extension}`);
+                    const inputName = `input_${randomUUID()}`;
+                    const tempInputPath = join(tempDir, `${inputName}.${safeExtension(extension)}`);
                     await writeFile(tempInputPath, docBuffer);
                     
-                    await new Promise<void>((resolve, reject) => {
-                        const timeout = 120000; // 2 minutes timeout
-                        const cmd = `timeout ${timeout / 1000} soffice --headless --convert-to pdf --outdir "${tempDir}" "${tempInputPath}"`;
-                        exec(cmd, (error) => {
-                            if (error) {
-                                reject(error);
-                            } else {
-                                resolve();
-                            }
-                        });
-                    });
+                    await run('soffice', ['--headless', '--convert-to', 'pdf', '--outdir', tempDir, tempInputPath], 120000);
                     
-                    const pdfFilename = `input_${randomUUID()}.pdf`;
+                    const pdfFilename = `${inputName}.pdf`;
                     const generatedPdfPath = join(tempDir, pdfFilename);
                     
                     if (existsSync(generatedPdfPath)) {
@@ -223,16 +232,7 @@ export async function convertOfficeToPng(
         }
         
         const pngPath = await tmpFile();
-        await new Promise<void>((resolve, reject) => {
-            const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dFirstPage=1 -dLastPage=1 -r150 -sOutputFile="${pngPath}" "${pdfPath}"`;
-            exec(cmd, (error) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve();
-                }
-            });
-        });
+        await run('gs', ['-dSAFER', '-dBATCH', '-dNOPAUSE', '-sDEVICE=png16m', '-dGraphicsAlphaBits=4', '-dFirstPage=1', '-dLastPage=1', '-r150', `-sOutputFile=${pngPath}`, pdfPath]);
         
         rm(pdfPath, { force: true }).catch(() => {});
         
@@ -269,27 +269,9 @@ export async function convertVectorToPng(
         const resolution = fileSize > 50 * 1024 * 1024 ? 72 : 150;
         
         if (extension === 'pdf' || file.mimeType === 'application/pdf') {
-            await new Promise<void>((resolve, reject) => {
-                const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dFirstPage=1 -dLastPage=1 -r${resolution} -sOutputFile="${tempPngPath}" "${contentPath}"`;
-                exec(cmd, (error) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
+            await run('gs', ['-dSAFER', '-dBATCH', '-dNOPAUSE', '-sDEVICE=png16m', '-dGraphicsAlphaBits=4', '-dFirstPage=1', '-dLastPage=1', `-r${resolution}`, `-sOutputFile=${tempPngPath}`, contentPath]);
         } else {
-            await new Promise<void>((resolve, reject) => {
-                const cmd = `gs -dSAFER -dBATCH -dNOPAUSE -sDEVICE=png16m -dGraphicsAlphaBits=4 -dEPSCrop -r${resolution} -sOutputFile="${tempPngPath}" "${contentPath}"`;
-                exec(cmd, (error) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
+            await run('gs', ['-dSAFER', '-dBATCH', '-dNOPAUSE', '-sDEVICE=png16m', '-dGraphicsAlphaBits=4', '-dEPSCrop', `-r${resolution}`, `-sOutputFile=${tempPngPath}`, contentPath]);
         }
         
         return tempPngPath;
@@ -375,16 +357,7 @@ export async function processImageThumbnail(
         // but not the pixels; ImageMagick handles these.
         if (isHeic) {
             try {
-                await new Promise<void>((resolve, reject) => {
-                    const cmd = `convert "${contentPath}[0]" -auto-orient -resize 1920x1280 -quality 85 "${thumbnailPath}.webp"`;
-                    exec(cmd, (error) => {
-                        if (error) {
-                            reject(error);
-                        } else {
-                            resolve();
-                        }
-                    });
-                });
+                await run('convert', [`${contentPath}[0]`, '-auto-orient', '-resize', '1920x1280', '-quality', '85', `${thumbnailPath}.webp`]);
 
                 return `${thumbnailPath}.webp`;
             } catch (heicError) {
@@ -394,30 +367,12 @@ export async function processImageThumbnail(
 
         if (isPsd) {
             try {
-                await new Promise<void>((resolve, reject) => {
-                    const cmd = `convert "${contentPath}[0]" -resize 1920x1280 -quality 85 "${thumbnailPath}.webp"`;
-                    exec(cmd, (error) => {
-                        if (error) {
-                            reject(error);
-                        } else {
-                            resolve();
-                        }
-                    });
-                });
+                await run('convert', [`${contentPath}[0]`, '-resize', '1920x1280', '-quality', '85', `${thumbnailPath}.webp`]);
                 
                 return `${thumbnailPath}.webp`;
             } catch (psdError) {
                 try {
-                    await new Promise<void>((resolve, reject) => {
-                        const cmd = `convert "${contentPath}" -flatten -resize 1920x1280 -quality 85 "${thumbnailPath}.webp"`;
-                        exec(cmd, (error) => {
-                            if (error) {
-                                reject(error);
-                            } else {
-                                resolve();
-                            }
-                        });
-                    });
+                    await run('convert', [contentPath, '-flatten', '-resize', '1920x1280', '-quality', '85', `${thumbnailPath}.webp`]);
                     
                     return `${thumbnailPath}.webp`;
                 } catch (fallbackError) {
@@ -431,7 +386,7 @@ export async function processImageThumbnail(
         if (isLargeFile) {
             try {
                 await sharp(contentPath, { 
-                    limitInputPixels: 0,
+                    limitInputPixels: THUMBNAIL_MAX_PIXELS,
                     pages: 1,
                     failOn: 'none'
                 })
@@ -448,7 +403,7 @@ export async function processImageThumbnail(
             } catch (largeImageError) {
                 try {
                     await sharp(contentPath, { 
-                        limitInputPixels: 0,
+                        limitInputPixels: THUMBNAIL_MAX_PIXELS,
                         pages: 1,
                         failOn: 'none'
                     })
@@ -464,7 +419,7 @@ export async function processImageThumbnail(
                     return thumbnailPath;
                 } catch (reducedSizeError) {
                     await sharp(contentPath, { 
-                        limitInputPixels: 100000000,
+                        limitInputPixels: THUMBNAIL_MAX_PIXELS,
                         pages: 1,
                         failOn: 'none'
                     })
@@ -563,32 +518,14 @@ export async function processFontThumbnail(
         const thumbnailPath = await tmpFile();
         const sampleText = `ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n1234567890\nThe quick brown fox jumps over the lazy dog.\nPack my box with five dozen liquor jugs.\nSphynx of black quartz, judge my vow.`;
         
-        await new Promise<void>((resolve, reject) => {
-            const cmd = `convert -size 1920x1280 -background white -fill black -font "${contentPath}" -pointsize 48 -gravity center label:"${sampleText}" -quality 90 "${thumbnailPath}.webp"`;
-            exec(cmd, (error) => {
-                if (error) {
-                    reject(error);
-                } else {
-                    resolve();
-                }
-            });
-        });
+        await run('convert', ['-size', '1920x1280', '-background', 'white', '-fill', 'black', '-font', contentPath, '-pointsize', '48', '-gravity', 'center', `label:${sampleText}`, '-quality', '90', `${thumbnailPath}.webp`]);
         
         return `${thumbnailPath}.webp`;
     } catch (error) {
         try {
             const fallbackThumbnailPath = await tmpFile();
             const simpleSampleText = `Font: ${file.name}\n\nABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n1234567890`;
-            await new Promise<void>((resolve, reject) => {
-                const cmd = `convert -size 1280x720 -background white -fill black -pointsize 36 -gravity center label:"${simpleSampleText}" -quality 85 "${fallbackThumbnailPath}.webp"`;
-                exec(cmd, (error) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
+            await run('convert', ['-size', '1280x720', '-background', 'white', '-fill', 'black', '-pointsize', '36', '-gravity', 'center', `label:${simpleSampleText}`, '-quality', '85', `${fallbackThumbnailPath}.webp`]);
             
             return `${fallbackThumbnailPath}.webp`;
         } catch (fallbackError) {

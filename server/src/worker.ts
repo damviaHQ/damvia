@@ -22,6 +22,9 @@ import { assignProductsToAssetFiles, processDeletion, updateFileContent } from "
 import { extractStoredFileMetadata } from "./services/file-metadata"
 import { synchronizeCollection } from "./services/collection"
 import { pruneActivityEvents } from "./services/analytics"
+import { pruneExpiredSessions } from "./services/session"
+import { pruneAuditLog } from "./services/audit"
+import { notifyExpiringLicenses } from "./services/license-expiry"
 import { measureStorageUsage, StorageQuotaExceededError } from "./services/storage"
 import { integrityCheck as systemIntegrityCheck } from "./services/system"
 import { createDownloadArchive, DownloadAccessError, processExpiredDownloads } from "./services/download"
@@ -177,46 +180,58 @@ export async function startQueues({ enableWorker }: { enableWorker: boolean }) {
 	}
 }
 
+// A mail whose user, download or invitation was deleted after it was queued has nobody to go to:
+// skip it instead of throwing, which would retry it forever.
+function ifFound<T>(queue: string, send: (row: T) => Promise<unknown>) {
+	return async (row: T | null) => {
+		if (!row) {
+			logger.info('mailer.skipped-missing-row', { queue })
+			return
+		}
+		await send(row)
+	}
+}
+
 export const mailerEmailVerificationQueue = createQueue<{ userId: string }>({
 	name: 'mailer/email-verification',
 	processor: (data) =>
 		dataSource.getRepository(User).findOneBy({ id: data.userId })
-			.then(sendEmailVerificationEmail),
+			.then(ifFound('mailer/email-verification', sendEmailVerificationEmail)),
 })
 
 export const mailerLogInQueue = createQueue<{ userId: string }>({
 	name: 'mailer/log-in',
 	processor: (data) =>
 		dataSource.getRepository(User).findOneBy({ id: data.userId })
-			.then(sendLogInEmail)
+			.then(ifFound('mailer/log-in', sendLogInEmail))
 })
 
-export const mailerResetPasswordQueue = createQueue<{ userId: string, token: string }>({
+export const mailerResetPasswordQueue = createQueue<{ userId: string }>({
 	name: 'mailer/password-reset',
 	processor: (data) =>
-		dataSource.getRepository(User).findOneByOrFail({ id: data.userId })
-			.then((user) => sendResetPasswordEmail(user, data.token))
+		dataSource.getRepository(User).findOneBy({ id: data.userId })
+			.then(ifFound('mailer/password-reset', sendResetPasswordEmail))
 })
 
 export const mailerRequestApprovalQueue = createQueue<{ requesterId: string }>({
 	name: 'email/request-approval',
 	processor: (data) =>
 		dataSource.getRepository(User).findOneBy({ id: data.requesterId })
-			.then(sendRequestApprovalEmail)
+			.then(ifFound('email/request-approval', sendRequestApprovalEmail))
 })
 
 export const mailerUserApprovedEmailQueue = createQueue<{ userId: string }>({
 	name: 'email/user-approved',
 	processor: (data) =>
 		dataSource.getRepository(User).findOneBy({ id: data.userId })
-			.then(sendUserApprovedEmail)
+			.then(ifFound('email/user-approved', sendUserApprovedEmail))
 })
 
 export const mailerDownloadReadyQueue = createQueue<{ downloadId: string }>({
 	name: 'mailer/download-ready',
 	processor: (data) =>
 		dataSource.getRepository(Download).findOneBy({ id: data.downloadId })
-			.then(sendDownloadReady)
+			.then(ifFound('mailer/download-ready', sendDownloadReady))
 })
 
 export const mailerInvitationQueue = createQueue<{ invitationId: string }>({
@@ -224,7 +239,7 @@ export const mailerInvitationQueue = createQueue<{ invitationId: string }>({
 	processor: (data) =>
 		dataSource.getRepository(CollectionInvitation)
 			.findOne({ where: { id: data.invitationId }, relations: { collection: true, user: true } })
-			.then(sendInvitation)
+			.then(ifFound('mailer/invitation', sendInvitation))
 })
 
 export const assetUpdateContentQueue = createQueue<{ assetFileId: string }>({
@@ -320,4 +335,22 @@ export const activityPruneEventsQueue = createQueue<void>({
 	name: 'activity/prune-events',
 	processor: () => pruneActivityEvents(),
 	cron: '30 4 * * *',
+})
+
+export const licenseExpiryNoticeQueue = createQueue<void>({
+	name: 'license/expiry-notice',
+	processor: () => notifyExpiringLicenses().then(() => undefined),
+	cron: '0 6 * * *',
+})
+
+export const auditPruneQueue = createQueue<void>({
+	name: 'audit/prune',
+	processor: () => pruneAuditLog().then(() => undefined),
+	cron: '15 5 * * *',
+})
+
+export const authPruneSessionsQueue = createQueue<void>({
+	name: 'auth/prune-sessions',
+	processor: () => pruneExpiredSessions(),
+	cron: '45 4 * * *',
 })

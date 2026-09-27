@@ -16,4 +16,7 @@ COPY . .
 
 RUN npm run build
 
+# The server only writes to the system temp directory, so it runs without root.
+USER node
+
 CMD ["npm", "start"]
