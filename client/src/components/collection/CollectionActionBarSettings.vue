@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import FieldDescription from "@/components/ui/field/FieldDescription.vue"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -31,7 +31,7 @@ import {
   type ActionBarSettings,
 } from "@/utils/actionBar"
 import { useQuery } from "@tanstack/vue-query"
-import { Check, Filter, LayoutGrid, Search } from "@lucide/vue"
+import { Check, Filter, LayoutGrid } from "@lucide/vue"
 import { computed } from "vue"
 import Treeselect from "vue3-treeselect-ts"
 
@@ -48,7 +48,6 @@ const resetDescendants = defineModel<boolean>("resetDescendants", { required: tr
 // Share is only offered to people who can edit the collection, and they always
 // see every action, so a rule for it would change nothing yet.
 const actions: { key: ActionBarAction, label: string, icon: typeof Filter }[] = [
-  { key: "search", label: "Search in collection", icon: Search },
   { key: "filter", label: "Filter", icon: Filter },
   { key: "display", label: "Display preferences", icon: LayoutGrid },
 ]
@@ -58,7 +57,7 @@ const { data: audience } = useQuery({
   queryFn: () => trpc.collection.actionBarAudience.query(props.collectionId),
 })
 const groupOptions = computed(() => (audience.value?.groups ?? []).map((group) => ({ id: group.id, label: group.name })))
-const userOptions = computed(() => (audience.value?.users ?? []).map((user) => ({ id: user.id, label: `${user.name} (${user.email})` })))
+const userOptions = computed(() => (audience.value?.users ?? []).map((user) => ({ id: user.id, label: user.email ? `${user.name} (${user.email})` : user.name })))
 const names = computed(() => ({
   groups: new Map((audience.value?.groups ?? []).map((group) => [group.id, group.name])),
   users: new Map((audience.value?.users ?? []).map((user) => [user.id, user.name])),

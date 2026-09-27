@@ -42,6 +42,10 @@ export function canApproveUser(viewer: Viewer, user: AdminUser) {
 export function canDeleteUser(viewer: Viewer, user: AdminUser) {
   return viewer?.id !== user.id && canEditUser(viewer, user)
 }
+// Suspending, signing out, resets: the same people who could delete the account.
+export function canManageAccount(viewer: Viewer, user: AdminUser) {
+  return canDeleteUser(viewer, user)
+}
 export function csvCell(value: unknown) {
   const text = String(value ?? '')
   const safe = /^(?:[\s\uFEFF]*[=+\-@]|[\t\r\n])/.test(text) ? `'${text}` : text

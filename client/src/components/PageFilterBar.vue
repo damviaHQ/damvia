@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import PageFilterToggle from "@/components/PageFilterToggle.vue"
 import SearchFacetGroup from "@/components/search/SearchFacetGroup.vue"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { usePageFilter } from "@/composables/usePageFilter"
@@ -23,17 +24,17 @@ import {
   fileFacets,
   matchesCollection,
   matchesFile,
-  NAME_FILTER_KEY,
   type FilterableCollection,
   type FilterableFile,
   type PageFacets,
 } from "@/utils/pageFilter"
 import { ChevronDown, Search, X } from "@lucide/vue"
-import { computed } from "vue"
+import { computed, ref, watch } from "vue"
 
 const props = withDefaults(defineProps<{
   files?: FilterableFile[]
   collections?: DisplayCollection[]
+  restricted?: boolean
   showSummary?: boolean
   showSingleValues?: boolean
   facets?: PageFacets
@@ -50,13 +51,27 @@ const files = computed(() => props.files as unknown as FilterableFile[])
 const collections = computed(() => props.collections as unknown as FilterableCollection[])
 const facets = computed(() => props.facets ?? fileFacets(files.value, filter.state.value))
 
-// Only what the reader put on the bar from the funnel: showing every facet at
-// once was a wall of controls on a page that already has plenty.
-const showName = computed(() => store.pageFilters.includes(NAME_FILTER_KEY))
-const groups = computed(() => availableGroups(filter.state.value, facets.value, props.showSingleValues)
+const available = computed(() => availableGroups(filter.state.value, facets.value, props.showSingleValues))
+const groups = computed(() => available.value
   .filter((group) => store.pageFilters.includes(group.key))
   .map((group) => ({ ...group, id: group.key.replace(":", "-") })))
-const isEmpty = computed(() => !showName.value && !groups.value.length)
+const hasContent = computed(() => filter.isActive.value || (props.total !== undefined ? props.total > 0 : files.value.length > 0))
+const saved = ref(false)
+watch(() => [...store.pageFilters], () => { saved.value = false })
+function remove(key: string) {
+  filter.clearDimension(key)
+  store.togglePageFilter(key)
+}
+function save() {
+  try {
+    store.savePageFilters()
+    saved.value = true
+    saveError.value = ""
+  } catch {
+    saveError.value = "Could not save filters in this browser."
+  }
+}
+const saveError = ref("")
 
 const total = computed(() => props.total ?? files.value.length + collections.value.length)
 const shown = computed(() => props.shown ?? (
@@ -73,8 +88,8 @@ const triggerLabel = (selected: string[], options: { id: string, label: string }
 </script>
 
 <template>
-  <div v-if="!isEmpty" class="page-filter-bar mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-neutral-200 pb-3" role="search" aria-label="Filter this page">
-    <div v-if="showName" class="relative flex items-center">
+  <div v-if="hasContent" class="page-filter-bar mb-5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 border-b border-neutral-200 pb-3" role="search" aria-label="Filter this page" :title="restricted ? 'Hidden for some people' : undefined">
+    <div class="relative flex items-center">
       <Search class="pointer-events-none absolute left-3 size-3.5 text-neutral-500" aria-hidden="true" />
       <input
         id="page-filter-name"
@@ -96,11 +111,13 @@ const triggerLabel = (selected: string[], options: { id: string, label: string }
         <X class="size-3.5" aria-hidden="true" />
       </button>
     </div>
-    <Popover v-for="group in groups" :key="group.id">
+    <div v-for="group in groups" :key="group.id" class="flex max-w-full items-center rounded-full border border-neutral-200 bg-white">
+    <Popover>
       <PopoverTrigger as-child>
-        <button type="button" class="sort-pill" :aria-label="`${group.title}, ${triggerLabel(group.selected, group.options)}`">
-          <span class="border-r border-neutral-200 pr-2 text-neutral-500">{{ group.title }}</span>
-          <span class="max-w-40 truncate" :class="group.selected.length ? 'font-medium' : ''">{{ triggerLabel(group.selected, group.options) }}</span>
+        <button type="button" class="sort-pill min-w-0 !gap-1.5 !rounded-l-full !rounded-r-none !border-0 !px-2" :aria-label="`${group.title}, ${triggerLabel(group.selected, group.options)}`">
+          <span class="max-w-32 truncate border-r border-neutral-200 pr-1.5 text-neutral-500">{{ group.title }}</span>
+          <span class="shrink-0 text-neutral-400">{{ group.selected.length > 1 ? 'is any of' : 'is' }}</span>
+          <span class="max-w-28 truncate" :class="group.selected.length ? 'font-medium' : ''">{{ triggerLabel(group.selected, group.options) }}</span>
           <ChevronDown class="size-3.5 shrink-0 text-neutral-500" aria-hidden="true" />
         </button>
       </PopoverTrigger>
@@ -115,6 +132,15 @@ const triggerLabel = (selected: string[], options: { id: string, label: string }
         />
       </PopoverContent>
     </Popover>
-    <p :class="showSummary ? 'ml-auto text-caption tabular-nums text-[color:var(--dv-text-secondary)]' : 'sr-only'" aria-live="polite">{{ summaryLabel }}</p>
+    <button type="button" :aria-label="`Remove ${group.title} filter`" class="grid h-[29px] w-6 shrink-0 place-items-center rounded-r-full border-l border-neutral-200 text-neutral-500 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-ring" @click="remove(group.key)"><X class="size-3.5" aria-hidden="true" /></button>
+    </div>
+    <PageFilterToggle :groups="available" />
+    <div class="ml-auto flex shrink-0 items-center gap-2">
+      <button type="button" class="px-1 text-xs text-neutral-600 hover:text-neutral-950 disabled:opacity-50" :disabled="!filter.isActive.value" @click="filter.clear()">Clear</button>
+      <button v-if="store.pageFiltersChanged" type="button" class="sort-pill" title="Save the available filters as your defaults in this browser. Selected values are not saved." @click="save">Save</button>
+      <span role="status" class="sr-only left-0">{{ saved ? 'Default filters saved. Selected values were not saved.' : '' }}</span>
+    </div>
+    <p v-if="saveError" role="alert" class="w-full text-xs text-red-600">{{ saveError }}</p>
+    <p :class="showSummary ? 'ml-auto text-caption tabular-nums text-[color:var(--dv-text-secondary)]' : 'sr-only left-0'" aria-live="polite">{{ summaryLabel }}</p>
   </div>
 </template>

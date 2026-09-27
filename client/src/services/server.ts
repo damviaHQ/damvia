@@ -15,25 +15,34 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { createTRPCProxyClient, httpLink, TRPCClientError } from "@trpc/client"
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server'
 import type { AppRouter } from "server/src/trpc"
-import { useGlobalStore } from "../stores/globalStore.ts"
-import Cookie from "js-cookie"
 
 export type RouterInput = inferRouterInputs<AppRouter>
 export type RouterOutput = inferRouterOutputs<AppRouter>
 
 export const endpoint = import.meta.env.VITE_API_ENDPOINT ?? 'http://localhost:3000/trpc'
 
+// The API's public URL, for the routes outside tRPC such as single sign-on.
+export const apiBase = endpoint.replace(/\/trpc\/?$/, '')
+
 export const trpc = createTRPCProxyClient<AppRouter>({
 	links: [
+		// The session travels in an HttpOnly cookie set by the API.
 		httpLink({
 			url: endpoint,
-			async headers() {
-				const globalStore = useGlobalStore()
-				return { authorization: globalStore.authToken ?? Cookie.get('dam_token') }
-			},
+			fetch: (url, options) => fetch(url, { ...options, credentials: 'include' }),
 		}),
 	],
 })
+
+// Trades a session token from before server-side sessions (a `dam_token`
+// cookie or link parameter) for a session cookie, once.
+export async function upgradeLegacyToken(token: string) {
+	await fetch(`${endpoint}/auth.upgradeLegacyToken`, {
+		method: 'POST',
+		credentials: 'include',
+		headers: { authorization: token },
+	})
+}
 
 export function extractErrors(error: Error) {
 	const res = { message: error.message, fieldErrors: {} as Record<string, string> }

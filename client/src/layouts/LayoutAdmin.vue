@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useRecordLabel } from "@/composables/useRecordLabel"
@@ -20,6 +20,7 @@ import { formatStorage } from "@/utils/fileSize"
 import { useQuery } from "@tanstack/vue-query"
 import {
   AtSign,
+  ScrollText,
   Blocks,
   ContactRound,
   ChartColumn,
@@ -183,6 +184,10 @@ const storageLevel = computed(() => {
                 <AtSign class="w-4 h-4 mr-2" />
                 Authorized Domains
               </router-link>
+              <router-link :to="{ name: 'admin-audit-log' }" class="menu-item">
+                <ScrollText class="w-4 h-4 mr-2" />
+                Audit log
+              </router-link>
             </template>
           </div>
           <!-- Asset Management -->
@@ -244,7 +249,7 @@ const storageLevel = computed(() => {
       </nav>
       <div class="sidebar-credit">
         Powered by
-        <a href="https://damvia.com" target="_blank">Damvia</a>
+        <a href="https://damvia.com" target="_blank" rel="noopener" class="underline underline-offset-2">Damvia</a>
       </div>
     </aside>
     <div class="admin-workspace">

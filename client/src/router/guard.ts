@@ -12,12 +12,17 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
+import type { RouteLocationNormalized, RouteLocationRaw, RouteMeta } from 'vue-router'
 
 export const authRoutes = ['login', 'sign-up', 'password-reset', 'password-update']
 export const publicRoutes = ['legal-information', 'privacy-policy', 'link-expired']
 
-export function guardNavigation(to: Pick<RouteLocationNormalized, 'name' | 'query'>, isAuthenticated: boolean): true | RouteLocationRaw | undefined {
+export function guardNavigation(
+  to: Pick<RouteLocationNormalized, 'name' | 'query'> & { meta?: RouteMeta },
+  isAuthenticated: boolean,
+  role?: string,
+  isPhone = false,
+): true | RouteLocationRaw | undefined {
   const name = to.name as string
   if (publicRoutes.includes(name)) {
     return true
@@ -25,6 +30,14 @@ export function guardNavigation(to: Pick<RouteLocationNormalized, 'name' | 'quer
   if (!isAuthenticated && !authRoutes.includes(name)) {
     return { name: 'login', query: to.query }
   } else if (isAuthenticated && authRoutes.includes(name)) {
+    return { name: 'home' }
+  }
+  // The server refuses the data anyway; this keeps people off screens they
+  // cannot use instead of showing them an empty or broken page.
+  if (to.meta?.roles && !to.meta.roles.includes(role ?? '')) {
+    return { name: 'home' }
+  }
+  if (to.meta?.mobileOnly && !isPhone) {
     return { name: 'home' }
   }
   return undefined

@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { RouteLocationRaw } from "vue-router"
 import PageBlockView from "./PageBlockView.vue"
@@ -28,12 +28,14 @@ defineProps<{
   assets?: PageAssets
   collection?: Collection
   generateRoute: (collection: Collection) => RouteLocationRaw
+  // On a phone every block takes the full width, one under the other.
+  stacked?: boolean
 }>()
 </script>
 
 <template>
   <div class="page-renderer grid grid-cols-6 items-start gap-4">
-    <div v-for="(block, index) in blocks" :key="block.id ?? index" :class="spanClass(block.size)">
+    <div v-for="(block, index) in blocks" :key="block.id ?? index" :class="stacked ? 'col-span-6' : spanClass(block.size)">
       <PageBlockView :block="block" :assets="assets" :collection="collection" :generate-route="generateRoute" />
     </div>
   </div>

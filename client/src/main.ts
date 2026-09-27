@@ -18,6 +18,7 @@ import { createApp } from 'vue'
 import lazyLoad from 'vue3-lazyload'
 import App from './app.vue'
 import router from './router'
+import { queryClient } from './services/queryClient'
 import './style.css'
 
 const interStylesheet = document.createElement('link')
@@ -26,15 +27,7 @@ interStylesheet.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;
 document.head.append(interStylesheet)
 
 const app = createApp(App)
-app.use(vueQuery, {
-	queryClientConfig: {
-		defaultOptions: {
-			queries: {
-				refetchOnWindowFocus: false,
-			},
-		},
-	},
-})
+app.use(vueQuery, { queryClient })
 app.use(lazyLoad, {})
 app.use(router)
 app.use(createPinia())

@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import RelatedRecordsSettings from "@/components/catalogue/RelatedRecordsSettings.vue"
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
@@ -154,22 +154,24 @@ const handleFileUpload = async (event: Event) => {
   if (file) {
     isLoading.value = true
     try {
-      const uploadUrl = await trpc.settings.getAuthBackgroundUploadUrl.query()
-      await fetch(uploadUrl, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type,
-        },
-      })
+      const contentType = file.type as 'image/jpeg' | 'image/png' | 'image/webp'
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(contentType) || file.size > 20 * 1024 * 1024 || !file.size) {
+        throw new Error('Choose a JPEG, PNG or WebP image up to 20 MB.')
+      }
+      const upload = await trpc.settings.getAuthBackgroundUpload.mutate({ contentType })
+      const form = new FormData()
+      for (const [key, value] of Object.entries(upload.fields)) form.append(key, value)
+      form.append('file', file)
+      const response = await fetch(upload.url, { method: 'POST', body: form })
+      if (!response.ok) throw new Error('The upload failed. Please try again.')
 
       // After successful upload, trigger the server-side processing
-      await trpc.settings.processAuthBackgroundImage.mutate()
+      await trpc.settings.processAuthBackgroundImage.mutate({ uploadId: upload.uploadId })
 
       await fetchBackgroundImage() // Refresh the image after upload
       toast.success("Background image uploaded and processed successfully")
     } catch (error) {
-      toast.error("Failed to upload or process background image")
+      toast.error(extractErrors(error as Error).message)
     } finally {
       isLoading.value = false
     }
@@ -219,7 +221,7 @@ const removeBackgroundImage = async () => {
         </div>
 
         <div class="flex flex-wrap gap-4">
-          <input type="file" ref="fileInput" @change="handleFileUpload" accept="image/*" class="hidden" aria-label="Choose login background" />
+          <input type="file" ref="fileInput" @change="handleFileUpload" accept="image/jpeg,image/png,image/webp" class="hidden" aria-label="Choose login background" />
           <Button @click="fileInput?.click()" :disabled="isLoading">
             {{ isLoading ? 'Updating…' : backgroundImageUrl ? 'Replace background' : 'Upload background' }}
           </Button>

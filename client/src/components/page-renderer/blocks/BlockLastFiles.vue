@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,23 +7,25 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
+import { PAGE_FILES_RENDERER } from "../filesRenderer"
 import { Clock } from "@lucide/vue"
 import BlockPlaceholder from "./BlockPlaceholder.vue"
 import { trpc } from "@/services/server.ts"
 import { usePageFilter } from "@/composables/usePageFilter"
 import { matchesFile } from "@/utils/pageFilter"
 import { useQuery } from "@tanstack/vue-query"
-import { computed } from "vue"
+import { computed, inject } from "vue"
 import type { Collection } from "../types"
 
 const props = defineProps<{ data: any; collection?: Collection; editing?: boolean }>()
+const filesRenderer = inject(PAGE_FILES_RENDERER, CollectionRenderFiles)
 
 const { data: lastFiles } = useQuery({
   queryKey: computed(() => ["collection", props.collection?.id, "last-files"]),
@@ -45,7 +47,7 @@ const hiddenByFilter = computed(() => !props.editing && pageFilter.isActive.valu
     <BlockPlaceholder v-if="editing && !lastFiles.length" :icon="Clock" title="Latest files"
       explanation="The most recently added files appear here, and the list keeps itself up to date."
       reason="Nothing has been added recently, so this block is empty for now." />
-    <CollectionRenderFiles v-else :files="lastFiles" :force-view="forceView"
+    <component :is="filesRenderer" v-else :files="lastFiles" :force-view="forceView"
       :force-masonry-size="data.masonrySize ?? null" />
   </div>
 </template>

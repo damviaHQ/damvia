@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { menuIconClasses, menuIconSlotClasses, sidebarRowClasses, sidebarSectionTitleClasses } from "@/components/layout-main/navigationStyles"
 import SearchFacetGroup, { type FacetOption } from "@/components/search/SearchFacetGroup.vue"
@@ -30,7 +30,7 @@ import { ArrowLeft, Copy, Trash2 } from "@lucide/vue"
 import { computed } from "vue"
 import { useRoute } from "vue-router"
 
-const { form, terms, hasQuery, filters, setTerms, setExactMatch, setScope, toggleValue, clearFilters, setMetadataRange } = useSearchState()
+const { form, terms, recordInput, hasQuery, filters, setTerms, setExactMatch, setScope, toggleValue, clearFilters, setMetadataRange } = useSearchState()
 const route = useRoute()
 const isProductSearch = computed(() => route.query.kind === "products")
 const globalStore = useGlobalStore()
@@ -38,6 +38,7 @@ const viewsEnabled = computed(() => globalStore.env?.viewsEnabled !== false)
 const toast = useGlobalToast()
 const recordLabel = useRecordLabel()
 
+const activeFilters = computed(() => filters.value.filter(filter => !isProductSearch.value || filter.group === "attribute"))
 const filesEnabled = computed(() => !isProductSearch.value)
 const { data: assetTypes } = useQuery({ enabled: filesEnabled, queryKey: ["asset-types"], queryFn: () => trpc.assetType.list.query() })
 const { data: recordViews } = useQuery({ enabled: filesEnabled, queryKey: ["record-views"], queryFn: () => trpc.asset.listRecordViews.query() })
@@ -57,6 +58,12 @@ const { data: search } = useQuery({
   // Keep the previous counts while the next results load, so the rows do not disappear.
   placeholderData: keepPreviousData,
 })
+const { data: productFacets } = useQuery({
+  enabled: isProductSearch,
+  queryKey: computed(() => ["search-products-facets", recordInput.value]),
+  queryFn: () => trpc.catalogue.facets.query(recordInput.value),
+  placeholderData: keepPreviousData,
+})
 const notFoundInput = computed(() => ({
   query: terms.value,
   collectionId: form.value.collectionId,
@@ -71,7 +78,7 @@ const { data: notFound } = useQuery({
   queryFn: () => trpc.collection.searchNotFound.query(notFoundInput.value),
   placeholderData: keepPreviousData,
 })
-const missing = computed(() => (form.value.exactMatch ? [] : notFound.value ?? []))
+const missing = computed(() => (isProductSearch.value || form.value.exactMatch ? [] : notFound.value ?? []))
 
 type SearchFacets = RouterOutput["collection"]["search"]["facets"]
 const emptyFacets: SearchFacets = { assetTypes: {}, fileTypes: {}, extensions: {}, recordViews: {}, attributes: {}, metadata: {}, metadataRanges: {}, variantAxes: {} }
@@ -88,8 +95,9 @@ const recordViewOptions = computed<FacetOption[]>(() =>
     .map((view: string) => ({ id: view, label: view, count: facets.value.recordViews[view] ?? 0 }))
     .sort((a, b) => a.label.localeCompare(b.label))
 )
-const attributeGroups = computed(() =>
-  (recordFacets.value ?? []).map((facet: any) => {
+const attributeGroups = computed(() => isProductSearch.value
+  ? (productFacets.value?.attributes ?? []).map(field => ({ id: field.id, title: field.label, options: field.options }))
+  : (recordFacets.value ?? []).map((facet: any) => {
     const counts = facets.value.attributes[facet.id] ?? {}
     const values = new Set<string>([...facet.values, ...(form.value.attributes[facet.id] ?? [])])
     return {
@@ -197,35 +205,6 @@ function removeMissing() {
 
 <template>
   <div class="flex h-full min-w-0 flex-col" data-search-panel>
-    <div v-if="isProductSearch" class="flex min-w-0 flex-col gap-3">
-      <router-link :to="backTarget" :class="sidebarRowClasses">
-        <span :class="menuIconSlotClasses"><ArrowLeft :class="menuIconClasses" aria-hidden="true" /></span>
-        <span>{{ form.collectionId ? `Back to ${collectionName}` : "Back to Library" }}</span>
-      </router-link>
-      <section aria-labelledby="product-search-terms-title" class="flex min-w-0 flex-col gap-1.5">
-        <div class="flex h-8 items-center justify-between">
-          <label id="product-search-terms-title" for="search-panel-terms" :class="sidebarSectionTitleClasses">Search terms</label>
-          <Button v-if="hasQuery" type="button" variant="ghost" class="h-7 px-2 text-caption text-neutral-600 hover:text-red-600" @click="setTerms([])">Clear</Button>
-        </div>
-        <SearchTermsEditor class="mx-3" :model-value="terms" :exact-match="form.exactMatch" @update:model-value="setTerms" />
-        <label class="flex cursor-pointer items-center gap-2 px-3 pb-1 text-body text-neutral-700">
-          <Switch id="product-search-mode-exact" aria-label="Exact phrase" :model-value="form.exactMatch" @update:model-value="setExactMatch($event as boolean)" />
-          <span>Exact phrase</span>
-          <span class="text-caption text-[color:var(--dv-text-secondary)]">{{ form.exactMatch ? "the words in this order" : "off, multiple references" }}</span>
-        </label>
-      </section>
-      <section v-if="form.collectionId" aria-labelledby="product-search-where-title" class="border-t border-neutral-200 pt-2">
-        <h2 id="product-search-where-title" :class="sidebarSectionTitleClasses" class="mb-2">Where to search</h2>
-        <p class="truncate px-3 pb-1 text-caption text-[color:var(--dv-text-secondary)]" :title="collectionName">{{ collectionName }}</p>
-        <RadioGroup :model-value="form.searchScope" class="flex min-w-0 flex-col" @update:model-value="setScope($event as SearchScope)">
-          <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem id="product-search-scope-all" value="all" /> All collections</label>
-          <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem id="product-search-scope-sub" value="current_with_sub" /> <span class="min-w-0 flex-1 truncate">This collection and its sub-collections</span></label>
-          <label class="flex h-7 w-full min-w-0 cursor-pointer items-center gap-2 px-3 text-body text-neutral-800 hover:bg-neutral-200/60"><RadioGroupItem id="product-search-scope-current" value="current" /> <span class="min-w-0 flex-1 truncate">This collection only</span></label>
-        </RadioGroup>
-      </section>
-      <p v-else class="px-3 text-body text-neutral-500">Searching {{ recordLabel.lowerPlural.value }} in all collections.</p>
-    </div>
-    <template v-else>
     <!-- The filters scroll on their own so the footer never covers a value. -->
     <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto" data-search-panel-scroll>
     <router-link :to="backTarget" :class="sidebarRowClasses" class="-mx-0">
@@ -263,12 +242,12 @@ function removeMissing() {
       </RadioGroup>
     </section>
 
-    <SearchFacetGroup id="search-asset-types" title="Asset type" :options="assetTypeOptions" :selected="form.assetTypes" @toggle="toggleValue('asset_types', $event)" />
-    <SearchFacetGroup v-if="viewsEnabled && recordViewOptions.length" id="search-record-views" :title="`${recordLabel.singular.value} view`" :options="recordViewOptions" :selected="form.recordViews" :open="form.recordViews.length > 0" @toggle="toggleValue('record_views', $event)" />
+    <SearchFacetGroup v-if="!isProductSearch" id="search-asset-types" title="Asset type" :options="assetTypeOptions" :selected="form.assetTypes" @toggle="toggleValue('asset_types', $event)" />
+    <SearchFacetGroup v-if="!isProductSearch && viewsEnabled && recordViewOptions.length" id="search-record-views" :title="`${recordLabel.singular.value} view`" :options="recordViewOptions" :selected="form.recordViews" :open="form.recordViews.length > 0" @toggle="toggleValue('record_views', $event)" />
     <SearchFacetGroup v-for="group in attributeGroups" :id="`search-facet-${group.id}`" :key="group.id" :title="group.title" :options="group.options" :selected="form.attributes[group.id] ?? []" :open="(form.attributes[group.id]?.length ?? 0) > 0 || attributeGroups.length <= 3" @toggle="toggleValue(`attributes[${group.id}]`, $event)" />
-    <SearchFacetGroup v-for="group in axisGroups" :id="`search-axis-${group.id}`" :key="group.id" :title="group.title" :options="group.options" :selected="form.variantAxes[group.id] ?? []" :open="(form.variantAxes[group.id]?.length ?? 0) > 0" @toggle="toggleValue(`axes[${group.id}]`, $event)" />
-    <SearchFacetGroup v-for="group in metadataGroups" :id="`search-metadata-${group.id}`" :key="group.id" :title="group.truncated ? `${group.title} (first 200)` : group.title" :options="group.options" :selected="Array.isArray(form.metadata[group.id]) ? form.metadata[group.id] as string[] : []" :open="Array.isArray(form.metadata[group.id])" @toggle="toggleValue(`metadata[${group.id}]`, $event)" />
-    <section v-for="group in dateGroups" :key="group.id" :aria-labelledby="`search-date-${group.id}`" class="flex min-w-0 flex-col gap-1 border-t border-neutral-200 pt-1 pb-2">
+    <SearchFacetGroup v-for="group in isProductSearch ? [] : axisGroups" :id="`search-axis-${group.id}`" :key="group.id" :title="group.title" :options="group.options" :selected="form.variantAxes[group.id] ?? []" :open="(form.variantAxes[group.id]?.length ?? 0) > 0" @toggle="toggleValue(`axes[${group.id}]`, $event)" />
+    <SearchFacetGroup v-for="group in isProductSearch ? [] : metadataGroups" :id="`search-metadata-${group.id}`" :key="group.id" :title="group.truncated ? `${group.title} (first 200)` : group.title" :options="group.options" :selected="Array.isArray(form.metadata[group.id]) ? form.metadata[group.id] as string[] : []" :open="Array.isArray(form.metadata[group.id])" @toggle="toggleValue(`metadata[${group.id}]`, $event)" />
+    <section v-for="group in isProductSearch ? [] : dateGroups" :key="group.id" :aria-labelledby="`search-date-${group.id}`" class="flex min-w-0 flex-col gap-1 border-t border-neutral-200 pt-1 pb-2">
       <h2 :id="`search-date-${group.id}`" :class="sidebarSectionTitleClasses" class="flex h-8 items-center">{{ group.title }}</h2>
       <form class="grid grid-cols-2 gap-2 px-3" @submit.prevent="applyRange(group.id, $event)">
         <label class="grid gap-1 text-caption text-[color:var(--dv-text-secondary)]">From<input name="from" type="date" class="dv-input" :value="group.from" :min="group.min" :max="group.max" /></label>
@@ -278,9 +257,8 @@ function removeMissing() {
     </section>
 
     </div>
-    <div v-if="filters.length" class="-mx-3 shrink-0 border-t border-neutral-200 bg-neutral-50 px-3 pt-2">
-      <Button type="button" variant="outline" class="w-full" @click="clearFilters">Clear all filters ({{ filters.length }})</Button>
+    <div v-if="activeFilters.length" class="-mx-3 shrink-0 border-t border-neutral-200 bg-neutral-50 px-3 pt-2">
+      <Button type="button" variant="outline" class="w-full" @click="clearFilters">Clear all filters ({{ activeFilters.length }})</Button>
     </div>
-    </template>
   </div>
 </template>

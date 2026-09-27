@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionDisplayGridFiles from "@/components/collection/CollectionDisplayGridFiles.vue"
 import CollectionDisplayListFiles from "@/components/collection/CollectionDisplayListFiles.vue"
@@ -19,6 +19,7 @@ import CollectionRenderProducts from "@/components/collection/CollectionRenderPr
 import MainPageTools from "@/components/layout-main/MainPageTools.vue"
 import PageSelectionContext from "@/components/PageSelectionContext.vue"
 import DisplayPreferences from "@/components/DisplayPreferences.vue"
+import FilterChipList from "@/components/FilterChipList.vue"
 import Loader from "@/components/Loader.vue"
 import SearchEmptyState from "@/components/search/SearchEmptyState.vue"
 import SearchToolbar, { type FilterChip } from "@/components/search/SearchToolbar.vue"
@@ -48,15 +49,12 @@ const PER_PAGE = 300
 const PRODUCT_PAGE_SIZE = 48
 const route = useRoute()
 const isProductSearch = computed(() => route.query.kind === "products")
-const { form, terms, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange, setMetadataRange } = useSearchState()
+const { form, terms, recordInput, hasQuery, filters, isScoped, setValues, setSort, setScope, setExactMatch, toggleValue, clearFilters, setPage, setSizeRange, setMetadataRange } = useSearchState()
 providePageFilter()
 const { products: shownProducts } = providePageListings()
 const productSort = ref<{ column: string, direction: 'asc' | 'desc' }>({ column: 'recordKey', direction: 'asc' })
 const productInput = computed(() => ({
-  collectionId: form.value.searchScope === "all" ? undefined : form.value.collectionId,
-  collectionOnly: form.value.searchScope === "current",
-  search: form.value.exactMatch ? form.value.query?.trim() || undefined : undefined,
-  searchTerms: form.value.exactMatch ? undefined : terms.value,
+  ...recordInput.value,
   sort: productSort.value,
   offset: ((form.value.page ?? 1) - 1) * PRODUCT_PAGE_SIZE,
   limit: PRODUCT_PAGE_SIZE,
@@ -148,7 +146,7 @@ const formatOptions = computed(() => {
 })
 
 const chips = computed<FilterChip[]>(() =>
-  filters.value.filter((filter) => !["file_types", "extensions", "size"].includes(filter.group)).map((filter) => {
+  filters.value.filter((filter) => (!isProductSearch.value || filter.group === "attribute") && !["file_types", "extensions", "size"].includes(filter.group)).map((filter) => {
     if (filter.group === "asset_types") {
       const name = assetTypes.value?.find((assetType: any) => assetType.id === filter.value)?.name ?? filter.value
       return { key: filter.key, value: filter.value, label: `Asset type: ${name}`, category: "Asset type", displayValue: name }
@@ -169,7 +167,9 @@ const chips = computed<FilterChip[]>(() =>
       const name = field?.displayName || field?.name || "File metadata"
       return { key: filter.key, value: filter.value, label: `${name}: ${filter.value}`, category: name, displayValue: filter.value }
     }
-    const facet = recordFacets.value?.find((entry: any) => entry.id === filter.attributeId)
+    const facet = isProductSearch.value
+      ? productSearch.value?.fields.find(entry => entry.id === filter.attributeId)
+      : recordFacets.value?.find((entry: any) => entry.id === filter.attributeId)
     return { key: filter.key, value: filter.value, label: `${facet?.displayName || facet?.name || "Attribute"}: ${filter.value}`, category: facet?.displayName || facet?.name || "Attribute", displayValue: filter.value }
   })
 )
@@ -231,7 +231,10 @@ function focusTerms() {
       <PageSelectionContext :items="breadcrumb" :selected-count="selection.length" :selectable-count="selectable.length"
         :selection-label="allSelected ? 'Unselect all results on this page' : 'Select all results on this page'" @toggle="toggleSelection" />
     </MainPageTools>
-    <MainPageTools v-if="!isProductSearch" area="filters">
+    <MainPageTools v-if="isProductSearch" area="filters">
+      <FilterChipList :chips="chips" @remove="removeChip" @clear="clearFilters" />
+    </MainPageTools>
+    <MainPageTools v-else area="filters">
       <SearchToolbar
         :file-type-counts="facets.fileTypes"
         :file-types="form.fileTypes"
@@ -258,7 +261,9 @@ function focusTerms() {
       <p v-else-if="productStatus === 'error'" role="alert" class="text-body text-red-700">{{ productError?.message }}</p>
       <div v-else-if="productSearch" :aria-busy="productPlaceholder" :class="productPlaceholder && 'pointer-events-none opacity-60'">
         <CollectionRenderProducts v-if="productSearch.products.length" :products="productSearch.products" :fields="productSearch.fields" :card-title-field="productSearch.cardTitleField" :collection-id="productInput.collectionId" server-filtered @sort="productSort = $event" />
-        <p v-else role="status" class="py-12 text-center text-body text-neutral-500">No {{ recordLabel.lowerPlural.value }} found.</p>
+        <SearchEmptyState v-else :terms="terms" :not-found="[]" :scoped="isScoped" :scope-label="scopeLabel"
+          :has-filters="chips.length > 0" :exact-match="form.exactMatch"
+          @search-everywhere="setScope('all')" @clear-filters="clearFilters" @use-any-word="setExactMatch(false)" @edit-terms="focusTerms" />
         <nav v-if="productPages > 1" aria-label="Pages" class="mt-6 flex items-center justify-center gap-3 text-caption text-neutral-500">
           <Button variant="outline" size="sm" :disabled="(form.page ?? 1) === 1 || productPlaceholder" @click="setPage((form.page ?? 1) - 1)">Previous</Button>
           <span>Page {{ form.page ?? 1 }} of {{ productPages }}</span>

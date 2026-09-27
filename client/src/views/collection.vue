@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import MainPageTools from "@/components/layout-main/MainPageTools.vue"
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
@@ -25,7 +25,6 @@ import { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.
 import { Button } from "@/components/ui/button"
 import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import PageFilterBar from "@/components/PageFilterBar.vue"
-import PageFilterToggle from "@/components/PageFilterToggle.vue"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { trpc } from "@/services/server.ts"
 import { usePageContent } from "@/composables/usePageContent"
@@ -35,7 +34,6 @@ import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   FilePenLine,
   Link,
-  Search,
   Settings,
   Trash2,
 } from "@lucide/vue"
@@ -161,9 +159,8 @@ async function removeSelectedRecords() {
   <div v-else-if="status === 'success'" class="collection__container">
     <MainPageTools area="actions">
       <CollectionFavoriteButton :collection="collection" toolbar />
-      <PageFilterToggle v-if="shows('filter')" :files="filterable" :restricted="restricted('filter')" />
       <DisplayPreferences v-if="shows('display')" :files="shownFiles" :collections="shownCollections" :products="shownProducts.length ? shownProducts : undefined" :layout-locked="layoutLocked" :restricted="restricted('display')" />
-      <DropdownMenu v-if="collection.canEdit || shows('search')">
+      <DropdownMenu v-if="collection.canEdit">
         <DropdownMenuTrigger as-child>
           <Button aria-label="Collection actions" title="Collection actions" type="button" variant="ghost" size="icon-sm"><Settings class="text-neutral-500" /></Button>
         </DropdownMenuTrigger>
@@ -171,7 +168,6 @@ async function removeSelectedRecords() {
           <DropdownMenuItem v-if="collection.canEdit && shows('share')" @select="isShareModalOpen = true"><Link class="size-4" />Share collection</DropdownMenuItem>
           <DropdownMenuItem v-if="collection.canEdit" @select="isEditCollectionModalOpen = true"><Settings class="size-4" />Collection settings</DropdownMenuItem>
           <DropdownMenuItem v-if="collection.canEdit" as-child><router-link :to="{ name: 'collection-edit', params: { id: collection.id } }"><FilePenLine class="size-4" />Edit page</router-link></DropdownMenuItem>
-          <DropdownMenuItem v-if="shows('search')" as-child><router-link :to="{ name: 'search', query: { from_collection: collection.id, search_scope: 'current_with_sub' } }"><Search class="size-4" />Search in this collection</router-link></DropdownMenuItem>
           <DropdownMenuSeparator v-if="canRemoveFiles || canRemoveRecords" />
           <DropdownMenuItem v-if="canRemoveFiles" @select="removeSelectedFiles"><Trash2 class="size-4" />Remove selected assets</DropdownMenuItem>
           <DropdownMenuItem v-if="canRemoveRecords" @select="removeSelectedRecords"><Trash2 class="size-4" />Remove selected products</DropdownMenuItem>
@@ -183,7 +179,7 @@ async function removeSelectedRecords() {
         :selectable-count="selectable.length" selection-label="Select all items in this collection" @toggle="toggleSelection" />
     </MainPageTools>
     <MainPageTools area="filters">
-      <PageFilterBar :show-summary="false" v-if="shows('filter')" :files="filterable" :collections="shownCollections" />
+      <PageFilterBar :restricted="restricted('filter')" :show-summary="false" v-if="shows('filter')" :files="filterable" :collections="shownCollections" />
     </MainPageTools>
     <CollectionDialogShare v-if="collection.canEdit" v-model="isShareModalOpen" :collection="collection" />
     <CollectionRenderLayout :key="collection.id" :collection="collection"

@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
@@ -37,10 +37,17 @@ const { data: assetTypes } = useQuery({
   queryFn: () => trpc.assetType.list.query(),
 })
 
+// The collection's Search action decides who may search inside it. The collection
+// page has already loaded the collection, so this only reads the shared cache.
+const { data: openCollection } = useQuery({
+  queryKey: computed(() => ["collection", route.params.id]),
+  queryFn: () => trpc.collection.findById.query(route.params.id as string),
+  enabled: false,
+})
 const currentCollectionId = computed(() => {
   if (route.name === "search") {
     return queryValueToString(route.query.from_collection) ?? null
-  } else if (route.name === "collection") {
+  } else if (route.name === "collection" && (openCollection.value?.visibleActions?.search ?? true)) {
     return route.params.id as string
   }
   return null
@@ -214,8 +221,8 @@ function search(value = text.value) {
   if (route.name === "search") {
     routeQuery = { ...route.query }
     delete routeQuery.page
-  } else if (route.name === "collection") {
-    routeQuery.from_collection = route.params.id as string
+  } else if (currentCollectionId.value) {
+    routeQuery.from_collection = currentCollectionId.value
   }
   routeQuery.q = query
   if (options.value.kind === "products") {
@@ -225,7 +232,7 @@ function search(value = text.value) {
     delete routeQuery.kind
     routeQuery.asset_types = options.value.assetTypes
   }
-  routeQuery.search_scope = options.value.searchScope
+  routeQuery.search_scope = currentCollectionId.value ? options.value.searchScope : "all"
   if (options.value.exactMatch) {
     routeQuery.exact_match = "true"
   } else {
@@ -268,7 +275,7 @@ function clearText() {
     <Popover :open="isOpen">
       <PopoverAnchor as-child>
         <form ref="anchor" role="search" class="group flex h-10 min-w-0 items-center gap-2 border border-neutral-200 bg-neutral-50 px-2.5 transition-colors focus-within:border-neutral-400 focus-within:bg-white hover:border-neutral-300 w-full max-w-[480px]" @submit.prevent="search()">
-          <input ref="input" v-model="text" type="search" name="q" :aria-label="options.kind === 'files' ? 'Search files' : `Search ${recordLabel.lowerPlural.value}`" :placeholder="options.kind === 'files' ? 'Search for a file' : `Search for a ${recordLabel.lower.value}`" autocomplete="off" enterkeyhint="search" class="h-full min-w-0 flex-1 bg-transparent text-[length:var(--dv-field-label-size)] text-neutral-900 outline-hidden placeholder:text-[color:var(--dv-text-secondary)] [&::-webkit-search-cancel-button]:hidden w-full" :aria-expanded="isOpen" @focus="open" @click="open" @keydown.esc.prevent="close(); input?.blur()" />
+          <input ref="input" v-model="text" type="search" name="q" :aria-label="options.kind === 'files' ? 'Search files' : `Search ${recordLabel.lowerPlural.value}`" :placeholder="options.kind === 'files' ? 'Search for a file' : `Search for a ${recordLabel.lower.value}`" autocomplete="off" enterkeyhint="search" class="h-full min-w-0 flex-1 bg-transparent text-[length:var(--dv-field-label-size)] text-neutral-900 outline-hidden placeholder:text-[color:var(--dv-text-secondary)] [&::-webkit-search-cancel-button]:hidden w-full" role="combobox" aria-haspopup="dialog" aria-controls="client-search-options" :aria-expanded="isOpen" @focus="open" @click="open" @keydown.esc.prevent="close(); input?.blur()" />
           <button v-if="text" type="button" aria-label="Clear search text" class="grid size-6 cursor-pointer place-items-center text-neutral-500 hover:text-neutral-900" @click="clearText"><X class="size-4" aria-hidden="true" /></button>
           <div role="group" aria-label="Search for" class="flex h-7 shrink-0 items-center border-l border-neutral-200 pl-1">
             <button type="button" aria-label="Search files" title="Search files" :aria-pressed="options.kind === 'files'" class="flex h-7 cursor-pointer items-center gap-1 px-1.5 text-caption text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-ring" :class="options.kind === 'files' && 'bg-neutral-200 text-neutral-900'" @click="setKind('files')"><span>Files</span></button>
@@ -276,7 +283,7 @@ function clearText() {
           </div>
         </form>
       </PopoverAnchor>
-      <PopoverContent data-search-options align="start" :side-offset="6" class="client-search-popover w-[min(760px,calc(100vw-24px))] p-3" @open-auto-focus.prevent @close-auto-focus.prevent @interact-outside="handleInteractOutside" @escape-key-down="close">
+      <PopoverContent id="client-search-options" aria-label="Search options" data-search-options align="start" :side-offset="6" class="client-search-popover w-[min(760px,calc(100vw-24px))] p-3" @open-auto-focus.prevent @close-auto-focus.prevent @interact-outside="handleInteractOutside" @escape-key-down="close">
         <p class="mb-3 text-caption text-[color:var(--dv-text-secondary)]">
           <template v-if="options.kind === 'products'">Find {{ recordLabel.lowerPlural.value }} by reference or details, with their linked pictures. Paste several references to find them together.</template>
           <template v-else>Find individual pictures, documents or videos. Use asset types to filter the files.</template>

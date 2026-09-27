@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import ProductCard from "@/components/catalogue/ProductCard.vue"
 import { gridClasses } from "@/components/collection/gridStyles"
@@ -19,7 +19,6 @@ import CollectionDialogAddToCollection from "@/components/collection/CollectionD
 import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
 import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import PageFilterBar from "@/components/PageFilterBar.vue"
-import PageFilterToggle from "@/components/PageFilterToggle.vue"
 import PathBreadcrumb from "@/components/navigation/PathBreadcrumb.vue"
 import { providePageFilter } from "@/composables/usePageFilter"
 import Loader from "@/components/Loader.vue"
@@ -155,7 +154,6 @@ function addToCollection() {
           <span class="text-caption text-neutral-500">{{ product.collectionFiles.length }} linked assets</span>
         </div>
         <div class="flex items-center gap-1">
-          <PageFilterToggle :files="product.collectionFiles" show-single-values />
           <DisplayPreferences :files="product.collectionFiles" grouped />
         </div>
       </div>

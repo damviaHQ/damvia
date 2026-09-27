@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import FieldDescription from "@/components/ui/field/FieldDescription.vue"
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
@@ -162,17 +162,16 @@ function productSettingsChanged() {
 async function onSubmit() {
   try {
     if (form.value.thumbnailURL && form.value.thumbnailFile) {
-      const uploadUrl = await trpc.collection.presignedThumbnailUploadUrl.query({
+      const upload = await trpc.collection.presignedThumbnailUploadUrl.query({
         id: props.collection.id,
+        contentType: form.value.thumbnailFile.type as "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "image/avif",
       })
-
-      await fetch(uploadUrl, {
-        method: "PUT",
-        body: form.value.thumbnailFile,
-        headers: {
-          "Content-Type": form.value.thumbnailFile.type,
-        },
-      })
+      const body = new FormData()
+      Object.entries(upload.fields).forEach(([key, value]) => body.append(key, value))
+      body.append("file", form.value.thumbnailFile)
+      const response = await fetch(upload.url, { method: "POST", body })
+      if (!response.ok) throw new Error("The thumbnail could not be uploaded.")
+      await trpc.collection.finalizeThumbnailUpload.mutate({ id: props.collection.id, uploadId: upload.uploadId })
     }
 
     const updateData: any = {
@@ -213,7 +212,6 @@ async function onSubmit() {
     emit("updated", collection)
     toast.success("Collection updated")
   } catch (error) {
-    console.error("Error updating collection:", error)
     toast.error((error as Error).message)
   }
 }
@@ -284,7 +282,7 @@ async function onSubmit() {
               <span v-else class="text-xs text-neutral-500">No image</span>
             </div>
             <div class="grid justify-items-start gap-2">
-              <input ref="upload" type="file" accept="image/*" class="hidden" aria-label="Collection thumbnail" @change="handleFileUploaded" />
+              <input ref="upload" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" class="hidden" aria-label="Collection thumbnail" @change="handleFileUploaded" />
               <Button type="button" variant="outline" size="sm" @click="upload?.click()"><ImageUp class="size-5" />Upload image</Button>
               <Button v-if="form.thumbnailURL" type="button" variant="ghost" size="sm" @click="form.thumbnailURL = null"><ImageMinus class="size-5" />Remove image</Button>
             </div>

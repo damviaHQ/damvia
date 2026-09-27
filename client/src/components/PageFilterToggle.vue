@@ -13,103 +13,83 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import SearchFacetGroup from "@/components/search/SearchFacetGroup.vue"
 import { usePageFilter } from "@/composables/usePageFilter"
+import type { PageFilterGroup } from "@/utils/pageFilter"
 import { useGlobalStore } from "@/stores/globalStore"
-import {
-  availableGroups,
-  fileFacets,
-  groupValueCount,
-  NAME_FILTER_KEY,
-  pageFilterCount,
-  type FilterableFile,
-  type PageFacets,
-} from "@/utils/pageFilter"
-import { Filter } from "@lucide/vue"
-import { computed } from "vue"
+import { ChevronRight, Plus, Search, Tag } from "@lucide/vue"
+import { computed, ref, watch } from "vue"
 
-const props = withDefaults(defineProps<{ files?: FilterableFile[], restricted?: boolean, facets?: PageFacets, showSingleValues?: boolean }>(), { files: () => [], restricted: false })
-
+const props = defineProps<{ groups: PageFilterGroup[] }>()
 const store = useGlobalStore()
 const filter = usePageFilter()
-
-const files = computed(() => props.files as unknown as FilterableFile[])
-const facets = computed(() => props.facets ?? fileFacets(files.value, filter.state.value))
-
-// Every filter this page can offer. The name always can: it matches the files
-// and the sub-collections alike, and it needs no values behind it.
-const offered = computed(() => [
-  { key: NAME_FILTER_KEY, title: "Name", detail: "Search this page" },
-  ...availableGroups(filter.state.value, facets.value, props.showSingleValues).map((group) => ({
-    key: group.key,
-    title: group.title,
-    detail: `${group.options.length} value${group.options.length === 1 ? "" : "s"}`,
-  })),
-])
-
-const count = computed(() => pageFilterCount(filter.state.value))
-const chosenCount = computed(() => offered.value.filter((item) => store.pageFilters.includes(item.key)).length)
-
-// Switching a filter off takes its values with it, so the page cannot stay
-// narrowed by something nobody can see any more.
-function toggle(key: string) {
-  if (store.pageFilters.includes(key)) {
-    filter.clearDimension(key)
-  }
-  store.togglePageFilter(key)
+const activeKey = ref<string | null>(null)
+const openedByHover = ref(false)
+const query = ref("")
+const open = ref(false)
+const offered = computed(() => props.groups.filter(group => (!store.pageFilters.includes(group.key) || group.key === activeKey.value)
+  && group.title.toLowerCase().includes(query.value.toLowerCase())))
+watch(open, () => {
+  activeKey.value = null
+  query.value = ""
+})
+function showOptions(key: string, hover = false) {
+  openedByHover.value = hover
+  activeKey.value = key
 }
-
-function clearAll() {
-  filter.clear()
-  store.clearPageFilters()
+function updateOptions(key: string, isOpen: boolean) {
+  if (isOpen) showOptions(key)
+  else if (activeKey.value === key) activeKey.value = null
+}
+function add(key: string) {
+  if (!store.pageFilters.includes(key)) store.togglePageFilter(key)
+}
+function toggleValue(key: string, value: string) {
+  add(key)
+  filter.toggleValue(key, value)
+}
+function addWithoutValue(key: string) {
+  add(key)
+  open.value = false
 }
 </script>
 
 <template>
-  <Popover>
+  <Popover v-model:open="open">
     <PopoverTrigger as-child>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Filters"
-        :title="`Choose the filters shown on this page${restricted ? ' · Hidden for some people' : ''}`"
-        class="relative text-neutral-500 data-[state=open]:bg-neutral-100 data-[state=open]:text-neutral-950"
-      >
-        <Filter aria-hidden="true" />
-        <span v-if="count" class="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-0.5 text-[10px] leading-none font-semibold tabular-nums text-neutral-700 ring-2 ring-white">
-          {{ count }}<span class="sr-only"> filters active</span>
-        </span>
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent align="end" :side-offset="8" :collision-padding="12" class="w-64 p-0" aria-label="Filters">
-      <div class="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
-        <h2 class="text-[13px] font-semibold text-neutral-900">Filters</h2>
-      </div>
-      <p class="px-4 pb-2 text-[11px] leading-4 text-neutral-500">Choose what to filter this page by. Only what is ticked appears above the content.</p>
-      <ul class="flex flex-col pb-1">
-        <li v-for="(item, index) in offered" :key="item.key">
-          <label :for="`page-filter-choice-${index}`" class="flex min-h-8 w-full cursor-pointer items-center gap-2 px-4 py-1 text-body text-neutral-800 hover:bg-neutral-100">
-            <Checkbox :id="`page-filter-choice-${index}`" :aria-label="item.title" :model-value="store.pageFilters.includes(item.key)" @update:model-value="toggle(item.key)" />
-            <span class="min-w-0 flex-1 truncate">{{ item.title }}</span>
-            <span v-if="groupValueCount(filter.state.value, item.key)" class="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-white px-0.5 text-[10px] leading-none font-semibold tabular-nums text-neutral-700">
-              {{ groupValueCount(filter.state.value, item.key) }}<span class="sr-only"> values in use</span>
-            </span>
-            <span v-else class="shrink-0 text-caption text-[color:var(--dv-text-secondary)]">{{ item.detail }}</span>
-          </label>
-        </li>
-      </ul>
-      <p v-if="offered.length === 1" class="px-4 pb-2 text-[11px] leading-4 text-neutral-500">Other filters appear when this page has more than one value to choose from.</p>
-      <button
-        v-if="chosenCount || count"
-        type="button"
-        class="h-8 w-full cursor-pointer border-t border-neutral-200 px-4 text-left text-caption font-medium text-neutral-600 hover:text-neutral-950"
-        @click="clearAll"
-      >
-        Remove all filters
+      <button type="button" aria-label="Add filter" title="Add filter" class="grid size-[29px] shrink-0 place-items-center rounded-full text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950 focus-visible:outline-2 focus-visible:outline-ring">
+        <Plus class="size-4" aria-hidden="true" />
       </button>
+    </PopoverTrigger>
+    <PopoverContent align="start" :collision-padding="12" class="w-60 p-1" aria-label="Add filter">
+      <div class="flex items-center gap-2 border-b border-neutral-200 px-2 pb-2 pt-1">
+        <Search class="size-3.5 text-neutral-500" aria-hidden="true" />
+        <input v-model="query" aria-label="Find a filter" placeholder="Add filter…" class="min-w-0 w-full bg-transparent text-sm outline-none" />
+      </div>
+      <div class="max-h-64 overflow-y-auto py-1">
+        <Popover v-for="group in offered" :key="group.key" :open="activeKey === group.key" @update:open="updateOptions(group.key, $event)">
+          <PopoverTrigger as-child>
+            <button type="button" @pointerenter="$event.pointerType === 'mouse' && showOptions(group.key, true)" @click.prevent="showOptions(group.key)" @keydown.right.prevent="showOptions(group.key)" :class="activeKey === group.key ? 'bg-neutral-100' : ''" class="flex min-h-8 w-full items-center gap-2 rounded px-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-ring">
+              <Tag class="size-3.5 text-neutral-500" aria-hidden="true" />
+              <span class="min-w-0 flex-1 truncate">{{ group.title }}</span>
+              <ChevronRight class="size-3.5 text-neutral-500" aria-hidden="true" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="right" align="start" :side-offset="8" :collision-padding="12" class="max-h-80 w-60 overflow-y-auto p-1" :aria-label="group.title" @open-auto-focus="openedByHover && $event.preventDefault()" @close-auto-focus="open && $event.preventDefault()">
+            <SearchFacetGroup
+              :id="`add-filter-${group.key.replace(':', '-')}`"
+              :title="group.title"
+              :options="group.options"
+              :selected="group.selected"
+              :show-header="false"
+              @toggle="toggleValue(group.key, $event)"
+            />
+            <button v-if="!store.pageFilters.includes(group.key)" type="button" class="mt-1 min-h-8 w-full border-t border-neutral-200 px-3 text-left text-xs text-neutral-500 hover:text-neutral-950" @click="addWithoutValue(group.key)">Add without a value</button>
+          </PopoverContent>
+        </Popover>
+        <p v-if="!offered.length" class="px-2 py-2 text-xs text-neutral-500">{{ query ? 'No matching filters.' : 'All available filters are on the bar.' }}</p>
+      </div>
     </PopoverContent>
   </Popover>
 </template>

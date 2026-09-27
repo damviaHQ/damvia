@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import AdminUserEdit from '@/components/admin/AdminUserEdit.vue'
@@ -22,9 +22,9 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { useGlobalToast } from '@/composables/useGlobalToast'
 import { extractErrors, trpc } from '@/services/server'
 import { useGlobalStore } from '@/stores/globalStore'
-import { canApproveUser, canDeleteUser, canEditUser, filterUsers, usersCsv, userState, userStateLabels, type AdminUser, type UserFilters, type UserSort, type UserView } from '@/utils/adminUsers'
+import { canApproveUser, canDeleteUser, canEditUser, canManageAccount, filterUsers, usersCsv, userState, userStateLabels, type AdminUser, type UserFilters, type UserSort, type UserView } from '@/utils/adminUsers'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowDownToLine, ArrowUpDown, Check, ChevronLeft, ChevronRight, ClipboardList, Search, SlidersHorizontal, Trash2, Users, X } from '@lucide/vue'
+import { ArrowDownToLine, ArrowUpDown, Check, ChevronLeft, ChevronRight, ClipboardList, FileCheck2, Search, SlidersHorizontal, Trash2, Users, X } from '@lucide/vue'
 import { computed, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -64,6 +64,13 @@ const savingDetails = ref(false)
 const returnTarget = shallowRef<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 watch(() => route.query.needsApproval, value => { filters.value.view = value === 'true' ? 'pending' : 'all' })
+// /admin/users/:id (the link in the approval request email) opens that person.
+watch([() => route.params.id, () => users.value.length], ([id]) => {
+  if (typeof id === 'string' && users.value.some(user => user.id === id)) {
+    selectedUserId.value = id
+    detailsOpen.value = true
+  }
+}, { immediate: true })
 watch([filters, perPage], () => { page.value = 1; selectedIds.value = [] }, { deep: true })
 watch([sortKey, ascending], () => { page.value = 1 })
 watch(filtered, records => { page.value = Math.min(page.value, pageCount.value); selectedIds.value = selectedIds.value.filter(id => records.some(user => user.id === id)) })
@@ -109,6 +116,34 @@ async function remove() {
   } catch (error) { deleteError.value = extractErrors(error as Error).message }
   finally { busyId.value = null }
 }
+const suspendedAt = (user: AdminUser) => (user as AdminUser & { suspendedAt?: string | null }).suspendedAt ?? null
+const mfaEnabled = (user: AdminUser) => !!(user as AdminUser & { mfaEnabled?: boolean }).mfaEnabled
+const confirmingSuspend = ref(false)
+watch(selectedUserId, () => { confirmingSuspend.value = false })
+async function accountAction(user: AdminUser, action: 'suspend' | 'resume' | 'revokeSessions' | 'sendPasswordResetFor' | 'resendVerificationEmailFor' | 'resetMfa', done: string) {
+  if (busyId.value) return
+  busyId.value = user.id
+  try {
+    await trpc.user[action].mutate(user.id)
+    confirmingSuspend.value = false
+    await refreshUsers()
+    toast.success(done)
+  } catch (error) { toast.error(extractErrors(error as Error).message) }
+  finally { busyId.value = null }
+}
+async function exportAccessReview() {
+  try {
+    const csv = await trpc.user.accessReview.query()
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `access-review-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (error) { toast.error(extractErrors(error as Error).message) }
+}
 async function copyEmails() {
   try {
     await navigator.clipboard.writeText(exportRecords.value.filter(user => user.emailVerified).map(user => user.email).join(', '))
@@ -133,6 +168,7 @@ function exportCsv() {
   <AdminPageHeader :description="store.user?.role === 'manager' ? 'Users in your region.' : undefined">
    <Button variant="outline" class="dv-button" :disabled="!verifiedEmailCount" @click="copyEmails"><ClipboardList />Copy emails</Button>
    <Button variant="outline" class="dv-button" :disabled="!exportRecords.length" @click="exportCsv"><ArrowDownToLine />{{ selectedIds.length ? `Export ${selectedIds.length} selected` : 'Export users' }}</Button>
+   <Button variant="outline" class="dv-button" @click="exportAccessReview"><FileCheck2 />Export access review</Button>
   </AdminPageHeader>
   <Loader v-if="status === 'pending'" :text="true" />
   <div v-else-if="status === 'error'" class="admin-error" role="alert"><p>{{ error?.message }}</p><Button variant="outline" class="dv-button" @click="refetch()">Try again</Button></div>
@@ -169,7 +205,7 @@ function exportCsv() {
       <td><button class="user-identity" :aria-label="`View ${user.name}`" @click="openDetails(user, $event)"><span class="user-avatar">{{ initials(user.name) }}</span><span class="user-identity-copy"><strong>{{ user.name }}<small v-if="user.id === store.user?.id" class="self-label">You</small></strong><span>{{ user.email }}</span><span v-if="user.company">{{ user.company }}</span></span></button></td>
       <td><span class="user-role">{{ roleLabels[user.role] }}</span><span v-if="user.maintenanceContact" class="user-cell-secondary">Storage alerts</span></td>
       <td><span>{{ user.region || 'No region' }}</span><span class="user-cell-secondary">{{ user.groups.map(group => group.name).join(', ') || 'No groups' }}</span></td>
-      <td><Button v-if="canApproveUser(store.user, user)" class="dv-button dv-button--primary user-status-approval" :disabled="!!busyId" :aria-label="`Approve ${user.name}`" @click="approve(user)"><Check />{{ busyId === user.id ? 'Approving…' : 'Approve' }}</Button><span v-else class="dv-badge" :class="{ 'dv-badge--success': userState(user) === 'active', 'dv-badge--warning': userState(user) === 'pending' }">{{ userStateLabels[userState(user)] }}</span></td>
+      <td><Button v-if="canApproveUser(store.user, user)" class="dv-button dv-button--primary user-status-approval" :disabled="!!busyId" :aria-label="`Approve ${user.name}`" @click="approve(user)"><Check />{{ busyId === user.id ? 'Approving…' : 'Approve' }}</Button><span v-else-if="suspendedAt(user)" class="dv-badge dv-badge--danger">Suspended</span><span v-else class="dv-badge" :class="{ 'dv-badge--success': userState(user) === 'active', 'dv-badge--warning': userState(user) === 'pending' }">{{ userStateLabels[userState(user)] }}</span></td>
       <td class="user-joined">{{ formatDate(user.createdAt) }}</td>
       <td class="user-joined">{{ user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never' }}</td>
       <td><div class="user-row-actions"><button v-if="canDeleteUser(store.user, user)" class="user-delete" :disabled="!!busyId" :aria-label="`Delete ${user.name}`" @click="askDelete(user, $event)"><Trash2 /></button></div></td>
@@ -182,9 +218,22 @@ function exportCsv() {
    <DialogContent class="dv-theme dv-admin admin-dialog user-details-dialog" @close-auto-focus="restoreFocus" @escape-key-down="event => { if (savingDetails) event.preventDefault() }" @interact-outside="event => { if (savingDetails) event.preventDefault() }">
     <DialogHeader><DialogTitle>{{ selectedUser?.name || 'User details' }}</DialogTitle><DialogDescription v-if="selectedUser">{{ selectedUser.email }} · Joined {{ formatDate(selectedUser.createdAt) }}</DialogDescription></DialogHeader>
     <template v-if="selectedUser">
-     <div class="user-detail-status"><span class="dv-badge" :class="{ 'dv-badge--success': userState(selectedUser) === 'active', 'dv-badge--warning': userState(selectedUser) === 'pending' }">{{ userStateLabels[userState(selectedUser)] }}</span><Button v-if="canApproveUser(store.user, selectedUser)" class="dv-button dv-button--primary" :disabled="!!busyId || savingDetails" @click="approve(selectedUser)">{{ busyId ? 'Approving…' : 'Approve user' }}</Button></div>
+     <div class="user-detail-status"><span v-if="suspendedAt(selectedUser)" class="dv-badge dv-badge--danger">Suspended since {{ formatDate(suspendedAt(selectedUser)!) }}</span><span v-else class="dv-badge" :class="{ 'dv-badge--success': userState(selectedUser) === 'active', 'dv-badge--warning': userState(selectedUser) === 'pending' }">{{ userStateLabels[userState(selectedUser)] }}</span><Button v-if="canApproveUser(store.user, selectedUser)" class="dv-button dv-button--primary" :disabled="!!busyId || savingDetails" @click="approve(selectedUser)">{{ busyId ? 'Approving…' : 'Approve user' }}</Button></div>
      <AdminUserEdit v-if="canEditUser(store.user, selectedUser)" :key="selectedUser.id" :user="selectedUser" @saving="savingDetails = $event" @close="detailsOpen = false" />
      <div v-else class="read-only-details"><p>Only an administrator can edit this account.</p><dl><dt>Company</dt><dd>{{ selectedUser.company }}</dd><dt>Role</dt><dd>{{ roleLabels[selectedUser.role] }}</dd><dt>Region</dt><dd>{{ selectedUser.region || 'No region' }}</dd><dt>Groups</dt><dd>{{ selectedUser.groups.map(group => group.name).join(', ') || 'No groups' }}</dd></dl></div>
+     <section v-if="canManageAccount(store.user, selectedUser)" class="user-account-actions" aria-labelledby="user-account-actions-title">
+      <h3 id="user-account-actions-title">Account access</h3>
+      <p v-if="confirmingSuspend">{{ selectedUser.name }} is signed out everywhere and their download links stop working until access is restored. Their collections and downloads are kept.</p>
+      <div class="user-account-actions__buttons">
+       <template v-if="suspendedAt(selectedUser)"><Button variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'resume', 'Access restored')">Restore access</Button></template>
+       <template v-else-if="confirmingSuspend"><Button variant="outline" class="dv-button" @click="confirmingSuspend = false">Cancel</Button><Button class="dv-button user-confirm-delete" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'suspend', 'Access suspended')">Suspend access</Button></template>
+       <Button v-else variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="confirmingSuspend = true">Suspend access</Button>
+       <Button variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'revokeSessions', 'Signed out everywhere')">Sign out everywhere</Button>
+       <Button variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'sendPasswordResetFor', 'Password reset email sent')">Send password reset</Button>
+       <Button v-if="!selectedUser.emailVerified" variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'resendVerificationEmailFor', 'Verification email sent')">Resend verification email</Button>
+       <Button v-if="store.user?.role === 'admin' && mfaEnabled(selectedUser)" variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'resetMfa', 'Two-step verification reset')">Reset two-step verification</Button>
+      </div>
+     </section>
     </template>
    </DialogContent>
   </Dialog>
@@ -249,6 +298,10 @@ function exportCsv() {
 .user-confirm-delete { background:var(--dv-color-danger); color:white; border-color:var(--dv-color-danger); }
 .user-confirm-delete:hover:not(:disabled) { background:var(--dv-color-danger); color:white; }
 .read-only-details { font-size:var(--dv-size-body); }
+.user-account-actions { display:grid; gap:12px; margin-top:24px; padding-top:20px; border-top:1px solid var(--dv-color-line); font-size:var(--dv-size-body); }
+.user-account-actions h3 { font-weight:600; }
+.user-account-actions p { color:var(--dv-text-secondary); }
+.user-account-actions__buttons { display:flex; flex-wrap:wrap; gap:8px; }
 .read-only-details p { color:var(--dv-text-secondary); }
 .read-only-details dl { display:grid; grid-template-columns:100px 1fr; gap:16px; margin-top:20px; }
 .read-only-details dt { color:var(--dv-text-secondary); }

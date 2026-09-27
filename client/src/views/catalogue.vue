@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionDialogAddToCollection from "@/components/collection/CollectionDialogAddToCollection.vue"
 import PageSelectionContext from "@/components/PageSelectionContext.vue"
@@ -20,7 +20,6 @@ import MainPageTools from "@/components/layout-main/MainPageTools.vue"
 import DisplayPreferences from "@/components/DisplayPreferences.vue"
 import Loader from "@/components/Loader.vue"
 import PageFilterBar from "@/components/PageFilterBar.vue"
-import PageFilterToggle from "@/components/PageFilterToggle.vue"
 import { Button } from "@/components/ui/button"
 import { providePageFilter } from "@/composables/usePageFilter"
 import { providePageListings } from "@/composables/usePageListings"
@@ -100,7 +99,6 @@ function toggleSelection() {
     </MainPageTools>
     <MainPageTools area="actions">
         <Button v-if="selected.length && globalStore.user?.role !== 'guest'" type="button" variant="outline" size="sm" class="md:hidden" @click="isAddToCollectionOpen = true">Add to collection</Button>
-        <PageFilterToggle :facets="facets" />
         <DisplayPreferences :products="shownProducts" />
     </MainPageTools>
     <p v-if="collection?.description" class="mb-5 text-body text-neutral-600">{{ collection.description }}</p>

@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,23 +7,25 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
+import { PAGE_FILES_RENDERER } from "../filesRenderer"
 import { Files } from "@lucide/vue"
 import BlockPlaceholder from "./BlockPlaceholder.vue"
 import { trpc } from "@/services/server.ts"
 import { usePageFilter } from "@/composables/usePageFilter"
 import { matchesFile } from "@/utils/pageFilter"
 import { useQuery } from "@tanstack/vue-query"
-import { computed } from "vue"
+import { computed, inject } from "vue"
 import type { Collection } from "../types"
 
 const props = defineProps<{ data: any; collection?: Collection; editing?: boolean }>()
+const filesRenderer = inject(PAGE_FILES_RENDERER, CollectionRenderFiles)
 
 const collectionId = computed(() => props.data?.collectionId || props.collection?.id)
 const { data: collection } = useQuery({
@@ -49,7 +51,7 @@ const hiddenByFilter = computed(() => !props.editing && pageFilter.isActive.valu
       :reason="data.collectionId
         ? 'The collection you chose holds no file yet.'
         : 'This block shows the files of this collection, and there are none yet. They appear as soon as files are added.'" />
-    <CollectionRenderFiles v-else :collection="collection" :force-view="forceView"
+    <component :is="filesRenderer" v-else :collection="collection" :force-view="forceView"
       :force-masonry-size="data.masonrySize ?? null" />
   </div>
 </template>

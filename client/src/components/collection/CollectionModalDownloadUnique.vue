@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import * as fileType from "@/utils/fileType.ts"
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
@@ -28,6 +28,7 @@ import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { RouterInput, RouterOutput, trpc } from "@/services/server.ts"
 import { formatFileSize } from "@/utils/fileSize"
+import { DOWNLOAD_MAX_BYTES } from "@/utils/downloadDelivery"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
   Check,
@@ -111,6 +112,7 @@ const title = computed(() => props.recordId ? productTitle.value : currentFile.v
 const productFacts = computed(() => (selection.value?.columns ?? []).map((column, index) => ({ ...column, value: selection.value?.previewRows?.[0]?.[index] })).filter(column => column.value))
 const viewOptions = computed(() => [...new Set(files.value.map(file => file.recordView).filter((view): view is string => !!view))].sort())
 const showViews = computed(() => !!props.recordId && !!selection.value?.viewsEnabled && !!viewOptions.value.length)
+const allViewsSelected = computed(() => !!viewOptions.value.length && viewOptions.value.every(view => selectedViews.value.includes(view)))
 const productIndex = computed(() => props.recordId ? (props.productIds ?? []).indexOf(props.recordId) : -1)
 const canNavigateProducts = computed(() => productIndex.value >= 0 && (props.productIds?.length ?? 0) > 1)
 const downloadFiles = computed(() => props.recordId
@@ -118,7 +120,7 @@ const downloadFiles = computed(() => props.recordId
   : currentFile.value ? [currentFile.value] : [])
 const totalSize = computed(() => downloadFiles.value.reduce((total, file) => total + Number(file.size), 0))
 const hasLicense = computed(() => downloadFiles.value.some(file => !!file.license))
-const canDownload = computed(() => !isLoading.value && !isResolving.value && !!downloadFiles.value.length && totalSize.value < 10_000_000_000 && (!hasLicense.value || form.value.isAcceptingTerms))
+const canDownload = computed(() => !isLoading.value && !isResolving.value && !!downloadFiles.value.length && totalSize.value < DOWNLOAD_MAX_BYTES && (!hasLicense.value || form.value.isAcceptingTerms))
 const hasCustomDownloadSettings = computed(() => downloadFiles.value.some(file =>
   (file.mimeType.startsWith('image/') && form.value.imageFormat !== 'original') ||
   (file.mimeType.startsWith('video/') && form.value.videoFormat !== 'original')
@@ -236,6 +238,7 @@ async function download() {
       ...form.value,
       isAcceptingTerms: hasLicense.value ? form.value.isAcceptingTerms : true,
       collectionFileIds: downloadFiles.value.map(file => file.id),
+      licenseAccepted: hasLicense.value && form.value.isAcceptingTerms,
     };
 
     const downloadRes = await trpc.download.create.mutate(formData as RouterInput['download']['create'])
@@ -525,10 +528,10 @@ watch(() => props.modelValue, (newValue) => {
           </div>
           <fieldset v-if="showViews" class="product-views">
             <legend>Views to download</legend>
-            <div class="view-actions"><button type="button" @click="selectedViews = [...viewOptions]">Select all</button><button type="button" @click="selectedViews = []">Remove all</button></div>
+            <div class="view-actions"><button type="button" @click="selectedViews = allViewsSelected ? [] : [...viewOptions]">{{ allViewsSelected ? 'Remove all' : 'Select all' }}</button></div>
             <div class="view-options"><label v-for="view in viewOptions" :key="view"><input v-model="selectedViews" type="checkbox" :value="view" />{{ view }}</label></div>
           </fieldset>
-          <CollectionDownloadFileOptions :files="downloadFiles" :direct-limit="recordId ? 2_000_000_000 : 5_000_000_000"
+          <CollectionDownloadFileOptions :files="downloadFiles"
             v-model:image-format="form.imageFormat" v-model:image-resolution="form.imageResolution"
             v-model:video-format="form.videoFormat" v-model:video-resolution="form.videoResolution"
             v-model:delivery="form.downloadType" v-model:accepted="form.isAcceptingTerms" />
@@ -547,7 +550,7 @@ watch(() => props.modelValue, (newValue) => {
       <span role="status">{{ recordId ? `${downloadFiles.length} ${downloadFiles.length === 1 ? 'file' : 'files'} · ` : '' }}{{ formatFileSize(totalSize) }}<span v-if="hasCustomDownloadSettings"> · Final size may vary</span></span>
       <div class="gallery-modal__actions"><Button variant="outline" @click="$emit('update:modelValue', null)">Cancel</Button><Button @click="download" :disabled="!canDownload"><Download :size="16" />{{ isLoading ? 'Preparing files…' : recordId ? (showViews && selectedViews.length === viewOptions.length ? 'Download all views' : `Download ${downloadFiles.length} ${downloadFiles.length === 1 ? 'file' : 'files'}`) : 'Download' }}</Button></div>
     </div>
-    <p v-if="totalSize >= 10_000_000_000" class="gallery-modal__limit text-sm text-destructive" role="alert">Select fewer files to stay under 10 GB.</p>
+    <p v-if="totalSize >= DOWNLOAD_MAX_BYTES" class="gallery-modal__limit text-sm text-destructive" role="alert">Select fewer files to stay under 10 GB.</p>
   </FocusScope>
   </Teleport>
 </template>

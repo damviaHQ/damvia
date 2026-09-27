@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,28 +7,29 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { menuIconClasses } from "@/components/layout-main/navigationStyles"
 import DialogMemberDisplay from "@/components/dialog-member/DialogMemberDisplay.vue"
 import DialogMemberDownloads from "@/components/dialog-member/DialogMemberDownloads.vue"
 import DialogMemberLinks from "@/components/dialog-member/DialogMemberLinks.vue"
 import DialogMemberProfile from "@/components/dialog-member/DialogMemberProfile.vue"
+import DialogMemberSecurity from "@/components/dialog-member/DialogMemberSecurity.vue"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useMediaQuery } from "@vueuse/core"
-import { FileDown, LayoutDashboard, Link, User } from "@lucide/vue"
+import { FileDown, LayoutDashboard, Link, ShieldCheck, User } from "@lucide/vue"
 import { TabsTrigger as TabsTriggerPrimitive } from "reka-ui"
 import { computed, ref, watch } from "vue"
 
 const props = defineProps<{
   open: boolean
-  initialTab?: "downloads" | "links" | "profile" | "display-preferences"
+  initialTab?: "downloads" | "links" | "profile" | "security" | "display-preferences"
 }>()
 
 const emit = defineEmits<{
@@ -37,6 +38,7 @@ const emit = defineEmits<{
 
 const accountTabs = [
   { id: 'profile', label: 'Profile', icon: User, description: 'Manage your profile and account details.' },
+  { id: 'security', label: 'Security', icon: ShieldCheck, description: 'Two-step verification and the browsers where you are signed in.' },
   { id: 'downloads', label: 'Downloads', icon: FileDown, description: 'Downloads from the last 30 days. Links are available for 7 days.' },
   { id: 'links', label: 'Links', icon: Link, description: 'Manage collection invitations and guest access.' },
   { id: 'display-preferences', label: 'Display preferences', icon: LayoutDashboard, description: 'Choose grid or list for each type. Changes are saved in this browser.' },
@@ -88,6 +90,7 @@ const closeDialog = () => {
             <TabsContent value="downloads" class="m-0"><DialogMemberDownloads @close="closeDialog" /></TabsContent>
             <TabsContent value="links" class="m-0"><DialogMemberLinks @close="closeDialog" /></TabsContent>
             <TabsContent value="profile" class="m-0"><DialogMemberProfile /></TabsContent>
+            <TabsContent value="security" class="m-0"><DialogMemberSecurity /></TabsContent>
             <TabsContent value="display-preferences" class="m-0"><DialogMemberDisplay /></TabsContent>
           </div>
         </div>

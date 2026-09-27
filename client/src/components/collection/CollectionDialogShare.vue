@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,7 @@ import dayjs from "dayjs"
 import { Copy, Link, Send, XCircle } from "@lucide/vue"
 import { computed, onMounted, ref } from "vue"
 import { useRouter } from "vue-router"
+import { invitationLink } from "@/utils/invitationLink"
 
 type Collection = RouterOutput["collection"]["findById"]
 type Invitation = Collection["invitations"][number]
@@ -92,22 +93,8 @@ async function createInvitation(sendEmail: boolean) {
 }
 
 async function copyInvitationLink(email: string) {
-  const url = new URL(router.resolve({ name: 'collection', params: { id: props.collection.id } }).href, window.location.origin)
-  const searchParams = new URLSearchParams()
-  searchParams.set(
-    "auth_params",
-    window.btoa(
-      JSON.stringify({
-        magicLink: true,
-        email,
-        collectionName: props.collection.name,
-        collectionId: props.collection.id,
-      })
-    )
-  )
-  url.search = searchParams.toString()
-  url.hash = ""
-  await navigator.clipboard.writeText(url.toString())
+  const path = router.resolve({ name: 'collection', params: { id: props.collection.id } }).href
+  await navigator.clipboard.writeText(invitationLink(window.location.origin, path, { email, collectionId: props.collection.id, collectionName: props.collection.name }))
   toast.success("Invitation link copied!")
 }
 

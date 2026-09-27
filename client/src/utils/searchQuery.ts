@@ -171,6 +171,26 @@ export function clearFilterQuery(query: LocationQuery): LocationQuery {
   return patchSearchQuery(query, patch)
 }
 
+// The filters, sort and phrase mode of a query, without the terms or scope:
+// what a filter screen edits as a draft before applying it in one step.
+export function filterDraft(query: LocationQuery): LocationQuery {
+  const draft: LocationQuery = {}
+  for (const [key, value] of Object.entries(query)) {
+    if ((FILTER_KEYS as readonly string[]).includes(key) || attributeKey.test(key) || metadataKey.test(key) || metadataRangeKey.test(key) || axisKey.test(key) || key === 'sort' || key === 'exact_match') {
+      draft[key] = value
+    }
+  }
+  return draft
+}
+
+// Replaces every filter of the query with the draft; terms, scope and mode stay.
+export function applyFilterDraft(query: LocationQuery, draft: LocationQuery): LocationQuery {
+  const cleared = clearFilterQuery(query)
+  delete cleared.sort
+  delete cleared.exact_match
+  return patchSearchQuery(cleared, draft)
+}
+
 export type ActiveFilter = { key: string, value: string, group: 'asset_types' | 'record_views' | 'file_types' | 'extensions' | 'size' | 'attribute' | 'metadata' | 'metadata_range' | 'axis', attributeId?: string }
 
 export function formatDateRange(range: { from?: string, to?: string }): string {

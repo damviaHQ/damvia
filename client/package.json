@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "design:check": "vue-tsc --noEmit -p tsconfig.design-system.json",
-    "typecheck": "vue-tsc --noEmit",
+    "typecheck": "vue-tsc --noEmit && vue-tsc --noEmit -p tsconfig.playwright.json",
     "ui:check": "vue-tsc --noEmit -p tsconfig.ui.json",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -53,6 +53,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/js-cookie": "^3.0.5",

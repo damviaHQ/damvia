@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import Loader from "@/components/Loader.vue"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { useGlobalToast } from "@/composables/useGlobalToast"
-import { trpc } from "@/services/server"
+import { extractErrors, trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
 import { zodTypedSchema } from "@/lib/zodTypedSchema"
@@ -63,6 +63,22 @@ const updateProfile = handleSubmit(async (values) => {
   globalStore.fetchUser()
   toast.success("Profile updated successfully")
 })
+
+async function downloadMyData() {
+  try {
+    const data = await trpc.user.exportMyData.mutate()
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }))
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `my-data-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (error) {
+    toast.error(extractErrors(error as Error).message)
+  }
+}
 
 async function removeAccount() {
   try {
@@ -118,6 +134,11 @@ async function removeAccount() {
         </FormField>
         <Button type="submit" class="justify-self-start">Save changes</Button>
       </form>
+      <div class="grid w-full max-w-lg gap-2 pt-2">
+        <h3 class="font-medium">Your data</h3>
+        <p class="text-sm text-neutral-600">Download a copy of what this library holds about you: your account, groups, favourites, collections, invitations, downloads, activity and sign-ins, as a JSON file.</p>
+        <Button type="button" variant="outline" class="justify-self-start" @click="downloadMyData">Download my data</Button>
+      </div>
       <div class="profile__alert-container w-full max-w-lg pt-2">
         <Alert variant="destructive" class="border-0 bg-transparent p-0 flex items-start gap-3">
           <div class="flex self-start gap-2">

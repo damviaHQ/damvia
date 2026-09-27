@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,11 +7,11 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, watchEffect } from 'vue'
 import { ArrowDown, ArrowUp, FileStack, GripVertical, Table2, Download } from '@lucide/vue'
@@ -26,6 +26,7 @@ import { RouterInput, RouterOutput, trpc } from '@/services/server'
 import { useDownloadStore } from '@/stores/downloadStore'
 import { useGlobalStore } from '@/stores/globalStore'
 import { formatFileSize } from '@/utils/fileSize'
+import { downloadSummary } from '@/utils/downloadDelivery'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ (e: 'update:modelValue', open: boolean): void }>()
@@ -54,17 +55,19 @@ const productViewsEnabled = computed(() => !!res.value?.viewsEnabled && !!res.va
 const availableFiles = computed(() => (res.value?.files ?? []).filter(file => !productViewsEnabled.value || !!file.recordView))
 const viewOptions = computed(() => [...new Set(availableFiles.value.map(file => file.recordView).filter((view): view is string => !!view))].sort())
 const filterViews = computed(() => productViewsEnabled.value && !!viewOptions.value.length)
+const allViewsSelected = computed(() => !!viewOptions.value.length && viewOptions.value.every(view => views.value.includes(view)))
 const displayedFiles = computed(() => availableFiles.value.filter(file => !filterViews.value || views.value.includes(file.recordView ?? '')))
 const files = computed(() => displayedFiles.value.filter(file => !excluded.value.includes(file.id)))
 function toggleFile(id: string) {
   excluded.value = excluded.value.includes(id) ? excluded.value.filter(current => current !== id) : [...excluded.value, id]
 }
-const bytes = computed(() => files.value.reduce((sum, file) => sum + file.size, 0))
-const imageCount = computed(() => files.value.filter(file => file.mimeType.startsWith('image/')).length)
-const directAllowed = computed(() => bytes.value <= 2_000_000_000 && imageCount.value <= 300)
+const summary = computed(() => downloadSummary(files.value))
+const directAllowed = computed(() => summary.value.directAllowed)
 const licenses = computed(() => [...new Map(files.value.flatMap(file => file.license ? [[file.license.id, file.license] as const] : [])).values()])
+const availableColumns = computed(() => (res.value?.columns ?? []).filter(column => format.value === 'xlsx' || column.id !== 'picture'))
+const allColumnsSelected = computed(() => !!availableColumns.value.length && availableColumns.value.every(column => columns.value.includes(column.id)))
 const selectedColumns = computed(() => orderedColumns.value.filter(column => columns.value.includes(column.id) && (format.value === 'xlsx' || column.id !== 'picture')))
-const canDownloadFiles = computed(() => !!res.value && !busy.value && !!files.value.length && bytes.value < 10_000_000_000 && (!licenses.value.length || accepted.value))
+const canDownloadFiles = computed(() => !!res.value && !busy.value && !!files.value.length && !summary.value.tooLarge && (!licenses.value.length || accepted.value))
 const canDownloadList = computed(() => !!res.value && !busy.value && !!res.value.recordCount && !!selectedColumns.value.length)
 
 function moveColumn(index: number, direction: number) {
@@ -107,7 +110,7 @@ watch([() => props.modelValue, () => store.selection, reload], async (_, __, onC
 }, { immediate: true })
 watchEffect(() => {
   if (!directAllowed.value) delivery.value = 'email'
-  if (imageCount.value > 300) imageFormat.value = 'original'
+  if (!summary.value.conversionAllowed) imageFormat.value = 'original'
 })
 watch(files, () => { accepted.value = false })
 
@@ -123,6 +126,7 @@ async function download(choice: 'files' | 'list' | 'all') {
     videoFormat: videoFormat.value,
     videoResolution: videoResolution.value,
     downloadType: delivery.value,
+    licenseAccepted: accepted.value,
     ...(choice === 'all' ? { recordExport: { items, columns: selectedColumnIds, format: exportFormat } } : {}),
   } as RouterInput['download']['create']
   busy.value = true
@@ -184,7 +188,6 @@ async function download(choice: 'files' | 'list' | 'all') {
         <div class="download-body">
           <div class="download-preview">
             <template v-if="availableFiles.length && activeTab === 'files'">
-              <div class="section-heading"><h3>{{ files.length }} {{ files.length === 1 ? 'file' : 'files' }}</h3></div>
               <div v-if="displayedFiles.length" class="download-file-grid">
                 <label v-for="file in displayedFiles" :key="file.id" class="download-file" :class="{ 'is-excluded': excluded.includes(file.id) }">
                   <span class="file-picture">
@@ -223,7 +226,7 @@ async function download(choice: 'files' | 'list' | 'all') {
               <h3 v-if="!res.recordCount" class="download-section-heading"><FileStack :size="16" />Files <span>{{ availableFiles.length }}</span></h3>
               <div class="download-section-body">
                 <div v-if="filterViews" class="download-views">
-                  <div class="section-heading"><h3>Views</h3><div class="view-actions"><button type="button" class="text-action" @click="views = [...viewOptions]">Select all</button><button type="button" class="text-action" @click="views = []">Remove all</button></div></div>
+                  <div class="section-heading"><h3>Views</h3><div class="view-actions"><button type="button" class="text-action" @click="views = allViewsSelected ? [] : [...viewOptions]">{{ allViewsSelected ? 'Remove all' : 'Select all' }}</button></div></div>
                   <div class="view-options">
                     <label v-for="view in viewOptions" :key="view" :class="{ chosen: views.includes(view) }">
                       <input v-model="views" type="checkbox" :value="view" />{{ view }}
@@ -243,8 +246,8 @@ async function download(choice: 'files' | 'list' | 'all') {
                   <label :class="{ chosen: format === 'xlsx' }"><input v-model="format" type="radio" value="xlsx" name="list-format" />Excel <span>.xlsx</span></label>
                   <label :class="{ chosen: format === 'csv' }"><input v-model="format" type="radio" value="csv" name="list-format" />CSV <span>.csv</span></label>
                 </div></fieldset>
-                <fieldset class="columns-fieldset"><legend>Columns <span>{{ selectedColumns.length }} / {{ res.columns.length - (format === 'csv' && res.columns.some(column => column.id === 'picture') ? 1 : 0) }}</span></legend>
-                  <div class="column-actions"><button type="button" class="text-action" @click="columns = res.columns.map(column => column.id)">Select all</button><button type="button" class="text-action" @click="columns = []">Clear</button></div>
+                <fieldset class="columns-fieldset" aria-labelledby="download-columns-heading">
+                  <div class="columns-heading"><h3 id="download-columns-heading">Columns <span>{{ selectedColumns.length }} / {{ availableColumns.length }}</span></h3><button type="button" class="text-action" @click="columns = allColumnsSelected ? [] : res.columns.map(column => column.id)">{{ allColumnsSelected ? 'Remove all' : 'Select all' }}</button></div>
                   <Draggable v-model="orderedColumns" item-key="id" handle=".column-grip" tag="ul" class="column-list" :animation="150">
                     <template #item="{ element: column, index }">
                       <li class="column-choice" :class="{ 'is-unavailable': format === 'csv' && column.id === 'picture' }">
@@ -261,15 +264,15 @@ async function download(choice: 'files' | 'list' | 'all') {
           </aside>
         </div>
         <div class="download-footer">
-          <span role="status">{{ [availableFiles.length ? `${files.length} files` : '', res.recordCount ? `${res.recordCount} ${labels.lowerPlural.value}` : ''].filter(Boolean).join(' · ') }}</span>
+          <span role="status">{{ [availableFiles.length ? `${files.length} ${files.length === 1 ? 'file' : 'files'}` : '', res.recordCount ? `${res.recordCount} ${labels.lowerPlural.value}` : ''].filter(Boolean).join(' · ') }}</span>
           <div class="download-actions">
             <Button variant="outline" :disabled="busy" @click="emit('update:modelValue', false)">Cancel</Button>
             <Button v-if="availableFiles.length" variant="outline" :disabled="!canDownloadFiles" @click="download('files')"><Download :size="16" />{{ delivery === 'email' ? 'Email files link' : 'Download files' }}</Button>
             <Button v-if="res.recordCount" variant="outline" :disabled="!canDownloadList" @click="download('list')"><Download :size="16" />{{ `Download ${format === 'xlsx' ? 'Excel' : 'CSV'}` }}</Button>
-            <Button v-if="availableFiles.length && res.recordCount" :disabled="!canDownloadFiles || !canDownloadList" @click="download('all')"><Download :size="16" />{{ delivery === 'email' ? 'Email all link' : 'Download all' }}</Button>
+            <Button v-if="availableFiles.length && res.recordCount" :disabled="!canDownloadFiles || !canDownloadList" @click="download('all')"><Download :size="16" />{{ delivery === 'email' ? `Email files and ${format === 'xlsx' ? 'Excel' : 'CSV'}` : 'Download all' }}</Button>
           </div>
         </div>
-        <p v-if="availableFiles.length && bytes >= 10_000_000_000" class="text-sm text-destructive" role="alert">Select fewer files to stay under 10 GB.</p>
+        <p v-if="availableFiles.length && summary.tooLarge" class="text-sm text-destructive" role="alert">Select fewer files to stay under 10 GB.</p>
       </template>
     </DialogContent>
   </Dialog>
@@ -318,17 +321,20 @@ async function download(choice: 'files' | 'list' | 'all') {
 .file-size, .preview-caption { display:block; font-size:12px; color:hsl(var(--muted-foreground)); margin-top:4px; }
 .download-options legend { margin-bottom:10px; width:100%; }
 .download-options legend span { float:right; font-weight:400; color:hsl(var(--muted-foreground)); }
-.format-options, .delivery-options { display:flex; flex-direction:column; gap:10px; }
+.format-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.delivery-options { display:flex; flex-direction:column; gap:10px; }
 .format-options label, .delivery-options label, .column-list label, .accept-terms { display:flex; align-items:center; gap:9px; font-size:13px; cursor:pointer; overflow-wrap:anywhere; }
-.format-options label { border:1px solid hsl(var(--border)); padding:10px; }
+.format-options label { min-width:0; border:1px solid hsl(var(--border)); padding:8px; white-space:nowrap; }
 .format-options span { margin-left:auto; font-size:12px; color:hsl(var(--muted-foreground)); }
-.column-actions { display:flex; justify-content:space-between; margin-bottom:12px; }
-.column-list { display:flex; flex-direction:column; gap:2px; padding:0; margin:0; list-style:none; }
-.column-choice { display:flex; align-items:center; gap:6px; min-height:38px; padding:2px 4px; }
+.columns-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.columns-heading h3 { display:flex; align-items:baseline; gap:6px; }
+.columns-heading span { font-size:12px; font-weight:400; color:hsl(var(--muted-foreground)); }
+.column-list { display:flex; flex-direction:column; gap:0; padding:0; margin:0; list-style:none; }
+.column-choice { display:flex; align-items:center; gap:4px; min-height:32px; padding:0 2px; }
 .column-choice:hover, .column-choice:focus-within { background:hsl(var(--muted)); }
 .column-choice.is-unavailable { opacity:.55; }
 .column-choice label { flex:1; min-width:0; }
-.column-grip, .column-move button { display:flex; align-items:center; justify-content:center; width:24px; height:28px; color:hsl(var(--muted-foreground)); }
+.column-grip, .column-move button { display:flex; align-items:center; justify-content:center; width:22px; height:26px; color:hsl(var(--muted-foreground)); }
 .column-grip { cursor:grab; }
 .column-grip:active { cursor:grabbing; }
 .column-move { display:flex; opacity:0; }

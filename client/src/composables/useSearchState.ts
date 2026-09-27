@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import {
   activeFilters,
+  applyFilterDraft,
   clearFilterQuery,
   parseQueryParts,
   parseSearchQuery,
@@ -24,7 +25,7 @@ import {
   type SearchSort,
 } from "@/utils/searchQuery"
 import { computed } from "vue"
-import { useRoute, useRouter } from "vue-router"
+import { useRoute, useRouter, type LocationQuery } from "vue-router"
 
 // The URL is the only search state: every change is a route push and the results refetch from it.
 export function useSearchState() {
@@ -50,6 +51,13 @@ export function useSearchState() {
   return {
     form,
     terms,
+    recordInput: computed(() => ({
+      collectionId: form.value.searchScope === "all" ? undefined : form.value.collectionId,
+      collectionOnly: form.value.searchScope === "current",
+      search: form.value.exactMatch ? form.value.query?.trim() || undefined : undefined,
+      searchTerms: form.value.exactMatch ? undefined : terms.value,
+      filters: Object.entries(form.value.attributes).map(([column, values]) => ({ column, op: "has_any" as const, values })),
+    })),
     hasQuery,
     filters,
     isScoped,
@@ -64,6 +72,9 @@ export function useSearchState() {
     toggleValue: (key: string, value: string) =>
       router.push({ name: "search", query: toggleQueryValue(route.query, key, value) }),
     clearFilters: () => router.push({ name: "search", query: clearFilterQuery(route.query) }),
+    // A filter screen edits a draft and changes the address once, on Apply.
+    applyDraft: (draft: LocationQuery, query: LocationQuery = route.query) =>
+      router.replace({ name: "search", query: applyFilterDraft(query, draft) }),
     setPage: (page: number) =>
       router.push({ name: "search", query: { ...route.query, page: page > 1 ? String(page) : undefined } }),
   }

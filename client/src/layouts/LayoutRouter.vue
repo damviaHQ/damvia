@@ -1,5 +1,5 @@
 <!-- Damvia - Open Source Digital Asset Manager
-Copyright (C) 2024 Arnaud DE SAINT JEAN
+Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
 published by the Free Software Foundation, either version 3 of the
@@ -7,12 +7,13 @@ License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>. -->
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { useIsPhone } from "@/composables/useIsPhone"
 import { computed, defineAsyncComponent } from "vue"
 import { useRoute } from "vue-router"
 
@@ -21,8 +22,13 @@ const LayoutAuth = defineAsyncComponent(() => import("@/layouts/LayoutAuth.vue")
 const LayoutEditor = defineAsyncComponent(() => import("@/layouts/LayoutEditor.vue"))
 const LayoutMain = defineAsyncComponent(() => import("@/layouts/LayoutMain.vue"))
 const LayoutPublic = defineAsyncComponent(() => import("@/layouts/LayoutPublic.vue"))
+const LayoutMobile = defineAsyncComponent(() => import("@/mobile/LayoutMobile.vue"))
 
 const route = useRoute()
+const isPhone = useIsPhone()
+// Phones get their own interface for signed-in screens; sign-in and public
+// pages are simple enough to be shared.
+const phone = computed(() => isPhone.value && ["main", "admin", "editor"].includes(route.meta.layout ?? ""))
 const component = computed(() => {
   switch (route.meta.layout) {
     case "main":
@@ -41,7 +47,8 @@ const component = computed(() => {
 </script>
 
 <template>
-  <component v-if="component" :is="component">
+  <LayoutMobile v-if="phone" />
+  <component v-else-if="component" :is="component">
     <router-view />
   </component>
   <router-view v-else />
