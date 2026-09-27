@@ -13,14 +13,14 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { menuIconClasses, menuIconSlotClasses, sidebarSectionTitleClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "./navigationStyles"
+import { MENU_TOUCH, menuIconClasses, menuIconSlotClasses, sidebarSectionTitleClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "./navigationStyles"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsTruncated } from "@/composables/useIsTruncated"
 import { RouterOutput } from "@/services/server.ts"
 import sortBy from "lodash/sortBy"
-import { ChevronDown, ChevronRight } from "@lucide/vue"
-import { computed, ref, watch } from "vue"
+import { ArrowRight, ChevronDown, ChevronRight } from "@lucide/vue"
+import { computed, inject, ref, watch } from "vue"
 
 type MenuItem = RouterOutput["menuItem"]["list"][number]
 
@@ -30,6 +30,8 @@ const open = ref(props.openItems.includes(props.item.collectionId))
 // A section is a heading: it is never a link, and its items stay at the
 // level the section sits at rather than being indented under it.
 const isSection = computed(() => props.item.type === "section")
+const touch = inject(MENU_TOUCH, false)
+const touchParent = computed(() => touch && props.item.type === "collection" && !!props.item.hasAccess && !!props.item.children?.length)
 
 const labelRef = ref<HTMLElement | null>(null)
 const { isTruncated, check } = useIsTruncated()
@@ -53,6 +55,8 @@ const isActiveItem = computed(() => {
   const itemId = props.item.collectionId || props.item.pageId
   return itemId && props.openItems[props.openItems.length - 1] === itemId
 })
+
+const isActive = computed(() => !!isActiveItem.value)
 
 const activeChildIndex = computed(() => {
   if (!sortedChildren.value.length || !open.value) return -1
@@ -95,6 +99,16 @@ function handleLinkClick(event: MouseEvent) {
 
 <template>
   <div class="layout-link-tree__wrapper flex flex-col relative">
+    <div v-if="touchParent" class="flex items-center gap-1">
+      <button type="button" :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${item.collectionName}`"
+        :class="[treeRowClasses, 'min-h-11 flex-1 text-left', isActive && ['layout-menu-tree__item--active', treeActiveRowClasses]]" @click="open = !open">
+        <span :class="menuIconSlotClasses"><ChevronDown v-if="open" :class="menuIconClasses" aria-hidden="true" /><ChevronRight v-else :class="menuIconClasses" aria-hidden="true" /></span>
+        <span class="min-w-0 flex-1 truncate">{{ item.collectionName }}</span>
+      </button>
+      <router-link :to="{ name: routeName, params: { id: item.collectionId } }" :aria-label="`Open ${item.collectionName}`"
+        class="grid size-11 shrink-0 place-items-center rounded-md text-neutral-400 hover:bg-neutral-200 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-ring"><ArrowRight class="size-4" aria-hidden="true" /></router-link>
+    </div>
+    <template v-else>
     <Button type="button" variant="ghost" v-if="item.type === 'collection' && item.hasAccess && item.children?.length > 0" @click="open = !open"
       :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${item.collectionName}`"
       class="layout-menu-tree__icon-wrapper peer absolute left-px top-2 z-10 flex cursor-pointer border-none size-5 min-h-0 p-0.5 hover:bg-neutral-200 shrink-0">
@@ -133,6 +147,7 @@ function handleLinkClick(event: MouseEvent) {
         {{ item.type === 'collection' ? item.collectionName : item.type === 'page' ? item.pageName : item.data?.text }}
       </TooltipContent>
     </Tooltip>
+    </template>
     <div v-if="isSection" class="mt-4 mb-2" :class="sidebarSectionTitleClasses">{{ item.data?.label }}</div>
     <div v-if="item.type === 'divider'"
       :class="['h-px', item.data.border ? 'bg-neutral-400' : 'bg-transparent', 'divider self-center w-[90%]']" :style="{

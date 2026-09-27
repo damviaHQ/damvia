@@ -37,16 +37,19 @@ export function useHomeTarget() {
   const globalStore = useGlobalStore()
   const menu = useQuery({ refetchOnMount: true, queryKey: ['menu-items'], queryFn: () => trpc.menuItem.list.query() })
   const tree = useQuery({ refetchOnMount: true, queryKey: ['collection', 'tree'], queryFn: () => trpc.collection.tree.query() })
-  const target = computed<RouteLocationRaw | false | null>(() => {
-    if (menu.isFetching.value || tree.isFetching.value || tree.status.value !== 'success') return null
+  // What home shows: a collection or a page. `null` while the first load runs,
+  // `false` when there is nowhere to go. Cached data answers at once.
+  const home = computed<{ type: 'collection' | 'page', id: string } | false | null>(() => {
+    if (menu.isPending.value || tree.isPending.value) return null
     const homeItem = findHome(menu.data.value)
     if (!homeItem || globalStore.user?.role === 'guest') {
       const first = tree.data.value?.[0]
-      return first ? { name: 'collection', params: { id: first.id } } : false
+      return first ? { type: 'collection', id: first.id } : false
     }
-    if (homeItem.type === 'page' && homeItem.pageId) return { name: 'page', params: { id: homeItem.pageId } }
-    if (homeItem.type === 'collection' && homeItem.collectionId) return { name: 'collection', params: { id: homeItem.collectionId } }
+    if (homeItem.type === 'page' && homeItem.pageId) return { type: 'page', id: homeItem.pageId }
+    if (homeItem.type === 'collection' && homeItem.collectionId) return { type: 'collection', id: homeItem.collectionId }
     return false
   })
-  return { target, menu: menu.data }
+  const target = computed<RouteLocationRaw | false | null>(() => home.value ? { name: home.value.type, params: { id: home.value.id } } : home.value)
+  return { home, target, menu: menu.data }
 }

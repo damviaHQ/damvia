@@ -44,6 +44,8 @@ type Screen = {
   role?: MockOptions['role']
   signedOut?: boolean
   phone?: boolean
+  // A step after the page is ready, such as opening a panel.
+  open?: (page: Page) => Promise<void>
   answers?: Answers
 }
 
@@ -60,7 +62,9 @@ const screens: Record<string, Screen> = {
   'phone search': { url: '/search?q=Campaign', phone: true, answers: results, ready: page => page.getByText('3 files', { exact: true }) },
   'phone search filters': { url: '/search?q=Campaign&panel=filters', phone: true, answers: results, ready: page => page.getByRole('dialog', { name: 'Filters' }) },
   'phone downloads': { url: '/downloads', phone: true, ready: heading },
-  'phone library': { url: '/library', phone: true, ready: page => page.getByRole('link', { name: 'Brand guidelines' }) },
+  'phone menu': { url: '/collections/campaign', phone: true, ready: heading,
+    open: async page => { await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Menu' }).click(); await expect(page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'Brand guidelines' })).toBeVisible() } },
+  'phone sign-in': { url: '/login', phone: true, signedOut: true, answers: { 'settings.getAuthBackgroundImage': { imageUrl: 'https://example.test/cover.jpg', exists: true } }, ready: page => page.getByRole('button', { name: 'Log in', exact: true }) },
   'phone users as manager': { url: '/admin/users', phone: true, role: 'manager', answers: { 'user.list': people, 'group.list': [] }, ready: page => page.getByRole('link', { name: /Alex Morgan/ }) },
 }
 
@@ -79,6 +83,7 @@ for (const [name, screen] of Object.entries(screens)) {
     })
     await page.goto(screen.url)
     await expect(screen.ready(page)).toBeVisible()
+    await screen.open?.(page)
     await api.settled()
     await expectNoViolations(page)
   })
@@ -90,7 +95,7 @@ test('account security tab has no WCAG 2.1 AA violations found by axe', async ({
     'auth.sessions': sessions,
   })
   await page.goto('/collections/campaign')
-  await page.locator('aside').getByRole('button', { name: 'My account', exact: true }).click()
+  await page.getByRole('banner', { name: 'Page tools' }).getByRole('button', { name: 'My account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Profile', exact: true }).click()
   await page.getByRole('dialog').getByRole('tab', { name: 'Security', exact: true }).click()
   await expect(page.getByText("Where you're signed in")).toBeVisible()

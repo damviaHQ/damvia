@@ -12,7 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { DEFAULT_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT, MIN_IMAGE_HEIGHT } from "server/src/page-blocks/schema"
+import { DEFAULT_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT, MIN_IMAGE_HEIGHT } from "server/src/page-blocks/limits"
 import type { MediaRef, VideoRef } from "server/src/page-blocks/schema"
 import type { PageAssets } from "./types"
 

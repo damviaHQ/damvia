@@ -22,10 +22,18 @@ import { PAGE_FILES_RENDERER } from "@/components/page-renderer/filesRenderer"
 import { trpc } from "@/services/server"
 import MobileTopBar from "../components/MobileTopBar.vue"
 import MobilePageFiles from "../components/MobilePageFiles.vue"
+import { menuCrumbs, menuPath, type Crumb, type MenuNode } from "../composables"
 
 provide(PAGE_FILES_RENDERER, MobilePageFiles)
 const route = useRoute()
-const id = computed(() => route.params.id as string)
+// Home shows its collection or page in place, at "/", under the client logo.
+const props = defineProps<{ homeId?: string }>()
+const id = computed(() => props.homeId ?? (route.params.id as string))
+const { data: menu } = useQuery({ queryKey: ["menu-items"], queryFn: () => trpc.menuItem.list.query() })
+const trail = computed<Crumb[]>(() => {
+  const path = menuPath(menu.value as MenuNode[] | undefined, (item) => item.type === "page" && item.pageId === id.value)
+  return path ? menuCrumbs(path) : []
+})
 const { data: page, isLoading, error } = useQuery({
   queryKey: computed(() => ["page", id.value]),
   queryFn: () => trpc.page.findById.query(id.value),
@@ -33,7 +41,7 @@ const { data: page, isLoading, error } = useQuery({
 </script>
 
 <template>
-  <MobileTopBar :title="page?.name ?? 'Page'" back />
+  <MobileTopBar :title="page?.name ?? 'Page'" :back="!homeId" :logo="!!homeId" :trail="homeId ? undefined : trail" />
   <Loader v-if="isLoading" :text="true" />
   <p v-else-if="error" role="alert" class="px-4 pt-8 text-center text-[var(--dv-text-secondary)]">This page is not available to you.</p>
   <div v-else-if="page" class="px-4 pt-4 pb-24">

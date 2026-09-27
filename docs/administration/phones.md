@@ -10,10 +10,12 @@ Damvia shows a separate interface on screens narrower than 768 px. It uses the s
 
 ## Five tabs
 
+Every screen's top bar shows where it sits: the parent collections, each tappable, then the current screen. The home screen shows the client logo instead.
+
 | Tab | Shows |
 |---|---|
-| **Home** | The menu item marked as home, as on a computer. Guests land on their first collection. |
-| **Library** | The menu, one level per screen. Sections become headings and dividers become space. Collections a person cannot open are not listed. Guests see the collections shared with them. |
+| **Home** | The menu item marked as home, shown in place under the client logo. Guests see their first collection. |
+| **Menu** | Opens the same navigation as the computer sidebar in a panel over 80% of the screen: Favorites, My collections (with **+** to create one) and the menu in the order set on the Menu screen, with sections, expandable branches and the current collection or page highlighted. Guests see the collections shared with them. On the phone, tapping anywhere on an entry that holds others opens or closes it; its **Open** button goes to the entry itself. An entry with nothing inside opens directly. |
 | **Search** | One search field for files or for your records (the tab uses your record label). A **Filters** screen holds sort, file type, format, size, dates, record fields, variants and file metadata, and changes the results only when **Apply** is pressed. A search link copied from a computer keeps all its criteria. |
 | **Saved** | Favorites and the person's own collections. Not shown to guests. |
 | **Account** | Profile, **Downloads**, sign out, and for managers and admins **Users** and, for admins, **Library status**. A badge counts the people waiting for approval. |

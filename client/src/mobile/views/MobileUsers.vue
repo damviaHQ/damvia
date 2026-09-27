@@ -59,8 +59,8 @@ const shown = computed(() => {
 </script>
 
 <template>
-  <MobileTopBar title="Users" back="/account" />
-  <div class="sticky top-14 z-20 grid gap-2 border-b border-[var(--dv-color-line)] bg-[var(--dv-surface-panel)] px-4 py-2">
+  <MobileTopBar title="Users" back="/account" :trail="[{ label: 'Account', to: { name: 'account' } }]" />
+  <div class="sticky top-[52px] z-20 grid gap-2 border-b border-[var(--dv-color-line)] bg-[var(--dv-surface-panel)] px-4 py-2">
     <label class="flex min-h-11 items-center gap-2 rounded-[var(--dv-radius-field)] border border-[var(--dv-color-line-strong)] px-3">
       <Search :size="18" aria-hidden="true" class="text-[var(--dv-text-secondary)]" />
       <span class="sr-only">Search people</span>

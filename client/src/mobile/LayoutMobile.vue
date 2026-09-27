@@ -13,13 +13,14 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { computed, defineAsyncComponent, markRaw, type Component } from "vue"
+import { computed, defineAsyncComponent, markRaw, ref, type Component } from "vue"
 import { useRoute } from "vue-router"
 import { useQuery } from "@tanstack/vue-query"
-import { House, LibraryBig, Search, Star, CircleUserRound } from "@lucide/vue"
+import { House, Menu, Search, Star, CircleUserRound } from "@lucide/vue"
 import { trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
 import MobileDesktopOnly from "./MobileDesktopOnly.vue"
+import MobileMenuDrawer from "./components/MobileMenuDrawer.vue"
 
 const route = useRoute()
 const globalStore = useGlobalStore()
@@ -44,9 +45,12 @@ const { data: pending } = useQuery({
   queryFn: async () => (await trpc.user.list.query()).filter((user) => user.emailVerified && !user.approved && !user.suspendedAt).length,
 })
 
+const menuOpen = ref(false)
+
 const tabs = computed(() => [
-  { id: "home", label: "Home", icon: House, to: { name: "home" }, active: ["home", "page", "collection", "collection-404", "product"].includes(String(route.name)) && route.query.from !== "library" },
-  { id: "library", label: "Library", icon: LibraryBig, to: { name: "library" }, active: route.name === "library" || route.query.from === "library" },
+  { id: "home", label: "Home", icon: House, to: { name: "home" }, active: route.name === "home" },
+  // Menu opens the drawer; it also shows as current on the screens it leads to.
+  { id: "menu", label: "Menu", icon: Menu, active: menuOpen.value || ["page", "collection", "collection-404", "product"].includes(String(route.name)) },
   { id: "search", label: "Search", icon: Search, to: { name: "search" }, active: ["search", "catalogue"].includes(String(route.name)) },
   ...(role.value === "guest" ? [] : [{ id: "saved", label: "Saved", icon: Star, to: { name: "favorites" }, active: ["favorites", "my-collections"].includes(String(route.name)) }]),
   { id: "account", label: "Account", icon: CircleUserRound, to: { name: "account" }, badge: pending.value || 0,
@@ -60,15 +64,17 @@ const tabs = computed(() => [
       <component :is="screen" :key="screenKey" />
     </main>
     <nav class="mobile-tabs" aria-label="Main">
-      <router-link v-for="tab in tabs" :key="tab.id" :to="tab.to" class="mobile-tabs__item"
-        :class="{ 'mobile-tabs__item--active': tab.active }" :aria-current="tab.active ? 'page' : undefined">
-        <span class="relative">
-          <component :is="tab.icon" :size="22" aria-hidden="true" />
+      <component :is="tab.to ? 'router-link' : 'button'" v-for="tab in tabs" :key="tab.id" :to="tab.to" :type="tab.to ? undefined : 'button'"
+        :aria-expanded="tab.to ? undefined : menuOpen" class="mobile-tabs__item" @click="tab.to ? undefined : (menuOpen = true)"
+        :class="{ 'mobile-tabs__item--active': tab.active }" :aria-current="tab.to && tab.active ? 'page' : undefined">
+        <span class="mobile-tabs__icon">
+          <component :is="tab.icon" :size="22" :stroke-width="tab.active ? 2.4 : 1.8" aria-hidden="true" />
           <span v-if="tab.badge" class="mobile-tabs__badge">{{ tab.badge > 99 ? "99+" : tab.badge }}<span class="sr-only"> waiting for approval</span></span>
         </span>
         <span>{{ tab.label }}</span>
-      </router-link>
+      </component>
     </nav>
+    <MobileMenuDrawer v-model:open="menuOpen" />
   </div>
 </template>
 
@@ -102,16 +108,36 @@ const tabs = computed(() => [
   min-height: 56px;
   font-size: 11px;
   font-weight: 500;
+  background: none;
+  border: 0;
   color: var(--dv-text-secondary);
   text-decoration: none;
 }
 .mobile-tabs__item--active {
   color: var(--dv-text-primary);
+  font-weight: 700;
+}
+/* The active tab is shown three ways: a filled pill, a heavier icon and bold text. */
+.mobile-tabs__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 30px;
+  border-radius: 15px;
+  transition: background-color 0.15s;
+}
+.mobile-tabs__item--active .mobile-tabs__icon {
+  background: var(--dv-action-primary);
+  color: var(--dv-color-white);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-tabs__icon { transition: none; }
 }
 .mobile-tabs__badge {
   position: absolute;
   top: -6px;
-  right: -12px;
+  right: 2px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;

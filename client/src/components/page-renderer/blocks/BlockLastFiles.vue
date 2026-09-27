@@ -13,7 +13,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import CollectionRenderFiles from "@/components/collection/CollectionRenderFiles.vue"
 import { PAGE_FILES_RENDERER } from "../filesRenderer"
 import { Clock } from "@lucide/vue"
 import BlockPlaceholder from "./BlockPlaceholder.vue"
@@ -21,8 +20,11 @@ import { trpc } from "@/services/server.ts"
 import { usePageFilter } from "@/composables/usePageFilter"
 import { matchesFile } from "@/utils/pageFilter"
 import { useQuery } from "@tanstack/vue-query"
-import { computed, inject } from "vue"
+import { computed, inject, defineAsyncComponent } from "vue"
 import type { Collection } from "../types"
+
+// The desktop grid loads only where it is shown; phones supply their own.
+const CollectionRenderFiles = defineAsyncComponent(() => import("@/components/collection/CollectionRenderFiles.vue"))
 
 const props = defineProps<{ data: any; collection?: Collection; editing?: boolean }>()
 const filesRenderer = inject(PAGE_FILES_RENDERER, CollectionRenderFiles)

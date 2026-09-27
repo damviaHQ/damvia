@@ -13,16 +13,18 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import CollectionRender from "@/components/collection/CollectionRender.vue"
 import { trpc } from "@/services/server.ts"
 import { usePageFilter } from "@/composables/usePageFilter"
 import { matchesCollection } from "@/utils/pageFilter"
 import { useQuery } from "@tanstack/vue-query"
 import { LayoutGrid } from "@lucide/vue"
-import { computed } from "vue"
+import { computed, defineAsyncComponent } from "vue"
 import { RouteLocationRaw } from "vue-router"
 import type { Collection, PageAssets } from "../types"
 import BlockPlaceholder from "./BlockPlaceholder.vue"
+
+// The desktop grid loads only where it is shown; phones supply their own.
+const CollectionRender = defineAsyncComponent(() => import("@/components/collection/CollectionRender.vue"))
 
 const props = defineProps<{
   data: any

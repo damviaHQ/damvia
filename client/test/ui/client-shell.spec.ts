@@ -35,10 +35,10 @@ test('page tools stay outside the hero and scrolling content, with account ancho
   await expect(tools.getByRole('textbox', { name: 'Filter by name' })).toBeVisible()
   await expect(page.locator('main .page-hero')).toBeVisible()
   await expect(page.locator('main').getByRole('button', { name: 'Add filter', exact: true })).toHaveCount(0)
-  const account = page.locator('aside').getByRole('button', { name: 'My account', exact: true })
+  const account = tools.getByRole('button', { name: 'My account', exact: true })
   const before = (await tools.boundingBox())!
   const accountBefore = (await account.boundingBox())!
-  expect(accountBefore.y).toBeGreaterThan(900)
+  expect(accountBefore.y).toBeLessThan(before.y + 72)
   expect((await page.locator('.page-hero').boundingBox())!.y).toBeGreaterThanOrEqual(before.y + before.height)
   await page.locator('main').evaluate(el => { el.scrollTop = 400 })
   await expect.poll(() => page.locator('main').evaluate(el => el.scrollTop)).toBeGreaterThan(0)

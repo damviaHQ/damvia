@@ -68,11 +68,8 @@ const title = z.string().max(120).nullish()
 const fileLayout = z.enum(['grid', 'list', 'masonry']).nullish()
 const masonrySize = z.number().int().min(1).max(4).nullish()
 
-// How tall a picture is allowed to be, in pixels: the author drags the picture
-// itself rather than choosing among fixed words.
-export const MIN_IMAGE_HEIGHT = 80
-export const MAX_IMAGE_HEIGHT = 2400
-export const DEFAULT_IMAGE_HEIGHT = 420
+import { DEFAULT_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT, MIN_IMAGE_HEIGHT } from './limits'
+export { DEFAULT_IMAGE_HEIGHT, MAX_IMAGE_HEIGHT, MIN_IMAGE_HEIGHT }
 
 // Pages written before the handle existed stored one of four words.
 const LEGACY_IMAGE_HEIGHTS: Record<string, number> = {

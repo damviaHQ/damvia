@@ -13,16 +13,19 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { menuIconClasses, menuIconSlotClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "./navigationStyles"
+import { MENU_TOUCH, menuIconClasses, menuIconSlotClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "./navigationStyles"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useIsTruncated } from "@/composables/useIsTruncated"
-import { ChevronDown, ChevronRight } from "@lucide/vue"
-import { computed, ref, watch } from "vue"
+import { ArrowRight, ChevronDown, ChevronRight } from "@lucide/vue"
+import { computed, inject, ref, watch } from "vue"
 
 type Item = { id: string; name: string; children: Item[] }
 const props = defineProps<{ routeName: string; item: Item; openItems: string[] }>()
 const open = ref(props.openItems.includes(props.item.id))
+const touch = inject(MENU_TOUCH, false)
+const touchParent = computed(() => touch && !!props.item.children?.length)
+const isActive = computed(() => props.openItems[props.openItems.length - 1] === props.item.id)
 
 const labelRef = ref<HTMLElement | null>(null)
 const { isTruncated, check } = useIsTruncated()
@@ -89,6 +92,16 @@ function handleLinkClick(event: MouseEvent) {
 <template>
   <div>
     <div class="relative">
+      <div v-if="touchParent" class="flex items-center gap-1">
+      <button type="button" :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${item.name}`"
+        :class="[treeRowClasses, 'min-h-11 flex-1 text-left', isActive && ['layout-link-tree__item--active', treeActiveRowClasses]]" @click="open = !open">
+        <span :class="menuIconSlotClasses"><ChevronDown v-if="open" :class="menuIconClasses" aria-hidden="true" /><ChevronRight v-else :class="menuIconClasses" aria-hidden="true" /></span>
+        <span class="min-w-0 flex-1 truncate">{{ item.name }}</span>
+      </button>
+      <router-link :to="{ name: routeName, params: { id: item.id } }" :aria-label="`Open ${item.name}`"
+        class="grid size-11 shrink-0 place-items-center rounded-md text-neutral-400 hover:bg-neutral-200 hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-ring"><ArrowRight class="size-4" aria-hidden="true" /></router-link>
+    </div>
+    <template v-else>
       <Button v-if="item.children?.length > 0" @click="open = !open" variant="ghost" type="button"
         :aria-expanded="open" :aria-label="`${open ? 'Collapse' : 'Expand'} ${item.name}`"
         class="layout-link-tree__icon-wrapper peer absolute left-px top-2 z-10 flex cursor-pointer border-none size-5 min-h-0 p-0.5 hover:bg-neutral-200 shrink-0">
@@ -110,6 +123,7 @@ function handleLinkClick(event: MouseEvent) {
           {{ item.name }}
         </TooltipContent>
       </Tooltip>
+      </template>
     </div>
     <div v-if="open" class="children-container relative pl-4">
       <span v-if="hasActiveChild" aria-hidden="true" data-tree-connector :class="treeConnectorStartClasses" />

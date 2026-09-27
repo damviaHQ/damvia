@@ -13,7 +13,9 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
+import type { RouterOutput } from '@/services/server'
+import { byPosition } from '@/utils/menuOrder'
 import { useGlobalStore, type SelectionItem } from '@/stores/globalStore'
 
 // What the phone screens need to show a file. Every file list from the API
@@ -62,4 +64,31 @@ export function useMobileSelection() {
     else store.addToSelection(item)
   }
   return { selection: computed(() => store.selection), count, has, toggle, clear: () => store.clearSelection() }
+}
+
+// Where the person is in the menu. The menu is the map everyone knows from the
+// computer version, so every phone screen places itself on it.
+export type MenuNode = RouterOutput['menuItem']['list'][number]
+export type Crumb = { label: string, to?: RouteLocationRaw }
+
+export function menuLabel(item: MenuNode): string {
+  return item.collectionName ?? item.pageName ?? item.data?.label ?? item.data?.text ?? ''
+}
+
+// The entries from the top of the menu down to the first one that matches.
+export function menuPath(items: MenuNode[] | undefined, match: (item: MenuNode) => boolean): MenuNode[] | null {
+  for (const item of byPosition(items)) {
+    if (match(item)) return [item]
+    const below = menuPath(item.children as MenuNode[] | undefined, match)
+    if (below) return [item, ...below]
+  }
+  return null
+}
+
+// The menu parents of an entry, as a trail: collections link to themselves,
+// section headings and other entries are left out.
+export function menuCrumbs(path: MenuNode[]): Crumb[] {
+  return path.slice(0, -1)
+    .filter((item) => item.type === 'collection' && item.hasAccess)
+    .map((item) => ({ label: menuLabel(item), to: { name: 'collection', params: { id: item.collectionId } } }))
 }

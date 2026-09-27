@@ -17,7 +17,7 @@ defineProps<{ text?: boolean }>()
 </script>
 
 <template>
-  <div role="status" aria-live="polite" class="loader__container flex flex-col items-center gap-4 absolute [top:50%] [left:50%] [color:var(--dv-text-secondary)]">
+  <div role="status" aria-live="polite" class="loader__container flex flex-col items-center gap-4 absolute [top:50%] [left:50%] -translate-x-1/2 -translate-y-1/2 [color:var(--dv-text-secondary)]">
     <span class="loader-animation w-10 h-10 border-4 border-dashed rounded-[50%] border-neutral-300 inline-block relative box-border animate-spin"></span>
     <div v-if="text" class="loader-text">Loading</div>
     <span v-else class="sr-only">Loading…</span>

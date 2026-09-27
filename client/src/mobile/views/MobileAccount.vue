@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
-import MobileTopBar from "../components/MobileTopBar.vue"
 
 const store = useGlobalStore()
 const toast = useGlobalToast()
@@ -50,8 +49,8 @@ async function save() {
 </script>
 
 <template>
-  <MobileTopBar title="Account" />
-  <div class="grid gap-6 px-4 pt-4 pb-24">
+  <h1 class="sr-only">Account</h1>
+  <div class="grid gap-6 px-4 pt-[max(16px,env(safe-area-inset-top))] pb-24">
     <section class="grid gap-3" aria-labelledby="profile-heading">
       <h2 id="profile-heading" class="text-sm font-semibold text-[var(--dv-text-secondary)]">Profile</h2>
       <p class="break-all">{{ user?.email }}</p>

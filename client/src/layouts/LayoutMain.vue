@@ -13,25 +13,17 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import MainLinkTree from "@/components/layout-main/MainLinkTree.vue"
-import MainMenuTree from "@/components/layout-main/MainMenuTree.vue"
-import { menuIconClasses, menuIconSlotClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "@/components/layout-main/navigationStyles"
+import MainNavigation from "@/components/layout-main/MainNavigation.vue"
 import SearchPanel from "@/components/search/SearchPanel.vue"
-import { useMyCollections } from "@/composables/useMyCollections"
-import MainAccountMenu from "@/components/layout-main/MainAccountMenu.vue"
 import Logo from "@/components/ClientLogo.vue"
 import MainTopbar from "@/components/layout-main/MainTopbar.vue"
 import { Button } from "@/components/ui/button"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { RouterOutput, trpc } from "@/services/server.ts"
-import { useGlobalStore } from "@/stores/globalStore"
-import { useQuery } from "@tanstack/vue-query"
 import { FocusScope } from "reka-ui"
 import { useMediaQuery } from "@vueuse/core"
-import sortBy from "lodash/sortBy"
-import { ChevronDown, ChevronRight, Plus, Menu, X, Star } from "@lucide/vue"
-import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, provide, ref, watch } from "vue"
-import { useRoute, useRouter } from "vue-router"
+import { Menu, X } from "@lucide/vue"
+import { computed, nextTick, onBeforeUnmount, provide, ref, watch } from "vue"
+import { useRoute } from "vue-router"
 
 provide('client-page-tools', true)
 
@@ -98,7 +90,6 @@ const isSearchRoute = computed(() => route.name === "search")
 // The search panel needs room for counts and long attribute values.
 const SEARCH_SIDEBAR_MIN = 320
 const asideWidth = computed(() => isSearchRoute.value ? Math.max(sidebarWidth.value, SEARCH_SIDEBAR_MIN) : sidebarWidth.value)
-const router = useRouter()
 const mobileNavOpen = ref(false)
 const isMobile = useMediaQuery('(max-width: 767px)')
 watch(mobileNavOpen, async open => {
@@ -108,150 +99,6 @@ watch(mobileNavOpen, async open => {
   else document.getElementById('client-navigation-toggle')?.focus()
 })
 watch(() => route.fullPath, () => { mobileNavOpen.value = false })
-const isDialogCreateCollectionOpen = ref<boolean>(false)
-
-type Collection = RouterOutput["collection"]["tree"][number]
-
-const globalStore = useGlobalStore()
-const { data: collections, myCollections } = useMyCollections()
-const { data: menuItems } = useQuery({
-  queryKey: ["menu-items"],
-  queryFn: () => trpc.menuItem.list.query(),
-})
-
-const publicCollections = computed(() => {
-  return collections.value
-    ?.filter((c: Collection) => c.public || c.ownerId !== globalStore.user?.id)
-    .sort((a: Collection, b: Collection) => a.name.localeCompare(b.name))
-})
-
-const flattenCollections = computed(() => {
-  const items: Collection[] = []
-  const pushItems = (collections: Collection[]) =>
-    collections?.forEach((collection) => {
-      items.push(collection)
-      if (collection.children) {
-        pushItems(collection.children)
-      }
-    })
-  if (collections.value) {
-    pushItems(collections.value)
-  }
-  return items
-})
-
-const openCollections = computed(() => {
-  const ids: string[] = []
-  
-  if (route.name === "collection" && route.params.id) {
-    const currentId = route.params.id as string
-    const findPath = (items: Array<{ id: string; children?: any[] }>, menu = false): string[] | null => {
-      for (const item of items) {
-        const id = menu ? (item as any).collectionId : item.id
-        if (id === currentId) return [currentId]
-        const childPath = findPath(item.children ?? [], menu)
-        if (childPath) return id ? [id, ...childPath] : childPath
-      }
-      return null
-    }
-    const treePath = findPath(collections.value ?? [])
-    const menuPath = findPath(menuItems.value ?? [], true)
-    if (menuPath) return menuPath
-    if (treePath) return treePath
-    const collection = flattenCollections.value.find((item) => item.id === currentId)
-    for (let current = collection; current; current = current.parent) {
-      ids.push(current.id)
-    }
-    return ids.length ? ids.reverse() : [currentId]
-  }
-  
-  if (route.name === "page" && route.params.id) {
-    const pageId = route.params.id as string
-    
-    const owningCollection = flattenCollections.value.find((collection) => 
-      collection.page?.id === pageId
-    )
-    
-    if (owningCollection) {
-      for (let current = owningCollection; current; current = current.parent) {
-        ids.push(current.id)
-      }
-      ids.reverse()
-    } else {
-      const findMenuItemByPageId = (items: any[], pageId: string): any => {
-        for (const item of items) {
-          if (item.pageId === pageId) {
-            return item
-          }
-          if (item.children) {
-            const found = findMenuItemByPageId(item.children, pageId)
-            if (found) return found
-          }
-        }
-        return null
-      }
-      
-      const menuItem = findMenuItemByPageId(menuItems.value || [], pageId)
-      
-      if (menuItem) {
-        if (!menuItem.collectionId && menuItem.parentId) {
-          const findParentCollectionId = (items: any[], parentId: string): string | null => {
-            for (const item of items) {
-              if (item.id === parentId) {
-                return item.collectionId || (item.parentId ? findParentCollectionId(items, item.parentId) : null)
-              }
-              if (item.children) {
-                const found = findParentCollectionId(item.children, parentId)
-                if (found) return found
-              }
-            }
-            return null
-          }
-          
-          const parentCollectionId = findParentCollectionId(menuItems.value || [], menuItem.parentId)
-          
-          if (parentCollectionId) {
-            const collection = flattenCollections.value.find(c => c.id === parentCollectionId)
-            
-            if (collection) {
-              for (let current = collection; current; current = current.parent) {
-                ids.push(current.id)
-              }
-              ids.reverse()
-            }
-          }
-        } else if (menuItem.collectionId) {
-          const collection = flattenCollections.value.find(c => c.id === menuItem.collectionId)
-          
-          if (collection) {
-            for (let current = collection; current; current = current.parent) {
-              ids.push(current.id)
-            }
-            ids.reverse()
-          }
-        }
-      }
-    }
-    
-    ids.push(pageId)
-    return ids
-  }
-  
-  return []
-})
-
-const activeMyCollectionIndex = computed(() =>
-  myCollections.value.findIndex((collection: Collection) => openCollections.value.includes(collection.id))
-)
-const myCollectionsActive = computed(() => activeMyCollectionIndex.value >= 0)
-const isMyCollectionsTabOpen = ref(route.name === "my-collections")
-
-watch([myCollectionsActive, () => route.fullPath], () => {
-  if (myCollectionsActive.value) {
-    isMyCollectionsTabOpen.value = true
-  }
-}, { immediate: true })
-const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/collection/CollectionDialogCreate.vue"))
 </script>
 
 <template>
@@ -266,47 +113,7 @@ const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/c
         <Button class="mx-3 mt-3 justify-start md:hidden" variant="ghost" @click="mobileNavOpen = false"><X class="size-4" />Close navigation</Button>
         <div class="min-h-0 flex-1 overflow-y-auto px-3 py-5">
         <SearchPanel v-if="isSearchRoute" />
-        <nav v-else aria-label="Collections">
-          <div v-if="globalStore.user?.role !== 'guest'" class="mb-4 grid gap-1">
-            <router-link :to="{ name: 'favorites' }" :class="treeRowClasses" :active-class="treeActiveRowClasses">
-              <span :class="menuIconSlotClasses"><Star :class="menuIconClasses" aria-hidden="true" /></span><span class="min-w-0 truncate">Favorites</span>
-            </router-link>
-            <div>
-              <div class="relative flex items-center gap-1">
-                <Button v-if="myCollections.length" type="button" variant="ghost"
-                  :aria-expanded="isMyCollectionsTabOpen" aria-controls="my-collections-tree"
-                  :aria-label="`${isMyCollectionsTabOpen ? 'Collapse' : 'Expand'} My collections`"
-                  class="peer absolute left-px top-2 z-10 size-5 min-h-0 shrink-0 border-none p-0.5 hover:bg-neutral-200"
-                  @click="isMyCollectionsTabOpen = !isMyCollectionsTabOpen">
-                  <ChevronDown v-if="isMyCollectionsTabOpen" :class="menuIconClasses" />
-                  <ChevronRight v-else :class="menuIconClasses" />
-                </Button>
-                <router-link :to="{ name: 'my-collections' }" :class="[treeRowClasses, 'flex-1 peer-hover:bg-neutral-200 peer-hover:text-neutral-900']" :active-class="treeActiveRowClasses"
-                  :aria-expanded="myCollections.length ? isMyCollectionsTabOpen : undefined" :aria-controls="myCollections.length ? 'my-collections-tree' : undefined"
-                  @click.exact="isMyCollectionsTabOpen = !isMyCollectionsTabOpen">
-                  <span :class="menuIconSlotClasses" aria-hidden="true" /><span class="min-w-0 truncate">My collections</span>
-                </router-link>
-                <Button variant="ghost" size="icon" aria-label="Create collection" class="size-7 p-1.5 [&_svg]:size-4" @click="isDialogCreateCollectionOpen = true"><Plus :class="menuIconClasses" /></Button>
-              </div>
-              <div v-if="isMyCollectionsTabOpen && myCollections.length" id="my-collections-tree" class="children-container relative pl-4">
-                <span v-if="myCollectionsActive" aria-hidden="true" data-tree-connector :class="treeConnectorStartClasses" />
-                <div v-for="(collection, index) in myCollections" :key="collection.id" class="relative">
-                  <span v-if="myCollectionsActive && index <= activeMyCollectionIndex" aria-hidden="true" data-tree-connector
-                    class="pointer-events-none absolute -left-[5px] top-0 w-px bg-[#d4d4d4]"
-                    :class="index === activeMyCollectionIndex ? 'h-[18px]' : 'h-full'" />
-                  <span v-if="index === activeMyCollectionIndex" aria-hidden="true" data-tree-connector
-                    class="pointer-events-none absolute -left-[5px] top-[18px] h-px w-[6px] bg-[#d4d4d4]" />
-                  <MainLinkTree :item="collection" :open-items="openCollections" route-name="collection" />
-                </div>
-              </div>
-            </div>
-          </div>
-          <MainLinkTree v-if="globalStore.user?.role === 'guest'" v-for="collection in publicCollections" :key="collection.id" :item="collection" :open-items="openCollections ?? []" route-name="collection" />
-          <MainMenuTree v-else-if="menuItems" v-for="item in sortBy(menuItems, 'position')" :key="item.id" :item="item" :open-items="openCollections ?? []" route-name="collection" />
-        </nav>
-        </div>
-        <div class="flex shrink-0 items-center gap-1 border-t border-neutral-200 p-2">
-          <div class="min-w-0 flex-1"><MainAccountMenu /></div>
+        <MainNavigation v-else />
         </div>
       </aside>
       </FocusScope>
@@ -316,6 +123,5 @@ const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/c
     <!-- Search keeps its top inset inside the opaque sticky toolbar. -->
     <main id="main-content" tabindex="-1" class="client-workspace isolate min-h-0 min-w-0 flex-1 overflow-auto px-5 pb-5 pt-5 focus:outline-none"><slot /></main>
     </div>
-    <CollectionDialogCreate v-model="isDialogCreateCollectionOpen" @created="router.push({ name: 'collection', params: { id: $event.id } })" />
   </div>
 </template>

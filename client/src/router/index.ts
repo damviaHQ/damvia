@@ -15,8 +15,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { isPhoneNow } from "@/composables/useIsPhone"
 import { guardNavigation } from "@/router/guard.ts"
 import { useGlobalStore } from "@/stores/globalStore"
-import { nextTick, type Component } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import { defineAsyncComponent, nextTick, type Component } from 'vue'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 declare module 'vue-router' {
 	interface RouteMeta {
@@ -31,9 +31,22 @@ declare module 'vue-router' {
 	}
 }
 
+// Vue Router downloads a route's component before showing it. On a phone the
+// phone screen replaces the desktop one, so the desktop view is handed over
+// unloaded: it downloads only if that screen is ever shown at desktop width.
+type Loader = () => Promise<unknown>
+const deferOnPhone = (load: Loader): Loader => () => isPhoneNow() ? Promise.resolve(defineAsyncComponent(load as () => Promise<Component>)) : load()
+
+// Sign-in and public pages are the same on every screen and load normally.
+function signedInScreens(routes: RouteRecordRaw[]): RouteRecordRaw[] {
+	return routes.map((route) => 'component' in route && typeof route.component === 'function' && ['main', 'admin', 'editor'].includes(route.meta?.layout ?? '')
+		? { ...route, component: deferOnPhone(route.component as Loader) } as RouteRecordRaw
+		: route)
+}
+
 const router = createRouter({
 	history: createWebHistory(),
-	routes: [
+	routes: signedInScreens([
 		{ name: 'login', path: '/login', component: () => import('@/views/auth/auth-login.vue'), meta: { layout: 'auth', title: 'Sign in' } },
 		{ name: 'sign-up', path: '/sign-up', component: () => import('@/views/auth/auth-sign-up.vue'), meta: { layout: 'auth', title: 'Sign up' } },
 		{ name: 'password-reset', path: '/password-reset', component: () => import('@/views/auth/auth-password-reset.vue'), meta: { layout: 'auth', title: 'Reset password' } },
@@ -48,7 +61,6 @@ const router = createRouter({
 		{ name: 'product', path: '/products/:id', component: () => import('@/views/product.vue'), meta: { layout: 'main', title: 'Product', mobile: () => import('@/mobile/views/MobileProduct.vue') } },
 		{ name: 'search', path: '/search', component: () => import('@/views/search.vue'), meta: { layout: 'main', title: 'Search', mobile: () => import('@/mobile/views/MobileSearch.vue') } },
 		{ name: 'favorites', path: '/favorites', component: () => import('@/views/favorites.vue'), meta: { layout: 'main', title: 'Favorites', mobile: () => import('@/mobile/views/MobileSaved.vue') } },
-		{ name: 'library', path: '/library/:itemId?', component: () => import('@/views/home.vue'), meta: { layout: 'main', title: 'Library', mobileOnly: true, mobile: () => import('@/mobile/views/MobileLibrary.vue') } },
 		{ name: 'account', path: '/account', component: () => import('@/views/home.vue'), meta: { layout: 'main', title: 'Account', mobileOnly: true, mobile: () => import('@/mobile/views/MobileAccount.vue') } },
 		{ name: 'downloads', path: '/downloads', component: () => import('@/views/home.vue'), meta: { layout: 'main', title: 'Downloads', mobileOnly: true, mobile: () => import('@/mobile/views/MobileDownloads.vue') } },
 		{ name: 'admin-user', path: '/admin/users/:id', component: () => import('@/views/admin/admin-users.vue'), meta: { layout: 'admin', title: 'User', roles: ['admin', 'manager'], mobile: () => import('@/mobile/views/MobileUser.vue') } },
@@ -89,7 +101,7 @@ const router = createRouter({
 		{ name: 'privacy-policy', path: '/privacy-policy', component: () => import('@/views/public/public-privacy-policy.vue'), meta: { layout: 'public', title: 'Privacy Policy' } },
 		{ name: 'legal-information', path: '/legal-information', component: () => import('@/views/public/public-legal-information.vue'), meta: { layout: 'public', title: 'Legal Information' } },
 		{ name: 'link-expired', path: '/link-expired', component: () => import('@/views/public/public-link-expired.vue'), meta: { layout: 'public', title: 'Link expired' } },
-	],
+	]),
 })
 
 router.beforeEach(async (to) => {

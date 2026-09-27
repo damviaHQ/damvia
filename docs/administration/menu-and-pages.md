@@ -115,6 +115,6 @@ For current layout and upload limitations, see [Known limitations](../reference/
 
 ## Page tools stay outside the editorial layout
 
-Standalone pages and collection pages place their tools in the fixed workspace header, outside the scrolling blocks. A hero or introduction remains the first editorial content; authors do not place filters in the page editor. Existing action-bar visibility settings still apply. On a standalone page, administrators can open **Page actions** (the gear) to edit the page or manage pages. The account menu is at the bottom of the sidebar.
+Standalone pages and collection pages place their tools in the fixed workspace header, outside the scrolling blocks. A hero or introduction remains the first editorial content; authors do not place filters in the page editor. Existing action-bar visibility settings still apply. On a standalone page, administrators can open **Page actions** (the gear) to edit the page or manage pages. The account menu is the user icon at the top right of the workspace header.
 
 The search field retains its existing DAM search and scope choices; page filters narrow the content rendered on the current page. Moving the controls does not change access permissions or search scope.

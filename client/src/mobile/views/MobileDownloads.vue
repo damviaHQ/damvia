@@ -48,7 +48,7 @@ function contents(download: { fileCount: number, recordCount: number }) {
 </script>
 
 <template>
-  <MobileTopBar title="Downloads" back="/account" />
+  <MobileTopBar title="Downloads" back="/account" :trail="[{ label: 'Account', to: { name: 'account' } }]" />
   <Loader v-if="isLoading" :text="true" />
   <p v-else-if="error" role="alert" class="grid gap-3 px-4 pt-8 text-center">Downloads could not be loaded.<button type="button" class="min-h-11 underline" @click="refetch()">Try again</button></p>
   <section v-else class="grid gap-3 px-4 pt-4 pb-24">

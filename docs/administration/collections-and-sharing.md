@@ -106,7 +106,7 @@ Deleting a collection removes its descendants, links, invitations, menu entries,
 
 ## Use the page tools
 
-The DAM fills the browser window. The sidebar keeps the account menu at its bottom; navigation and the main content scroll independently. Search sits on the left of the fixed tools area above the content. Favorites, filters and display preferences stay directly accessible on a collection, subject to its existing tool visibility settings.
+The DAM fills the browser window. Navigation and the main content scroll independently. Search sits on the left of the fixed tools area above the content, and the account menu (the user icon) sits at its top right. Favorites, filters and display preferences stay directly accessible on a collection, subject to its existing tool visibility settings.
 
 Search uses the same fixed tools area: display preferences and global selection actions at the top, then the local selection beside **Search results**, with file type, sort, format and size filters to its right. Select-all applies to results on the current page and preserves selections elsewhere. Its hover labels match collection pages. Advanced search criteria remain in the sidebar; result counts and the search scope appear above the results. Product search uses the same selection and display controls.
 

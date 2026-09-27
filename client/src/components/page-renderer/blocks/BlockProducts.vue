@@ -14,14 +14,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import Loader from "@/components/Loader.vue"
-import CollectionRenderProducts from "@/components/collection/CollectionRenderProducts.vue"
 import { PackageSearch } from "@lucide/vue"
 import BlockPlaceholder from "./BlockPlaceholder.vue"
 import { trpc } from "@/services/server.ts"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { useQuery } from "@tanstack/vue-query"
-import { computed } from "vue"
+import { computed, defineAsyncComponent } from "vue"
 import type { Collection } from "../types"
+
+// The desktop grid loads only where it is shown; phones supply their own.
+const CollectionRenderProducts = defineAsyncComponent(() => import("@/components/collection/CollectionRenderProducts.vue"))
 
 // The catalogue is paginated server side; a block has no page controls of its
 // own, so it asks for as much as one call allows and points to the full

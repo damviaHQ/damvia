@@ -12,6 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import type { InjectionKey } from 'vue'
 // Match the dashboard's Lucide menu icons. Toolbars use their own action sizes.
 export const menuIconClasses = 'size-4 shrink-0'
 export const menuIconSlotClasses = 'grid size-5 shrink-0 place-items-center'
@@ -22,3 +23,7 @@ export const treeRowClasses = 'cursor-pointer flex h-9 min-w-0 items-center gap-
 
 // Start below the expanded chevron; keep the stem on its centre axis.
 export const treeConnectorStartClasses = 'pointer-events-none absolute left-[11px] -top-[10px] h-[10px] w-px bg-[#d4d4d4]'
+
+// On touch screens a row that holds other entries opens and closes like its
+// chevron, and a separate "Open" button goes to the entry itself.
+export const MENU_TOUCH: InjectionKey<boolean> = Symbol('menu-touch')

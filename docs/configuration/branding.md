@@ -45,6 +45,8 @@ An admin uploads an image under `/admin/settings`. The flow is:
 2. The server downloads it, resizes it to at most 2000 px high with `sharp`, encodes it as WebP at quality 80, stores it as `settings/auth-background.webp`, and deletes the temporary object.
 3. The login, sign-up and password pages ask for `settings.getAuthBackgroundImage`, which returns a presigned GET URL valid 24 hours when the object exists.
 
+On a computer the image fills the right 60% of the sign-in screens. On a phone it becomes a band across the top third, with the form on a rounded sheet below it; the image is cropped to fill that band, so keep the subject near the centre. Without an image, phones show the form alone.
+
 Removing the image from the same screen deletes the object. Because the image is in the main bucket, it survives a rebuild of the assets bucket and must be included in backups. See [Backups](../deployment/backups.md).
 
 ## Brand Logo and favicon

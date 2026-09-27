@@ -60,7 +60,7 @@ async function act(action: "retry" | "measure") {
 </script>
 
 <template>
-  <MobileTopBar title="Library status" back="/account" />
+  <MobileTopBar title="Library status" back="/account" :trail="[{ label: 'Account', to: { name: 'account' } }]" />
   <Loader v-if="isLoading" :text="true" />
   <p v-else-if="error" role="alert" class="grid gap-3 px-4 pt-8 text-center">Status could not be loaded.<button type="button" class="min-h-11 underline" @click="refetch()">Try again</button></p>
   <div v-else-if="data" class="grid gap-6 px-4 pt-4 pb-24">

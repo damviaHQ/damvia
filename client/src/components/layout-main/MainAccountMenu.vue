@@ -42,11 +42,11 @@ const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDi
 <template>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" type="button" class="h-11 w-full justify-start gap-3 px-3" aria-label="My account">
-            <User class="size-5 shrink-0" /><span class="min-w-0 truncate text-body">{{ globalStore.user?.name || "My account" }}</span>
+          <Button variant="ghost" size="icon" type="button" class="size-9" aria-label="My account" :title="globalStore.user?.name || 'My account'">
+            <User class="size-5 shrink-0" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" :collision-padding="16" align="start" class="w-60 p-1 [&_[role=menuitem]]:min-h-9 [&_[role=menuitem]]:gap-2 [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-body [&_[role=menuitem]]:whitespace-nowrap">
+        <DropdownMenuContent :collision-padding="16" align="end" class="w-60 p-1 [&_[role=menuitem]]:min-h-9 [&_[role=menuitem]]:gap-2 [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-body [&_[role=menuitem]]:whitespace-nowrap">
           <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground">My Account</DropdownMenuLabel>
           <DropdownMenuItem class="cursor-pointer" @click="
             showMemberDialog = true

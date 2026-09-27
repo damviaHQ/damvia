@@ -27,7 +27,8 @@ test('a collection opens with the phone navigation, a two-column grid and a prev
   await page.goto('/collections/campaign')
   await expect(page.getByRole('heading', { name: 'Autumn essentials', level: 1 })).toBeVisible()
   const tabs = page.getByRole('navigation', { name: 'Main' })
-  for (const name of ['Home', 'Library', 'Search', 'Saved', 'Account']) await expect(tabs.getByRole('link', { name })).toBeVisible()
+  for (const name of ['Home', 'Search', 'Saved', 'Account']) await expect(tabs.getByRole('link', { name })).toBeVisible()
+  await expect(tabs.getByRole('button', { name: 'Menu' })).toBeVisible()
   expect(await fits(page)).toBe(true)
   await page.getByRole('button', { name: /Campaign — Sand\.jpg/ }).click()
   const preview = page.getByRole('dialog', { name: 'Campaign — Sand.jpg' })
@@ -78,11 +79,79 @@ test('a ready download is one tap from a copied link', async ({ page, context, m
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(ready.url)
 })
 
-test('the library walks the menu one level at a time', async ({ page }) => {
+test('the menu drawer shows the computer sidebar, in its order, and opens where you are', async ({ page, mockTrpc }) => {
+  const entry = (id: string, name: string, position: number, extra = {}) => ({ id, type: 'collection', hasAccess: true, collectionId: id, collectionName: name, position, children: [], ...extra })
   await phone(page)
-  await page.goto('/library')
-  await page.getByRole('link', { name: 'Brand guidelines' }).click()
-  await expect(page).toHaveURL(/\/collections\/collection-1/)
+  await mockTrpc({ 'menuItem.list': [
+    entry('third', 'Third', 2),
+    { id: 'section', type: 'section', hasAccess: true, position: 1, data: { label: 'Campaigns' }, children: [entry('b', 'Second in section', 1), entry('a', 'First in section', 0)] },
+    entry('first', 'First', 0, { children: [entry('y', 'Child two', 1), entry('x', 'Child one', 0)] }),
+  ] })
+  await page.goto('/collections/campaign')
+  const menuTab = page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Menu' })
+  await menuTab.click()
+  const drawer = page.getByRole('dialog', { name: 'Menu' })
+  await expect(drawer).toBeVisible()
+  // 80% of a 390 px screen, flush left once it has slid in.
+  await expect.poll(async () => Math.round((await drawer.boundingBox())!.x)).toBe(0)
+  expect(Math.round((await drawer.boundingBox())!.width)).toBe(312)
+  const nav = drawer.getByRole('navigation', { name: 'Collections' })
+  for (const name of ['Favorites', 'My collections']) await expect(nav.getByRole('link', { name })).toBeVisible()
+  // A row holding other entries is one big toggle; a row without any opens directly.
+  const firstRow = nav.getByRole('button', { name: 'Expand First' })
+  await expect(nav.getByRole('link', { name: /^(First in section|Second in section|Third)$/ })).toHaveText(['First in section', 'Second in section', 'Third'])
+  await expect(nav.getByText('Campaigns')).toBeVisible()
+  const rowBox = (await firstRow.boundingBox())!
+  expect(rowBox.height).toBeGreaterThanOrEqual(44)
+  expect(rowBox.width).toBeGreaterThan(150)
+  await firstRow.click({ position: { x: rowBox.width - 10, y: rowBox.height / 2 } })
+  await expect(page).toHaveURL(/\/collections\/campaign$/)
+  await expect(nav.getByRole('button', { name: 'Collapse First' })).toHaveAttribute('aria-expanded', 'true')
+  await nav.getByRole('button', { name: 'Collapse First' }).click()
+  await expect(nav.getByRole('link', { name: 'Child one' })).toHaveCount(0)
+  await nav.getByRole('button', { name: 'Expand First' }).click()
+  await expect(nav.getByRole('link', { name: /^Child (one|two)$/ })).toHaveText(['Child one', 'Child two'])
+  await nav.getByRole('link', { name: 'Child one' }).click()
+  await expect(page).toHaveURL(/\/collections\/x$/)
+  await expect(drawer).toHaveCount(0)
+  await expect(page.locator('header.mobile-top-bar').getByRole('link', { name: 'First' })).toBeVisible()
+  await menuTab.click()
+  await expect(drawer.locator('.layout-menu-tree__item--active')).toHaveText('Child one')
+  // "Open" goes to the parent collection itself.
+  await drawer.getByRole('link', { name: 'Open First' }).click()
+  await expect(page).toHaveURL(/\/collections\/first$/)
+  await expect(drawer).toHaveCount(0)
+})
+
+test('home shows its collection in place, under the client logo, with nothing to go back to', async ({ page, mockTrpc }) => {
+  await phone(page)
+  const menu = defaults['menuItem.list'] as { id: string }[]
+  await mockTrpc({ 'menuItem.list': menu.map((item, index) => index === 0 ? { ...item, home: true } : item) })
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /Campaign — Sand\.jpg/ })).toBeVisible()
+  await expect(page).toHaveURL(/\/$/)
+  const bar = page.locator('header.mobile-top-bar')
+  await expect(bar.getByRole('img', { name: 'Damvia' })).toBeVisible()
+  await expect(bar.getByRole('button', { name: 'Back' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Autumn essentials', level: 1 })).toBeAttached()
+  await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+  await page.goto('/collections/campaign')
+  await expect(page.locator('header.mobile-top-bar').getByRole('button', { name: 'Back' })).toBeVisible()
+})
+
+test('the loading spinner sits in the middle of the screen', async ({ page, mockTrpc }) => {
+  await phone(page)
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await mockTrpc({ 'collection.findById': async () => { await held; return defaults['collection.findById'] } })
+  await page.goto('/collections/campaign')
+  const spinner = page.getByRole('status').filter({ hasText: 'Loading' })
+  await expect(spinner).toBeVisible()
+  const box = (await spinner.boundingBox())!
+  expect(Math.abs(box.x + box.width / 2 - 195)).toBeLessThanOrEqual(2)
+  expect(Math.abs(box.y + box.height / 2 - 422)).toBeLessThanOrEqual(2)
+  release()
+  await expect(page.getByRole('heading', { name: 'Autumn essentials', level: 1 })).toBeVisible()
 })
 
 test('search opens full-screen filters that apply in one step', async ({ page, mockTrpc }) => {

@@ -25,7 +25,6 @@ import { useMyCollections } from "@/composables/useMyCollections"
 import { trpc } from "@/services/server"
 import type { MobileFile } from "../composables"
 import { usePreviewQuery } from "../composables"
-import MobileTopBar from "../components/MobileTopBar.vue"
 import MobileFileGrid from "../components/MobileFileGrid.vue"
 import MobilePreview from "../components/MobilePreview.vue"
 
@@ -58,8 +57,8 @@ async function create() {
 </script>
 
 <template>
-  <MobileTopBar title="Saved" />
-  <div class="flex border-b border-[var(--dv-color-line)] px-4" role="tablist">
+  <h1 class="sr-only">Saved</h1>
+  <div class="sticky top-0 z-30 flex border-b border-[var(--dv-color-line)] bg-[var(--dv-surface-panel)] px-4 pt-[env(safe-area-inset-top)]" role="tablist" aria-label="Saved">
     <router-link :to="{ name: 'favorites' }" replace role="tab" :aria-selected="tab === 'favorites'" class="min-h-12 flex-1 content-center text-center no-underline text-inherit" :class="tab === 'favorites' && 'border-b-2 border-[var(--dv-text-primary)] font-semibold'">Favorites</router-link>
     <router-link :to="{ name: 'my-collections' }" replace role="tab" :aria-selected="tab === 'collections'" class="min-h-12 flex-1 content-center text-center no-underline text-inherit" :class="tab === 'collections' && 'border-b-2 border-[var(--dv-text-primary)] font-semibold'">My collections</router-link>
   </div>

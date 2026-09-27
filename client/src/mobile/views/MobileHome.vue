@@ -13,26 +13,29 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import { watch } from "vue"
-import { useRouter } from "vue-router"
 import Loader from "@/components/Loader.vue"
 import { useHomeTarget } from "@/composables/useHomeTarget"
 import MobileTopBar from "../components/MobileTopBar.vue"
+import MobileCollection from "./MobileCollection.vue"
+import MobilePage from "./MobilePage.vue"
 
-const router = useRouter()
-const { target } = useHomeTarget()
-watch(target, (next) => { if (next) router.replace(next) }, { immediate: true })
+// Home is the first screen: it shows the tenant's home collection or page
+// itself, so the address stays "/" and there is nothing to go back to.
+const { home } = useHomeTarget()
 </script>
 
 <template>
-  <MobileTopBar logo />
-  <section v-if="target === false" class="grid gap-3 px-4 pt-10 text-center">
-    <h1 class="text-lg font-semibold">Welcome</h1>
-    <p class="text-[var(--dv-text-secondary)]">Browse the library or search for a file.</p>
-    <div class="flex justify-center gap-3">
-      <router-link :to="{ name: 'library' }" class="min-h-11 inline-flex items-center underline">Library</router-link>
-      <router-link :to="{ name: 'search' }" class="min-h-11 inline-flex items-center underline">Search</router-link>
-    </div>
-  </section>
-  <Loader v-else :text="true" />
+  <MobileCollection v-if="home && home.type === 'collection'" :key="home.id" :home-id="home.id" />
+  <MobilePage v-else-if="home && home.type === 'page'" :key="home.id" :home-id="home.id" />
+  <template v-else>
+    <MobileTopBar logo />
+    <section v-if="home === false" class="grid gap-3 px-4 pt-10 text-center">
+      <h1 class="text-lg font-semibold">Welcome</h1>
+      <p class="text-[var(--dv-text-secondary)]">Open the menu below to browse the library, or search for a file.</p>
+      <div class="flex justify-center">
+        <router-link :to="{ name: 'search' }" class="min-h-11 inline-flex items-center underline">Search</router-link>
+      </div>
+    </section>
+    <Loader v-else :text="true" />
+  </template>
 </template>

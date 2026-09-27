@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import MainAccountMenu from "@/components/layout-main/MainAccountMenu.vue"
 import MainFilterRail from "@/components/layout-main/MainFilterRail.vue"
 import MainSearchBar from "@/components/layout-main/MainSearchBar.vue"
 import MainTopbarDownloadNotification from "@/components/layout-main/MainTopbarDownloadNotification.vue"
@@ -68,6 +69,7 @@ const CollectionModalDownloadMulti = defineAsyncComponent(() => import("@/compon
       </div>
         <div id="client-page-actions" class="flex flex-wrap items-center gap-1 empty:hidden" />
         <MainTopbarDownloadNotification />
+        <MainAccountMenu />
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-x-4 px-5">

@@ -86,7 +86,7 @@ function toggleGroup(groupId: string) {
 </script>
 
 <template>
-  <MobileTopBar :title="user?.name ?? 'User'" back="/admin/users" />
+  <MobileTopBar :title="user?.name ?? 'User'" back="/admin/users" :trail="[{ label: 'Account', to: { name: 'account' } }, { label: 'Users', to: { name: 'admin-users' } }]" />
   <Loader v-if="isLoading" :text="true" />
   <p v-else-if="!user" class="px-4 pt-8 text-center text-[var(--dv-text-secondary)]">This person is not in your list.</p>
   <div v-else class="grid gap-6 px-4 pt-4 pb-24">

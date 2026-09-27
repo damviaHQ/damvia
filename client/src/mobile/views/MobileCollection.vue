@@ -25,7 +25,7 @@ import { useRecordLabel } from "@/composables/useRecordLabel"
 import { trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
 import type { MobileFile } from "../composables"
-import { usePreviewQuery, useMobileSelection } from "../composables"
+import { menuCrumbs, menuLabel, menuPath, usePreviewQuery, useMobileSelection, type Crumb, type MenuNode } from "../composables"
 import MobileTopBar from "../components/MobileTopBar.vue"
 import MobileFileGrid from "../components/MobileFileGrid.vue"
 import MobilePreview from "../components/MobilePreview.vue"
@@ -40,7 +40,9 @@ const store = useGlobalStore()
 const { plural } = useRecordLabel()
 const favorites = useCollectionFavorites()
 const selection = useMobileSelection()
-const id = computed(() => route.params.id as string)
+// Home shows its collection or page in place, at "/", under the client logo.
+const props = defineProps<{ homeId?: string }>()
+const id = computed(() => props.homeId ?? (route.params.id as string))
 const selecting = ref(false)
 const sharing = ref(false)
 
@@ -50,6 +52,25 @@ const { data: collection, isLoading, error } = useQuery({
 })
 watch(error, (value) => { if (value) router.replace({ name: "collection-404", params: { id: id.value } }) })
 
+// The trail: the menu path when the collection is in the menu, otherwise its
+// parent collections below the nearest one that is.
+const { data: menu } = useQuery({ enabled: computed(() => store.user?.role !== "guest"), queryKey: ["menu-items"], queryFn: () => trpc.menuItem.list.query() })
+const trail = computed<Crumb[]>(() => {
+  type Parent = { id: string, name: string, parent?: Parent | null }
+  const parents: Parent[] = []
+  for (let parent = (collection.value as { parent?: Parent | null } | undefined)?.parent; parent; parent = parent.parent) parents.unshift(parent)
+  const inMenu = (collectionId: string) => menuPath(menu.value as MenuNode[] | undefined, (item) => item.type === "collection" && item.collectionId === collectionId)
+  const own = inMenu(id.value)
+  if (own) return menuCrumbs(own)
+  for (let index = parents.length - 1; index >= 0; index--) {
+    const anchor = inMenu(parents[index].id)
+    if (anchor) {
+      return [...menuCrumbs(anchor), { label: menuLabel(anchor.at(-1)!), to: { name: "collection", params: { id: parents[index].id } } },
+        ...parents.slice(index + 1).map((parent) => ({ label: parent.name, to: { name: "collection", params: { id: parent.id } } }))]
+    }
+  }
+  return parents.map((parent) => ({ label: parent.name, to: { name: "collection", params: { id: parent.id } } }))
+})
 const files = computed(() => (collection.value?.files ?? []) as MobileFile[])
 const children = computed(() => collection.value?.children ?? [])
 const hasPage = computed(() => !!collection.value?.page?.blocks?.length)
@@ -66,7 +87,7 @@ function stopSelecting() {
 </script>
 
 <template>
-  <MobileTopBar :title="collection?.name ?? 'Collection'" :back="true">
+  <MobileTopBar :title="collection?.name ?? 'Collection'" :back="!homeId" :logo="!!homeId" :trail="homeId ? undefined : trail">
     <button v-if="collection && !isGuest" type="button" class="grid size-11 place-items-center" :aria-label="favorite ? 'Remove from favorites' : 'Add to favorites'" :aria-pressed="favorite" @click="favorites.toggle(collection as any)">
       <Star :size="20" aria-hidden="true" :fill="favorite ? 'currentColor' : 'none'" />
     </button>
@@ -82,9 +103,8 @@ function stopSelecting() {
     </div>
 
     <template v-else>
-      <section v-if="children.length" aria-labelledby="collections-heading">
-        <h2 id="collections-heading" class="px-4 pb-2 text-sm font-semibold text-[var(--dv-text-secondary)]">Collections</h2>
-        <router-link v-for="child in children" :key="child.id" :to="{ name: 'collection', params: { id: child.id }, query: route.query.from ? { from: route.query.from } : {} }"
+      <section v-if="children.length" aria-label="Collections">
+        <router-link v-for="child in children" :key="child.id" :to="{ name: 'collection', params: { id: child.id }}"
           class="flex min-h-[52px] items-center gap-3 border-b border-[var(--dv-color-line)] px-4 no-underline text-inherit">
           <Folder :size="20" aria-hidden="true" /><span class="flex-1 truncate">{{ child.name }}</span><ChevronRight :size="18" aria-hidden="true" />
         </router-link>
