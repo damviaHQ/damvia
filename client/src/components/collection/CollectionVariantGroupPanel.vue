@@ -67,6 +67,7 @@ const forceOverride = computed(() => group.value?.overrides.find((override) => o
 async function refresh() {
   await queryClient.invalidateQueries({ queryKey: ["variant-group"] })
   await queryClient.invalidateQueries({ queryKey: ["search"] })
+  await queryClient.invalidateQueries({ queryKey: ["collection"] })
 }
 async function act(run: () => Promise<unknown>, message: string) {
   try {

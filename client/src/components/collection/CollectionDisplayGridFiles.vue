@@ -14,21 +14,22 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { DEFAULT_MASONRY_SIZE, fileDisplayGroup, MASONRY_SIZES } from '@/utils/displayPreferences'
-import { gridClasses, gridCardClasses, gridPreviewClasses, masonryCardClasses, masonryColumns, masonryGridStyle, masonryPreviewClasses, masonryTile, thumbnailFavoriteButtonClasses } from './gridStyles'
+import { MASONRY_GAP, MASONRY_ROW, gridClasses, gridCardClasses, gridPreviewClasses, masonryCardClasses, masonryColumns, masonryGridStyle, masonryPreviewClasses, masonryTile, thumbnailFavoriteButtonClasses } from './gridStyles'
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import CollectionPathTooltip from "@/components/collection/CollectionPathTooltip.vue"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import CollectionModalGallery from "@/components/collection/CollectionModalDownloadUnique.vue"
-import CollectionVariantGroupPanel from "@/components/collection/CollectionVariantGroupPanel.vue"
+import CollectionVariantBand from "@/components/collection/CollectionVariantBand.vue"
 import { useFileFavorites } from "@/composables/useFileFavorites"
 import { useGlobalToast } from "@/composables/useGlobalToast.ts"
+import { useVariantGroups } from "@/composables/useVariantGroups"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { getFileExtension } from "@/utils/fileExtention"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQueryClient } from "@tanstack/vue-query"
 import { Star, StarOff, Trash2 } from "@lucide/vue"
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
 
@@ -43,11 +44,13 @@ const props = defineProps<{
   // A page block can ask for masonry instead, at a size its author chose.
   masonry?: boolean
   masonrySize?: number | null
+  // Every file of the listing before variants were folded, so a variant on
+  // screen keeps its own entry.
+  allFiles?: File[]
 }>()
 const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
 const currentCollectionFileId = ref<string | null>(null)
-const openGroupId = ref<string | null>(null)
 const {
   canFavorite: haveAccessToFavorites,
   isFavorite,
@@ -60,6 +63,9 @@ const removable = computed(
   () => props.collection?.canEdit && !props.collection.synchronized
 )
 const files = computed(() => props.files ?? props.collection?.files)
+const variants = useVariantGroups(computed(() => files.value ?? []), computed(() => props.allFiles))
+const { openGroupId } = variants
+const openCard = computed(() => (files.value as File[] | undefined)?.find(file => variants.grouped(file) && file.variantGroup!.id === openGroupId.value))
 
 const displayGroupId = computed(() => fileDisplayGroup(files.value ?? []).id)
 const isMasonry = computed(() => props.masonry || (!props.uniform && globalStore.displayPreferences[displayGroupId.value] === 'masonry'))
@@ -123,6 +129,53 @@ function handleSelection(file: File) {
   globalStore.addToSelection({ id: file.id, type: "file" })
 }
 
+// The band opens under the whole row of its card, never in the middle of it.
+const bandAfter = ref(-1)
+function placeBand() {
+  const list: File[] = files.value ?? []
+  const index = list.findIndex(file => variants.grouped(file) && file.variantGroup!.id === openGroupId.value)
+  if (index < 0) {
+    bandAfter.value = -1
+    return
+  }
+  if (isMasonry.value) {
+    const count = columns.value.count || 1
+    bandAfter.value = Math.min(list.length - 1, Math.floor(index / count) * count + count - 1)
+    return
+  }
+  const cards = [...(container.value?.querySelectorAll<HTMLElement>(':scope > article') ?? [])]
+  const top = cards[index]?.offsetTop
+  let last = index
+  while (last + 1 < cards.length && cards[last + 1].offsetTop === top) last++
+  bandAfter.value = last
+}
+watch([openGroupId, containerWidth, isMasonry, () => files.value?.length], () => nextTick(placeBand))
+
+// In masonry the band spans as many of the small rows as its height needs.
+const bandHeight = ref(0)
+let bandObserver: ResizeObserver | undefined
+function observeBand(element: unknown) {
+  bandObserver?.disconnect()
+  if (!(element instanceof HTMLElement)) return
+  bandObserver = new ResizeObserver(([entry]) => { bandHeight.value = entry.contentRect.height })
+  bandObserver.observe(element)
+}
+onBeforeUnmount(() => bandObserver?.disconnect())
+const bandStyle = computed(() => isMasonry.value
+  ? { gridColumn: '1 / -1', gridRowEnd: `span ${Math.max(1, Math.ceil((bandHeight.value + MASONRY_GAP) / MASONRY_ROW))}`, paddingBottom: `${MASONRY_GAP}px` }
+  : undefined)
+
+function openPreview(file: File) {
+  variants.preview(file)
+  currentCollectionFileId.value = file.id
+}
+
+function variantLabel(file: File) {
+  const count = variants.selectedCount(file)
+  const total = variants.members(file).length > 1 ? variants.members(file).length : file.variantGroup!.memberCount
+  return count && count < total ? `${count} of ${total} selected` : `${file.variantGroup!.memberCount} variants`
+}
+
 async function remove(file: File) {
   if (!removable.value) {
     return
@@ -145,16 +198,18 @@ async function remove(file: File) {
 
 <template>
   <div ref="container" :class="isMasonry ? 'p-0.5' : gridClasses" :style="gridStyle">
-    <article v-for="file in files" :key="file.id" :class="isMasonry ? masonryCardClasses : gridCardClasses"
+    <template v-for="(file, index) in files" :key="file.id">
+    <article :class="isMasonry ? masonryCardClasses : gridCardClasses"
       :style="tileStyle(file)">
-      <div :class="[isMasonry ? masonryPreviewClasses : gridPreviewClasses, isFileSelected(file) && 'outline-2 outline-neutral-500', globalStore.groupVariants && file.variantGroup && 'variant-stack']">
+      <div :class="[isMasonry ? masonryPreviewClasses : gridPreviewClasses, (variants.grouped(file) ? variants.groupState(file) : isFileSelected(file)) && 'outline-2 outline-neutral-500', variants.grouped(file) && 'variant-stack']">
         <CollectionPathTooltip :path="getPath?.(file)">
-          <button type="button" class="absolute inset-0 flex size-full items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-800" :class="!isMasonry && 'p-2'" :aria-label="`Preview ${file.name}`" @click="currentCollectionFileId = file.id">
+          <button type="button" class="absolute inset-0 flex size-full items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-neutral-800" :class="!isMasonry && 'p-2'" :aria-label="`Preview ${file.name}`" @click="openPreview(file)">
             <img v-if="file.thumbnailURL" :src="file.thumbnailURL" :alt="file.name" loading="lazy" decoding="async" class="size-full" :class="isMasonry ? 'object-cover' : 'object-contain'" @load="measure(file, $event)" />
             <thumbnailPlaceholder v-else class="h-20 w-auto! fill-neutral-400" aria-hidden="true" />
           </button>
         </CollectionPathTooltip>
-        <CollectionCheckbox :label="`Select ${file.name}`" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="isFileSelected(file) ? 'opacity-100' : 'opacity-0'" :state="isFileSelected(file) ? 'check' : false" @click="handleSelection(file)" />
+        <CollectionCheckbox v-if="variants.grouped(file)" :label="`Select all ${file.variantGroup!.memberCount} variants of ${file.variantGroup!.displayName}`" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="variants.groupState(file) ? 'opacity-100' : 'opacity-0'" :state="variants.groupState(file)" @click="variants.toggleGroup(file)" />
+        <CollectionCheckbox v-else :label="`Select ${file.name}`" class="absolute left-3 top-3 z-10 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="isFileSelected(file) ? 'opacity-100' : 'opacity-0'" :state="isFileSelected(file) ? 'check' : false" @click="handleSelection(file)" />
         <div class="absolute right-[0.9rem] top-4 z-10 flex gap-2">
           <button v-if="removable" type="button" :aria-label="`Remove ${file.name}`" class="grid size-6 place-items-center bg-transparent text-neutral-600 opacity-0 hover:text-red-700 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" @click="remove(file)"><Trash2 class="size-6" /></button>
           <button v-if="haveAccessToFavorites" type="button" :disabled="isSavingFavorite(file.id) || !favoritesReady" :aria-label="`${isFavorite(file) ? 'Remove from' : 'Add to'} favorites: ${file.name}`" :aria-pressed="isFavorite(file)" class="group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="[thumbnailFavoriteButtonClasses, isFavorite(file) ? 'opacity-100' : 'opacity-0']" @click="toggleFavorite(file)"><span class="relative block size-6">
@@ -162,7 +217,7 @@ async function remove(file: File) {
             <StarOff v-if="isFavorite(file)" aria-hidden="true" class="absolute inset-0 size-6 stroke-[2] fill-none text-neutral-500 opacity-0 group-hover/favorite:opacity-100 group-focus-visible/favorite:opacity-100" />
           </span></button>
         </div>
-        <button v-if="globalStore.groupVariants && file.variantGroup" type="button" class="absolute bottom-3 left-3 z-10 rounded-full bg-neutral-900/80 px-2.5 py-1 text-xs font-medium text-white hover:bg-neutral-900" :aria-label="`Show the ${file.variantGroup.memberCount} variants of ${file.variantGroup.displayName}`" @click="openGroupId = file.variantGroup.id">{{ file.variantGroup.memberCount }} variants</button>
+        <button v-if="variants.grouped(file)" type="button" class="absolute bottom-3 left-3 z-10 rounded-full bg-neutral-900/80 px-2.5 py-1 text-xs font-medium text-white hover:bg-neutral-900" :aria-label="`Show the ${file.variantGroup!.memberCount} variants of ${file.variantGroup!.displayName}`" :aria-expanded="openGroupId === file.variantGroup!.id" @click="variants.toggleBand(file)">{{ variantLabel(file) }}</button>
         <!-- Masonry drops the caption under the tile, so the details live over
              the image; pointer-events stay off to keep the whole tile clickable. -->
         <div v-if="isMasonry" class="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/75 to-transparent p-3 pt-8 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 group-has-[:focus-visible]:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
@@ -171,14 +226,17 @@ async function remove(file: File) {
         </div>
       </div>
       <CollectionPathTooltip v-if="!isMasonry" :path="getPath?.(file)">
-        <button type="button" class="mt-2.5 block w-full truncate text-left text-sm font-normal text-neutral-800 hover:text-neutral-950" :title="getPath?.(file) ? undefined : file.name" @click="currentCollectionFileId = file.id">{{ file.name }}</button>
+        <button type="button" class="mt-2.5 block w-full truncate text-left text-sm font-normal text-neutral-800 hover:text-neutral-950" :title="getPath?.(file) ? undefined : file.name" @click="openPreview(file)">{{ file.name }}</button>
       </CollectionPathTooltip>
       <p v-if="!isMasonry" class="mt-1 text-xs text-neutral-500"><span class="uppercase">{{ getFileExtension(file.name) }}</span><span class="mx-1.5 text-neutral-300">·</span>{{ formatFileSize(file.size) }}</p>
     </article>
+    <div v-if="index === bandAfter && openCard && variants.groups[openGroupId!]" :ref="observeBand" class="basis-full self-start" :style="bandStyle">
+      <CollectionVariantBand :group="variants.groups[openGroupId!]" :members="variants.members(openCard!)" @close="openGroupId = null" />
+    </div>
+    </template>
     <p v-if="!files?.length && placeholder" class="col-span-full py-12 text-center text-sm text-neutral-500">{{ placeholder }}</p>
   </div>
-  <CollectionModalGallery v-model="currentCollectionFileId" :collection="collection" :files="$props.files" />
-  <CollectionVariantGroupPanel v-model="openGroupId" />
+  <CollectionModalGallery v-model="currentCollectionFileId" :collection="collection" :files="$props.files ? variants.previewFiles.value : undefined" />
 </template>
 
 <style scoped>

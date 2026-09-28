@@ -25,7 +25,7 @@ export const thumbnailFavoriteButtonClasses = 'group/favorite grid size-6 shrink
 export const MASONRY_GAP = 8
 // Rows are a fine unit so a tile spans close to its exact height; whatever is
 // left inside the span is the vertical gap.
-const MASONRY_ROW = 4
+export const MASONRY_ROW = 4
 // Wide enough that a real picture always keeps its own shape and is never
 // cropped; the bounds only catch a pathological banner or column.
 const MASONRY_MIN_RATIO = 0.15

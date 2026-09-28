@@ -19,7 +19,8 @@ import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import TableSortHeader from "@/components/TableSortHeader.vue"
 import CollectionModalGallery from "@/components/collection/CollectionModalDownloadUnique.vue"
-import CollectionVariantGroupPanel from "@/components/collection/CollectionVariantGroupPanel.vue"
+import CollectionVariantBand from "@/components/collection/CollectionVariantBand.vue"
+import { useVariantGroups } from "@/composables/useVariantGroups"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -59,12 +60,13 @@ const props = defineProps<{
   files?: File[]
   collection?: RouterOutput["collection"]["findById"]
   placeholder?: string | null
+  // Every file of the listing before variants were folded.
+  allFiles?: File[]
 }>()
 const toast = useGlobalToast()
 const globalStore = useGlobalStore()
 const queryClient = useQueryClient()
 const currentCollectionFileId = ref<string | null>(null)
-const openGroupId = ref<string | null>(null)
 const hoveredRowId = ref<string | null>(null)
 const copiedCellId = ref<string | null>(null)
 
@@ -80,8 +82,17 @@ const removable = computed(
   () => props.collection?.canEdit && !props.collection.synchronized
 )
 const files = computed(() => props.files ?? props.collection?.files ?? [])
+const variants = useVariantGroups(computed(() => files.value as File[]), computed(() => props.allFiles))
+const { openGroupId } = variants
+// Selecting the whole list takes the variants folded under each row too.
+const everyFile = computed<File[]>(() => props.allFiles ?? files.value)
+function variantLabel(file: File) {
+  const count = variants.selectedCount(file)
+  const total = variants.members(file).length > 1 ? variants.members(file).length : file.variantGroup!.memberCount
+  return count && count < total ? `${count} of ${total} selected` : `${file.variantGroup!.memberCount} variants`
+}
 const selection = computed(() =>
-  files.value.filter((file: File) =>
+  everyFile.value.filter((file: File) =>
     globalStore.selection.some((item) => item.type === "file" && item.id === file.id)
   )
 )
@@ -93,16 +104,16 @@ function isFileSelected(file: File) {
 }
 
 function toggleGlobalSelection() {
-  if (selection.value.length === files.value.length) {
+  if (selection.value.length === everyFile.value.length) {
     globalStore.selection
       .filter((item) =>
-        files.value.find((file: File) => file.id === item.id && item.type === "file")
+        everyFile.value.find((file: File) => file.id === item.id && item.type === "file")
       )
       .forEach((item) => globalStore.removeFromSelection(item))
     return
   }
 
-  files.value
+  everyFile.value
     .filter(
       (file: File) =>
         !globalStore.selection.find((item) => file.id === item.id && item.type === "file")
@@ -269,7 +280,7 @@ const table = useTable<typeof features, File>({
             class="text-neutral-600"
             :aria-sort="header.column.getIsSorted() === 'asc' ? 'ascending' : header.column.getIsSorted() === 'desc' ? 'descending' : undefined">
             <div v-if="header.column.id === 'name'" class="flex items-center gap-4">
-              <CollectionCheckbox v-if="files.length > 0" label="Select all" @click="toggleGlobalSelection()" :state="selection.length === files.length
+              <CollectionCheckbox v-if="files.length > 0" label="Select all" @click="toggleGlobalSelection()" :state="selection.length === everyFile.length
                 ? 'check'
                 : selection.length > 0
                   ? 'undetermined'
@@ -285,11 +296,16 @@ const table = useTable<typeof features, File>({
         </tr>
       </thead>
       <tbody>
-        <tr v-if="table.getRowModel().rows.length" v-for="row in table.getRowModel().rows" :key="row.id"
-          @mouseenter="hoveredRowId = row.id" @mouseleave="hoveredRowId = null" class="group">
+        <template v-if="table.getRowModel().rows.length" v-for="row in table.getRowModel().rows" :key="row.id">
+        <tr @mouseenter="hoveredRowId = row.id" @mouseleave="hoveredRowId = null" class="group">
           <td v-for="cell in row.getVisibleCells()" :key="cell.id" class="text-body">
             <div v-if="cell.column.id === 'name'" class="flex flex-row items-center gap-4">
-              <CollectionCheckbox :label="`Select ${cell.row.original.name}`" @click="handleSelection(cell.row.original)" :class="[
+              <CollectionCheckbox v-if="variants.grouped(cell.row.original)" :label="`Select all ${cell.row.original.variantGroup!.memberCount} variants of ${cell.row.original.variantGroup!.displayName}`" @click="variants.toggleGroup(cell.row.original)" :class="[
+                'collection-list-files__file-selection',
+                variants.groupState(cell.row.original) &&
+                'collection-list-files__file-selection--selected',
+              ]" :state="variants.groupState(cell.row.original)" />
+              <CollectionCheckbox v-else :label="`Select ${cell.row.original.name}`" @click="handleSelection(cell.row.original)" :class="[
                 'collection-list-files__file-selection',
                 isFileSelected(cell.row.original) &&
                 'collection-list-files__file-selection--selected',
@@ -297,7 +313,7 @@ const table = useTable<typeof features, File>({
 
               <div class="collection-list__file-wrapper flex items-center gap-4">
                 <button type="button" :aria-label="`Preview ${cell.row.original.name}`" class="flex shrink-0 cursor-pointer"
-                  @click="currentCollectionFileId = row.original.id">
+                  @click="variants.preview(row.original); currentCollectionFileId = row.original.id">
                   <img v-if="cell.row.original.thumbnailURL" v-lazy="cell.row.original.thumbnailURL"
                     :src="cell.row.original.thumbnailURL" alt=""
                     class="w-20 min-w-20 h-12 object-contain bg-neutral-100" />
@@ -317,7 +333,7 @@ const table = useTable<typeof features, File>({
                         >
                           {{ cell.row.original.name }}
                         </button>
-                        <button v-if="globalStore.groupVariants && cell.row.original.variantGroup" type="button" class="ml-2 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-800 hover:bg-neutral-300" :aria-label="`Show the ${cell.row.original.variantGroup.memberCount} variants of ${cell.row.original.variantGroup.displayName}`" @click.stop="openGroupId = cell.row.original.variantGroup.id">{{ cell.row.original.variantGroup.memberCount }} variants</button>
+                        <button v-if="variants.grouped(cell.row.original)" type="button" class="ml-2 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-800 hover:bg-neutral-300" :aria-label="`Show the ${cell.row.original.variantGroup!.memberCount} variants of ${cell.row.original.variantGroup!.displayName}`" :aria-expanded="openGroupId === cell.row.original.variantGroup!.id" @click.stop="variants.toggleBand(cell.row.original)">{{ variantLabel(cell.row.original) }}</button>
                         <div v-if="copiedCellId === `${cell.row.id}-filename`"
                              class="absolute -top-8 left-0 text-xs text-neutral-500 bg-white px-2 py-1 rounded shadow-xs border border-neutral-200 z-20 copied-indicator animate-in fade-in-0 duration-150">
                           copied
@@ -386,6 +402,12 @@ const table = useTable<typeof features, File>({
             </TooltipProvider>
           </td>
         </tr>
+        <tr v-if="variants.grouped(row.original) && openGroupId === row.original.variantGroup!.id && variants.groups[openGroupId!]" class="variant-band-row">
+          <td :colspan="row.getVisibleCells().length" class="py-3">
+            <CollectionVariantBand :group="variants.groups[openGroupId!]" :members="variants.members(row.original)" @close="openGroupId = null" />
+          </td>
+        </tr>
+        </template>
         <tr v-else>
           <td :colspan="table.getHeaderGroups()[0].headers.length">
             {{ placeholder }}
@@ -395,6 +417,5 @@ const table = useTable<typeof features, File>({
     </table>
     <span class="sr-only" role="status" aria-live="polite">{{ copiedCellId ? 'Copied to clipboard' : '' }}</span>
   </div>
-  <CollectionModalGallery v-model="currentCollectionFileId" :collection="collection" :files="$props.files" />
-  <CollectionVariantGroupPanel v-model="openGroupId" />
+  <CollectionModalGallery v-model="currentCollectionFileId" :collection="collection" :files="$props.files ? variants.previewFiles.value : undefined" />
 </template>

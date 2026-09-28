@@ -155,7 +155,7 @@ Hiding a tool changes what the page shows, not what people can reach. A hidden *
 
 ## Variants show as one card
 
-When an asset type groups its variants, search shows the formats, languages and durations of one creative as a single stacked card that opens on every version, with **Download all**, in search, collections and pages alike. Each reader can switch off **Group variants** in **Display preferences** to list every file. See [Variants](./variants.md).
+When an asset type groups its variants, search shows the formats, languages and durations of one creative as a single stacked card, in search, collections and pages alike. Ticking the card selects every version; its **n variants** label opens them in a band under the row, where they are picked one by one. Each reader can switch off **Group variants** in **Display preferences** to list every file. See [Variants](./variants.md).
 
 ## Known operational limits
 

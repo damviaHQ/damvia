@@ -72,8 +72,8 @@ const fileDisplayPreference = computed<DisplayView>(() => {
 <template>
   <template v-if="!hiddenByFilter">
     <CollectionDisplayListFiles v-if="fileDisplayPreference === 'list'" :collection="collection" :files="visibleFiles"
-      :placeholder="placeholder" />
-    <CollectionDisplayGridFiles v-else :collection="collection" :files="visibleFiles" :placeholder="placeholder"
+      :all-files="rawFiles" :placeholder="placeholder" />
+    <CollectionDisplayGridFiles v-else :collection="collection" :files="visibleFiles" :all-files="rawFiles" :placeholder="placeholder"
       :get-path="getPath" :uniform="forceView === 'grid'" :masonry="forceView === 'masonry'"
       :masonry-size="forceMasonrySize ?? null" />
   </template>

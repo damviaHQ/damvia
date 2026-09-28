@@ -197,6 +197,8 @@ export async function formatCollectionFile({ file, recordAttributes, metadata, v
 
 	return {
 		id: file.id,
+		// The same file listed from two collections is one variant of its group.
+		assetFileId: file.assetFile.id,
 		name: file.assetFile.name,
 		mimeType: file.assetFile.mimeType,
 		assetTypeId: file.assetFile.assetTypeId,

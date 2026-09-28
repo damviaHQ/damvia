@@ -33,7 +33,17 @@ An axis is shared by every group whose values it already holds, so naming it onc
 
 ## What readers see
 
-Every file listing (search, collections, page blocks, favourites and product pages) shows one card per group, with its cover, a stacked outline and a **n variants** button. The card stands where the first member of the group would have been; a page filter is applied first, so a group stays on screen when only one of its variants matches. The button opens the group: each member with its preview, its value on each axis, its type, its status and a download link, and **Download all**, which opens the usual download dialog with the group as the selection. Members a reader cannot see, because of a collection, group or licence rule, are neither listed, counted nor downloaded.
+Every file listing (search, collections, page blocks, favourites and product pages) shows one card per group, with its cover, a stacked outline and a **n variants** label. The card stands where the first member of the group would have been; a page filter is applied first, so a group stays on screen when only one of its variants matches. Members a reader cannot see, because of a collection, group or licence rule, are neither listed, counted nor downloaded.
+
+A card stands for its whole group:
+
+| On the card | What happens |
+|---|---|
+| The picture or the name | Opens the preview on the cover. **Next** goes through the other variants of the group, then on to the next card. |
+| The checkbox | Selects every variant of the group, and a second click takes them all back. When only some variants are selected, the box shows a dash and the label reads **2 of 5 selected**; clicking the box selects the rest. |
+| The **n variants** label | Opens the group in a band under the card's row, one shade darker, across the whole width. It shows every variant with its values on each axis (`FR`, `9x16`…), a checkbox each, **Select all**, **Download all** (the usual download dialog with the group as the selection) and, for admins, **Edit group**. A preview opened from the band stays among the variants. The label again, the close button or `Esc` closes it. |
+
+In the list view the label opens the same band as a row under the file.
 
 Readers who prefer every file on its own switch off **Group variants** in **Display preferences**. The switch appears only where the listing holds a group, applies to every listing including search on the phone, and is saved in the browser. It is on by default.
 
