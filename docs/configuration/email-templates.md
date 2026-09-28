@@ -3,7 +3,7 @@ title: Email templates
 description: The ten emails Damvia sends, when each goes out, the variables it can use, and how its wording is rendered safely.
 sidebar:
   order: 4
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-28
 ---
 
 Every email Damvia sends uses one branded layout, carrying the client logo and accent colour, and has wording admins edit under **Admin → Emails**. This page is the reference for the templates themselves: when each is sent, to whom, and what it can say. The editing workflow is in [Emails](../administration/emails.md).
@@ -27,7 +27,7 @@ Each template has a subject, a preview text (the grey line most inboxes show aft
 
 | Key | Sent when | Recipients | Variables |
 |---|---|---|---|
-| `email-verification` | A user signs up, asks to resend the verification, or an admin changes their address | The user | `url`: `APP_URL/?verificationCode=...` |
+| `email-verification` | A user signs up, asks to resend the verification, corrects their unverified address, or an admin changes their address | The user | `url`: `APP_URL/?verificationCode=...` |
 | `login` | Sign-in without password, or with the magic-link option. Only to an existing account that is not suspended | The user | `url`: `APP_URL/login?link=...`, single use, valid 15 minutes |
 | `reset-password` | "Forgot password", or an admin or manager sends a reset. Not to a suspended account | The user | `url`: `APP_URL/password-update?email=...&token=...`, valid one hour. The token is created when the email is sent; a newer request replaces it |
 | `request-approval` | A user verifies their email while still unapproved | Every admin, plus the managers of the user's region, in one message; only approved, verified, non-suspended accounts | `requester.name`, `requester.email`, `requester.company`; `url`: `APP_URL/admin/users/{id}` |

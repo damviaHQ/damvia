@@ -79,6 +79,7 @@ const save = () => run("save", () => trpc.user.update.mutate({
 const suspend = () => run("suspend", () => trpc.user.suspend.mutate(id.value), "Access suspended").then(() => { confirmSuspend.value = false })
 const resume = () => run("resume", () => trpc.user.resume.mutate(id.value), "Access restored")
 const resend = () => run("resend", () => trpc.user.resendVerificationEmailFor.mutate(id.value), "Verification email sent")
+const markVerified = () => run("markVerified", () => trpc.user.markEmailVerifiedFor.mutate(id.value), "Email marked as verified")
 const reset = () => run("reset", () => trpc.user.sendPasswordResetFor.mutate(id.value), "Password reset email sent")
 function toggleGroup(groupId: string) {
   groupIds.value = groupIds.value.includes(groupId) ? groupIds.value.filter((current) => current !== groupId) : [...groupIds.value, groupId]
@@ -132,6 +133,7 @@ function toggleGroup(groupId: string) {
     <section v-if="editable && !self" class="grid gap-2" aria-labelledby="help-heading">
       <h2 id="help-heading" class="text-sm font-semibold text-[var(--dv-text-secondary)]">Help them sign in</h2>
       <Button v-if="userState(user) === 'unverified'" type="button" variant="outline" class="min-h-12" :disabled="!!busy" @click="resend">Resend verification email</Button>
+      <Button v-if="userState(user) === 'unverified'" type="button" variant="outline" class="min-h-12" :disabled="!!busy" @click="markVerified">Mark email as verified</Button>
       <Button type="button" variant="outline" class="min-h-12" :disabled="!!busy" @click="reset">Send password reset email</Button>
     </section>
 

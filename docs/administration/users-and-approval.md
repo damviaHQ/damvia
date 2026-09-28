@@ -3,7 +3,7 @@ title: Users and approval
 description: Approve accounts, assign roles, groups and regions, and remove access without confusing verification with approval.
 sidebar:
   order: 3
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-28
 ---
 
 An account normally needs two independent conditions before it can use the library: its email must be verified and the account must be approved. Roles then decide what the person can administer; regions, groups, collection rules and file licences decide what content they can see.
@@ -18,7 +18,7 @@ The first account cannot approve itself. Promote it through the database as desc
 
 ## Approve a user
 
-Open `/admin/users`. A verified, unapproved account shows an **Approve** action. Approval enables normal access and sends the user-approved email, which carries a single-use sign-in link valid 7 days. An account that has not verified its email address cannot be approved; ask the user to follow the verification email, or resend it with `user.resendVerificationEmailFor`.
+Open `/admin/users`. A verified, unapproved account shows an **Approve** action. Approval enables normal access and sends the user-approved email, which carries a single-use sign-in link valid 7 days. An account that has not verified its email address cannot be approved; ask the user to follow the verification email, resend it with `user.resendVerificationEmailFor`, or, when the email never arrives (spam filtering, a blocked sender), use **Mark email as verified** once you know the address belongs to the person.
 
 Managers see and change users only in their own region. They may approve members and guests, edit their name/company/groups, and remove eligible accounts. They cannot grant `admin` or `manager`, change anyone's region (their own included), change another user's email address, or change/remove another manager or admin.
 
@@ -72,6 +72,7 @@ Open a user from the Users screen (`/admin/users/{id}`). The **Account access** 
 | Sign out everywhere | `user.revokeSessions` | Ends every session of the account. |
 | Send password reset | `user.sendPasswordResetFor` | Sends the reset-password email. Refused for a suspended account. |
 | Resend verification email | `user.resendVerificationEmailFor` | Shown while the email is unverified. Sends the verification email again. |
+| Mark email as verified | `user.markEmailVerifiedFor` | Shown while the email is unverified. Confirms the address without the link, voids the pending link and records `user.email_verified`. It does not approve the account and sends no approval request. |
 | Reset two-step verification | `user.resetMfa` | Admins only, shown when the account has two-step verification on. Removes the enrolment and ends every session. The user enrols again at next sign-in if their role requires it. |
 
 Managers and admins can also approve and suspend from a phone; see [Phones](./phones.md).

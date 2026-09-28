@@ -52,7 +52,7 @@ export async function createContext({ req, res }: CreateFastifyContextOptions) {
 // procedures write a detailed entry of their own instead.
 export const EXPLICITLY_AUDITED = new Set([
 	'user.update', 'user.approve', 'user.remove', 'user.suspend', 'user.resume', 'user.revokeSessions', 'user.resetMfa',
-	'user.sendPasswordResetFor', 'user.resendVerificationEmailFor', 'user.updateProfile', 'user.removeAccount',
+	'user.sendPasswordResetFor', 'user.resendVerificationEmailFor', 'user.markEmailVerifiedFor', 'user.changeUnverifiedEmail', 'user.updateProfile', 'user.removeAccount',
 	'auth.logout', 'auth.revokeSession', 'auth.revokeOtherSessions', 'auth.mfaSetup', 'auth.mfaEnable', 'auth.mfaDisable',
 	'auth.mfaRegenerateRecoveryCodes', 'audit.export', 'user.exportMyData', 'user.exportData',
 ])

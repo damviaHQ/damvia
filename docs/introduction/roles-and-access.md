@@ -3,7 +3,7 @@ title: Roles and access
 description: The four user roles, email verification and account approval, and the exact rule that decides which collections and files a user can see or edit.
 sidebar:
   order: 3
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-28
 ---
 
 This page gives you the access model as the server enforces it: roles, account approval, regions and groups, the collection visibility rule, edit rights and guest invitations.
@@ -23,7 +23,7 @@ The admin area (`Back to the DAM` sidebar) shows all sections to admins and only
 
 Every account carries two flags, and most procedures require both to be `true` (`userApproved` in `server/src/trpc/index.ts`):
 
-- `emailVerified`: set when the user follows the link sent by the `mailer/email-verification` job. While it is `false` the client shows "An email has been sent with a link to confirm your account" with a resend button.
+- `emailVerified`: set when the user follows the link sent by the `mailer/email-verification` job, or when an admin or manager marks the address as verified. The link works in any browser, signed in or not, so it can be opened on the device the email was read on. While it is `false` the client shows "An email has been sent with a link to confirm your account" with a resend button, a form to correct a mistyped address and a sign-out button. Correcting the address sends a new link, voids the old one, and decides `approved` again from the new domain, as at sign-up.
 - `approved`: set at sign-up if the email domain is in the authorized domains list, otherwise by an admin or a manager of the user's region, and only once the email is verified. While it is `false` (and the email is verified) the client shows "Please wait until your account is approved". Once the email is verified, the `email/request-approval` job notifies approvers; approval sends `email/user-approved`.
 
 A third condition overrides both: a suspended account (`suspendedAt` set) cannot sign in at all, and its sessions and download links stop working. See [Accounts and links](../administration/accounts-and-links.md#suspending-an-account).

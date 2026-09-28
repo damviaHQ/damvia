@@ -16,6 +16,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 import AuthResendEmail from "@/components/AuthResendEmail.vue"
 import MfaSetup from "@/components/auth/MfaSetup.vue"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import Loader from "@/components/Loader.vue"
 import { Toaster } from "@/components/ui/sonner"
 import { provideGlobalToast } from "@/composables/useGlobalToast"
@@ -25,12 +27,13 @@ import { extractErrors, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { accentVariables } from "@/lib/brand-color"
 import { useQuery } from "@tanstack/vue-query"
-import { watch } from "vue"
-import { useRoute } from "vue-router"
+import { ref, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
 import { toast } from "vue-sonner"
 import "vue3-treeselect-ts/dist/style.css"
 
 const route = useRoute()
+const router = useRouter()
 const globalStore = useGlobalStore()
 provideGlobalToast()
 
@@ -49,15 +52,24 @@ watch(() => brandTheme.value?.accentColor, (accent) => {
   style.textContent = `.dv-theme.dv-neutral.dv-client{${variables}}`
 }, { immediate: true })
 
+// The link works signed out too, for instance on the phone the email was
+// read on, where the guard has sent it to the sign-in page.
 watch(
-  route,
-  () => {
-    if (route.query.verificationCode) {
-      trpc.user.verifyEmail
-        .mutate(route.query.verificationCode as string)
-        .then(globalStore.fetchUser)
-        .catch((error) => toast.error(extractErrors(error as Error).message))
-    }
+  () => route.query.verificationCode,
+  (code) => {
+    if (typeof code !== "string" || !code) return
+    router.replace({ query: { ...route.query, verificationCode: undefined } })
+    trpc.user.verifyEmail
+      .mutate(code)
+      .then(async () => {
+        if (!globalStore.user) {
+          toast.success("Your email address is confirmed. Sign in to continue.")
+          return
+        }
+        toast.success("Your email address is confirmed.")
+        await globalStore.fetchUser()
+      })
+      .catch((error) => toast.error(extractErrors(error as Error).message))
   },
   { immediate: true }
 )
@@ -67,6 +79,33 @@ const resendVerificationEmail = async () => {
     throw new Error("User not found")
   }
   await trpc.user.resendVerificationEmail.mutate(globalStore.user.id)
+}
+
+const editingEmail = ref(false)
+const newEmail = ref("")
+const emailError = ref<string | null>(null)
+const savingEmail = ref(false)
+
+function startEditingEmail() {
+  newEmail.value = globalStore.user?.email ?? ""
+  emailError.value = null
+  editingEmail.value = true
+}
+
+async function changeEmail(event: Event) {
+  event.preventDefault()
+  savingEmail.value = true
+  emailError.value = null
+  try {
+    await trpc.user.changeUnverifiedEmail.mutate(newEmail.value.trim())
+    await globalStore.fetchUser()
+    editingEmail.value = false
+    toast.success("A new confirmation email has been sent.")
+  } catch (error) {
+    emailError.value = extractErrors(error as Error).message
+  } finally {
+    savingEmail.value = false
+  }
 }
 
 </script>
@@ -85,15 +124,30 @@ const resendVerificationEmail = async () => {
     </div>
   </LayoutAuth>
   <LayoutAuth v-else-if="globalStore.user && !(globalStore.user.approved && globalStore.user.emailVerified)">
-    <div v-if="!globalStore.user.emailVerified" role="status" class="flex flex-col">
-      <p>An email has been sent with a link to confirm your account to: <span class="font-bold">{{
+    <div v-if="!globalStore.user.emailVerified" class="flex flex-col">
+      <p role="status">An email has been sent with a link to confirm your account to: <span class="font-bold">{{
         globalStore.user.email }}</span> </p>
-      <div class="text-sm flex flex-col gap-1 mt-8">
+      <p class="text-sm text-neutral-500 mt-2">The link also works if you open it on another device.</p>
+      <form v-if="editingEmail" class="grid gap-2 mt-8" @submit="changeEmail">
+        <Label for="pending-email">Email address</Label>
+        <Input id="pending-email" type="email" v-model="newEmail" autocomplete="email" required autofocus
+          :aria-invalid="emailError ? true : undefined" :aria-describedby="emailError ? 'pending-email-error' : undefined" />
+        <p v-if="emailError" id="pending-email-error" class="text-sm text-red-600">{{ emailError }}</p>
+        <div class="flex gap-2">
+          <Button type="submit" :disabled="savingEmail || !newEmail.trim()">Send to this address</Button>
+          <Button type="button" variant="ghost" @click="editingEmail = false">Cancel</Button>
+        </div>
+      </form>
+      <div v-else class="text-sm flex flex-col gap-1 mt-8">
         <div>No email? Check your spam folder</div>
         <div class="flex items-center gap-2 flex-nowrap whitespace-nowrap">or
           <AuthResendEmail :onResend="resendVerificationEmail" />
         </div>
+        <div class="flex items-center gap-2 flex-nowrap whitespace-nowrap">Wrong address?
+          <Button variant="link" class="p-0 text-neutral-500" @click="startEditingEmail">change it</Button>
+        </div>
       </div>
+      <Button type="button" variant="ghost" class="justify-self-start self-start mt-8" @click="globalStore.logout">Sign out</Button>
     </div>
     <div v-else role="status">
       <div>Please wait until your account is approved.</div>

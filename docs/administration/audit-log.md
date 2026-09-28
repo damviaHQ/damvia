@@ -3,7 +3,7 @@ title: Audit log
 description: The append-only record of administrative changes, sign-ins, refusals and access to downloads, and how to filter, export and retain it.
 sidebar:
   order: 17
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-28
 ---
 
 Damvia records who changed what, every sign-in and failed sign-in, and every refused request in the `audit_log` table. Admins read it under **User Management > Audit log** (`/admin/audit-log`). Managers have no access.
@@ -43,6 +43,7 @@ An entry is written in the same transaction as the change it describes where the
 | `user.created`, `user.updated`, `user.approved`, `user.deleted` | Account lifecycle. `user.updated` carries before and after of email, name, company, role, region, groups, approval and maintenance contact. |
 | `user.suspended`, `user.resumed` | Suspension and its lifting. |
 | `password.reset`, `password.reset_sent`, `user.verification_resent` | A password reset completed; a reset or verification email sent by an admin or manager. |
+| `user.email_verified` | An admin or manager marked a user's email address as verified without the confirmation link. |
 | `access_review.exported`, `audit.exported` | Someone exported the access review or the audit log. |
 | `collection.access_changed` | A collection's draft state, owner or group restrictions changed, with before and after. |
 | `invitation.created`, `invitation.removed` | A guest invitation was sent or withdrawn. |

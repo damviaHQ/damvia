@@ -98,7 +98,8 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `resendVerificationEmail` | mutation | login | Resends the caller’s verification email; no token is returned |
 | `me` | query | login | Current user, with `mfaEnabled`, `mfaSetupRequired` and `hasPassword`. Also stamps `users.last_login_at` and inserts a `login` activity event when the previous stamp is older than 30 minutes |
 | `updateProfile` | mutation | login | Own name/company; changing email requires admin |
-| `verifyEmail` | mutation | login | Consumes `?verificationCode=` |
+| `verifyEmail` | mutation | public | Consumes `?verificationCode=`; the code alone identifies the account, so the link works signed out. Limited to 10 attempts per IP per 15 minutes |
+| `changeUnverifiedEmail` | mutation | login | While the caller's email is unverified: sets a new address, voids the old link and reset token, decides `approved` from the new domain, queues a new verification email. 5 per hour |
 | `removeAccount` | mutation | login | Deletes own account (`FORBIDDEN` for any other id) |
 | `findById` | query | `userManagerOrAdmin` | One user (managers: own region) |
 | `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user; `maintenanceContact` is applied by admins on admin profiles only. Only admins change region or another user's email; an email change by an admin ends that user's sessions and clears their reset and email-link tokens |
@@ -106,6 +107,7 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `approve` | mutation | `userManagerOrAdmin` | Approves a verified account (`BAD_REQUEST` before verification) and pushes `email/user-approved` |
 | `remove` | mutation | `userManagerOrAdmin` | Deletes a user with their personal collections, invitations and downloads; their public collections lose their owner. Managers can delete only members and guests in their region |
 | `resendVerificationEmailFor` | mutation | `userManagerOrAdmin` | Resends the verification email of a managed, unverified user |
+| `markEmailVerifiedFor` | mutation | `userManagerOrAdmin` | Marks a managed user's email as verified without the link; records `user.email_verified` |
 | `sendPasswordResetFor` | mutation | `userManagerOrAdmin` | Pushes `mailer/password-reset` for a managed, non-suspended user |
 | `suspend` | mutation | `userManagerOrAdmin` | Sets `suspendedAt` on a managed user, deletes their email-link tokens and sessions. Refused on oneself |
 | `resume` | mutation | `userManagerOrAdmin` | Clears `suspendedAt` and the lockout of a managed user |

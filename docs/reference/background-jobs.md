@@ -3,7 +3,7 @@ title: Background jobs
 description: Every queue and cron the worker runs, what triggers it, and what it does.
 sidebar:
   order: 3
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-28
 ---
 
 Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. Every API process connects pg-boss and can queue jobs; jobs are processed inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
@@ -32,7 +32,7 @@ All queues are declared in `server/src/worker.ts`. The push helpers set `retryBa
 | `asset/extract-metadata` | The `metadata:backfill` CLI command | Reads the EXIF, IPTC and XMP metadata, and whether a C2PA manifest is present, of one processed image from its copy in the assets bucket and replaces its stored values. Does nothing for a file that is not `up_to_date` or not an image, and stores nothing, without failing, for an image format that cannot be read, such as PSD. Images downloaded by `asset/update-content` are read there, without this job. |
 | `collection/synchronization` | Linking a collection to an asset folder, and the cloud sync whenever a folder is created, renamed or moved | Refreshes the collection's name, files and child collections from its folder; never deletes a child. Takes a transaction-scoped advisory lock (`pg_advisory_xact_lock`) on the topmost synchronized ancestor, so two workers refreshing the same tree run one after the other. One job at a time per worker. |
 | `download/create-archive` | `download.create` with type `email` | Checks current access, builds the file or zip archive, uploads it to `downloads/{id}`, then pushes `mailer/download-ready`. If access is no longer allowed, marks the download `failed` without retrying or sending a ready email. One job at a time. |
-| `mailer/email-verification` | Sign-up, "resend verification" | Sends the `email-verification` template with the `?verificationCode=` link. |
+| `mailer/email-verification` | Sign-up, "resend verification", an address corrected before verification | Sends the `email-verification` template with the `?verificationCode=` link. |
 | `mailer/log-in` | Login in passwordless mode or with the magic-link option | Creates a single-use sign-in token valid 15 minutes and sends the `login` template with a `/login?link=` URL. |
 | `mailer/password-reset` | "Forgot password", or "Send password reset" by an admin or manager | Creates the reset token (valid one hour, replacing any earlier one) and sends the `reset-password` template. The token is created here so it is never stored in the queue. Nothing is sent for a suspended account. |
 | `email/request-approval` | A user verifies their email while still unapproved | Sends the `request-approval` template to every admin and to the managers of the requester's region, with a link to `/admin/users/{id}`. |

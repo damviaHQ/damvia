@@ -115,6 +115,67 @@ test('managers and admins resend a verification mail for an unverified account t
     assert.deepEqual(state.queued.map(job => job.userId), [pending.id, far.id])
 })
 
+test('the verification link works signed out, once, and asks for approval when the account needs it', async () => {
+    const code = randomUUID().replaceAll('-', '')
+    const pending = await makeUser('member', { approved: false, emailVerified: false, emailVerificationCode: code })
+    state.queued.length = 0
+    assert.equal(await caller(null).user.verifyEmail(code), undefined)
+    const stored = await db.getRepository(User).findOneByOrFail({ id: pending.id })
+    assert.deepEqual([stored.emailVerified, stored.emailVerificationCode], [true, null])
+    assert.deepEqual(state.queued, [{ name: 'mailerRequestApprovalQueue', requesterId: pending.id }])
+    await assert.rejects(caller(null).user.verifyEmail(code), error => error.code === 'BAD_REQUEST')
+    await assert.rejects(caller(null).user.verifyEmail(''), error => error.code === 'BAD_REQUEST')
+    // Signed in as someone else, the code still confirms its own account only.
+    const other = await makeUser('member', { approved: true, emailVerified: false, emailVerificationCode: `${code}x` })
+    state.queued.length = 0
+    await caller(fixtures.member).user.verifyEmail(`${code}x`)
+    assert.equal((await db.getRepository(User).findOneByOrFail({ id: other.id })).emailVerified, true)
+    assert.deepEqual(state.queued, [])
+})
+
+test('an unverified account can correct its address, which is confirmed again and approved by its domain', async () => {
+    await save(AuthorizedDomain, { domain: 'fixed.test' })
+    const pending = await makeUser('member', { approved: false, emailVerified: false, emailVerificationCode: 'old-code', resetPasswordToken: 'old-reset', resetPasswordExpiresAt: new Date(Date.now() + 60000) })
+    state.queued.length = 0
+    const email = `${randomUUID()}@fixed.test`
+    assert.equal(await caller(pending).user.changeUnverifiedEmail(email), undefined)
+    const stored = await db.getRepository(User).findOneByOrFail({ id: pending.id })
+    assert.equal(stored.email, email)
+    assert.equal(stored.emailVerified, false)
+    assert.equal(stored.approved, true)
+    assert.equal(stored.resetPasswordToken, null)
+    assert.match(stored.emailVerificationCode, /^[a-f0-9]{24}$/)
+    assert.deepEqual(state.queued, [{ name: 'mailerEmailVerificationQueue', userId: pending.id }])
+    assert.equal((await auditRows('user.updated', pending.id))[0].actor_id, pending.id)
+    await assert.rejects(caller(null).user.verifyEmail('old-code'), error => error.code === 'BAD_REQUEST')
+    // Leaving an authorised domain drops the approval it granted.
+    await caller({ ...pending, ...stored }).user.changeUnverifiedEmail(`${randomUUID()}@elsewhere.test`)
+    assert.equal((await db.getRepository(User).findOneByOrFail({ id: pending.id })).approved, false)
+    await assert.rejects(caller({ ...pending, email: 'x' }).user.changeUnverifiedEmail(fixtures.member.email), error => error.code === 'BAD_REQUEST' && /taken/.test(error.message))
+    await assert.rejects(caller(fixtures.member).user.changeUnverifiedEmail(`${randomUUID()}@example.test`), error => error.code === 'BAD_REQUEST')
+    await assert.rejects(caller(null).user.changeUnverifiedEmail(`${randomUUID()}@example.test`), error => error.code === 'UNAUTHORIZED')
+})
+
+test('managers and admins mark the email of an account they manage as verified, and it is recorded', async () => {
+    const otherRegion = await save(Region, { name: randomUUID(), defaultGroupId: fixtures.group.id })
+    const pending = await makeUser('member', { approved: false, emailVerified: false, emailVerificationCode: 'mark-code' })
+    assert.equal(await caller(fixtures.manager).user.markEmailVerifiedFor(pending.id), undefined)
+    const stored = await db.getRepository(User).findOneByOrFail({ id: pending.id })
+    assert.deepEqual([stored.emailVerified, stored.emailVerificationCode, stored.approved], [true, null, false])
+    assert.equal((await auditRows('user.email_verified', pending.id))[0].actor_id, fixtures.manager.id)
+    await caller(fixtures.manager).user.approve(pending.id)
+    await assert.rejects(caller(fixtures.manager).user.markEmailVerifiedFor(pending.id), error => error.code === 'BAD_REQUEST')
+    const pendingAdmin = await makeUser('admin', { emailVerified: false })
+    await assert.rejects(caller(fixtures.manager).user.markEmailVerifiedFor(pendingAdmin.id), error => error.code === 'FORBIDDEN')
+    const far = await makeUser('member', { emailVerified: false, regionId: otherRegion.id })
+    await assert.rejects(caller(fixtures.manager).user.markEmailVerifiedFor(far.id), error => error.code === 'NOT_FOUND')
+    await caller(fixtures.admin).user.markEmailVerifiedFor(far.id)
+    const another = await makeUser('member', { emailVerified: false })
+    for (const user of [null, fixtures.guest, fixtures.member, another]) {
+        await forbidden(caller(user).user.markEmailVerifiedFor(another.id))
+    }
+})
+
 test('the verification job mails the account its own link to the client', async () => {
     const user = await makeUser('member', { emailVerified: false, emailVerificationCode: 'abc123def456' })
     state.sentMails.length = 0

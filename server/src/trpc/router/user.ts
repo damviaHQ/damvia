@@ -17,6 +17,7 @@ import { hashPassword, hashResetToken } from '../../services/credentials'
 import { randomBytes } from "node:crypto"
 import { z } from 'zod'
 import { ActivityEvent, ActivityEventType } from "../../entity/activity-event"
+import { AuthorizedDomain } from "../../entity/authorized-domain"
 import { LoginToken } from "../../entity/login-token"
 import { User, UserRole } from "../../entity/user"
 import { SessionMethod } from "../../entity/user-session"
@@ -361,24 +362,54 @@ export default router({
 
 			return formatPublicUser(user)
 		}),
+	// The code alone proves the mailbox, so the link also works in a browser
+	// that is not signed in, such as the phone the email was opened on.
 	verifyEmail: publicProcedure
-		.use(authMiddleware())
-		.input(z.string().max(100))
+		.input(z.string().min(1).max(100))
 		.mutation(async ({ ctx, input }) => {
-			enforce(`verify-email:user:${ctx.user.id}`, 10, 15 * MINUTE)
-			if (ctx.user.emailVerificationCode !== input) {
-				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid verification code.' })
-			}
+			enforce(`verify-email:ip:${ctx.req.ip}`, 10, 15 * MINUTE)
+			const user = await dataSource.getRepository(User).findOneBy({ emailVerificationCode: input })
+			if (!user) throw new TRPCError({ code: 'BAD_REQUEST', message: 'This confirmation link is invalid or has already been used.' })
 
-			ctx.user.emailVerified = true
-			ctx.user.emailVerificationCode = null
 			const verified = await dataSource.getRepository(User).update(
-				{ id: ctx.user.id, emailVerificationCode: input },
+				{ id: user.id, emailVerificationCode: input },
 				{ emailVerified: true, emailVerificationCode: null },
 			)
-			if (!verified.affected) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid verification code.' })
-			if (!ctx.user.approved) {
-				await mailerRequestApprovalQueue.push({ requesterId: ctx.user.id })
+			if (!verified.affected) throw new TRPCError({ code: 'BAD_REQUEST', message: 'This confirmation link is invalid or has already been used.' })
+			if (!user.approved) {
+				await mailerRequestApprovalQueue.push({ requesterId: user.id })
+			}
+		}),
+	// Lets someone who mistyped their address at sign-up fix it. The new
+	// address is confirmed like the first one, and approval is decided again
+	// by its domain, as at sign-up.
+	changeUnverifiedEmail: publicProcedure
+		.use(authMiddleware())
+		.input(z.email())
+		.mutation(async ({ ctx, input }) => {
+			enforce(`change-unverified-email:user:${ctx.user.id}`, 5, 60 * MINUTE)
+			if (ctx.user.emailVerified) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Email already verified.' })
+			if (input === ctx.user.email) throw new TRPCError({ code: 'BAD_REQUEST', message: 'This is already your email address.' })
+			const user = await dataSource.getRepository(User).findOneByOrFail({ id: ctx.user.id })
+			const before = accountSnapshot(user)
+			user.email = input
+			user.emailVerificationCode = randomBytes(12).toString('hex')
+			user.approved = await dataSource.getRepository(AuthorizedDomain).exists({ where: { domain: input.split('@').pop() } })
+			try {
+				await dataSource.transaction(async (em) => {
+					await em.getRepository(User).update(user.id, {
+						email: user.email, emailVerificationCode: user.emailVerificationCode, approved: user.approved,
+						resetPasswordToken: null, resetPasswordExpiresAt: null,
+					})
+					await em.getRepository(LoginToken).delete({ userId: user.id })
+					await mailerEmailVerificationQueue.push({ userId: user.id })
+					await recordAudit(em, { actorId: user.id, action: 'user.updated', targetType: 'user', targetId: user.id, before, after: accountSnapshot(user), req: ctx.req })
+				})
+			} catch (error) {
+				if (/^Key \(email\)=\(.+\) already exists.$/.test(error.detail)) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'Email address already taken.' })
+				}
+				throw error
 			}
 		}),
 	list:
@@ -478,6 +509,19 @@ export default router({
 			if (user.emailVerified) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Email already verified.' })
 			await mailerEmailVerificationQueue.push({ userId: user.id })
 			await recordAudit(null, { actorId: ctx.user.id, action: 'user.verification_resent', targetType: 'user', targetId: user.id, req: ctx.req })
+		}),
+	// For a user whose verification mail never arrives: the approver vouches
+	// for the address instead of the link.
+	markEmailVerifiedFor: publicProcedure
+		.use(authMiddleware(userManagerOrAdmin))
+		.input(z.uuid())
+		.mutation(async ({ ctx, input }) => {
+			const user = await managedUser(ctx.user, input)
+			if (user.emailVerified) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Email already verified.' })
+			await dataSource.transaction(async (em) => {
+				await em.getRepository(User).update(user.id, { emailVerified: true, emailVerificationCode: null })
+				await recordAudit(em, { actorId: ctx.user.id, action: 'user.email_verified', targetType: 'user', targetId: user.id, req: ctx.req })
+			})
 		}),
 	sendPasswordResetFor: publicProcedure
 		.use(authMiddleware(userManagerOrAdmin))

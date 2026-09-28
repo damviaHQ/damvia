@@ -120,7 +120,7 @@ const suspendedAt = (user: AdminUser) => (user as AdminUser & { suspendedAt?: st
 const mfaEnabled = (user: AdminUser) => !!(user as AdminUser & { mfaEnabled?: boolean }).mfaEnabled
 const confirmingSuspend = ref(false)
 watch(selectedUserId, () => { confirmingSuspend.value = false })
-async function accountAction(user: AdminUser, action: 'suspend' | 'resume' | 'revokeSessions' | 'sendPasswordResetFor' | 'resendVerificationEmailFor' | 'resetMfa', done: string) {
+async function accountAction(user: AdminUser, action: 'suspend' | 'resume' | 'revokeSessions' | 'sendPasswordResetFor' | 'resendVerificationEmailFor' | 'markEmailVerifiedFor' | 'resetMfa', done: string) {
   if (busyId.value) return
   busyId.value = user.id
   try {
@@ -231,6 +231,7 @@ function exportCsv() {
        <Button variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'revokeSessions', 'Signed out everywhere')">Sign out everywhere</Button>
        <Button variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'sendPasswordResetFor', 'Password reset email sent')">Send password reset</Button>
        <Button v-if="!selectedUser.emailVerified" variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'resendVerificationEmailFor', 'Verification email sent')">Resend verification email</Button>
+       <Button v-if="!selectedUser.emailVerified" variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'markEmailVerifiedFor', 'Email marked as verified')">Mark email as verified</Button>
        <Button v-if="store.user?.role === 'admin' && mfaEnabled(selectedUser)" variant="outline" class="dv-button" :disabled="!!busyId || savingDetails" @click="accountAction(selectedUser, 'resetMfa', 'Two-step verification reset')">Reset two-step verification</Button>
       </div>
      </section>
