@@ -16,11 +16,12 @@ import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 import { EmailSettings } from "../../entity/email-settings"
 import { EmailTemplate } from "../../entity/email-template"
-import { dataSource, mailTransporter } from "../../env"
+import { apiURL, dataSource, emailEventsSecret, mailTransporter, newsletterDailyLimit, newsletterRatePerSecond } from "../../env"
 import { EMAIL_DEFINITIONS, EMAIL_KEYS, emailDefinition, GLOBAL_VARIABLES } from "../../mail/catalogue"
 import { assertRenders, emailSender, renderEmail, templateContent } from "../../mail/render"
 import { sanitizeBlockHtml } from "../../page-blocks/sanitize"
 import { recordAudit } from "../../services/audit"
+import { checkSenderDomain, smtpProvider } from "../../services/email-domain"
 import { enforce } from "../../services/rate-limit"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
@@ -138,13 +139,36 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.query(async () => {
 			const row = await dataSource.getRepository(EmailSettings).findOneByOrFail({ id: 1 })
-			const sender = await emailSender()
+			const [sender, [events]] = await Promise.all([emailSender(), dataSource.query(`
+				SELECT (SELECT max(created_at) FROM audit_log WHERE action IN ('email.bounced', 'email.complained')) AS "lastAt",
+					(SELECT count(*)::int FROM users WHERE email_bounced_at IS NOT NULL) AS bounced
+			`)])
 			return {
 				senderName: row.senderName,
 				senderAddress: row.senderAddress,
 				replyTo: row.replyTo,
 				footerText: row.footerText,
 				effectiveFrom: sender.from,
+				provider: smtpProvider()?.name ?? null,
+				newsletterPace: { perSecond: newsletterRatePerSecond(), perDay: newsletterDailyLimit() },
+				// The secret itself stays with the host.
+				emailEvents: { enabled: !!emailEventsSecret(), url: `${apiURL()}/v1/email-events/`, lastAt: events.lastAt as Date | null, bounced: events.bounced as number },
+			}
+		}),
+	// The DNS records of the domain emails come from, and what to add.
+	checkDomain: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(z.object({ selector: z.string().trim().max(63).regex(/^[a-z0-9._-]*$/i).optional() }))
+		.query(async ({ ctx, input }) => {
+			enforce(`email-domain:${ctx.user.id}`, 30, 10 * 60 * 1000)
+			const domain = (await emailSender()).from.address.split('@')[1].toLowerCase()
+			if (!/^(?=.{1,253}$)([a-z0-9-]{1,63}\.)+[a-z]{2,63}$/.test(domain)) {
+				return { domain, checks: [], problem: `Emails leave from ${domain}, which receivers cannot check. Set a sender address on your own domain.` }
+			}
+			try {
+				return { domain, checks: await checkSenderDomain(domain, input.selector), problem: null }
+			} catch {
+				return { domain, checks: [], problem: `The DNS records of ${domain} could not be read. Try again in a moment.` }
 			}
 		}),
 	updateSettings: publicProcedure

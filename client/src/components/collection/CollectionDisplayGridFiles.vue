@@ -29,7 +29,7 @@ import { getFileExtension } from "@/utils/fileExtention"
 import { formatFileSize } from "@/utils/fileSize"
 import { useQueryClient } from "@tanstack/vue-query"
 import { Star, StarOff, Trash2 } from "@lucide/vue"
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue"
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
 
@@ -129,27 +129,15 @@ function handleSelection(file: File) {
   globalStore.addToSelection({ id: file.id, type: "file" })
 }
 
-// The band opens under the whole row of its card, never in the middle of it.
-const bandAfter = ref(-1)
-function placeBand() {
-  const list: File[] = files.value ?? []
-  const index = list.findIndex(file => variants.grouped(file) && file.variantGroup!.id === openGroupId.value)
-  if (index < 0) {
-    bandAfter.value = -1
-    return
-  }
-  if (isMasonry.value) {
-    const count = columns.value.count || 1
-    bandAfter.value = Math.min(list.length - 1, Math.floor(index / count) * count + count - 1)
-    return
-  }
-  const cards = [...(container.value?.querySelectorAll<HTMLElement>(':scope > article') ?? [])]
-  const top = cards[index]?.offsetTop
-  let last = index
-  while (last + 1 < cards.length && cards[last + 1].offsetTop === top) last++
-  bandAfter.value = last
-}
-watch([openGroupId, containerWidth, isMasonry, () => files.value?.length], () => nextTick(placeBand))
+// The open band takes the place of its cover on a line of its own, as wide as
+// the columns of cards: the cards before it keep their line, the ones after it
+// follow below. Cards are 276px wide with a 24px gap.
+const CARD = 276
+const GAP = 24
+const bandFlex = computed(() => {
+  const perRow = Math.max(1, Math.floor((containerWidth.value + GAP) / (CARD + GAP)))
+  return { flex: `0 0 ${perRow * (CARD + GAP) - GAP}px`, maxWidth: '100%' }
+})
 
 // In masonry the band spans as many of the small rows as its height needs.
 const bandHeight = ref(0)
@@ -163,7 +151,7 @@ function observeBand(element: unknown) {
 onBeforeUnmount(() => bandObserver?.disconnect())
 const bandStyle = computed(() => isMasonry.value
   ? { gridColumn: '1 / -1', gridRowEnd: `span ${Math.max(1, Math.ceil((bandHeight.value + MASONRY_GAP) / MASONRY_ROW))}`, paddingBottom: `${MASONRY_GAP}px` }
-  : undefined)
+  : bandFlex.value)
 
 function openPreview(file: File) {
   variants.preview(file)
@@ -198,8 +186,11 @@ async function remove(file: File) {
 
 <template>
   <div ref="container" :class="isMasonry ? 'p-0.5' : gridClasses" :style="gridStyle">
-    <template v-for="(file, index) in files" :key="file.id">
-    <article :class="isMasonry ? masonryCardClasses : gridCardClasses"
+    <template v-for="file in files" :key="file.id">
+    <div v-if="file === openCard && variants.groups[openGroupId!]" :ref="observeBand" class="min-w-0 self-start" :style="bandStyle">
+      <CollectionVariantBand :group="variants.groups[openGroupId!]" :members="variants.members(openCard!)" @close="openGroupId = null" />
+    </div>
+    <article v-else :class="isMasonry ? masonryCardClasses : gridCardClasses"
       :style="tileStyle(file)">
       <div :class="[isMasonry ? masonryPreviewClasses : gridPreviewClasses, (variants.grouped(file) ? variants.groupState(file) : isFileSelected(file)) && 'outline-2 outline-neutral-500', variants.grouped(file) && 'variant-stack']">
         <CollectionPathTooltip :path="getPath?.(file)">
@@ -230,9 +221,6 @@ async function remove(file: File) {
       </CollectionPathTooltip>
       <p v-if="!isMasonry" class="mt-1 text-xs text-neutral-500"><span class="uppercase">{{ getFileExtension(file.name) }}</span><span class="mx-1.5 text-neutral-300">·</span>{{ formatFileSize(file.size) }}</p>
     </article>
-    <div v-if="index === bandAfter && openCard && variants.groups[openGroupId!]" :ref="observeBand" class="basis-full self-start" :style="bandStyle">
-      <CollectionVariantBand :group="variants.groups[openGroupId!]" :members="variants.members(openCard!)" @close="openGroupId = null" />
-    </div>
     </template>
     <p v-if="!files?.length && placeholder" class="col-span-full py-12 text-center text-sm text-neutral-500">{{ placeholder }}</p>
   </div>

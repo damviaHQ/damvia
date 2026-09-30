@@ -11,7 +11,7 @@ Contributor reference, kept in the repository and not published on the documenta
 | `server/.env.template`, `client/.env.template` | `reference/environment-variables.md`, `configuration/client-env.md` |
 | `server/src/worker.ts` | `reference/background-jobs.md`, `deployment/worker-and-scaling.md` |
 | `server/src/index.ts` (startup, 5-minute sync loop) | `integrations/index.md`, `deployment/worker-and-scaling.md` |
-| `server/src/server.ts` (Fastify, cookie, helmet, CORS and origin check, request log, body limit, `/v1/downloads/:id`) | `deployment/reverse-proxy.md`, `administration/downloads.md`, `contributing/architecture.md` |
+| `server/src/server.ts` (Fastify, cookie, helmet, CORS and origin check, request log, body limit, `/v1/downloads/:id`, `/v1/branding/email-logo.png`, `/v1/newsletter-images/`, `/v1/unsubscribe/`, `/v1/email-events/`) | `deployment/reverse-proxy.md`, `administration/downloads.md`, `contributing/architecture.md`, `integrations/smtp.md` |
 | `server/src/cli.ts`, `server/src/services/system.ts` | `reference/cli.md`, `deployment/integrity-check.md` |
 | `server/src/asset-updater/sources.ts` (`ASSET_SOURCES`, overlap rules), `server/src/env.ts` (`assetUpdaters`), `server/src/entity/asset-source.ts` (run status) | `integrations/sources.md`, `reference/environment-variables.md`, `administration/dashboard.md` |
 | `server/src/asset-updater/dropbox.ts` | `integrations/dropbox.md` |
@@ -21,6 +21,10 @@ Contributor reference, kept in the repository and not published on the documenta
 | `server/src/services/image-processor.ts` | `administration/assets-tree.md`, `getting-started/index.md` (system packages) |
 | `server/src/services/mailer.ts`, `server/src/mail/` (catalogue, renderer, layout) | `configuration/email-templates.md`, `integrations/smtp.md` |
 | `client/src/views/admin/admin-emails.vue`, `admin-email-edit.vue`, `server/src/trpc/router/email-template.ts` | `administration/emails.md` |
+| `server/src/trpc/router/newsletter.ts`, `services/newsletter.ts`, `services/audience.ts`, `services/newsletter-image.ts`, `services/email-domain.ts`, `services/email-events.ts`, `mail/newsletter-sanitize.ts`, `client/src/views/admin/admin-newsletters.vue`, `admin-newsletter-edit.vue`, `components/newsletter/`, `views/public/public-unsubscribe.vue`, `components/account/AccountNewsletters.vue` | `administration/newsletters.md`, `integrations/smtp.md`, `reference/background-jobs.md`, `contributing/api.md` |
+| `server/src/services/email-domain.ts` (sender domain check) | `administration/emails.md`, `integrations/smtp.md` |
+| `server/src/services/privacy.ts` (export and anonymisation) | `configuration/privacy.md` |
+| `server/src/services/branding.ts` (logo, email logo, `brandName`) | `configuration/branding.md`, `configuration/email-templates.md` |
 | Accent colour (`brand_settings`, `client/src/lib/brand-color.ts`) | `configuration/branding.md` |
 | `server/src/services/user.ts`, `trpc/router/user.ts`, `trpc/router/authorized-domain.ts` | `administration/users-and-approval.md`, `introduction/roles-and-access.md`, `getting-started/first-admin.md` |
 | `server/src/trpc/index.ts` (auth predicates, MFA enrolment gate) | `introduction/roles-and-access.md`, `contributing/api.md` |
@@ -30,7 +34,8 @@ Contributor reference, kept in the repository and not published on the documenta
 | `server/src/trpc/router/auth.ts`, `services/session.ts`, `services/sign-in.ts`, `services/login-token.ts`, `services/rate-limit.ts`, `services/mfa.ts`, `services/password-policy.ts`, `entity/user-session.ts`, `entity/login-token.ts` | `administration/accounts-and-links.md`, `configuration/server-env.md`, `contributing/api.md`, `contributing/data-model.md`, `reference/troubleshooting.md` |
 | `server/src/services/security-checks.ts` (`security.configuration` warnings) | `configuration/server-env.md`, `deployment/server-docker.md` |
 | `server/src/load-env.ts` (`loadFileVariables`, `*_FILE`) | `reference/environment-variables.md`, `deployment/server-docker.md` |
-| `client/src/views/auth/auth-login.vue` (link and invitation exchange, MFA step), `client/src/components/auth/MfaSetup.vue`, `client/src/components/dialog-member/DialogMemberSecurity.vue` (Account > Security) | `administration/accounts-and-links.md`, `contributing/architecture.md` |
+| `client/src/views/account.vue`, `client/src/components/account/`, `client/src/components/layout-main/MainTopbarDownloadNotification.vue` | `administration/downloads.md`, `administration/collections-and-sharing.md`, `contributing/architecture.md` |
+| `client/src/views/auth/auth-login.vue` (link and invitation exchange, MFA step), `client/src/components/auth/MfaSetup.vue`, `client/src/components/account/AccountSecurity.vue` (Account > Security) | `administration/accounts-and-links.md`, `contributing/architecture.md` |
 | `server/src/services/collection.ts`, `trpc/router/collection.ts`, `trpc/router/collection/invitation.ts`, `entity/collection.ts` | `administration/collections-and-sharing.md`, `introduction/roles-and-access.md` |
 | `client/src/utils/pageFilter.ts`, `composables/usePageFilter.ts`, `components/PageFilterBar.vue`, `PageFilterToggle.vue`, `FilterChipList.vue`, `TableSortHeader.vue`, `components/collection/CollectionRender*.vue`, `CollectionDisplayList*.vue` | `administration/collections-and-sharing.md`, `administration/menu-and-pages.md` |
 | `server/src/trpc/router/region.ts`, `group.ts`, `entity/region.ts`, `entity/group.ts` | `administration/groups-and-regions.md` |

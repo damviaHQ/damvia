@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { computed, ref, watch } from "vue"
-import { useQuery } from "@tanstack/vue-query"
+import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { ChevronRight, Download, LogOut, ShieldCheck, Users, Activity } from "@lucide/vue"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
@@ -33,6 +33,21 @@ const changed = computed(() => name.value.trim() !== (user.value?.name ?? "") ||
 const { data: downloads } = useQuery({ queryKey: ["downloads"], queryFn: () => trpc.download.list.query() })
 const preparing = computed(() => (downloads.value ?? []).filter((download) => download.status === "preparing").length)
 const ready = computed(() => (downloads.value ?? []).filter((download) => download.status === "ready").length)
+const queryClient = useQueryClient()
+const { data: newsletters } = useQuery({ queryKey: ["newsletter-subscription-me"], queryFn: () => trpc.newsletter.mySubscription.query() })
+const savingNewsletters = ref(false)
+
+async function setNewsletters(event: Event) {
+  savingNewsletters.value = true
+  try {
+    await trpc.newsletter.setMySubscription.mutate({ subscribed: (event.target as HTMLInputElement).checked })
+    await queryClient.invalidateQueries({ queryKey: ["newsletter-subscription-me"] })
+  } catch (error) {
+    toast.error((error as Error).message)
+  } finally {
+    savingNewsletters.value = false
+  }
+}
 
 async function save() {
   saving.value = true
@@ -61,6 +76,16 @@ async function save() {
         <input v-model="company" maxlength="80" autocomplete="organization" class="min-h-11 rounded-[var(--dv-radius-field)] border border-[var(--dv-color-line-strong)] px-3 text-base" />
       </label>
       <Button v-if="changed" type="button" class="min-h-12" :disabled="saving || !name.trim() || !company.trim()" @click="save">Save</Button>
+    </section>
+
+    <section v-if="newsletters" class="grid gap-2" aria-labelledby="newsletters-heading">
+      <h2 id="newsletters-heading" class="text-sm font-semibold text-[var(--dv-text-secondary)]">Email communication</h2>
+      <p v-if="newsletters.bouncedAt" class="text-sm">Emails to your address could not be delivered, so news and updates are paused. Tick the box once it works again.</p>
+      <label class="flex min-h-11 items-start gap-3">
+        <input type="checkbox" class="mt-1 size-5" :checked="newsletters.subscribed && !newsletters.bouncedAt" :disabled="savingNewsletters" @change="setNewsletters" />
+        <span class="grid gap-0.5"><span class="font-medium">Receive news and updates from {{ store.env?.appName ?? "us" }}</span>
+          <span class="text-sm text-[var(--dv-text-secondary)]">Account emails, such as password resets, always arrive.</span></span>
+      </label>
     </section>
 
     <nav class="grid" aria-label="Account">

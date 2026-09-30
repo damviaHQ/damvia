@@ -52,8 +52,10 @@ describe('routes', () => {
   })
 
   test('only the phone screens are phone-only, and each has a phone view', () => {
-    expect(routes.filter(route => route.meta.mobileOnly).map(route => route.name).sort()).toEqual(['account', 'downloads'])
+    expect(routes.filter(route => route.meta.mobileOnly).map(route => route.name).sort()).toEqual(['downloads'])
     for (const route of routes.filter(route => route.meta.mobileOnly)) expect(route.meta.mobile, String(route.name)).toBeTypeOf('function')
+    expect(named('downloads').meta.desktop).toEqual({ name: 'account', params: { section: 'downloads' } })
+    expect(named('account').meta.mobile).toBeTypeOf('function')
     // Editing is not offered on a phone.
     for (const name of ['collection-edit', 'admin-page', 'admin-records', 'admin-settings']) expect(named(name).meta.mobile, name).toBeUndefined()
   })

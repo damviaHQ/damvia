@@ -38,7 +38,7 @@ Open the **Folder rules** tab of **Asset types** (`/admin/asset-types?tab=folder
 |---|---|
 | Pattern | A JavaScript regular expression tested against the folder path, for example `^/DIGITAL PACK/.*/PACKSHOTS`. Case does not matter. Paths start with `/` and the name of the source's top folder, such as `/Dropbox/Season/Packshots`. Rejected when empty, longer than 500 characters, not a valid expression, a duplicate of another rule, or when it takes more than 50 ms on a sample path. |
 | Asset type | Given to every folder matched by the pattern and, by inheritance, to their subfolders. |
-| Enabled | Disabled rules are kept but not applied. |
+| Apply this rule | Off pauses the rule without deleting it: the list shows it as not enabled, and the folders it typed are worked out again without it when you save. |
 
 Rules are applied by the enrichment pass that runs after every sync, and immediately when a rule is saved or re-applied. The dialog shows, before saving, how many folders match with three examples, and what those folders currently hold ("12 folders currently Packshot (rule `…`)", "3 folders currently Shooting (set by hand, not changed)"). Saving writes the type to the matched folders and their files. Nothing is ever written to the cloud storage.
 

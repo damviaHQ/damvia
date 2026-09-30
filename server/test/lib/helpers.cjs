@@ -72,6 +72,7 @@ env.assetUpdaterFor = () => ({
     },
 })
 env.mailTransporter = () => ({ sendMail: async mail => { state.sentMails.push(mail) } })
+env.newsletterTransporter = () => ({ sendMail: async mail => { state.sentMails.push(mail) } })
 env.storageQuota = () => null
 env.diskUsage = async () => state.disk
 env.serverAlertEmails = () => []

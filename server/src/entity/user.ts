@@ -104,6 +104,22 @@ export class User {
 	@Column({ type: 'timestamptz', nullable: true })
 	suspendedAt: Date | null
 
+	// Newsletters stop; account emails such as a password reset still arrive.
+	@Column({ type: 'timestamptz', nullable: true })
+	newsletterOptOutAt: Date | null
+
+	// Raised when the person changes their newsletter choice from their
+	// account: unsubscribe links in newsletters already sent stop working.
+	@Column({ default: 0 })
+	newsletterTokenVersion: number
+
+	// The mail provider reported the address as undeliverable.
+	@Column({ type: 'timestamptz', nullable: true })
+	emailBouncedAt: Date | null
+
+	@Column({ type: 'varchar', length: 500, nullable: true })
+	emailBounceReason: string | null
+
 	@OneToMany(() => UserGroup, userGroup => userGroup.user, {cascade: true})
 	userGroups: UserGroup[];
 

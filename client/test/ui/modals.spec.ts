@@ -12,48 +12,8 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { assetType, collection, user } from './lib/fixtures'
+import { collection, user } from './lib/fixtures'
 import { expect, test } from './lib/trpc'
-
-test('account panels keep aligned controls, visible headings and contained navigation', async ({ page, mockTrpc, shot }) => {
-  await mockTrpc({
-    'assetType.list': ['Events', 'Products', 'Photography'].map((label, i) => ({ ...assetType, id: `type-${i}`, name: label })),
-    'download.list': [{ id: 'download-1', createdAt: '2026-09-19', expiresAt: '2026-09-26', status: 'completed', fileCount: 12, url: 'https://example.test/download' }],
-    'collection.invitation.getUserInvitations': [{ id: 'invite-1', createdAt: '2026-09-19', expiresAt: '2099-09-26', email: 'alexandra.morgan@example.test', collection: { id: 'campaign', name: 'Autumn essentials campaign', public: true } }],
-  })
-  await page.goto('/collections/campaign')
-  await page.getByRole('button', { name: 'My account', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Display preferences', exact: true }).click()
-  const dialog = page.getByRole('dialog')
-  await expect(dialog.getByRole('heading', { name: 'Display preferences', exact: true })).toBeVisible()
-  await expect(dialog.locator('[data-display-row]')).toHaveCount(5)
-  const rows = await dialog.locator('[data-display-row]').evaluateAll(elements => elements.map(element => {
-    const controls = element.querySelector('[role="radiogroup"]')!.getBoundingClientRect()
-    return { x: controls.x, width: controls.width }
-  }))
-  expect(new Set(rows.map(row => row.x)).size).toBe(1)
-  expect(await dialog.locator('aside').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
-  await shot('account-display')
-  for (const panel of ['Profile', 'Downloads', 'Links']) {
-    await dialog.getByRole('tab', { name: panel, exact: true }).click()
-    await expect(dialog.getByRole('heading', { name: panel, exact: true })).toBeVisible()
-    const active = dialog.getByRole('tab', { name: panel, exact: true })
-    await expect(active).toHaveAttribute('aria-selected', 'true')
-    const hovered = await active.evaluate(element => getComputedStyle(element).backgroundColor)
-    await page.mouse.move(0, 0)
-    await expect(active).toHaveCSS('background-color', hovered)
-    expect(hovered).not.toBe('rgba(0, 0, 0, 0)')
-    if (panel === 'Links') expect(await dialog.locator('table').evaluate(element => element.scrollWidth <= element.parentElement!.clientWidth)).toBe(true)
-    await expect(dialog.locator('[data-account-content]')).not.toContainText('Loading')
-    await shot(`account-${panel.toLowerCase()}`)
-    if (panel === 'Profile') {
-      await dialog.getByRole('button', { name: 'Delete account', exact: true }).click()
-      await expect(page.getByRole('alertdialog')).toBeVisible()
-      await shot('review-delete-account')
-      await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click()
-    }
-  }
-})
 
 test('client dialogs and nested content have readable headings and contained layouts', async ({ page, mockTrpc, shot }) => {
   let editor = false

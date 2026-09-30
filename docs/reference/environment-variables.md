@@ -95,6 +95,10 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 | `SMTP_USER` | unset | SMTP login. Authentication is only enabled when **both** `SMTP_USER` and `SMTP_PASS` are set. |
 | `SMTP_PASS` | unset | SMTP password. |
 | `SMTP_REQUIRE_TLS` | `false` | `true` refuses to send unless the server upgrades the connection with STARTTLS. Recommended for any relay outside the host. Port `465` always uses implicit TLS. |
+| `NEWSLETTER_RATE_PER_SECOND` | `5` | How many [newsletter](../administration/newsletters.md) messages leave per second, one at a time, across every worker process. Below `1`, such as `0.5`, spaces them further apart. A value that is not a positive number stops the server at startup. Set it under your mail provider's limit. See [SMTP](../integrations/smtp.md#newsletters). |
+| `NEWSLETTER_DAILY_LIMIT` | `2000` | At most this many newsletter messages leave in any 24 hours, across every worker process; the rest of a send waits and resumes by itself. `0` turns the limit off; anything but a whole number stops the server at startup. Raise it gradually as the sending domain earns a reputation. See [SMTP](../integrations/smtp.md#newsletters). |
+| `NEWSLETTER_MESSAGE_STREAM` | unset | Postmark only: the message stream for newsletters, such as `broadcast`. Unset, newsletters use the transactional `outbound` stream, which Postmark does not allow for bulk email. |
+| `EMAIL_EVENTS_SECRET` | unset | At least 32 characters (`openssl rand -hex 32`); shorter stops the server at startup. Turns on `POST API_URL/v1/email-events/<secret>`, where the mail provider reports bounces and spam complaints. Unset, that address answers `404`. See [SMTP](../integrations/smtp.md#bounce-and-spam-reports). |
 | `MAILCONFIG` | unset | No longer read. Email templates are edited under **Admin → Emails**; startup logs a warning while the variable is set. Remove it. See [Email templates](../configuration/email-templates.md). |
 
 ### Cloud storage sync

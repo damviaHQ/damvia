@@ -3,7 +3,7 @@ title: Troubleshooting
 description: The failures a new instance meets first, what they mean, and the fix.
 sidebar:
   order: 6
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-29
 ---
 
 Symptoms are grouped by where you notice them. Server messages are quoted as they appear in the logs (Winston, plain text on stdout).
@@ -58,6 +58,17 @@ Symptoms are grouped by where you notice them. Server messages are quoted as the
 | Download link opens `/link-expired` | The download is older than 7 days, or the id is unknown. | Create a new download. |
 | The browser cannot reach the presigned URL | The S3 endpoint in `ASSETS_S3_URL` is only resolvable from the server. | Expose the S3 endpoint publicly (HTTPS) and use that hostname in the URL. See [Object storage](../integrations/object-storage.md). |
 | `You cannot download more than 10GB.` | The selection's total original size is at or above 10 GB. | Split the download. |
+
+## Newsletters
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| A newsletter stays **Scheduled** after its time | No process runs with `ENABLE_WORKER=true`, so `newsletter/dispatch` never runs. | Start the worker. It sends within a minute. |
+| A newsletter stays **Sending** | The daily limit is reached (the **Delivery** page says when it resumes), or the worker stopped. | Wait: it resumes by itself when the limit allows, or 15 minutes after the worker is back. Raise `NEWSLETTER_DAILY_LIMIT` only if your domain and provider can take more. |
+| Many recipients **Failed** at once | The mail server refused every message: wrong `SMTP_*`, a sending limit at the provider, or an unverified sender. | Read the error next to a recipient, fix the cause, then **Retry failed**. |
+| Newsletters land in spam | Missing SPF, DKIM or DMARC, or a sudden volume from a young domain. | Fix what **Admin → Emails → Sender domain** lists, lower `NEWSLETTER_DAILY_LIMIT`, and connect bounce and spam reports. See [SMTP](../integrations/smtp.md#newsletters). |
+| **Bounce and spam reports** shows **Not connected** | `EMAIL_EVENTS_SECRET` is not set on the API. | Set it (32 characters or more) and add the webhook at the provider. See [SMTP](../integrations/smtp.md#bounce-and-spam-reports). |
+| An unsubscribe link says it does not work | It is older than 90 days, or the person changed their choice in their profile since. | Sign in and use **Email communication** in the profile. |
 
 ## Client
 

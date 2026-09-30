@@ -15,10 +15,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import type { RouteLocationNormalized, RouteLocationRaw, RouteMeta } from 'vue-router'
 
 export const authRoutes = ['login', 'sign-up', 'password-reset', 'password-update']
-export const publicRoutes = ['legal-information', 'privacy-policy', 'link-expired']
+export const publicRoutes = ['legal-information', 'privacy-policy', 'link-expired', 'unsubscribe']
 
 export function guardNavigation(
-  to: Pick<RouteLocationNormalized, 'name' | 'query'> & { meta?: RouteMeta },
+  to: Pick<RouteLocationNormalized, 'name' | 'query'> & { meta?: RouteMeta, params?: RouteLocationNormalized['params'] },
   isAuthenticated: boolean,
   role?: string,
   isPhone = false,
@@ -38,7 +38,11 @@ export function guardNavigation(
     return { name: 'home' }
   }
   if (to.meta?.mobileOnly && !isPhone) {
-    return { name: 'home' }
+    return to.meta.desktop ?? { name: 'home' }
+  }
+  // Phones keep downloads on their own screen.
+  if (isPhone && name === 'account' && to.params?.section === 'downloads') {
+    return { name: 'downloads' }
   }
   return undefined
 }

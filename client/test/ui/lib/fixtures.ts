@@ -145,6 +145,7 @@ export const defaults: Record<string, unknown> = {
   'user.me': user,
   'settings.getClientLogo': { imageUrl: null },
   'settings.getBrandTheme': { accentColor: null, brandName: null },
+  'newsletter.mySubscription': { subscribed: true, bouncedAt: null, bounceReason: null },
   'collection.tree': [],
   'collection.ListPrivateCollections': [],
   'collection.findById': collection,

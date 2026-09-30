@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { textOn } from './color'
-import { escapeHtml } from './html'
+import { decodeEntities, escapeHtml } from './html'
 
 export type LayoutInput = {
 	appName: string
@@ -26,6 +26,8 @@ export type LayoutInput = {
 	heading: string
 	bodyHtml: string
 	button: { label: string, url: string } | null
+	// Newsletters only: account emails cannot be turned off.
+	unsubscribeUrl?: string | null
 }
 
 const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
@@ -33,6 +35,16 @@ const INK = '#18181b'
 const TEXT = '#3f3f46'
 const MUTED = '#71717a'
 const LINE = '#e4e4e7'
+
+function bulletproofButton(label: string, url: string, accent: string, margin: string): string {
+	return `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:${margin};">
+                <tr>
+                  <td bgcolor="${accent}" style="border-radius:8px;background:${accent};">
+                    <a href="${escapeHtml(url)}" target="_blank" style="display:inline-block;padding:13px 24px;font-family:${FONT};font-size:15px;line-height:20px;font-weight:600;color:${textOn(accent)};text-decoration:none;border-radius:8px;">${label}</a>
+                  </td>
+                </tr>
+              </table>`
+}
 
 // Mail clients drop most stylesheets, so every tag the editor produces gets
 // its style inline.
@@ -51,8 +63,16 @@ function styleBody(html: string, accent: string): string {
 		strong: `font-weight:600;color:${INK};`,
 		hr: `border:0;border-top:1px solid ${LINE};margin:24px 0;`,
 	}
-	return html.replace(/<(p|h[1-4]|ul|ol|li|blockquote|a|strong|hr)(\s[^>]*)?>/gi, (_match, tag: string, attributes = '') =>
-		`<${tag}${attributes} style="${styles[tag.toLowerCase()]}">`)
+	return html
+		// A button written in the body: the same button the account emails use.
+		.replace(/<a\s[^>]*data-button[^>]*>([\s\S]*?)<\/a>/gi, (match, label: string) => {
+			const href = /\shref="([^"]*)"/i.exec(match)?.[1]
+			return href ? bulletproofButton(label, decodeEntities(href), accent, '8px 0 24px') : label
+		})
+		.replace(/<(p|h[1-4]|ul|ol|li|blockquote|a|strong|hr)(\s[^>]*)?>/gi, (_match, tag: string, attributes = '') =>
+			`<${tag}${attributes} style="${styles[tag.toLowerCase()]}">`)
+		.replace(/<img(\s[^>]*)>/gi, (_match, attributes: string) =>
+			`<img${attributes.replace(/\s*\/$/, '')} style="display:block;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;margin:0 0 16px;border-radius:8px;">`)
 		// A paragraph's margin would double the gap before the next block.
 		.replace(/<li([^>]*)><p[^>]*>([\s\S]*?)<\/p><\/li>/gi, '<li$1>$2</li>')
 }
@@ -64,13 +84,7 @@ export function emailLayout(input: LayoutInput): string {
 		? `<img src="${escapeHtml(input.logoUrl)}" width="160" alt="${escapeHtml(input.appName)}" style="display:block;width:auto;max-width:160px;max-height:48px;height:auto;border:0;outline:none;text-decoration:none;">`
 		: `<span style="font-size:18px;line-height:24px;font-weight:600;color:${INK};">${escapeHtml(input.appName)}</span>`
 	const button = input.button ? `
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 28px;">
-                <tr>
-                  <td bgcolor="${accent}" style="border-radius:8px;background:${accent};">
-                    <a href="${escapeHtml(input.button.url)}" target="_blank" style="display:inline-block;padding:13px 24px;font-family:${FONT};font-size:15px;line-height:20px;font-weight:600;color:${textOn(accent)};text-decoration:none;border-radius:8px;">${input.button.label}</a>
-                  </td>
-                </tr>
-              </table>
+              ${bulletproofButton(input.button.label, input.button.url, accent, '8px 0 28px')}
               <p style="margin:0;font-size:13px;line-height:20px;color:${MUTED};">Button not working? Paste this link into your browser:<br><a href="${escapeHtml(input.button.url)}" target="_blank" style="color:${MUTED};text-decoration:underline;word-break:break-all;">${escapeHtml(input.button.url)}</a></p>` : ''
 	const footer = input.footerText.trim()
 		? `${escapeHtml(input.footerText.trim()).replace(/\n/g, '<br>')}<br>`
@@ -113,7 +127,7 @@ export function emailLayout(input: LayoutInput): string {
           </tr>
           <tr>
             <td style="padding:24px 4px 0;font-family:${FONT};font-size:12px;line-height:18px;color:#a1a1aa;">
-              ${footer}Sent by ${escapeHtml(input.appName)} · <a href="${escapeHtml(input.appUrl)}" target="_blank" style="color:#a1a1aa;text-decoration:underline;">${escapeHtml(host)}</a>
+              ${footer}Sent by ${escapeHtml(input.appName)} · <a href="${escapeHtml(input.appUrl)}" target="_blank" style="color:#a1a1aa;text-decoration:underline;">${escapeHtml(host)}</a>${input.unsubscribeUrl ? `<br><a href="${escapeHtml(input.unsubscribeUrl)}" target="_blank" style="color:#a1a1aa;text-decoration:underline;">Unsubscribe from these emails</a>` : ''}
             </td>
           </tr>
         </table>

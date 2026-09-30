@@ -33,6 +33,11 @@ export function decodeEntities(value: string): string {
 export function htmlToText(html: string): string {
 	return decodeEntities(html
 		.replace(/<br\s*\/?>/gi, '\n')
+		// The editor wraps list items in paragraphs, which would double the gaps.
+		.replace(/<li([^>]*)>\s*<p[^>]*>([\s\S]*?)<\/p>\s*<\/li>/gi, '<li$1>$2</li>')
+		// A button stands on its own line.
+		.replace(/(<a\s[^>]*data-button[^>]*>[\s\S]*?<\/a>)/gi, '$1\n\n')
+		.replace(/<img\s[^>]*?alt="([^"]+)"[^>]*>/gi, '[$1]\n\n')
 		.replace(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_match, href: string, label: string) => {
 			const text = label.replace(/<[^>]+>/g, '').trim()
 			const target = decodeEntities(href)

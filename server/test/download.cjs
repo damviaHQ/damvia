@@ -222,3 +222,43 @@ test('the ready mail sends the owner the API link of their download, rendered fr
     assert.equal(mail.text.match(/https?:\/\/\S+/)[0], link)
     assert(mail.html.includes(`href="${link}"`))
 })
+
+test('a download lists its files with the names and folders they have in the archive, for its owner only', async () => {
+    const shot = await save(CollectionFile, { collectionId: child.id, assetFileId: (await makeFile(await makeFolder(), { name: 'shot.tiff', mimeType: 'image/tiff', size: '2048', hasThumbnail: true })).id })
+    const download = await makeDownload(fixtures.member, [shot.id, photo.id, notes.id], { status: 'expired', imageFormat: 'jpg' })
+    const contents = await caller(fixtures.member).download.contents({ id: download.id })
+    assert.equal(contents.total, 3)
+    assert.equal(contents.unavailable, 0)
+    assert.equal(contents.recordList, null)
+    assert.deepEqual(contents.entries.map(entry => [entry.folder, entry.name]), [['Root', 'photo.jpg'], ['Root/Child', 'notes.txt'], ['Root/Child', 'shot.jpg']])
+    const tiff = contents.entries.find(entry => entry.id === shot.id)
+    assert.equal(tiff.size, 2048)
+    assert.equal(tiff.thumbnailURL, 'https://example.test/fixture')
+    assert.equal(contents.entries.find(entry => entry.id === notes.id).thumbnailURL, null)
+
+    await assert.rejects(caller(await makeUser()).download.contents({ id: download.id }), e => e.code === 'NOT_FOUND')
+    await assert.rejects(caller(fixtures.member).download.contents({ id: randomUUID() }), e => e.code === 'NOT_FOUND')
+})
+
+test('a single-file download has no folder, and files the owner can no longer see are only counted', async () => {
+    const single = await caller(fixtures.member).download.contents({ id: (await makeDownload(fixtures.member, [notes.id])).id })
+    assert.deepEqual(single.entries.map(entry => [entry.folder, entry.name]), [['', 'notes.txt']])
+
+    const hidden = await makeCollection({ name: 'Hidden', public: false, ownerId: fixtures.manager.id, assetFolderId: (await makeFolder()).id })
+    const hiddenFile = await save(CollectionFile, { collectionId: hidden.id, assetFileId: (await makeFile(await makeFolder(), { name: 'secret.png' })).id })
+    const recordExport = { items: [], columns: ['Code'], format: 'xlsx', recordIds: [randomUUID(), randomUUID()] }
+    const mixed = await caller(fixtures.member).download.contents({ id: (await makeDownload(fixtures.member, [photo.id, hiddenFile.id, randomUUID()], { recordExport })).id })
+    assert.equal(mixed.total, 3)
+    assert.equal(mixed.unavailable, 2)
+    assert.deepEqual(mixed.entries.map(entry => entry.name), ['photo.png'])
+    assert.ok(!JSON.stringify(mixed).includes('secret'))
+    assert.deepEqual(mixed.recordList, { name: 'record-list.xlsx', rows: 2 })
+})
+
+test('the contents list stops at its limit and keeps the full count', async () => {
+    const { downloadContents } = harness.services.download
+    const download = await makeDownload(fixtures.member, [photo.id, notes.id])
+    const contents = await downloadContents(db.manager, fixtures.member, download, 1)
+    assert.equal(contents.entries.length, 1)
+    assert.equal(contents.total, 2)
+})

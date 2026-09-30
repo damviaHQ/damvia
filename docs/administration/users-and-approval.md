@@ -3,7 +3,7 @@ title: Users and approval
 description: Approve accounts, assign roles, groups and regions, and remove access without confusing verification with approval.
 sidebar:
   order: 3
-lastUpdated: 2026-09-28
+lastUpdated: 2026-09-29
 ---
 
 An account normally needs two independent conditions before it can use the library: its email must be verified and the account must be approved. Roles then decide what the person can administer; regions, groups, collection rules and file licences decide what content they can see.
@@ -74,6 +74,8 @@ Open a user from the Users screen (`/admin/users/{id}`). The **Account access** 
 | Resend verification email | `user.resendVerificationEmailFor` | Shown while the email is unverified. Sends the verification email again. |
 | Mark email as verified | `user.markEmailVerifiedFor` | Shown while the email is unverified. Confirms the address without the link, voids the pending link and records `user.email_verified`. It does not approve the account and sends no approval request. |
 | Reset two-step verification | `user.resetMfa` | Admins only, shown when the account has two-step verification on. Removes the enrolment and ends every session. The user enrols again at next sign-in if their role requires it. |
+
+A **Bounced** tag next to an address in the Users list means the mail provider reported it as undeliverable. Newsletters to it are paused until the address changes or is verified again; account emails are still sent. See [Newsletters](./newsletters.md#bounces-and-spam-reports).
 
 Managers and admins can also approve and suspend from a phone; see [Phones](./phones.md).
 

@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import AccountNavigation from "@/components/account/AccountNavigation.vue"
 import MainNavigation from "@/components/layout-main/MainNavigation.vue"
 import SearchPanel from "@/components/search/SearchPanel.vue"
 import Logo from "@/components/ClientLogo.vue"
@@ -87,6 +88,7 @@ onBeforeUnmount(() => {
 
 const route = useRoute()
 const isSearchRoute = computed(() => route.name === "search")
+const isAccountRoute = computed(() => route.name === "account")
 // The search panel needs room for counts and long attribute values.
 const SEARCH_SIDEBAR_MIN = 320
 const asideWidth = computed(() => isSearchRoute.value ? Math.max(sidebarWidth.value, SEARCH_SIDEBAR_MIN) : sidebarWidth.value)
@@ -113,6 +115,7 @@ watch(() => route.fullPath, () => { mobileNavOpen.value = false })
         <Button class="mx-3 mt-3 justify-start md:hidden" variant="ghost" @click="mobileNavOpen = false"><X class="size-4" />Close navigation</Button>
         <div class="min-h-0 flex-1 overflow-y-auto px-3 py-5">
         <SearchPanel v-if="isSearchRoute" />
+        <AccountNavigation v-else-if="isAccountRoute" />
         <MainNavigation v-else />
         </div>
       </aside>

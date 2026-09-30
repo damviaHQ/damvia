@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from '@trpc/server'
 import { randomBytes } from 'node:crypto'
 import QRCode from 'qrcode'
+import { IsNull } from 'typeorm'
 import { z } from 'zod'
 import { CollectionInvitation } from '../../entity/collection-invitation'
 import { User } from '../../entity/user'
@@ -109,7 +110,9 @@ export default router({
 				await recordFailedSignIn(user, ctx.req)
 				throw invalidCredentials()
 			}
-			await clearFailedSignIns(user)
+			// With MFA, the count is cleared once the code is right, so a known
+			// password does not reset the lockout on wrong codes.
+			if (!user.mfaEnabledAt) await clearFailedSignIns(user)
 			return completeSignIn(ctx.req, ctx.res, user, SessionMethod.PASSWORD)
 		}),
 	verifyMfa: publicProcedure
@@ -120,10 +123,13 @@ export default router({
 			const user = await userWithMfa(challenge.userId)
 			if (!user || !user.mfaEnabledAt) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Your sign-in expired. Please start again.' })
 			assertNotSuspended(user)
+			if (isLocked(user)) throw tooManyAttempts()
 			if (!await consumeSecondFactor(user, input.code)) {
 				await recordAudit(null, { actorId: null, action: 'auth.mfa_failed', targetType: 'user', targetId: user.id, req: ctx.req })
+				await recordFailedSignIn(user, ctx.req)
 				throw new TRPCError({ code: 'BAD_REQUEST', message: 'This code is not valid.' })
 			}
+			await clearFailedSignIns(user)
 			await createSession(ctx.req, ctx.res, user, challenge.method, { invitationId: challenge.invitationId })
 			return { status: 'signed_in' }
 		}),
@@ -159,8 +165,7 @@ export default router({
 			enforce(`legacy:ip:${ctx.req.ip}`, 20, MINUTE)
 			const user = await userFromLegacyToken(ctx.req.headers.authorization)
 			if (!user) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Please sign in again.' })
-			await createSession(ctx.req, ctx.res, user, SessionMethod.LEGACY)
-			return { status: 'signed_in' }
+			return completeSignIn(ctx.req, ctx.res, user, SessionMethod.LEGACY)
 		}),
 	logout: publicProcedure
 		.mutation(async ({ ctx }) => {
@@ -206,7 +211,8 @@ export default router({
 		.mutation(async ({ ctx }) => {
 			if (ctx.user.mfaEnabledAt) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Two-step verification is already on.' })
 			const base32 = generateMfaSecret()
-			await dataSource.getRepository(User).update(ctx.user.id, { mfaSecret: encryptMfaSecret(base32), mfaLastStep: null })
+			const updated = await dataSource.getRepository(User).update({ id: ctx.user.id, mfaEnabledAt: IsNull() }, { mfaSecret: encryptMfaSecret(base32), mfaLastStep: null })
+			if (!updated.affected) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Two-step verification is already on.' })
 			const uri = mfaUri(base32, ctx.user.email, process.env.APP_NAME ?? 'Damvia')
 			return { secret: base32, uri, qrSvg: await QRCode.toString(uri, { type: 'svg', margin: 1 }) }
 		}),
@@ -220,9 +226,10 @@ export default router({
 			const step = verifyTotp(decryptMfaSecret(user.mfaSecret), input.code.replace(/\s/g, ''), null)
 			if (step === null) throw new TRPCError({ code: 'BAD_REQUEST', message: 'This code is not valid.' })
 			const { codes, hashes } = generateRecoveryCodes()
-			await dataSource.getRepository(User).update(user.id, {
+			const enabled = await dataSource.getRepository(User).update({ id: user.id, mfaEnabledAt: IsNull(), mfaSecret: user.mfaSecret }, {
 				mfaEnabledAt: new Date(), mfaLastStep: String(step), mfaRecoveryCodes: hashes,
 			})
+			if (!enabled.affected) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Start the setup again.' })
 			await revokeUserSessions(user.id, { exceptSessionId: ctx.session.id })
 			await recordAudit(null, { actorId: user.id, action: 'mfa.enabled', targetType: 'user', targetId: user.id, req: ctx.req })
 			return { recoveryCodes: codes }

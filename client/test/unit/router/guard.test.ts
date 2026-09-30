@@ -46,5 +46,14 @@ describe('navigation guard', () => {
     const library = { name: 'library', query: {}, meta: { mobileOnly: true } }
     expect(guardNavigation(library, true, 'member', true)).toBeUndefined()
     expect(guardNavigation(library, true, 'member', false)).toEqual({ name: 'home' })
+    const downloads = { name: 'downloads', query: {}, meta: { mobileOnly: true, desktop: { name: 'account', params: { section: 'downloads' } } } }
+    expect(guardNavigation(downloads, true, 'member', false)).toEqual({ name: 'account', params: { section: 'downloads' } })
+  })
+
+  test('phones open account downloads on their own screen', () => {
+    const account = { name: 'account', query: {}, params: { section: 'downloads' }, meta: {} }
+    expect(guardNavigation(account, true, 'member', true)).toEqual({ name: 'downloads' })
+    expect(guardNavigation(account, true, 'member', false)).toBeUndefined()
+    expect(guardNavigation({ ...account, params: { section: 'profile' } }, true, 'member', true)).toBeUndefined()
   })
 })

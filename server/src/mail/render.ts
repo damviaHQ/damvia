@@ -25,6 +25,7 @@ import { EmailContent, emailDefinition } from './catalogue'
 import { DEFAULT_ACCENT } from './color'
 import { decodeEntities, escapeHtml, htmlToText } from './html'
 import { emailLayout } from './layout'
+import { sanitizeNewsletterHtml } from './newsletter-sanitize'
 
 // Templates are written by admins. Nothing they write can read a file, call a
 // filter that does not exist, or run away with memory, and every value is
@@ -71,14 +72,17 @@ function liquidSource(value: string): string {
 	return value.replace(/\{\{[\s\S]*?\}\}|\{%[\s\S]*?%\}/g, (tag) => decodeEntities(tag))
 }
 
-async function renderParts(key: string, content: EmailContent, context: Record<string, unknown>) {
-	const definition = emailDefinition(key)
-	let body = liquidSource(sanitizeBlockHtml(content.bodyHtml))
-	for (const block of definition.blocks) {
+type Parts = { subject: string, preheader: string, heading: string, bodyHtml: string, buttonLabel: string }
+type RenderOptions = { blocks?: { name: string }[], sanitize?: (html: string) => string }
+
+// Liquid over each field, the admin's markup cleaned before and after.
+async function renderParts(content: EmailContent, context: Record<string, unknown>, { blocks = [], sanitize = sanitizeBlockHtml }: RenderOptions = {}): Promise<Parts> {
+	let body = liquidSource(sanitize(content.bodyHtml))
+	for (const block of blocks) {
 		body = body.replace(new RegExp(`\\{\\{\\s*${block.name}\\s*\\}\\}`, 'g'), BLOCK(block.name))
 	}
 	let bodyHtml = await html.parseAndRender(body, context)
-	for (const block of definition.blocks) {
+	for (const block of blocks) {
 		const rendered = BLOCKS[block.name]?.(context) ?? ''
 		bodyHtml = bodyHtml
 			.replace(new RegExp(`<p>\\s*${BLOCK(block.name)}\\s*</p>`, 'g'), rendered)
@@ -90,7 +94,7 @@ async function renderParts(key: string, content: EmailContent, context: Record<s
 		preheader: plainHtml(await html.parseAndRender(liquidSource(content.preheader), context)),
 		heading: plainHtml(await html.parseAndRender(liquidSource(content.heading), context)),
 		buttonLabel: plainHtml(await html.parseAndRender(liquidSource(content.buttonLabel), context)),
-		bodyHtml: sanitizeBlockHtml(bodyHtml),
+		bodyHtml: sanitize(bodyHtml),
 	}
 }
 
@@ -111,33 +115,71 @@ export async function accentColor(): Promise<string> {
 	return brand?.accentColor ?? DEFAULT_ACCENT
 }
 
-export async function renderEmail(key: string, values: Record<string, unknown>, draft?: EmailContent): Promise<RenderedEmail> {
-	const definition = emailDefinition(key)
-	const content = draft ?? (await templateContent(key)).content
-	const context = { appName: await brandName(), appUrl: appURL(), ...values }
-	const parts = await renderParts(key, content, context)
-	const [accent, logoUrl, sender] = await Promise.all([accentColor(), emailLogoUrl(), emailSender()])
-	const actionUrl = definition.action ? values[definition.action] : null
-	const button = typeof actionUrl === 'string' && actionUrl && parts.buttonLabel ? { label: parts.buttonLabel, url: actionUrl } : null
+type Frame = { appName: string, appUrl: string, button: { label: string, url: string } | null, unsubscribeUrl?: string | null }
 
+// The branded layout around rendered parts, and the matching plain text.
+async function compose(parts: Parts, frame: Frame): Promise<RenderedEmail> {
+	const [accent, logoUrl, sender] = await Promise.all([accentColor(), emailLogoUrl(), emailSender()])
+	const { appName, appUrl, button, unsubscribeUrl } = frame
 	const document = emailLayout({
-		appName: context.appName, appUrl: context.appUrl, accent, logoUrl, footerText: sender.footerText,
-		subject: parts.subject, preheader: parts.preheader, heading: parts.heading, bodyHtml: parts.bodyHtml, button,
+		appName, appUrl, accent, logoUrl, footerText: sender.footerText,
+		subject: parts.subject, preheader: parts.preheader, heading: parts.heading, bodyHtml: parts.bodyHtml, button, unsubscribeUrl,
 	})
 	const plain = [
 		parts.heading && htmlToText(parts.heading),
 		htmlToText(parts.bodyHtml),
 		button && `${htmlToText(button.label)}: ${button.url}`,
-		`--\n${[sender.footerText.trim(), `${context.appName} · ${context.appUrl}`].filter(Boolean).join('\n')}`,
+		`--\n${[sender.footerText.trim(), `${appName} · ${appUrl}`, unsubscribeUrl && `Unsubscribe: ${unsubscribeUrl}`].filter(Boolean).join('\n')}`,
 	].filter(Boolean).join('\n\n')
 	return { subject: parts.subject, html: document, text: plain }
+}
+
+export async function renderEmail(key: string, values: Record<string, unknown>, draft?: EmailContent): Promise<RenderedEmail> {
+	const definition = emailDefinition(key)
+	const content = draft ?? (await templateContent(key)).content
+	const context = { appName: await brandName(), appUrl: appURL(), ...values }
+	const parts = await renderParts(content, context, { blocks: definition.blocks })
+	const actionUrl = definition.action ? values[definition.action] : null
+	const button = typeof actionUrl === 'string' && actionUrl && parts.buttonLabel ? { label: parts.buttonLabel, url: actionUrl } : null
+	return compose(parts, { appName: context.appName, appUrl: context.appUrl, button })
 }
 
 // Saving a template that cannot render would fail every email it sends.
 export async function assertRenders(key: string, content: EmailContent) {
 	try {
-		await renderParts(key, content, { appName: await brandName(), appUrl: appURL(), ...emailDefinition(key).sample })
+		await renderParts(content, { appName: await brandName(), appUrl: appURL(), ...emailDefinition(key).sample }, { blocks: emailDefinition(key).blocks })
 	} catch (error) {
 		throw new TRPCError({ code: 'BAD_REQUEST', message: `The template has an error: ${(error as Error).message}` })
+	}
+}
+
+export type NewsletterContent = { subject: string, preheader: string, heading: string, bodyHtml: string }
+export type NewsletterReader = { name: string, email: string }
+
+export const NEWSLETTER_VARIABLES = [
+	{ name: 'user.name', description: "The reader's full name" },
+	{ name: 'user.firstName', description: "The reader's first name" },
+	{ name: 'user.email', description: "The reader's email address" },
+	{ name: 'appName', description: 'Your brand name, set in Settings' },
+	{ name: 'appUrl', description: 'The address of the portal' },
+]
+
+function newsletterContext(appName: string, reader: NewsletterReader) {
+	const name = reader.name.trim()
+	return { appName, appUrl: appURL(), user: { name, firstName: name.split(/\s+/)[0] ?? '', email: reader.email } }
+}
+
+export async function renderNewsletter(content: NewsletterContent, reader: NewsletterReader, unsubscribeUrl: string | null): Promise<RenderedEmail> {
+	const appName = await brandName()
+	const parts = await renderParts({ ...content, buttonLabel: '' }, newsletterContext(appName, reader), { sanitize: sanitizeNewsletterHtml })
+	return compose(parts, { appName, appUrl: appURL(), button: null, unsubscribeUrl })
+}
+
+// Scheduling a newsletter that cannot render would fail every email in it.
+export async function assertNewsletterRenders(content: NewsletterContent) {
+	try {
+		await renderParts({ ...content, buttonLabel: '' }, newsletterContext(await brandName(), { name: 'Sample Reader', email: 'reader@example.com' }), { sanitize: sanitizeNewsletterHtml })
+	} catch (error) {
+		throw new TRPCError({ code: 'BAD_REQUEST', message: `The newsletter has an error: ${(error as Error).message}` })
 	}
 }

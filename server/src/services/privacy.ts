@@ -27,7 +27,7 @@ export async function exportUserData(userId: string) {
 			u.suspended_at AS "suspendedAt", u.last_login_at AS "lastLoginAt", u.created_at AS "createdAt", u.updated_at AS "updatedAt"
 		FROM users u LEFT JOIN regions r ON r.id = u.region_id WHERE u.id = $1`)
 	if (!account) return null
-	const [groups, fileFavorites, collectionFavorites, collections, invitationsReceived, invitationsSent, downloads, activity, recordChanges, sessions, audit] = await Promise.all([
+	const [groups, fileFavorites, collectionFavorites, collections, invitationsReceived, invitationsSent, downloads, activity, recordChanges, sessions, audit, newsletters, [subscription]] = await Promise.all([
 		query(`SELECT g.name FROM user_groups ug JOIN groups g ON g.id = ug.group_id WHERE ug.user_id = $1 ORDER BY g.name`),
 		query(`SELECT af.name AS file, c.name AS collection, uf.created_at AS "createdAt"
 			FROM user_favorites uf JOIN collection_files cf ON cf.id = uf.collection_file_id
@@ -50,6 +50,9 @@ export async function exportUserData(userId: string) {
 		query(`SELECT created_at AS "createdAt", action, target_type AS "targetType", target_id AS "targetId", before, after,
 			actor_id = $1 AS "byYou", CASE WHEN actor_id = $1 THEN ip END AS ip, CASE WHEN actor_id = $1 THEN user_agent END AS "userAgent"
 			FROM audit_log WHERE actor_id = $1 OR (target_type = 'user' AND target_id = $1::text) ORDER BY created_at`),
+		query(`SELECT n.subject, r.email, r.status, r.sent_at AS "sentAt" FROM newsletter_recipients r
+			JOIN newsletters n ON n.id = r.newsletter_id WHERE r.user_id = $1 ORDER BY n.started_at, n.id`),
+		query(`SELECT newsletter_opt_out_at AS "unsubscribedAt", email_bounced_at AS "bouncedAt", email_bounce_reason AS "bounceReason" FROM users WHERE id = $1`),
 	])
 	return {
 		exportedAt: new Date().toISOString(),
@@ -63,6 +66,7 @@ export async function exportUserData(userId: string) {
 		recordChanges,
 		sessions,
 		audit,
+		newsletters: { subscribed: !subscription.unsubscribedAt, ...subscription, received: newsletters },
 	}
 }
 
@@ -75,4 +79,6 @@ export async function anonymiseUser(em: EntityManager, user: { id: string, email
 	await em.query(`UPDATE audit_log SET actor_label = $2 WHERE actor_id IS NULL AND lower(actor_label) = lower($1)`, [user.email, label])
 	await em.query(`UPDATE activity_events SET user_id = NULL WHERE user_id = $1`, [user.id])
 	await em.query(`UPDATE record_changes SET changed_by_id = NULL WHERE changed_by_id = $1`, [user.id])
+	// Kept so a newsletter's counts stay right, without saying who it reached.
+	await em.query(`UPDATE newsletter_recipients SET email = '', name = $2, user_id = NULL WHERE user_id = $1`, [user.id, label])
 }

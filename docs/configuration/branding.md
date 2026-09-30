@@ -3,7 +3,7 @@ title: Branding
 description: Rename the instance, set the accent colour of the portal and emails, set the login background, and replace the logo and favicon.
 sidebar:
   order: 5
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-29
 ---
 
 Branding uses runtime settings, build-time colours, an admin background upload, and static logo files. Knowing which is which saves a rebuild.
@@ -41,7 +41,7 @@ The three build-time variables `VITE_BRAND_COLOR`, `VITE_BRAND_COLOR_HOVER` and 
 
 An admin uploads an image under `/admin/settings`. The flow is:
 
-1. The client asks the server for a presigned PUT URL (`settings/auth-background-temp` in the main bucket, valid 24 hours) and uploads the file straight to S3.
+1. The client asks the server for a presigned POST policy (`settings/auth-background-temp/{userId}/{uploadId}` in the main bucket, valid 10 minutes) and uploads the file straight to S3.
 2. The server downloads it, resizes it to at most 2000 px high with `sharp`, encodes it as WebP at quality 80, stores it as `settings/auth-background.webp`, and deletes the temporary object.
 3. The login, sign-up and password pages ask for `settings.getAuthBackgroundImage`, which returns a presigned GET URL valid 24 hours when the object exists.
 

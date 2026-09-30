@@ -36,7 +36,7 @@ const isCreateOpen = ref(false)
       </MainPageTools>
       <MainPageTools area="actions"><template v-if="myCollections.length">
         <DisplayPreferences :collections="myCollections" />
-        <Button @click="isCreateOpen = true">
+        <Button type="button" variant="ghost" size="sm" class="text-neutral-500 hover:text-neutral-900" @click="isCreateOpen = true">
           <Plus aria-hidden="true" /> Create collection
         </Button>
       </template></MainPageTools>

@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import './load-env'
+import { Resolver } from 'node:dns/promises'
 import "reflect-metadata"
 import { Client as MinioClient } from 'minio'
 import { statfs } from "node:fs/promises"
@@ -161,6 +162,69 @@ export function mailTransporter(): Transporter {
     })
   }
   return _mailTransporter
+}
+
+// Newsletters go through their own connection, so a large send does not
+// delay a password reset. The pace is kept by the sender, across workers.
+let _newsletterTransporter: Transporter | null = null
+export function newsletterTransporter(): Transporter {
+  if (!_newsletterTransporter) {
+    _newsletterTransporter = createTransport({
+      host: process.env.SMTP_HOST ?? 'localhost',
+      port: parseInt(process.env.SMTP_PORT ?? '1025', 10),
+      secure: process.env.SMTP_PORT === '465',
+      requireTLS: process.env.SMTP_REQUIRE_TLS === 'true',
+      auth: (process.env.SMTP_USER && process.env.SMTP_PASS) ? {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      } : undefined,
+      pool: true,
+      maxConnections: 1,
+      // The send holds the lock that paces every worker: a stalled server must not keep it.
+      connectionTimeout: 30_000,
+      socketTimeout: 60_000,
+    }, {
+      headers: {
+        'X-PM-Message-Stream': process.env.NEWSLETTER_MESSAGE_STREAM?.trim() || 'outbound',
+      },
+    })
+  }
+  return _newsletterTransporter
+}
+
+// Newsletter messages allowed in any 24 hours; the rest wait for the next
+// day. A sudden burst from a domain is what spam filters punish first.
+export function newsletterDailyLimit(): number | null {
+  const raw = process.env.NEWSLETTER_DAILY_LIMIT?.trim()
+  const limit = Number(raw || '2000')
+  if (!Number.isInteger(limit) || limit < 0) throw new Error('NEWSLETTER_DAILY_LIMIT must be a whole number; 0 turns the limit off.')
+  return limit || null
+}
+
+export function newsletterRatePerSecond(): number {
+  const rate = Number(process.env.NEWSLETTER_RATE_PER_SECOND ?? '5')
+  if (!Number.isFinite(rate) || rate <= 0) throw new Error('NEWSLETTER_RATE_PER_SECOND must be a positive number.')
+  return rate
+}
+
+// The secret in the address mail providers post bounces and complaints to.
+// Unset, the address does not exist.
+export function emailEventsSecret(): string | null {
+  const value = process.env.EMAIL_EVENTS_SECRET?.trim()
+  if (!value) return null
+  if (value.length < 32) throw new Error('EMAIL_EVENTS_SECRET must be at least 32 characters, such as the output of `openssl rand -hex 32`.')
+  return value
+}
+
+// Read again at each use, so a typo stops the server here rather than the
+// newsletter screens later.
+newsletterDailyLimit()
+newsletterRatePerSecond()
+emailEventsSecret()
+
+// Looks up the sender domain's records for the email settings screen.
+export function dnsResolver(): Resolver {
+  return new Resolver({ timeout: 3000, tries: 2 })
 }
 
 // Days before a licence's end date on which admins are emailed.

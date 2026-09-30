@@ -3,17 +3,17 @@ title: Backups
 description: Protect PostgreSQL, the main bucket and configuration together, and rehearse recovery with the matching application version.
 sidebar:
   order: 7
-lastUpdated: 2026-09-21
+lastUpdated: 2026-09-29
 ---
 
 A recoverable instance needs a consistent database backup, main-bucket backup, configuration/secrets and the application version that produced them. Re-importing cloud assets does not reconstruct users, permissions or editorial uploads.
 
 | Store | Contents | Recovery |
 |---|---|---|
-| PostgreSQL | Users, permissions, collections, pages, records, asset metadata, downloads and pg-boss jobs | Restore the database backup. |
-| Main bucket | Collection thumbnails, page images/videos, login background | Restore objects from the same backup window. |
+| PostgreSQL | Users, permissions, collections, pages, records, asset metadata, downloads, email templates and sender, brand settings, newsletters, audiences and their recipients, and pg-boss jobs | Restore the database backup. |
+| Main bucket | Collection thumbnails, page images/videos, login background, client logo and its email copy, newsletter images (`newsletters/images/`, which emails already sent still load) | Restore objects from the same backup window. |
 | Assets bucket | Originals, generated previews, prepared archives | Re-fetch originals/previews only if cloud sources remain accessible. Archives are not recreated. |
-| Configuration and code | Server secrets, client build settings, mail templates, custom branding, commit/image identifiers | Restore from your configuration and release archive. |
+| Configuration and code | Server secrets (including `EMAIL_EVENTS_SECRET`), client build settings, commit/image identifiers | Restore from your configuration and release archive. |
 
 ## Back up the database and files together
 

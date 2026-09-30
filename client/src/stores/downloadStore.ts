@@ -18,7 +18,7 @@ import { defineStore } from "pinia"
 import type { DownloadStatus, DownloadType } from "server/src/entity/download"
 import { computed, ref, watch } from "vue"
 
-interface Download {
+export interface Download {
   url: string | null
   status: DownloadStatus
   id: string
@@ -27,6 +27,7 @@ interface Download {
   updatedAt: string
   downloadType: DownloadType
   fileCount: number
+  recordCount: number
   size?: number
 }
 

@@ -84,7 +84,7 @@ const hiddenCount = computed(() => filter.value.trim() ? 0 : available.value.len
     <div v-if="showHeader" class="flex h-8 items-center pr-2 hover:bg-neutral-200/60">
       <button type="button" class="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2" :aria-expanded="isOpen" :aria-controls="`${id}-options`" @click="isOpen = !isOpen">
         <span :id="`${id}-title`" :class="sidebarSectionTitleClasses" class="min-w-0 flex-1 truncate text-left">{{ title }}</span>
-        <span v-if="selected.length" class="grid size-5 place-items-center bg-neutral-800 text-[11px] font-semibold text-white" :aria-label="`${selected.length} selected`">{{ selected.length }}</span>
+        <span v-if="selected.length" class="grid size-5 place-items-center rounded-full bg-secondary text-[11px] font-semibold text-secondary-foreground" :aria-label="`${selected.length} selected`">{{ selected.length }}</span>
       </button>
       <button v-if="filterable && isOpen" type="button" class="mr-1 grid size-6 shrink-0 cursor-pointer place-items-center text-neutral-500 hover:bg-neutral-300/60 hover:text-neutral-900" :aria-label="`Search in ${title}`" :aria-expanded="isFilterOpen" :aria-controls="`${id}-filter`" @click="toggleFilter">
         <Search class="size-3.5" aria-hidden="true" />

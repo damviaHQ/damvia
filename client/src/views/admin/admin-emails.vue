@@ -20,13 +20,29 @@ import { Label } from "@/components/ui/label"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { extractErrors, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ChevronRight } from "@lucide/vue"
+import { AlertTriangle, CheckCircle2, ChevronRight, RefreshCw, XCircle } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
 const { data: templates, status, refetch } = useQuery({ queryKey: ['email-templates'], queryFn: () => trpc.emailTemplate.list.query() })
 const { data: settings } = useQuery({ queryKey: ['email-settings'], queryFn: () => trpc.emailTemplate.getSettings.query() })
+
+// What the sender domain publishes, looked up again after the sender changes.
+const selector = ref('')
+const checkedSelector = ref('')
+const { data: domain, error: domainError, isFetching: checkingDomain, refetch: recheckDomain } = useQuery({
+  queryKey: computed(() => ['email-domain', settings.value?.effectiveFrom.address, checkedSelector.value]),
+  queryFn: () => trpc.emailTemplate.checkDomain.query({ selector: checkedSelector.value || undefined }),
+  enabled: computed(() => !!settings.value),
+  staleTime: 60_000,
+  retry: false,
+})
+function checkSelector() {
+  if (checkedSelector.value === selector.value.trim()) recheckDomain()
+  else checkedSelector.value = selector.value.trim()
+}
+const STATUS_LABELS = { ok: 'Set up', warning: 'Needs attention', missing: 'Missing' } as const
 
 const groups = [
   { key: 'account', title: 'Account', description: 'Sign-up, sign-in and approval.' },
@@ -108,6 +124,48 @@ function edited(date: Date | string | null, by: string | null) {
         </form>
       </section>
 
+      <section class="dv-panel emails-panel" aria-labelledby="domain-heading">
+        <div class="domain-head">
+          <div>
+            <h2 id="domain-heading">Sender domain<template v-if="domain?.domain">: {{ domain.domain }}</template></h2>
+            <p>Receivers check these DNS records before trusting an email. Without them, emails land in spam and the domain loses its reputation.<template v-if="settings?.provider"> Emails go through {{ settings.provider }}.</template></p>
+          </div>
+          <Button variant="outline" class="dv-button" :disabled="checkingDomain" @click="recheckDomain()"><RefreshCw class="size-4 mr-2" aria-hidden="true" />{{ checkingDomain ? 'Checking…' : 'Check again' }}</Button>
+        </div>
+        <p v-if="domainError && !checkingDomain" class="domain-problem" role="alert">{{ extractErrors(domainError).message }}</p>
+        <p v-else-if="domain?.problem" class="domain-problem" role="alert">{{ domain.problem }}</p>
+        <ul v-else-if="domain" class="domain-checks">
+          <li v-for="check in domain.checks" :key="check.key" :data-status="check.status">
+            <CheckCircle2 v-if="check.status === 'ok'" class="domain-icon" aria-hidden="true" />
+            <AlertTriangle v-else-if="check.status === 'warning'" class="domain-icon" aria-hidden="true" />
+            <XCircle v-else class="domain-icon" aria-hidden="true" />
+            <div class="domain-body">
+              <p class="domain-title"><strong>{{ check.label }}</strong><span>{{ STATUS_LABELS[check.status] }}</span></p>
+              <code v-for="value in check.found" :key="value">{{ value }}</code>
+              <p v-if="check.advice" class="domain-advice">{{ check.advice }}</p>
+              <form v-if="check.key === 'dkim'" class="domain-selector" @submit.prevent="checkSelector">
+                <Label for="dkim-selector" class="sr-only">DKIM selector</Label>
+                <Input id="dkim-selector" v-model="selector" placeholder="Selector, such as 20260901pm" maxlength="63" />
+                <Button type="submit" variant="outline" class="dv-button" :disabled="checkingDomain">Check selector</Button>
+              </form>
+            </div>
+          </li>
+        </ul>
+        <div v-if="settings" class="domain-events" :data-status="settings.emailEvents.enabled ? 'ok' : 'warning'">
+          <p class="domain-title"><strong>Bounce and spam reports</strong><span>{{ settings.emailEvents.enabled ? 'Connected' : 'Not connected' }}</span></p>
+          <p v-if="settings.emailEvents.enabled" class="domain-advice">
+            Your mail provider posts them to <code>{{ settings.emailEvents.url }}…</code>
+            <template v-if="settings.emailEvents.lastAt"> Last report {{ new Date(settings.emailEvents.lastAt).toLocaleString() }}.</template><template v-else> No report received yet.</template>
+            {{ settings.emailEvents.bounced }} {{ settings.emailEvents.bounced === 1 ? 'address is' : 'addresses are' }} paused after a bounce; they show as <strong>Bounced</strong> in Users.
+          </p>
+          <p v-else class="domain-advice">Without them, addresses that bounce keep being sent to, and people who mark newsletters as spam keep receiving them, which harms the domain's reputation. The host sets <code>EMAIL_EVENTS_SECRET</code> and gives your provider the address <code>{{ settings.emailEvents.url }}&lt;secret&gt;</code>.</p>
+        </div>
+        <p v-if="settings" class="emails-note">
+          Newsletters leave at {{ settings.newsletterPace.perSecond }} a second<template v-if="settings.newsletterPace.perDay">, at most {{ settings.newsletterPace.perDay.toLocaleString() }} a day; a bigger audience is spread over the following days</template><template v-else>, with no daily limit</template>.
+          A new domain earns trust slowly: start with small sends. The host sets both limits (<code>NEWSLETTER_RATE_PER_SECOND</code>, <code>NEWSLETTER_DAILY_LIMIT</code>).
+        </p>
+      </section>
+
       <p v-if="status === 'pending'" role="status">Loading emails…</p>
       <div v-else-if="status === 'error'" role="alert">The emails could not be loaded. <Button class="dv-button" variant="outline" @click="refetch()">Try again</Button></div>
       <section v-for="group in grouped" v-else :key="group.key" class="dv-panel emails-group" :aria-labelledby="`group-${group.key}`">
@@ -164,6 +222,24 @@ function edited(date: Date | string | null, by: string | null) {
 .emails-row-recipients { font-size:var(--dv-size-caption); color:var(--dv-text-primary); }
 .emails-badge { font-size:11px; font-weight:500; padding:2px 8px; background:var(--dv-action-soft); color:var(--dv-action-primary); }
 .emails-row-chevron { width:18px; height:18px; color:var(--dv-text-secondary); }
+.domain-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.domain-problem { margin-top:16px; padding:10px 14px; background:#fffaeb; color:#93370d; font-size:var(--dv-size-body); }
+.domain-checks { list-style:none; margin:20px 0 16px; padding:0; border:1px solid var(--dv-color-line); }
+.domain-checks li { display:flex; gap:12px; padding:14px 16px; }
+.domain-checks li + li { border-top:1px solid var(--dv-color-line); }
+.domain-icon { width:18px; height:18px; flex-shrink:0; margin-top:2px; }
+.domain-checks [data-status=ok] .domain-icon { color:#067647; }
+.domain-checks [data-status=warning] .domain-icon { color:#b54708; }
+.domain-checks [data-status=missing] .domain-icon { color:var(--dv-color-danger, #b42318); }
+.domain-body { display:grid; gap:6px; min-width:0; flex:1; }
+.domain-title { display:flex; gap:10px; align-items:baseline; font-size:var(--dv-size-body); }
+.domain-title span { font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
+.domain-body code { font-size:var(--dv-size-caption); background:var(--dv-surface-canvas); padding:4px 8px; overflow-wrap:anywhere; }
+.domain-advice { font-size:var(--dv-size-caption); color:var(--dv-text-primary); }
+.domain-selector { display:flex; gap:8px; max-width:420px; }
+.emails-note code, .domain-events code { font-size:inherit; overflow-wrap:anywhere; }
+.domain-events { display:grid; gap:4px; padding:14px 16px; margin-bottom:16px; border:1px solid var(--dv-color-line); }
+.domain-events[data-status=warning] { background:#fffaeb; }
 .emails-panel :deep(.dv-button) { height:auto; padding:9px 14px; box-shadow:none; border-radius:0; }
 @media(max-width:700px) {
   .emails-panel { padding:20px; }

@@ -163,7 +163,7 @@ Back up first and apply the migration with application writers stopped. Validate
 
 - Synchronized collections are now identified by the folder they mirror (`asset_folder_id`), no longer by their name. The unique `(parent_id, name)` constraint is dropped; the migration first retires rows that mirrored the same folder twice under one parent (an artefact of the old rename race), keeping the oldest and moving custom collections found under the others to it (those that were more than one level down are flagged `duplicate_mirror` so an admin can put them back where they belong), then adds a unique index on `(parent_id, asset_folder_id)`.
 - `mpath` of `collections` and `menu_items` is rebuilt from `parent_id`, and `number_of_files` is recounted for every collection. On a large library this is a full scan of `collection_files`; run the upgrade off-peak.
-- Three nullable columns are added to `collections`: `orphaned_at`, `orphaned_from_name`, `orphaned_reason`. They mark custom collections re-homed after their synchronized parent disappeared, and synchronized collections whose folder moved somewhere ambiguous. See [Collections and sharing](../administration/collections-and-sharing.md#custom-collections-inside-a-synchronized-tree).
+- Three nullable columns are added to `collections`: `orphaned_at`, `orphaned_from_name`, `orphaned_reason`. They mark custom collections re-homed after their synchronized parent disappeared, and synchronized collections whose folder moved somewhere ambiguous. See [Collections and sharing](../administration/collections-and-sharing.md#custom-collections-survive-inside-a-synchronised-tree).
 - A synchronization no longer deletes child collections. Removal happens only when a folder leaves the cloud storage and the `asset/process-deletion` job runs. If you relied on a synchronization to prune collections whose folder still exists, delete them from the admin screen.
 - Rolling this migration back re-adds the name constraint; siblings sharing a name are renamed with a ` (2)`, ` (3)` suffix first.
 
@@ -188,11 +188,24 @@ Two stages join the enrichment pass, `families` and `readiness`, plus `product-r
 Emails are now branded HTML, with their wording edited under **Admin → Emails** instead of in a file.
 
 - **`MAILCONFIG` and `server/mailconfig.json` are no longer read.** Every email uses the new built-in wording until an admin changes it. If you had customised the wording, copy it into **Admin → Emails** before or right after the upgrade, then remove `MAILCONFIG`: startup logs a warning while it is set.
-- **Set the sender** under **Admin → Emails**. Sender addresses used to be in the templates; until set, emails leave from `APP_NAME` at `no-reply@` followed by the `APP_URL` host, which your mail provider may refuse. See [SMTP](../integrations/smtp.md).
+- **Set the sender** under **Admin → Emails**. Sender addresses used to be in the templates; until set, emails leave from the brand name (or `APP_NAME`) at `no-reply@` followed by the `APP_URL` host, which your mail provider may refuse. See [SMTP](../integrations/smtp.md).
 - **Emails show the client logo** from `API_URL/v1/branding/email-logo.png`, a public address. The PNG copy of an existing logo is made at the first email.
 - **Set the brand name** under **Admin → Settings**. Emails and the browser tab otherwise keep `APP_NAME`, which is often the long default name.
 - **Choose an accent colour** under **Admin → Settings**. It colours the email buttons and, from this release, the buttons and links of the client portal. Without one, emails and the portal keep the neutral dark colour.
 - The `email-templates` migration creates `brand_settings`, `email_settings` (one row each) and `email_templates` (empty). Rolling it back drops them and the customised wording.
+
+## Newsletters in this upgrade
+
+Admins can send [newsletters](../administration/newsletters.md) under **Admin → Newsletters**.
+
+- **Check your mail provider accepts bulk email** before the first send, and set `NEWSLETTER_RATE_PER_SECOND` under its limit (5 a second by default). At most `NEWSLETTER_DAILY_LIMIT` (2,000) newsletter emails leave a day; lower it for a domain that has not sent in bulk before.
+- **Check the sender domain** under **Admin → Emails → Sender domain**, and add the SPF, DKIM and DMARC records it lists as missing. On Postmark, create a broadcast stream and set `NEWSLETTER_MESSAGE_STREAM`. See [SMTP](../integrations/smtp.md#newsletters).
+- **Every account starts subscribed.** People unsubscribe from the link in each newsletter or from **Email communication** in their profile.
+- **Connect bounce and spam reports** by setting `EMAIL_EVENTS_SECRET` and adding the webhook at your mail provider. Without them, addresses that bounce keep being sent to. See [SMTP](../integrations/smtp.md#bounce-and-spam-reports).
+- **Audiences over about 500 people** are better served by a dedicated email platform; see [Newsletters](../administration/newsletters.md#built-for-small-audiences).
+- **Newsletter images are public** at `API_URL/v1/newsletter-images/…`, like the email logo. A reverse proxy must pass `/v1/newsletter-images/`, `POST /v1/unsubscribe/` and `POST /v1/email-events/` to the API, as it already does `/v1/downloads/`. After changing `API_URL`, redirect `/v1/newsletter-images/` from the old host so newsletters already sent keep their images.
+- The `email-deliverability` migration adds `newsletter_token_version`, `email_bounced_at` and `email_bounce_reason` to `users`, the `bounced` and `complained` recipient statuses, the `users_clear_email_bounce` trigger and an index on send times.
+- The `newsletters` migration adds `newsletter_opt_out_at` to `users` and creates `audiences`, `newsletters`, `newsletter_recipients` and `newsletter_images`, empty. Rolling it back drops them, and every unsubscribe.
 
 ## Matching on every asset type in this upgrade
 
@@ -255,6 +268,8 @@ The data enrichment screens are regrouped. Nothing is lost and old addresses red
 | `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |
 | `1790467200000-asset-type-rules` | `asset_type_rules` table; `asset_type_source` and `asset_type_rule_id` on `asset_folders`. Existing typed folders whose type differs from their parent's, and typed roots, are marked `manual`; the others `inherited`. Rolling back drops the table and the three columns and loses nothing the previous version reads |
 | `1792886400000-single-matching` | A File name rule from `PRODUCT_MATCHING_REGEX`, when set, on every asset type without rules; deletes the pg-boss schedules of the removed `asset/assign-products-to-asset-files` job. Rolling back changes nothing |
+| `1792800000000-email-deliverability` | `newsletter_token_version` (0), `email_bounced_at` and `email_bounce_reason` (null) on `users`; `bounced` and `complained` added to the recipient statuses; the `users_clear_email_bounce` trigger, which clears a bounce when the address changes or is verified again; the `newsletter_recipients_sent` index. Rolling back turns bounced and complained recipients back into `sent` and drops the rest |
+| `1792713600000-newsletters` | `newsletter_opt_out_at` on `users`, null, so everyone starts subscribed; `audiences`, `newsletters`, `newsletter_recipients` and `newsletter_images`, empty. Rolling back drops the four tables and the column, and with them every unsubscribe |
 | `1792627200000-brand-name` | `brand_name` on `brand_settings`, null, so the name stays `APP_NAME` until an admin sets one. Rolling back drops it |
 | `1792540800000-email-templates` | `brand_settings` (accent colour) and `email_settings` (sender and footer), one row each, and `email_templates`, empty: a row exists only for an email whose wording was changed. Rolling back drops the three tables and the customised wording |
 | `1792454400000-download-license-acceptance` | `license_accepted_at` and `license_ids` on `downloads`, empty for earlier downloads. Rolling back drops them |

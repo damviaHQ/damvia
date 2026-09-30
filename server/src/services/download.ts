@@ -166,6 +166,53 @@ export function formatFileName(download: Download, assetFile: AssetFile, collect
 	return path.reverse().join('/')
 }
 
+export const DOWNLOAD_CONTENTS_LIMIT = 100
+
+export type DownloadEntry = { id: string, name: string, folder: string, size: number, mimeType: string, thumbnailStorageKey: string | null }
+
+// What a download holds, rebuilt from its saved file ids with the names the
+// archive gives them. Nothing is stored for it: the list goes with the download.
+// Files the owner can no longer see are counted, not described.
+export async function downloadContents(em: EntityManager, user: User, download: Download, limit = DOWNLOAD_CONTENTS_LIMIT) {
+	const ids = [...new Set(download.collectionFileIds)]
+	const files = ids.length
+		? await userCollectionFilesQuery(user, em).andWhere('collection_file.id IN (:...ids)', { ids }).getMany()
+		: []
+	const ancestorIds = new Set(files.flatMap(file => file.collection?.path?.split('.').filter(Boolean) ?? []))
+	const ancestors = new Map((ancestorIds.size
+		? await em.getRepository(Collection).find({ where: { id: In([...ancestorIds]) }, select: { id: true, name: true } })
+		: []).map(collection => [collection.id, collection]))
+	// formatFileName walks `parent`; the materialized path gives the chain without a query per file.
+	const withParents = (collection: Collection | null) => {
+		const chain = collection?.path?.split('.').filter(Boolean) ?? []
+		return chain.reduce<Collection | null>((parent, id) => {
+			const found = ancestors.get(id)
+			return found ? Object.assign(new Collection(), { id, name: found.name, parent }) : parent
+		}, null)
+	}
+	const archived = ids.length > 1 || !!download.recordExport
+	const entries: DownloadEntry[] = files.map(file => {
+		const path = formatFileName(download, file.assetFile, archived ? withParents(file.collection ?? null) : null)
+		const cut = path.lastIndexOf('/')
+		return {
+			id: file.id,
+			name: path.slice(cut + 1),
+			folder: cut === -1 ? '' : path.slice(0, cut),
+			size: Number(file.assetFile.size),
+			mimeType: file.assetFile.mimeType,
+			thumbnailStorageKey: file.assetFile.hasThumbnail ? file.assetFile.thumbnailStorageKey : null,
+		}
+	}).sort((a, b) => a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name))
+	return {
+		total: ids.length,
+		unavailable: ids.length - files.length,
+		entries: entries.slice(0, limit),
+		recordList: download.recordExport
+			? { name: `record-list.${download.recordExport.format}`, rows: download.recordExport.recordIds.length }
+			: null,
+	}
+}
+
 export type TransformFileOptions = {
 	workingDirectory: string
 	download: Download

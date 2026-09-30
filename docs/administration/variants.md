@@ -1,6 +1,6 @@
 ---
 title: Variants
-description: Show the formats, languages and durations of one creative as a single card, name what differs between them and correct the grouping by hand.
+description: Show the formats, languages and durations of one creative as a single card, name what differs between them and set the grouping rules.
 sidebar:
   order: 14
 lastUpdated: 2026-09-30
@@ -16,7 +16,7 @@ Grouping is set per [asset type](./asset-types.md): tick **Group variants** on t
 
 Files are grouped inside one folder and one asset type, never across folders, because type and licence are set per folder.
 
-1. Each name loses its extension and is cut on `_`, `-`, space and `.`, in lower case. A record key found by a [matching step](./records.md#set-the-matching-steps) counts as one word, so `77374-228_01.jpg` and `77374-229_01.jpg` never merge.
+1. Each name loses its extension and is cut on `_`, `-`, space and `.`, in lower case. A record key found by a [matching rule](./records.md#set-the-matching-rules) counts as one word, so `77374-228_01.jpg` and `77374-229_01.jpg` never merge.
 2. The words are read as a tree from the first one. The shared start of the names is the group while every branch below it holds at least two files; where a branch would leave a file alone, the group stops. `pampa_campaign_a`, `pampa_campaign_b`, `pampa_teaser_a` and `pampa_teaser_b` make two groups. Branches that are formats, ratios, durations or languages never split a group, so a full grid of `1x1`, `9x16`, `en`, `fr` stays one card.
 3. A group needs at least two files, a shared start of at least **4** characters (so `01.jpg` to `24.jpg` never group), and a start that is not only a record key.
 4. Files whose name contains a **blocked word** are never grouped. By default: `v2`, `v3`, `final`, `ok`, `old`, `new`, `copy`, `img`, `dsc`, which keeps versions and camera dumps apart.
@@ -41,9 +41,9 @@ A card stands for its whole group:
 |---|---|
 | The picture or the name | Opens the preview on the cover. **Next** goes through the other variants of the group, then on to the next card. |
 | The checkbox | Selects every variant of the group, and a second click takes them all back. When only some variants are selected, the box shows a dash and the label reads **2 of 5 selected**; clicking the box selects the rest. |
-| The **n variants** label | Opens the group in a band under the card's row, one shade darker, across the whole width. It shows every variant with its values on each axis (`FR`, `9x16`…), a checkbox each, **Select all**, **Download all** (the usual download dialog with the group as the selection) and, for admins, **Edit group**. A preview opened from the band stays among the variants. The label again, the close button or `Esc` closes it. |
+| The **n variants** label | Opens the group in place of the card, on a line of its own as wide as the cards, one shade darker: the cover is its first variant, the cards before it keep their line and the ones after it follow below. Its variants are cards of the usual size in the same columns, each with its own checkbox, under a one-line header: a checkbox for the whole group, the group's name, **Download all** (the usual download dialog with the group as the selection) and close. A preview opened from the band stays among the variants. The close button or `Esc` brings the card back. |
 
-In the list view the label opens the same band as a row under the file.
+In the list view the label turns the cover's row into a header for the group (a checkbox for the whole group, its name and the label to fold it back) and lists every variant, the cover included, as ordinary rows under it, indented on a slightly darker background, in every column of the list. Sorting moves the group as one.
 
 Readers who prefer every file on its own switch off **Group variants** in **Display preferences**. The switch appears only where the listing holds a group, applies to every listing including search on the phone, and is saved in the browser. It is on by default.
 
@@ -60,14 +60,6 @@ Open **Asset Management → Variants** (`/admin/data-enrichment/variants`). The 
 
 Every change regroups straight away. Nothing is written to the cloud storage.
 
-## Correct a group by hand
+## Changes made by hand
 
-Admins see **Edit group** in the group panel. Select members, then:
-
-| Action | Effect |
-|---|---|
-| Split into new group | The selected files leave their group and form one of their own, marked **Forced**. |
-| Exclude from grouping | The selected files are never grouped again. |
-| Set as cover | The selected file is the cover, whatever the automatic choice. |
-
-These choices are kept by file, so they survive every sync and rename in the cloud storage, and each one has an **Undo**. Axis names are edited from the column headers of the panel too. Nothing is written to Dropbox, OneDrive or Google Drive.
+Groups are corrected from the file names and the settings above; there is no screen to split a group, exclude files or pick a cover by hand. Corrections made before are kept by file, survive every sync and rename, and are listed under **Changes by hand**, each with an **Undo**. Nothing is written to Dropbox, OneDrive or Google Drive.

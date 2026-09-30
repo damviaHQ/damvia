@@ -29,7 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogClose,
@@ -347,11 +347,6 @@ async function remove(id: string) {
             <p id="asset-type-help" class="text-body admin-text-secondary">The type given to every folder matched by this pattern, and to their subfolders unless a deeper rule or a hand-set type says otherwise.</p>
             <p v-if="errors.assetTypeId" class="admin-form-error">{{ errors.assetTypeId }}</p>
           </FieldGroup>
-          <div class="flex items-center space-x-2">
-            <Checkbox id="enabled" v-model="form.enabled" />
-            <Label for="enabled">Enabled</Label>
-          </div>
-          <p class="text-body admin-text-secondary">Disabled rules are kept but not applied.</p>
           <div class="admin-form-note" role="status" aria-live="polite">
             <template v-if="previewing">Checking the folders…</template>
             <template v-else-if="previewError">{{ previewError }}</template>
@@ -370,6 +365,10 @@ async function remove(id: string) {
               </ul>
             </template>
             <template v-else>Enter a pattern and pick a type to see what would change.</template>
+          </div>
+          <div>
+            <label class="flex items-center gap-2.5 mb-1"><Switch v-model="form.enabled" />Apply this rule</label>
+            <p class="text-body admin-text-secondary">Turn off to pause the rule without deleting it. Folders it typed are worked out again without it when you save.</p>
           </div>
         </div>
         <aside class="pattern-guide" aria-labelledby="pattern-guide-heading">

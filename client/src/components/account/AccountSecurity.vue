@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { accountGroupTitleClasses, accountListClasses } from "@/components/account/accountStyles"
 import MfaSetup from "@/components/auth/MfaSetup.vue"
 import FieldGroup from "@/components/ui/field/FieldGroup.vue"
 import { Button } from "@/components/ui/button"
@@ -86,12 +87,12 @@ async function mfaTurnedOn() {
 </script>
 
 <template>
-  <div class="grid max-w-2xl gap-10">
+  <div class="grid gap-10">
     <section class="grid gap-4" aria-labelledby="security-mfa-title">
-      <h3 id="security-mfa-title" class="text-base font-semibold">Two-step verification</h3>
+      <h2 id="security-mfa-title" :class="accountGroupTitleClasses">Two-step verification</h2>
       <MfaSetup v-if="!globalStore.user?.mfaEnabled" @done="mfaTurnedOn" />
       <div v-else class="grid max-w-lg gap-4">
-        <p class="text-sm">On. Enter a code from your authenticator app, or a recovery code, to change it.</p>
+        <p class="text-sm text-pretty">On. Enter a code from your authenticator app, or a recovery code, to change it.</p>
         <FieldGroup>
           <Label for="security-mfa-code">Code</Label>
           <Input id="security-mfa-code" v-model="code" autocomplete="one-time-code"
@@ -112,20 +113,18 @@ async function mfaTurnedOn() {
     </section>
 
     <section class="grid gap-4" aria-labelledby="security-sessions-title">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <h3 id="security-sessions-title" class="text-base font-semibold">Where you're signed in</h3>
-        <Button v-if="(sessions.data.value?.length ?? 0) > 1" type="button" variant="outline" @click="revokeOthers">Sign out everywhere else</Button>
-      </div>
-      <ul class="grid gap-2">
+      <h2 id="security-sessions-title" :class="accountGroupTitleClasses">Where you're signed in</h2>
+      <ul :class="accountListClasses" class="-mt-4">
         <li v-for="session in sessions.data.value" :key="session.id"
-          class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-neutral-200 px-4 py-3">
-          <div class="grid gap-1">
-            <span class="font-medium">{{ describeDevice(session.userAgent) }}<span v-if="session.current" class="text-neutral-500"> · this browser</span></span>
-            <span class="text-sm text-neutral-500">{{ methods[session.method] ?? session.method }} · signed in {{ formatDate(session.createdAt) }} · last active {{ formatDate(session.lastSeenAt) }}</span>
+          class="flex flex-wrap items-center justify-between gap-3 py-3.5">
+          <div class="grid gap-0.5">
+            <span class="text-body font-medium">{{ describeDevice(session.userAgent) }}<span v-if="session.current" class="text-neutral-500"> · this browser</span></span>
+            <span class="text-caption text-neutral-500">{{ methods[session.method] ?? session.method }} · signed in {{ formatDate(session.createdAt) }} · last active {{ formatDate(session.lastSeenAt) }}</span>
           </div>
-          <Button v-if="!session.current" type="button" variant="ghost" @click="revoke(session.id)">Sign out</Button>
+          <Button v-if="!session.current" type="button" variant="ghost" size="sm" @click="revoke(session.id)">Sign out</Button>
         </li>
       </ul>
+      <Button v-if="(sessions.data.value?.length ?? 0) > 1" type="button" variant="outline" class="justify-self-start" @click="revokeOthers">Sign out everywhere else</Button>
     </section>
   </div>
 </template>

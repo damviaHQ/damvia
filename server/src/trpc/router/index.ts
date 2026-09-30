@@ -36,6 +36,7 @@ import favoriteRouter from "./favorite"
 import groupRouter from "./group"
 import licenseRouter from "./license"
 import menuItemRouter from "./menu-item"
+import newsletterRouter from "./newsletter"
 import metadataFieldRouter from "./metadata-field"
 import pageRouter from "./page"
 import recordRouter from "./record"
@@ -78,6 +79,7 @@ const appRouter = router({
 	page: pageRouter,
 	settings: settingsRouter,
 	emailTemplate: emailTemplateRouter,
+	newsletter: newsletterRouter,
 	dashboard: dashboardRouter,
 	env: publicProcedure.query(async () => {
 		const regions = await dataSource.getRepository(Region).find()

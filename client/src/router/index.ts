@@ -16,7 +16,7 @@ import { isPhoneNow } from "@/composables/useIsPhone"
 import { guardNavigation } from "@/router/guard.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { defineAsyncComponent, nextTick, type Component } from 'vue'
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type RouteLocationRaw, type RouteRecordRaw } from 'vue-router'
 
 declare module 'vue-router' {
 	interface RouteMeta {
@@ -26,8 +26,9 @@ declare module 'vue-router' {
 		roles?: string[]
 		// The phone screen for this route. Without one, phones get a "use a computer" screen.
 		mobile?: () => Promise<{ default: Component }>
-		// Screens that exist only on phones; a computer is sent home.
+		// Screens that exist only on phones; a computer is sent home, or to `desktop`.
 		mobileOnly?: boolean
+		desktop?: RouteLocationRaw
 	}
 }
 
@@ -61,8 +62,8 @@ const router = createRouter({
 		{ name: 'product', path: '/products/:id', component: () => import('@/views/product.vue'), meta: { layout: 'main', title: 'Product', mobile: () => import('@/mobile/views/MobileProduct.vue') } },
 		{ name: 'search', path: '/search', component: () => import('@/views/search.vue'), meta: { layout: 'main', title: 'Search', mobile: () => import('@/mobile/views/MobileSearch.vue') } },
 		{ name: 'favorites', path: '/favorites', component: () => import('@/views/favorites.vue'), meta: { layout: 'main', title: 'Favorites', mobile: () => import('@/mobile/views/MobileSaved.vue') } },
-		{ name: 'account', path: '/account', component: () => import('@/views/home.vue'), meta: { layout: 'main', title: 'Account', mobileOnly: true, mobile: () => import('@/mobile/views/MobileAccount.vue') } },
-		{ name: 'downloads', path: '/downloads', component: () => import('@/views/home.vue'), meta: { layout: 'main', title: 'Downloads', mobileOnly: true, mobile: () => import('@/mobile/views/MobileDownloads.vue') } },
+		{ name: 'account', path: '/account/:section(profile|security|downloads|links|display)?', component: () => import('@/views/account.vue'), meta: { layout: 'main', title: 'Account', mobile: () => import('@/mobile/views/MobileAccount.vue') } },
+		{ name: 'downloads', path: '/downloads', component: () => import('@/views/home.vue'), meta: { layout: 'main', title: 'Downloads', mobileOnly: true, desktop: { name: 'account', params: { section: 'downloads' } }, mobile: () => import('@/mobile/views/MobileDownloads.vue') } },
 		{ name: 'admin-user', path: '/admin/users/:id', component: () => import('@/views/admin/admin-users.vue'), meta: { layout: 'admin', title: 'User', roles: ['admin', 'manager'], mobile: () => import('@/mobile/views/MobileUser.vue') } },
 		{ name: 'admin-dashboard', path: '/admin', component: () => import('@/views/admin/admin-dashboard.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Dashboard', mobile: () => import('@/mobile/views/MobileStatus.vue') } },
 		{ name: 'admin-analytics', path: '/admin/analytics', component: () => import('@/views/admin/admin-analytics.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Insights' } },
@@ -74,6 +75,8 @@ const router = createRouter({
 		{ name: 'admin-settings', path: '/admin/settings', component: () => import('@/views/admin/admin-settings.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Settings' } },
 		{ name: 'admin-emails', path: '/admin/emails', component: () => import('@/views/admin/admin-emails.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Emails' } },
 		{ name: 'admin-email', path: '/admin/emails/:key', component: () => import('@/views/admin/admin-email-edit.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Edit email' } },
+		{ name: 'admin-newsletters', path: '/admin/newsletters', component: () => import('@/views/admin/admin-newsletters.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Newsletters' } },
+		{ name: 'admin-newsletter', path: '/admin/newsletters/:id', component: () => import('@/views/admin/admin-newsletter-edit.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Newsletter' } },
 		{ name: 'admin-assets', path: '/admin/assets/:id?', component: () => import('@/views/admin/admin-assets.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Assets' } },
 		{ name: 'admin-asset-types', path: '/admin/asset-types', component: () => import('@/views/admin/admin-asset-types.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Asset types' } },
 		{ path: '/admin/data-enrichment', redirect: { name: 'admin-matching' } },
@@ -101,6 +104,7 @@ const router = createRouter({
 		{ name: 'privacy-policy', path: '/privacy-policy', component: () => import('@/views/public/public-privacy-policy.vue'), meta: { layout: 'public', title: 'Privacy Policy' } },
 		{ name: 'legal-information', path: '/legal-information', component: () => import('@/views/public/public-legal-information.vue'), meta: { layout: 'public', title: 'Legal Information' } },
 		{ name: 'link-expired', path: '/link-expired', component: () => import('@/views/public/public-link-expired.vue'), meta: { layout: 'public', title: 'Link expired' } },
+		{ name: 'unsubscribe', path: '/unsubscribe', component: () => import('@/views/public/public-unsubscribe.vue'), meta: { layout: 'public', title: 'Newsletters' } },
 	]),
 })
 

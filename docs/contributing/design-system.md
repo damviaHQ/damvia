@@ -3,7 +3,7 @@ title: Design system
 description: Review the proposed Damvia design foundation and reuse its tokens across the admin and website.
 sidebar:
   order: 7
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-28
 ---
 
 Damvia’s proposed design system shares the brand’s blue and midnight palette, typography, spacing and common control styles across the admin and website. The production admin uses this foundation. A single isolated reference page documents the tokens and shared component contracts. Customer portals keep their own branding.
@@ -92,7 +92,7 @@ Admin screens built around one large table (the records grid, the review step of
 
 The client shares the dashboard's component language: square controls and asset frames, restrained borders, consistent spacing and 12px dialog corners. Its default palette is grey and charcoal. Brand colour is reserved for tenant configuration; supplied logos and asset colours are preserved. This is one design system with two themes, not two component libraries.
 
-The desktop shell uses a compact header, resizable navigation, compact collection breadcrumbs, uniform thumbnail grids, readable list rows and a light preview/download panel. Search, favorites, account dialogs, collection actions and authentication use the same controls. No new product features were added. A dedicated mobile redesign remains a separate pass.
+The desktop shell uses a compact header, resizable navigation, compact collection breadcrumbs, uniform thumbnail grids, readable list rows and a light preview/download panel. Search, favorites, the account page, collection actions and authentication use the same controls. No new product features were added. A dedicated mobile redesign remains a separate pass.
 
 Use Tailwind in Vue templates for layout, dimensions, spacing, states and component styling. Shared framework-neutral defaults load once in the components cascade layer so Tailwind utilities can override them. Do not import `components.css` again from individual Vue components. The former `styles/client.css` override layer has been removed, and client-facing Vue components no longer contain style blocks.
 

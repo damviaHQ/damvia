@@ -3,7 +3,7 @@ title: Accounts and links
 description: Session lifetime, email links, sign-in protection, two-step verification, suspension and the actual scope of link revocation for administrators.
 sidebar:
   order: 12
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-29
 ---
 
 Account access, invitation access and object URLs have separate lifetimes. This page describes administrative consequences; it is not a login or sharing tutorial.
@@ -17,6 +17,7 @@ Account access, invitation access and object URLs have separate lifetimes. This 
 | Invitation link | Works while the invitation exists and before its expiry date. Each invitation email creates a new link and disables the earlier one. The sessions it opens end with the invitation. |
 | Collection invitation | Access branch expires at the start of the selected date; deleting the invitation removes that branch. Other owner/group/public grants remain. |
 | Presigned S3 URLs | Authorisation is embedded in the signed URL. Removing an invitation or a user does not revoke an already issued S3 URL, but it expires on its own: one hour for previews and originals shown in the library, 5 minutes for the redirect behind a download link. |
+| Newsletter unsubscribe link | Signed with `APP_SECRET`, valid 90 days, and can only unsubscribe its one account. It stops working as soon as the person changes their newsletter choice in their profile. See [Newsletters](./newsletters.md#unsubscribing). |
 | Download link | `API_URL/v1/downloads/{id}` requires no session, so it can be passed on. Each click checks that the download is ready, not past its seven-day expiry, and that its owner is still approved, not suspended and can still reach every file, then redirects to an S3 URL valid 5 minutes. |
 
 ## What ends a session
@@ -38,7 +39,7 @@ Changing `APP_SECRET` does not end sessions. It makes every enrolled authenticat
 
 Unknown email addresses and wrong passwords get the same answer, `Invalid email or password.`, in the same time. A login-link request always answers that an email was sent; the email goes only to an existing account that is not suspended.
 
-After 5 consecutive wrong passwords, the account is locked for 1 minute, then 2, 4 and so on, up to 60 minutes per further failure. A locked account answers `Too many attempts` even to the right password. A successful sign-in or a password reset clears the count; so does `user.resume`.
+After 5 consecutive wrong passwords or two-step verification codes, the account is locked for 1 minute, then 2, 4 and so on, up to 60 minutes per further failure. A locked account answers `Too many attempts` even to the right password or code. A successful sign-in or a password reset clears the count; so does `user.resume`. With two-step verification on, the right password alone does not clear it, only a right code does.
 
 The API also counts attempts per client address and per account:
 

@@ -25,6 +25,7 @@ import { pruneActivityEvents } from "./services/analytics"
 import { pruneExpiredSessions } from "./services/session"
 import { pruneAuditLog } from "./services/audit"
 import { notifyExpiringLicenses } from "./services/license-expiry"
+import { sendNewsletterBatch, SendBatch, startDueNewsletters } from "./services/newsletter"
 import { measureStorageUsage, StorageQuotaExceededError } from "./services/storage"
 import { integrityCheck as systemIntegrityCheck } from "./services/system"
 import { createDownloadArchive, DownloadAccessError, processExpiredDownloads } from "./services/download"
@@ -335,6 +336,22 @@ export const licenseExpiryNoticeQueue = createQueue<void>({
 	name: 'license/expiry-notice',
 	processor: () => notifyExpiringLicenses().then(() => undefined),
 	cron: '0 6 * * *',
+})
+
+export const newsletterSendQueue = createQueue<SendBatch>({
+	name: 'newsletter/send',
+	processor: (data) => sendNewsletterBatch(data),
+	workerOptions: { batchSize: 1 },
+})
+
+// Every minute for scheduled newsletters; pushed at once for "Send now".
+export const newsletterDispatchQueue = createQueue<void>({
+	name: 'newsletter/dispatch',
+	processor: async () => {
+		const batches = await startDueNewsletters()
+		if (batches.length) await newsletterSendQueue.bulkPush(batches.map((data) => ({ data })))
+	},
+	cron: '* * * * *',
 })
 
 export const auditPruneQueue = createQueue<void>({

@@ -32,17 +32,39 @@ const list = [
   { key: 'invitation', label: 'Collection invitation', group: 'sharing', trigger: 'Someone shares a collection.', recipients: 'The invited person', subject: 'Invited', customised: false, updatedAt: null, updatedBy: null },
   { key: 'disk-alert', label: 'Server disk alert', group: 'alerts', trigger: 'The disk fills up.', recipients: 'SERVER_ALERT_EMAILS', subject: 'Disk', customised: false, updatedAt: null, updatedBy: null },
 ]
-const settings = { senderName: null, senderAddress: null, replyTo: null, footerText: '', effectiveFrom: { name: 'Damvia', address: 'no-reply@localhost' } }
+const settings = { senderName: null, senderAddress: null, replyTo: null, footerText: '', effectiveFrom: { name: 'Damvia', address: 'no-reply@localhost' }, provider: 'Postmark', newsletterPace: { perSecond: 5, perDay: 2000 }, emailEvents: { enabled: false, url: 'http://localhost:3000/v1/email-events/', lastAt: null, bounced: 0 } }
+const domainChecks = {
+  domain: 'acme.test',
+  problem: null,
+  checks: [
+    { key: 'spf', label: 'SPF', status: 'ok', found: ['v=spf1 include:spf.mtasv.net ~all'], advice: '' },
+    { key: 'dkim', label: 'DKIM', status: 'missing', found: [], advice: 'No signing key was found.' },
+    { key: 'dmarc', label: 'DMARC', status: 'missing', found: [], advice: 'Add a TXT record on _dmarc.acme.test: "v=DMARC1; p=none".' },
+    { key: 'mx', label: 'Replies', status: 'ok', found: ['mx.acme.test'], advice: '' },
+  ],
+}
 const previewHtml = (input: { content: { subject: string } }) => ({ subject: input.content.subject, html: `<html><body><h1>${input.content.subject}</h1></body></html>` })
 
-test('the emails page groups every email and saves the sender', async ({ page, mockTrpc }) => {
-  const api = await mockTrpc({ 'emailTemplate.list': list, 'emailTemplate.getSettings': settings, 'emailTemplate.updateSettings': (input: unknown) => input, 'emailTemplate.get': template, 'emailTemplate.preview': previewHtml }, { role: 'admin' })
+test('the emails page groups every email and saves the sender', async ({ page, mockTrpc, shot }) => {
+  const api = await mockTrpc({ 'emailTemplate.list': list, 'emailTemplate.getSettings': settings, 'emailTemplate.updateSettings': (input: unknown) => input, 'emailTemplate.get': template, 'emailTemplate.preview': previewHtml, 'emailTemplate.checkDomain': domainChecks }, { role: 'admin' })
   await page.goto('/admin/emails')
   for (const group of ['Account', 'Sharing and downloads', 'Alerts']) await expect(page.getByRole('heading', { name: group })).toBeVisible()
   const reset = page.getByRole('link', { name: /Password reset/ })
   await expect(reset).toContainText('Customised')
   await expect(reset).toContainText('by Ada')
   await expect(page.getByText('no-reply@localhost')).toBeVisible()
+  const domain = page.getByRole('region', { name: /Sender domain/ })
+  await expect(domain.getByRole('heading')).toHaveText('Sender domain: acme.test')
+  await expect(domain.locator('[data-status=missing]')).toHaveCount(2)
+  await expect(domain).toContainText('v=DMARC1; p=none')
+  await expect(domain).toContainText('at most 2,000 a day')
+  await expect(domain).toContainText('Not connected')
+  await expect(domain).toContainText('EMAIL_EVENTS_SECRET')
+  await domain.scrollIntoViewIfNeeded()
+  await shot('sender-domain')
+  await domain.getByPlaceholder(/Selector/).fill('20260901pm')
+  await domain.getByRole('button', { name: 'Check selector' }).click()
+  await expect.poll(() => api.last('emailTemplate.checkDomain')).toEqual({ selector: '20260901pm' })
 
   await page.getByLabel('Name', { exact: true }).fill('  Acme Assets ')
   await page.getByLabel('Address', { exact: true }).fill('assets@acme.test')
@@ -112,10 +134,16 @@ test('a template error shows next to the preview and blocks the test email', asy
 })
 
 test('the brand accent colours the portal but not the admin', async ({ page, mockTrpc }) => {
-  await mockTrpc({ 'settings.getBrandTheme': { accentColor: '#e4572e' }, 'emailTemplate.list': list, 'emailTemplate.getSettings': settings }, { role: 'admin' })
+  await mockTrpc({ 'settings.getBrandTheme': { accentColor: '#e4572e' }, 'emailTemplate.list': list, 'emailTemplate.getSettings': settings, 'emailTemplate.checkDomain': domainChecks }, { role: 'admin' })
   await page.goto('/')
   const portalBlue = () => page.locator('.dv-theme').first().evaluate(element => getComputedStyle(element).getPropertyValue('--dv-color-blue').trim())
   await expect.poll(portalBlue).toBe('#e4572e')
   await page.goto('/admin/emails')
   await expect.poll(portalBlue).not.toBe('#e4572e')
+})
+
+test('a domain check that fails says so instead of showing nothing', async ({ page, mockTrpc }) => {
+  await mockTrpc({ 'emailTemplate.list': list, 'emailTemplate.getSettings': settings, 'emailTemplate.checkDomain': trpcError(429, 'TOO_MANY_REQUESTS', 'Too many attempts. Please wait a few minutes and try again.') }, { role: 'admin' })
+  await page.goto('/admin/emails')
+  await expect(page.getByRole('region', { name: /Sender domain/ }).getByRole('alert')).toContainText('Too many attempts')
 })

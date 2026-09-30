@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { accountSections } from "@/components/account/accountSections"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -23,21 +24,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useGlobalStore } from "@/stores/globalStore"
-import {
-  Download,
-  LayoutDashboard,
-  Link,
-  LogOut,
-  Settings,
-  User,
-  Users
-} from "@lucide/vue"
-import { defineAsyncComponent, ref } from "vue"
+import { LogOut, Settings, User, Users } from "@lucide/vue"
 
 const globalStore = useGlobalStore()
-const showMemberDialog = ref(false)
-const memberDialogInitialTab = ref<"downloads" | "links" | "profile" | "display-preferences">("downloads")
-const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDialogMember.vue"))
 </script>
 <template>
       <DropdownMenu>
@@ -47,61 +36,40 @@ const LayoutDialogMember = defineAsyncComponent(() => import("@/layouts/LayoutDi
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent :collision-padding="16" align="end" class="w-60 p-1 [&_[role=menuitem]]:min-h-9 [&_[role=menuitem]]:gap-2 [&_[role=menuitem]]:px-3 [&_[role=menuitem]]:text-body [&_[role=menuitem]]:whitespace-nowrap">
-          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground">My Account</DropdownMenuLabel>
-          <DropdownMenuItem class="cursor-pointer" @click="
-            showMemberDialog = true
-          memberDialogInitialTab = 'profile';
-          ">
-            <User />
-            <span>Profile</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem class="cursor-pointer" @click="
-            showMemberDialog = true
-          memberDialogInitialTab = 'downloads';
-          ">
-            <Download />
-            <span>My Downloads</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem class="cursor-pointer" @click="
-            showMemberDialog = true
-          memberDialogInitialTab = 'links';
-          ">
-            <Link />
-            <span>My Links</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem class="cursor-pointer" @click="
-            showMemberDialog = true
-          memberDialogInitialTab = 'display-preferences';
-          ">
-            <LayoutDashboard />
-            <span>Display preferences</span>
-          </DropdownMenuItem>
+          <DropdownMenuLabel class="grid px-3 py-2 font-normal">
+            <span class="truncate text-body font-semibold text-foreground">{{ globalStore.user?.name }}</span>
+            <span class="truncate text-caption text-muted-foreground">{{ globalStore.user?.email }}</span>
+          </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground" v-if="globalStore.user?.role === 'manager'">
-            Manage
-          </DropdownMenuLabel>
-          <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground" v-if="globalStore.user?.role === 'admin'">
-            Administrate
-          </DropdownMenuLabel>
-          <DropdownMenuItem v-if="['admin'].includes(globalStore.user?.role ?? '')">
-            <router-link :to="{ name: 'admin-dashboard' }" class="flex w-full items-center gap-2">
-              <Settings />
-              <span>Administration</span>
+          <DropdownMenuItem v-for="section in accountSections" :key="section.id" as-child class="cursor-pointer">
+            <router-link :to="{ name: 'account', params: { section: section.id } }">
+              <component :is="section.icon" />
+              <span>{{ section.label }}</span>
             </router-link>
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')">
-            <router-link :to="{ name: 'admin-users' }" class="flex w-full items-center gap-2">
-              <Users />
-              <span>Manage Users</span>
-            </router-link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')"
-            class="my-1" />
+          <template v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')">
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel class="px-3 text-caption font-medium text-muted-foreground">
+              {{ globalStore.user?.role === 'admin' ? 'Administrate' : 'Manage' }}
+            </DropdownMenuLabel>
+            <DropdownMenuItem v-if="globalStore.user?.role === 'admin'" as-child class="cursor-pointer">
+              <router-link :to="{ name: 'admin-dashboard' }">
+                <Settings />
+                <span>Administration</span>
+              </router-link>
+            </DropdownMenuItem>
+            <DropdownMenuItem as-child class="cursor-pointer">
+              <router-link :to="{ name: 'admin-users' }">
+                <Users />
+                <span>Manage Users</span>
+              </router-link>
+            </DropdownMenuItem>
+          </template>
+          <DropdownMenuSeparator />
           <DropdownMenuItem @click="globalStore.logout()" class="cursor-pointer">
             <LogOut />
             <span>Log out</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-  <LayoutDialogMember v-model:open="showMemberDialog" :initial-tab="memberDialogInitialTab" />
 </template>

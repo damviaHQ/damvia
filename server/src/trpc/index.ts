@@ -55,6 +55,11 @@ export const EXPLICITLY_AUDITED = new Set([
 	'user.sendPasswordResetFor', 'user.resendVerificationEmailFor', 'user.markEmailVerifiedFor', 'user.changeUnverifiedEmail', 'user.updateProfile', 'user.removeAccount',
 	'auth.logout', 'auth.revokeSession', 'auth.revokeOtherSessions', 'auth.mfaSetup', 'auth.mfaEnable', 'auth.mfaDisable',
 	'auth.mfaRegenerateRecoveryCodes', 'audit.export', 'user.exportMyData', 'user.exportData',
+	// Record their own entry, or change nothing: previews and counts run on every keystroke.
+	'emailTemplate.update', 'emailTemplate.reset', 'emailTemplate.preview', 'emailTemplate.updateSettings', 'settings.updateBrandTheme',
+	'newsletter.create', 'newsletter.update', 'newsletter.duplicate', 'newsletter.remove', 'newsletter.preview', 'newsletter.schedule',
+	'newsletter.cancel', 'newsletter.resume', 'newsletter.audienceSize', 'newsletter.saveAudience', 'newsletter.removeAudience',
+	'newsletter.setMySubscription',
 ])
 
 // What a user whose role requires MFA may still call before enrolling.

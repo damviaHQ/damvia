@@ -217,3 +217,54 @@ test('a test email goes to the admin who sends it, with the unsaved draft', asyn
     for (let i = 0; i < 9; i++) await caller(admin).emailTemplate.sendTest({ key: 'login', content: content() })
     await assert.rejects(caller(admin).emailTemplate.sendTest({ key: 'login', content: content() }), /Too many/)
 })
+
+test('the sender domain check reads SPF, DKIM, DMARC and MX and says what to add', async () => {
+    const previous = env.dnsResolver
+    const smtpHost = process.env.SMTP_HOST
+    const zone = {}
+    const missing = () => Object.assign(new Error('missing'), { code: 'ENOTFOUND' })
+    env.dnsResolver = () => ({
+        resolveTxt: async name => { if (!zone[name]) throw missing(); return zone[name].map(record => [record]) },
+        resolveMx: async name => { if (!zone[`mx:${name}`]) throw missing(); return zone[`mx:${name}`] },
+    })
+    try {
+        await forbidden(caller(member).emailTemplate.checkDomain({}))
+        const local = await caller(admin).emailTemplate.checkDomain({})
+        assert.match(local.problem, /own domain/)
+
+        await caller(admin).emailTemplate.updateSettings({ senderName: null, senderAddress: 'news@acme.test', replyTo: null, footerText: '' })
+        process.env.SMTP_HOST = 'smtp.sendgrid.net'
+        const bare = await caller(admin).emailTemplate.checkDomain({})
+        assert.equal(bare.domain, 'acme.test')
+        assert.deepEqual(bare.checks.map(check => [check.key, check.status]), [['spf', 'missing'], ['dkim', 'missing'], ['dmarc', 'missing'], ['mx', 'warning']])
+        assert.match(bare.checks[0].advice, /v=spf1 include:sendgrid\.net ~all/)
+
+        zone['acme.test'] = ['google-site-verification=x', 'v=spf1 include:_spf.google.com ~all']
+        zone['s1._domainkey.acme.test'] = ['k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC']
+        zone['_dmarc.acme.test'] = ['v=DMARC1; p=none; rua=mailto:d@acme.test']
+        zone['mx:acme.test'] = [{ exchange: 'mx.acme.test', priority: 10 }]
+        const partial = await caller(admin).emailTemplate.checkDomain({})
+        assert.deepEqual(partial.checks.map(check => [check.key, check.status]), [['spf', 'warning'], ['dkim', 'ok'], ['dmarc', 'warning'], ['mx', 'ok']])
+        assert.match(partial.checks[0].advice, /SendGrid.*include:sendgrid\.net/)
+        assert.deepEqual(partial.checks[1].found, ['s1._domainkey'])
+
+        process.env.SMTP_HOST = 'smtp.postmarkapp.com'
+        zone['acme.test'] = ['v=spf1 include:spf.mtasv.net -all']
+        zone['_dmarc.acme.test'] = ['v=DMARC1; p=quarantine']
+        zone['20260901pm._domainkey.acme.test'] = ['k=rsa;p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQD']
+        delete zone['s1._domainkey.acme.test']
+        assert.equal((await caller(admin).emailTemplate.checkDomain({})).checks[1].status, 'missing')
+        const typed = await caller(admin).emailTemplate.checkDomain({ selector: '20260901pm' })
+        assert(typed.checks.every(check => check.status === 'ok'), JSON.stringify(typed.checks))
+        await assert.rejects(caller(admin).emailTemplate.checkDomain({ selector: 'x._domainkey.evil.test/..' }))
+
+        zone['acme.test'] = ['v=spf1 +all', 'v=spf1 include:spf.mtasv.net ~all']
+        assert.match((await caller(admin).emailTemplate.checkDomain({})).checks[0].advice, /2 SPF records/)
+
+        env.dnsResolver = () => ({ resolveTxt: async () => { throw Object.assign(new Error('timeout'), { code: 'ETIMEOUT' }) }, resolveMx: async () => [] })
+        assert.match((await caller(admin).emailTemplate.checkDomain({})).problem, /could not be read/)
+    } finally {
+        env.dnsResolver = previous
+        if (smtpHost === undefined) delete process.env.SMTP_HOST; else process.env.SMTP_HOST = smtpHost
+    }
+})

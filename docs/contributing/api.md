@@ -52,7 +52,7 @@ On the client, `extractErrors(error)` in `client/src/services/server.ts` returns
 
 - Base URL: `VITE_API_ENDPOINT`, default `http://localhost:3000/trpc`.
 - A query is `GET /trpc/<router>.<procedure>?input=<JSON>`; a mutation is `POST /trpc/<router>.<procedure>` with the JSON input as body. Nested routers use dots: `collection.invitation.create`. The `httpLink` sends one request per call, no batching.
-- Authentication is the HttpOnly `damvia_session` cookie set by the sign-in procedures; the client sends it with `credentials: 'include'`. A script calls `auth.login` and keeps the cookie. The `authorization` header is read only by `auth.upgradeLegacyToken`, which exchanges a JWT issued before server-side sessions (signed with `APP_SECRET`, with the account's current `authVersion`) for a session once.
+- Authentication is the HttpOnly `damvia_session` cookie set by the sign-in procedures; the client sends it with `credentials: 'include'`. A script calls `auth.login` and keeps the cookie. The `authorization` header is read only by `auth.upgradeLegacyToken`, which exchanges a JWT issued before server-side sessions (signed with `APP_SECRET`, with the account's current `authVersion`) for a session once, or for a two-step verification challenge when the account has it on.
 - Requests other than `GET`, `HEAD` and `OPTIONS` with an `Origin` header other than the origin of `APP_URL` or `API_URL` get `403` before reaching tRPC.
 - There is no OpenAPI document. Types flow from `AppRouter` (`export type AppRouter = typeof appRouter` in `router/index.ts`) to the client through `RouterInput` and `RouterOutput`, `inferRouterInputs<AppRouter>` and `inferRouterOutputs<AppRouter>` in `client/src/services/server.ts`.
 
@@ -207,6 +207,7 @@ Two restrictions separate this router from `record.list`, which is admin only. F
 | `favorite.removeCollection` | mutation | `userApproved`, `userMember` | Unstars a collection; a no-op when it was not starred |
 | `download.list` | query | `userApproved` | The caller's `ready`, `preparing` and `failed` downloads, plus those `expired` in the last month |
 | `download.exportRecords` | mutation | `userApproved` | Exports selected accessible records or collections as base64 CSV/XLSX with selected visible columns; up to 10,000 rows, access rechecked at export |
+| `download.contents` | query | `userApproved` | The files of one of the caller's downloads (`NOT_FOUND` for anyone else's): the first 100 with their archive name, folder, size and a signed thumbnail URL, the total, how many the caller can no longer see, and the record list if any. Rebuilt from `collectionFileIds`; nothing is stored |
 | `download.create` | mutation | `userApproved` | Creates a download (`FORBIDDEN` at or above 10,000,000,000 bytes); optional `recordExport` adds an access-checked CSV/XLSX list to the file ZIP; `email` type pushes `download/create-archive` |
 
 ### `record`, `recordAttribute` and `recordTable`
@@ -351,7 +352,30 @@ Every procedure requires `userAdmin`. A `key` is one of the keys in `server/src/
 | `reset` | mutation | Deletes the row so the default applies; audited as `email_template.reset` |
 | `preview` | mutation | `{ subject, html }` of unsaved content, rendered with the catalogue's sample values and the current branding. A mutation so the draft travels in the POST body: a long message in a GET URL exceeds Node's 16 KB header limit, and a reverse proxy's lower one |
 | `sendTest` | mutation | Sends unsaved content to the caller's address with `[Test]` before the subject; 10 per admin per 15 minutes; a refused send is `BAD_GATEWAY` with the mail server's message |
-| `getSettings`, `updateSettings` | query, mutation | Sender name, address, reply-to and footer; `getSettings` also returns the effective `From`. Updates are audited as `email_settings.updated` |
+| `getSettings`, `updateSettings` | query, mutation | Sender name, address, reply-to and footer; `getSettings` also returns the effective `From`, the provider recognised from `SMTP_HOST`, the newsletter pace, and `emailEvents` (`enabled`, the webhook address without its secret, the last report and the number of bounced addresses). Updates are audited as `email_settings.updated` |
+| `checkDomain` | query | `{ selector? }`: the SPF, DKIM, DMARC and MX findings for the sender domain, each `ok`, `warning` or `missing` with advice (`services/email-domain.ts`); 30 per admin per 10 minutes. A timeout or an unusable domain returns `problem` instead |
+
+### `newsletter`
+
+Every procedure requires `userAdmin`, except the four below the table. A `filter` is the audience shape in `services/audience.ts`; `content` is `{ subject, preheader, heading, bodyHtml }`, with `bodyHtml` sanitised by `mail/newsletter-sanitize.ts` (page-text rules plus images served from `/v1/newsletter-images/` and `a[data-button]`).
+
+| Procedure | Kind | Purpose |
+|---|---|---|
+| `list`, `get` | query | Newsletters with their status and recipient counts (`total`, `pending`, `sent`, `failed`, `skipped`, `bounced`, `complained`); one newsletter with its content (image addresses rewritten to the current `API_URL`), filter, variables and `pace` (`perSecond`, `limit`, `sent`, `remaining`, `nextAt`) |
+| `create`, `duplicate` | mutation | A new draft, empty or copied; audited as `newsletter.created` |
+| `update` | mutation | Saves a draft's content and audience; `CONFLICT` unless it is a draft. Audited as `newsletter.updated` |
+| `remove` | mutation | Deletes a draft; `CONFLICT` for any other status |
+| `preview`, `sendTest` | mutation | Render unsaved content for the caller; the test goes to the caller with `[Test]` in the subject, 10 per admin per 15 minutes |
+| `schedule` | mutation | `{ id, at }`: `at` null sends now and pushes `newsletter/dispatch`. Refuses an empty subject or message, an audience of nobody, a render error, or a time in the past or over a year ahead. Audited as `newsletter.scheduled` |
+| `cancel` | mutation | A scheduled newsletter back to a draft; `CONFLICT` once sending started |
+| `resume` | mutation | Failed recipients back to `pending`, then pushes `newsletter/send` jobs; audited as `newsletter.retried` |
+| `recipients` | query | Recipients of a newsletter, filtered by status or name/email, 50 a page |
+| `audienceSize` | mutation | `{ count, sample }` for a filter. A mutation because a hand-picked list can be too long for a URL |
+| `people` | query | Every account with `reachable`, for the person picker |
+| `audiences`, `saveAudience`, `removeAudience` | query, mutation | Saved audiences with their current count; audited as `audience.saved` and `audience.removed` |
+| `createImageUpload`, `finalizeImageUpload` | mutation | Presigned POST to `newsletters/uploads/{userId}/{uploadId}`, then re-encoded by sharp to JPEG, or PNG when transparent, at most 960 px wide |
+
+`mySubscription` (`{ subscribed, bouncedAt, bounceReason }`) and `setMySubscription` need only a session, as account management. `setMySubscription` raises `newsletterTokenVersion`, ending every unsubscribe link already sent, and subscribing clears a bounce. `subscription` (query) and `unsubscribe` (mutation, `{ token }`) are public and can only unsubscribe: the token is an HS256 JWT of `APP_SECRET` with `purpose: 'newsletter-unsubscribe'`, the user id and their `newsletterTokenVersion` (`v`), valid 90 days. Both are rate-limited per address and the query changes nothing. The mail clients' one-click button posts to the Fastify route `POST /v1/unsubscribe/:token` instead.
 
 ### `dashboard`
 

@@ -202,7 +202,7 @@ function exportCsv() {
      </tr></thead>
      <tbody><tr v-for="user in visible" :key="user.id" :class="{ 'is-selected': selectedIds.includes(user.id) }">
       <td class="selection-cell"><input v-model="selectedIds" type="checkbox" :value="user.id" :aria-label="`Select ${user.name}`" /></td>
-      <td><button class="user-identity" :aria-label="`View ${user.name}`" @click="openDetails(user, $event)"><span class="user-avatar">{{ initials(user.name) }}</span><span class="user-identity-copy"><strong>{{ user.name }}<small v-if="user.id === store.user?.id" class="self-label">You</small></strong><span>{{ user.email }}</span><span v-if="user.company">{{ user.company }}</span></span></button></td>
+      <td><button class="user-identity" :aria-label="`View ${user.name}`" @click="openDetails(user, $event)"><span class="user-avatar">{{ initials(user.name) }}</span><span class="user-identity-copy"><strong>{{ user.name }}<small v-if="user.id === store.user?.id" class="self-label">You</small></strong><span>{{ user.email }}<small v-if="user.emailBouncedAt" class="bounced-label" title="The mail provider reported this address as undeliverable">Bounced</small></span><span v-if="user.company">{{ user.company }}</span></span></button></td>
       <td><span class="user-role">{{ roleLabels[user.role] }}</span><span v-if="user.maintenanceContact" class="user-cell-secondary">Storage alerts</span></td>
       <td><span>{{ user.region || 'No region' }}</span><span class="user-cell-secondary">{{ user.groups.map(group => group.name).join(', ') || 'No groups' }}</span></td>
       <td><Button v-if="canApproveUser(store.user, user)" class="dv-button dv-button--primary user-status-approval" :disabled="!!busyId" :aria-label="`Approve ${user.name}`" @click="approve(user)"><Check />{{ busyId === user.id ? 'Approving…' : 'Approve' }}</Button><span v-else-if="suspendedAt(user)" class="dv-badge dv-badge--danger">Suspended</span><span v-else class="dv-badge" :class="{ 'dv-badge--success': userState(user) === 'active', 'dv-badge--warning': userState(user) === 'pending' }">{{ userStateLabels[userState(user)] }}</span></td>
@@ -315,4 +315,5 @@ function exportCsv() {
  .users-selection > span { display:none; }
 }
 @container (max-width:360px) { .users-filter-label { display:none; } }
+.bounced-label { margin-left:6px; padding:1px 6px; font-size:11px; background:#fef3f2; color:#b42318; }
 </style>

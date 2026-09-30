@@ -14,7 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import Loader from "@/components/Loader.vue"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import AccountNewsletters from "@/components/account/AccountNewsletters.vue"
+import { accountGroupTitleClasses } from "@/components/account/accountStyles"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -24,7 +25,7 @@ import { extractErrors, trpc } from "@/services/server"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
 import { zodTypedSchema } from "@/lib/zodTypedSchema"
-import { AlertTriangle } from "@lucide/vue"
+import { Download } from "@lucide/vue"
 import { useForm } from "vee-validate"
 import { watchEffect } from "vue"
 import * as z from "zod"
@@ -95,38 +96,37 @@ async function removeAccount() {
 </script>
 
 <template>
-  <div v-if="status === 'pending'">
-    <Loader :text="true" />
-  </div>
-  <div v-else-if="status === 'error'" role="alert" class="alert alert-danger">
-    {{ error?.message }}
-  </div>
-  <div v-else-if="status === 'success'" class="links__container grid gap-6">
-    <div class="grid gap-6">
-      <form @submit.prevent="updateProfile" class="grid w-full max-w-lg gap-5">
-        <FormField v-slot="{ componentField }" name="name">
-          <FormItem>
-            <FormLabel>Name</FormLabel>
-            <FormControl>
-              <Input v-bind="componentField" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-        <FormField v-slot="{ componentField }" name="company">
-          <FormItem>
-            <FormLabel>Company</FormLabel>
-            <FormControl>
-              <Input v-bind="componentField" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+  <Loader v-if="status === 'pending'" :text="true" />
+  <p v-else-if="status === 'error'" role="alert" class="text-body text-destructive">{{ error?.message }}</p>
+  <div v-else-if="status === 'success'" class="grid gap-10">
+    <section aria-labelledby="profile-details" class="grid gap-5">
+      <h2 id="profile-details" :class="accountGroupTitleClasses">Details</h2>
+      <form @submit.prevent="updateProfile" class="grid max-w-2xl gap-5">
+        <div class="grid gap-5 sm:grid-cols-2">
+          <FormField v-slot="{ componentField }" name="name">
+            <FormItem>
+              <FormLabel>Name</FormLabel>
+              <FormControl>
+                <Input v-bind="componentField" autocomplete="name" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+          <FormField v-slot="{ componentField }" name="company">
+            <FormItem>
+              <FormLabel>Company</FormLabel>
+              <FormControl>
+                <Input v-bind="componentField" autocomplete="organization" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
         <FormField v-slot="{ componentField }" name="email">
           <FormItem>
             <FormLabel>Email</FormLabel>
             <FormControl>
-              <Input v-bind="componentField" :disabled="globalStore?.user?.role !== 'admin'" />
+              <Input v-bind="componentField" autocomplete="email" :disabled="globalStore?.user?.role !== 'admin'" />
             </FormControl>
             <FormMessage />
             <FormDescription v-if="globalStore?.user?.role !== 'admin'">Contact an administrator to change your email.</FormDescription>
@@ -134,51 +134,43 @@ async function removeAccount() {
         </FormField>
         <Button type="submit" class="justify-self-start">Save changes</Button>
       </form>
-      <div class="grid w-full max-w-lg gap-2 pt-2">
-        <h3 class="font-medium">Your data</h3>
-        <p class="text-sm text-neutral-600">Download a copy of what this library holds about you: your account, groups, favourites, collections, invitations, downloads, activity and sign-ins, as a JSON file.</p>
-        <Button type="button" variant="outline" class="justify-self-start" @click="downloadMyData">Download my data</Button>
-      </div>
-      <div class="profile__alert-container w-full max-w-lg pt-2">
-        <Alert variant="destructive" class="border-0 bg-transparent p-0 flex items-start gap-3">
-          <div class="flex self-start gap-2">
-            <AlertTriangle class="w-6 h-6" />
-          </div>
-          <div class="flex flex-col gap-2">
-            <AlertTitle>
-              Delete account
-            </AlertTitle>
-            <AlertDescription>
-              This action cannot be undone. This will permanently delete your account and remove all your data including
-              downloads, shared links, and
-              collections. Guests won't be able to access your shared collections anymore.
-            </AlertDescription>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" class="mt-2 self-start">Delete account</Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your account and remove all your data
-                    including downloads, shared
-                    links,
-                    and
-                    collections. Guests won't be able to access your shared collections anymore.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction @click="removeAccount" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">Yes, remove my account
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+    </section>
 
-        </Alert>
+    <AccountNewsletters />
+
+    <section aria-labelledby="profile-data" class="grid gap-4">
+      <h2 id="profile-data" :class="accountGroupTitleClasses">Your data</h2>
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <p class="max-w-md text-body text-neutral-600">A JSON copy of what this library holds about you: account, groups, favourites, collections, invitations, downloads, newsletters, activity and sign-ins.</p>
+        <Button type="button" variant="outline" @click="downloadMyData"><Download class="size-4" aria-hidden="true" />Download my data</Button>
       </div>
-    </div>
+    </section>
+
+    <section aria-labelledby="profile-danger" class="grid gap-4">
+      <h2 id="profile-danger" :class="accountGroupTitleClasses">Danger zone</h2>
+      <div class="flex flex-wrap items-center justify-between gap-4 border border-destructive/30 p-4">
+        <div class="grid max-w-md gap-1">
+          <p class="text-body font-medium text-neutral-900">Delete account</p>
+          <p class="text-body text-neutral-600">Removes your account, downloads, shared links and collections. Guests lose access to what you shared.</p>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger as-child>
+            <Button variant="destructive">Delete account</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This cannot be undone. Your account, downloads, shared links and collections are deleted, and guests can no longer open the collections you shared.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction @click="removeAccount" class="bg-destructive text-destructive-foreground hover:bg-destructive/90">Yes, remove my account</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </section>
   </div>
 </template>

@@ -13,9 +13,11 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import LayoutDialogMember from "@/layouts/LayoutDialogMember.vue"
+import AccountDownloadRow from "@/components/account/AccountDownloadRow.vue"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useDownloadStore } from "@/stores/downloadStore"
-import { ArrowDown, File, FileDown } from "@lucide/vue"
+import dayjs from "dayjs"
+import { ArrowDown, ArrowRight, File, FileDown } from "@lucide/vue"
 import { storeToRefs } from "pinia"
 import { computed, onMounted, ref } from "vue"
 
@@ -23,11 +25,17 @@ const downloadStore = useDownloadStore()
 const { activeDownloadRequests, downloads, hasPreparingDownloads, newDownloads } = storeToRefs(downloadStore)
 const preparing = computed(() => activeDownloadRequests.value > 0 || hasPreparingDownloads.value)
 const ready = computed(() => !!downloads.value?.some(download => download.status === 'ready'))
-const showMemberDialog = ref(false)
+const open = ref(false)
+const newIds = computed(() => new Set((newDownloads.value ?? []).map(download => download.id)))
+const recent = computed(() => [...(downloads.value ?? [])]
+  .filter(download => download.status !== "expired")
+  .sort((a, b) => dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf())
+  .slice(0, 4))
 
-function openDownloads() {
-  showMemberDialog.value = true
-  if (ready.value) downloadStore.markDownloadsAsSeen()
+// The dots stay while the list is open so the new rows can be told apart.
+function onOpenChange(value: boolean) {
+  open.value = value
+  if (!value) downloadStore.markDownloadsAsSeen()
 }
 
 onMounted(() => {
@@ -39,20 +47,33 @@ onMounted(() => {
   <span class="sr-only" role="status" aria-live="polite">
     {{ preparing ? 'Preparing download' : ready ? 'Download ready' : '' }}
   </span>
-  <button v-if="preparing || ready" type="button" class="download-status"
-    :class="{ 'is-ready': !preparing && ready }"
-    :aria-label="preparing ? 'Preparing download — open downloads' : 'Download ready — open downloads'"
-    :title="preparing ? 'Preparing download' : 'Download ready'" @click="openDownloads">
-    <span class="download-status__icon" aria-hidden="true">
-      <template v-if="preparing">
-        <File class="size-5 stroke-[1.75]" />
-        <ArrowDown class="download-status__arrow size-3.5 stroke-[2.25]" />
-      </template>
-      <FileDown v-else class="size-5 stroke-[1.75]" />
-    </span>
-    <span v-if="!preparing && newDownloads?.length" class="download-status__dot" aria-hidden="true" />
-  </button>
-  <LayoutDialogMember v-model:open="showMemberDialog" initial-tab="downloads" />
+  <Popover v-if="preparing || ready" :open="open" @update:open="onOpenChange">
+    <PopoverTrigger as-child>
+      <button type="button" class="download-status"
+        :class="{ 'is-ready': !preparing && ready }"
+        :aria-label="preparing ? 'Preparing download — open downloads' : 'Download ready — open downloads'"
+        :title="preparing ? 'Preparing download' : 'Download ready'">
+        <span class="download-status__icon" aria-hidden="true">
+          <template v-if="preparing">
+            <File class="size-5 stroke-[1.75]" />
+            <ArrowDown class="download-status__arrow size-3.5 stroke-[2.25]" />
+          </template>
+          <FileDown v-else class="size-5 stroke-[1.75]" />
+        </span>
+        <span v-if="!preparing && newDownloads?.length" class="download-status__dot" aria-hidden="true" />
+      </button>
+    </PopoverTrigger>
+    <PopoverContent align="end" :collision-padding="16" class="w-[min(400px,calc(100vw-32px))] p-0" aria-labelledby="topbar-downloads-title">
+      <h2 id="topbar-downloads-title" class="border-b border-neutral-200 px-4 py-3 text-body font-semibold">Downloads</h2>
+      <p v-if="!recent.length" class="px-4 py-4 text-body text-neutral-500">Preparing your download…</p>
+      <ul v-else class="divide-y divide-neutral-100 px-4">
+        <AccountDownloadRow v-for="download in recent" :key="download.id" :download="download" :is-new="newIds.has(download.id)" compact />
+      </ul>
+      <router-link :to="{ name: 'account', params: { section: 'downloads' } }" class="flex items-center justify-between border-t border-neutral-200 px-4 py-3 text-body font-medium hover:bg-neutral-50" @click="onOpenChange(false)">
+        All downloads<ArrowRight class="size-4" aria-hidden="true" />
+      </router-link>
+    </PopoverContent>
+  </Popover>
 </template>
 
 <style scoped>

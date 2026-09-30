@@ -18,12 +18,17 @@ import helmet from '@fastify/helmet'
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify'
 import fastify from 'fastify'
 import { appRouter, createContext } from './trpc'
-import {apiURL, appURL, assetsS3, assetsS3Bucket, dataSource, logger, requestLogging, trustProxy} from "./env"
+import {apiURL, appURL, assetsS3, assetsS3Bucket, dataSource, emailEventsSecret, logger, requestLogging, trustProxy} from "./env"
 import {Download, DownloadStatus} from "./entity/download";
 import { userCollectionFilesQuery } from "./services/collection"
 import { recordAudit } from "./services/audit"
 import { registerOidcRoutes } from "./oidc-routes"
 import { readEmailLogo } from "./services/branding"
+import { readNewsletterImage } from "./services/newsletter-image"
+import { readUnsubscribeToken, setNewsletterSubscription } from "./services/newsletter"
+import { hit } from "./services/rate-limit"
+import { applyEmailEvent, readEmailEvents, snsConfirmationUrl } from "./services/email-events"
+import { createHash, timingSafeEqual } from "node:crypto"
 
 const server = fastify({ routerOptions: { maxParamLength: 5000 }, logger: false, bodyLimit: 5242880, trustProxy: trustProxy() })
 
@@ -58,7 +63,7 @@ if (requestLogging()) {
 	server.addHook('onResponse', async (req, res) => {
 		logger.info('http.response', {
 			method: req.method,
-			path: req.url.split('?')[0].replace(/^\/v1\/downloads\/[^/]+/, '/v1/downloads/:id'),
+			path: req.url.split('?')[0].replace(/^\/v1\/downloads\/[^/]+/, '/v1/downloads/:id').replace(/^\/v1\/unsubscribe\/[^/]+/, '/v1/unsubscribe/:token').replace(/^\/v1\/email-events\/[^/]+/, '/v1/email-events/:secret'),
 			status: res.statusCode,
 			ms: Math.round(res.elapsedTime),
 			ip: req.ip,
@@ -121,6 +126,54 @@ server.get('/v1/branding/email-logo.png', async (_req, res) => {
 	res.header('Cache-Control', 'public, max-age=3600')
 	res.header('Cross-Origin-Resource-Policy', 'cross-origin')
 	return res.send(logo)
+})
+
+// Images in newsletters. They never change, so mail clients may keep them.
+server.get<{ Params: { file: string } }>('/v1/newsletter-images/:file', async (req, res) => {
+	const [, id, extension] = /^([0-9a-f-]{36})\.(png|jpg)$/i.exec(req.params.file) ?? []
+	const image = id && UUID.test(id) ? await readNewsletterImage(id.toLowerCase(), extension.toLowerCase()).catch((error) => {
+		logger.error('newsletter.image-failed', { code: error.code })
+		return null
+	}) : null
+	if (!image) return res.code(404).send()
+	res.header('Content-Type', image.contentType)
+	res.header('Cache-Control', 'public, max-age=31536000, immutable')
+	res.header('Cross-Origin-Resource-Policy', 'cross-origin')
+	return res.send(image.body)
+})
+
+// The one-click unsubscribe mail clients offer next to the sender (RFC 8058).
+// It comes from the mail provider's servers, without cookies or an Origin.
+// The body only says "List-Unsubscribe=One-Click", as a form: it is not read.
+server.register(async (scope) => {
+	scope.addContentTypeParser('*', { parseAs: 'string', bodyLimit: 1024 }, (_req, _body, done) => done(null, null))
+	scope.post<{ Params: { token: string } }>('/v1/unsubscribe/:token', async (req, res) => {
+		if (!hit(`unsubscribe:${req.ip}`, 60, 15 * 60 * 1000)) return res.code(429).send()
+		const userId = await readUnsubscribeToken(req.params.token)
+		if (!userId || !await setNewsletterSubscription(userId, false)) return res.code(400).send()
+		return res.code(200).send()
+	})
+})
+
+// Bounces and complaints, posted by the mail provider. The secret in the
+// address is the proof it comes from there; every provider can post to a URL.
+server.register(async (scope) => {
+	scope.addContentTypeParser(['application/json', 'text/plain'], { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_req, body, done) => {
+		try { done(null, JSON.parse(body as string)) } catch { done(null, null) }
+	})
+	scope.post<{ Params: { secret: string } }>('/v1/email-events/:secret', async (req, res) => {
+		const secret = emailEventsSecret()
+		const digest = (value: string) => createHash('sha256').update(value).digest()
+		if (!secret || !timingSafeEqual(digest(req.params.secret), digest(secret))) return res.code(404).send()
+		const confirmation = snsConfirmationUrl(req.body)
+		if (confirmation) {
+			const confirmed = await fetch(confirmation, { redirect: 'error', signal: AbortSignal.timeout(10_000) }).then((reply) => reply.ok, () => false)
+			logger.info('email.events-subscription', { confirmed })
+			return res.code(confirmed ? 200 : 502).send()
+		}
+		for (const event of readEmailEvents(req.body)) await applyEmailEvent(event)
+		return res.code(200).send()
+	})
 })
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

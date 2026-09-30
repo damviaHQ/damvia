@@ -207,6 +207,56 @@ test('a JWT from before server-side sessions is traded once for a session and is
     }
 })
 
+test('a JWT from before server-side sessions still asks for the second factor', async () => {
+    const user = await withPassword()
+    const found = await resolve((await signIn(user)).token)
+    const own = caller(found.user, { session: found.session })
+    const { secret } = await own.auth.mfaSetup()
+    await own.auth.mfaEnable({ code: codeAt(secret) })
+    const legacy = sign({ userId: user.id, authVersion: user.authVersion }, process.env.APP_SECRET, { expiresIn: '180d' })
+    const res = fakeReply()
+    const result = await caller(null, { req: fakeRequest({ headers: { authorization: legacy } }), res }).auth.upgradeLegacyToken()
+    assert.equal(result.status, 'mfa_required')
+    assert.equal(cookieOf(res), undefined)
+})
+
+test('wrong codes lock the account, and the right password alone does not clear the count', async () => {
+    const user = await withPassword()
+    const found = await resolve((await signIn(user)).token)
+    const own = caller(found.user, { session: found.session })
+    const { secret } = await own.auth.mfaSetup()
+    await own.auth.mfaEnable({ code: codeAt(secret) })
+    for (let i = 0; i < 4; i++) {
+        rateLimit.resetRateLimits()
+        const { result } = await signIn(user)
+        await assert.rejects(caller(null).auth.verifyMfa({ challenge: result.challenge, code: '123456' }), error => error.code === 'BAD_REQUEST')
+    }
+    rateLimit.resetRateLimits()
+    const { result } = await signIn(user)
+    assert.equal((await db.getRepository(User).findOneByOrFail({ id: user.id })).failedLoginCount, 4)
+    await assert.rejects(caller(null).auth.verifyMfa({ challenge: result.challenge, code: '123456' }), error => error.code === 'BAD_REQUEST')
+    await assert.rejects(caller(null).auth.verifyMfa({ challenge: result.challenge, code: codeAt(secret, 30) }), error => error.code === 'TOO_MANY_REQUESTS')
+    await assert.rejects(signIn(user), error => error.code === 'TOO_MANY_REQUESTS')
+    await db.getRepository(User).update(user.id, { lockedUntil: null })
+    const next = await signIn(user)
+    assert.equal((await caller(null).auth.verifyMfa({ challenge: next.result.challenge, code: codeAt(secret, 30) })).status, 'signed_in')
+    assert.equal((await db.getRepository(User).findOneByOrFail({ id: user.id })).failedLoginCount, 0)
+})
+
+test('turning MFA on twice at once keeps the first answer\'s recovery codes valid', async () => {
+    const user = await withPassword()
+    const found = await resolve((await signIn(user)).token)
+    const own = caller(found.user, { session: found.session })
+    const { secret } = await own.auth.mfaSetup()
+    const results = await Promise.allSettled([own.auth.mfaEnable({ code: codeAt(secret) }), own.auth.mfaEnable({ code: codeAt(secret) })])
+    assert.deepEqual(results.map(result => result.status).sort(), ['fulfilled', 'rejected'])
+    const { recoveryCodes } = results.find(result => result.status === 'fulfilled').value
+    rateLimit.resetRateLimits()
+    const { result } = await signIn(user)
+    assert.equal((await caller(null).auth.verifyMfa({ challenge: result.challenge, code: recoveryCodes[0] })).status, 'signed_in')
+    await assert.rejects(own.auth.mfaSetup(), error => error.code === 'BAD_REQUEST')
+})
+
 test('two-step verification: setup, sign-in challenge, no code replay, single-use recovery codes', async () => {
     const user = await withPassword()
     const found = await resolve((await signIn(user)).token)
@@ -240,6 +290,7 @@ test('two-step verification: setup, sign-in challenge, no code replay, single-us
     await assert.rejects(caller(null).auth.verifyMfa({ challenge: expiredChallenge, code: recoveryCodes[1] }), error => error.code === 'UNAUTHORIZED')
     // Five attempts in five minutes, then the account's challenges are rate limited.
     rateLimit.resetRateLimits()
+    await db.getRepository(User).update(user.id, { failedLoginCount: 0 })
     const third = await signIn(user)
     for (let i = 0; i < 5; i++) await assert.rejects(caller(null).auth.verifyMfa({ challenge: third.result.challenge, code: '123456' }), error => error.code === 'BAD_REQUEST')
     await assert.rejects(caller(null).auth.verifyMfa({ challenge: third.result.challenge, code: recoveryCodes[1] }), error => error.code === 'TOO_MANY_REQUESTS')

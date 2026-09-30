@@ -89,15 +89,14 @@ for (const [name, screen] of Object.entries(screens)) {
   })
 }
 
-test('account security tab has no WCAG 2.1 AA violations found by axe', async ({ page, mockTrpc }) => {
+test('account security page has no WCAG 2.1 AA violations found by axe', async ({ page, mockTrpc }) => {
   const api = await mockTrpc({
     'user.me': { ...user, regionId: 'r1', mfaEnabled: false, mfaSetupRequired: false, hasPassword: true },
     'auth.sessions': sessions,
   })
   await page.goto('/collections/campaign')
   await page.getByRole('banner', { name: 'Page tools' }).getByRole('button', { name: 'My account', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Profile', exact: true }).click()
-  await page.getByRole('dialog').getByRole('tab', { name: 'Security', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Security', exact: true }).click()
   await expect(page.getByText("Where you're signed in")).toBeVisible()
   await api.settled()
   await expectNoViolations(page)

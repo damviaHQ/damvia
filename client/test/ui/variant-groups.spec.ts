@@ -35,50 +35,60 @@ function fixture(mockTrpc: MockTrpc) {
   return mockTrpc({ 'collection.findById': { ...source, files }, 'variantGroup.findById': group })
 }
 
-test('the label opens every variant in a band under the row, where they are selected one by one or all at once', async ({ page, mockTrpc, shot }) => {
+test('the label opens the group in place of its cover, on a full line of its own, where variants are selected one by one or all at once', async ({ page, mockTrpc, shot }) => {
   await fixture(mockTrpc)
   await page.goto('/collections/campaign')
   const label = page.getByRole('button', { name: 'Show the 3 variants of Launch', exact: true })
   await expect(page.getByRole('button', { name: 'Preview Essentials — Detail.jpg', exact: true })).toHaveCount(0)
+  const before = (await page.getByRole('button', { name: 'Preview Campaign — Sand.jpg', exact: true }).boundingBox())!
   await label.click()
-  await expect(label).toHaveAttribute('aria-expanded', 'true')
   const band = page.getByRole('region', { name: 'Launch, 3 variants' })
   await expect(band).toBeVisible()
+  // The cover is inside the band, never shown twice.
+  await expect(label).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Preview Botanical — Front.jpg', exact: true })).toHaveCount(1)
   await expect(band.getByRole('button', { name: /^Preview / })).toHaveCount(3)
-  for (const value of ['fr', 'de', 'en']) await expect(band.getByTitle('Language').getByText(value, { exact: true })).toBeVisible()
 
-  // Under the row of the card, never inside it.
-  const card = (await page.getByRole('article').getByRole('button', { name: 'Preview Botanical — Front.jpg', exact: true }).boundingBox())!
+  // The band takes a line of its own, as wide as the cards: the card before the
+  // cover keeps its place, the one after it moves below the band.
   const bandBox = (await band.boundingBox())!
-  expect(bandBox.y).toBeGreaterThan(card.y + card.height)
-  const nextRow = (await page.getByRole('button', { name: 'Preview Studio — Hero.jpg', exact: true }).boundingBox())!
-  expect(nextRow.y).toBeGreaterThan(bandBox.y + bandBox.height)
+  const sand = (await page.getByRole('button', { name: 'Preview Campaign — Sand.jpg', exact: true }).boundingBox())!
+  expect(sand).toEqual(before)
+  expect(bandBox.y).toBeGreaterThan(sand.y + sand.height)
+  expect(Math.abs(bandBox.x - (sand.x - 12))).toBeLessThan(4)
+  // Its variants are cards of the same size, starting under the first column.
+  const cover = (await band.getByRole('button', { name: 'Preview Botanical — Front.jpg', exact: true }).boundingBox())!
+  expect([cover.x, cover.height, cover.width]).toEqual([sand.x, sand.height, sand.width])
+  const following = (await page.getByRole('button', { name: 'Preview Studio — Edition.jpg', exact: true }).boundingBox())!
+  expect(following.y).toBeGreaterThan(bandBox.y + bandBox.height)
   await shot('variant-band')
 
-  await band.getByRole('button', { name: 'Select all 3', exact: true }).click()
+  await band.getByRole('checkbox', { name: 'Select all 3 variants', exact: true }).click()
   for (const name of ['Botanical — Front.jpg', 'Essentials — Detail.jpg', 'Launch — EN.jpg']) await expect(band.getByRole('checkbox', { name: `Select ${name}`, exact: true })).toBeChecked()
-  const cardBox = page.getByRole('checkbox', { name: 'Select all 3 variants of Launch', exact: true })
-  await expect(cardBox).toBeChecked()
   await band.getByRole('checkbox', { name: 'Select Launch — EN.jpg', exact: true }).click()
-  await expect(cardBox).toHaveAttribute('aria-checked', 'mixed')
-  await expect(page.getByRole('button', { name: 'Show the 3 variants of Launch', exact: true })).toHaveText('2 of 3 selected')
   await band.getByRole('button', { name: 'Close variants', exact: true }).click()
   await expect(band).toHaveCount(0)
   await expect(label).toHaveAttribute('aria-expanded', 'false')
+  await expect(label).toHaveText('2 of 3 selected')
+  await expect(page.getByRole('checkbox', { name: 'Select all 3 variants of Launch', exact: true })).toHaveAttribute('aria-checked', 'mixed')
 })
 
 test('the checkbox of a closed card takes the whole group, and takes it back', async ({ page, mockTrpc }) => {
   await fixture(mockTrpc)
   await page.goto('/collections/campaign')
   const cardBox = page.getByRole('checkbox', { name: 'Select all 3 variants of Launch', exact: true })
+  const label = page.getByRole('button', { name: 'Show the 3 variants of Launch', exact: true })
+  const band = page.getByRole('region', { name: 'Launch, 3 variants' })
   await cardBox.click()
   await expect(cardBox).toBeChecked()
-  await page.getByRole('button', { name: 'Show the 3 variants of Launch', exact: true }).click()
-  const band = page.getByRole('region', { name: 'Launch, 3 variants' })
+  await label.click()
   // The card and the band hold the same entries, not a second copy of the cover.
-  await expect(band.getByRole('checkbox', { checked: true })).toHaveCount(3)
+  await expect(band.getByRole('checkbox', { name: /^Select .*\.jpg$/, checked: true })).toHaveCount(3)
+  await band.getByRole('button', { name: 'Close variants', exact: true }).click()
   await cardBox.click()
-  await expect(band.getByRole('checkbox', { checked: true })).toHaveCount(0)
+  await expect(cardBox).not.toBeChecked()
+  await label.click()
+  await expect(band.getByRole('checkbox', { name: /^Select .*\.jpg$/, checked: true })).toHaveCount(0)
 })
 
 test('the preview of a cover walks through its variants before the next card', async ({ page, mockTrpc }) => {
@@ -91,4 +101,28 @@ test('the preview of a cover walks through its variants before the next card', a
     await dialog.getByRole('button', { name: 'Next file', exact: true }).click()
     await expect(dialog).toContainText(name)
   }
+})
+
+test('in the list, an open group becomes a header with every variant listed under it, whatever the sort', async ({ page, mockTrpc }) => {
+  await page.addInitScript(type => localStorage.setItem('dam_display_preferences', JSON.stringify({ [type]: 'list' })), files[0].assetType.id)
+  await fixture(mockTrpc)
+  await page.goto('/collections/campaign')
+  const names = () => page.locator('.collection-list-files__filename').allTextContents()
+  await expect.poll(names).toEqual(['Campaign — Sand.jpg', 'Botanical — Front.jpg', 'Studio — Edition.jpg', 'Campaign — Packaging.jpg', 'Botanical — Collection.jpg', 'Essentials — Natural.jpg', 'Studio — Hero.jpg'])
+  await page.getByRole('button', { name: 'Show the 3 variants of Launch', exact: true }).click()
+  // The label said three variants: the three files are listed, the cover among them.
+  const hide = page.getByRole('button', { name: 'Hide the 3 variants of Launch', exact: true })
+  await expect(hide).toBeVisible()
+  await expect(page.getByRole('row').filter({ has: hide })).toContainText('Launch')
+  await expect.poll(names).toEqual(['Campaign — Sand.jpg', 'Botanical — Front.jpg', 'Essentials — Detail.jpg', 'Launch — EN.jpg', 'Studio — Edition.jpg', 'Campaign — Packaging.jpg', 'Botanical — Collection.jpg', 'Essentials — Natural.jpg', 'Studio — Hero.jpg'])
+  // Each variant is an ordinary row with its own checkbox; the header takes the group.
+  await page.getByRole('checkbox', { name: 'Select Launch — EN.jpg', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: 'Select all 3 variants of Launch', exact: true })).toHaveAttribute('aria-checked', 'mixed')
+  await page.getByRole('button', { name: 'File', exact: true }).click()
+  const sorted = await names()
+  const cover = sorted.indexOf('Botanical — Front.jpg')
+  expect(sorted.slice(cover, cover + 3)).toEqual(['Botanical — Front.jpg', 'Essentials — Detail.jpg', 'Launch — EN.jpg'])
+  await hide.click()
+  await expect.poll(names).not.toContain('Launch — EN.jpg')
+  await expect(page.getByRole('button', { name: 'Show the 3 variants of Launch', exact: true })).toHaveText(/1 of 3 selected/)
 })

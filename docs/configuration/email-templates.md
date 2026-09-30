@@ -3,7 +3,7 @@ title: Email templates
 description: The ten emails Damvia sends, when each goes out, the variables it can use, and how its wording is rendered safely.
 sidebar:
   order: 4
-lastUpdated: 2026-09-28
+lastUpdated: 2026-09-29
 ---
 
 Every email Damvia sends uses one branded layout, carrying the client logo and accent colour, and has wording admins edit under **Admin → Emails**. This page is the reference for the templates themselves: when each is sent, to whom, and what it can say. The editing workflow is in [Emails](../administration/emails.md).
@@ -53,12 +53,26 @@ Wording is written with [LiquidJS](https://liquidjs.com) syntax. `{{ user.name }
 
 A variable that the template does not list prints nothing. A **block** such as `{{ licenseList }}` is laid out by Damvia (here, a bulleted list of licences with their end dates) and placed where it is written; put it on its own line in the message.
 
+## Newsletter variables
+
+[Newsletters](../administration/newsletters.md) use the same syntax and the same safeguards. They can use:
+
+| Variable | Value |
+|---|---|
+| `user.name` | The reader's full name |
+| `user.firstName` | The first word of the reader's name |
+| `user.email` | The reader's email address |
+| `appName` | The brand name |
+| `appUrl` | The address of the portal |
+
+A newsletter's message can also hold images uploaded for it and buttons. The unsubscribe link is added to the footer automatically.
+
 ## What a template cannot do
 
 Templates are written by admins, and the values they print come partly from other people (a user's name, a collection name). The renderer therefore:
 
 - **escapes every value** printed into the HTML, so a name such as `<script>` shows as text. The `raw` filter does not turn escaping off. Subjects are plain text and are not escaped;
-- **keeps only the formatting the editor produces** in the message: paragraphs, headings, bold, italic, lists, quotes, links (`http`, `https`, `mailto`) and rules. Styles, images, scripts and event attributes are removed when the template is saved, and again once values are filled in, so a value used as a link address (for example a name set to `javascript:…`) loses its link;
+- **keeps only the formatting the editor produces** in the message: paragraphs, headings, bold, italic, lists, quotes, links (`http`, `https`, `mailto`) and rules. Styles, images, scripts and event attributes are removed when the template is saved, and again once values are filled in, so a value used as a link address (for example a name set to `javascript:…`) loses its link. Newsletters also keep the images uploaded for them and their buttons; any other image is removed;
 - **treats the preview text, heading and button label as text**: a tag typed into them shows as text, without its attributes;
 - **refuses `{% include %}`, `{% render %}` and `{% layout %}`**: a template cannot read files from the server;
 - **refuses unknown filters and runaway loops**, with a render and memory limit.

@@ -3,7 +3,7 @@ title: Audit log
 description: The append-only record of administrative changes, sign-ins, refusals and access to downloads, and how to filter, export and retain it.
 sidebar:
   order: 17
-lastUpdated: 2026-09-28
+lastUpdated: 2026-09-29
 ---
 
 Damvia records who changed what, every sign-in and failed sign-in, and every refused request in the `audit_log` table. Admins read it under **User Management > Audit log** (`/admin/audit-log`). Managers have no access.
@@ -32,7 +32,7 @@ An entry is written in the same transaction as the change it describes where the
 
 | Action | When |
 |---|---|
-| `admin.change` | Any successful change made by an admin or a manager through the API, with the procedure name as target and its input as After. This covers settings, groups, regions, domains, licences, asset types, menu, pages, records and every other administration screen. Procedures listed below write their own, more detailed entry instead. |
+| `admin.change` | Any successful change made by an admin or a manager through the API, with the procedure name as target and its input as After. This covers settings, groups, regions, domains, licences, asset types, menu, pages, records and every other administration screen. Previews and recipient counts, which run as an admin types, record nothing. Procedures listed below write their own, more detailed entry instead. |
 | `access.denied` | A signed-in user called something their role or the object does not allow. |
 | `session.created` | A sign-in succeeded. After holds the method: `password`, `email_link`, `invitation`, `sso`, `password_reset`, `sign_up` or `legacy`. |
 | `session.ended`, `session.revoked` | Sign-out; a session ended from Account > Security, or every session ended by an admin or manager. |
@@ -52,6 +52,12 @@ An entry is written in the same transaction as the change it describes where the
 | `email_template.updated`, `email_template.reset` | An admin changed the wording of an email, or restored its default, with the previous and new content. |
 | `email_settings.updated` | The sender name, address, reply-to or footer changed. |
 | `brand.updated` | The brand name or accent colour changed. |
+| `newsletter.created`, `newsletter.updated`, `newsletter.removed` | A newsletter draft was created (or duplicated), saved or deleted. The entry holds its name, subject, status and audience, not the message. |
+| `newsletter.scheduled`, `newsletter.unscheduled` | A newsletter was sent now or scheduled, with the time and the number of recipients; or taken back to a draft. |
+| `newsletter.sent`, `newsletter.retried` | Sending finished, with the sent, failed and skipped counts (no actor); an admin retried the failed recipients. |
+| `audience.saved`, `audience.removed` | A saved newsletter audience was created, changed or deleted, with its filter. |
+| `email.bounced`, `email.complained` | The mail provider reported a person's address as undeliverable, with its reason, or reported that they marked an email as spam. No actor. |
+| `newsletter.unsubscribed`, `newsletter.resubscribed` | A person stopped or restarted newsletters, from the link in a newsletter, their mail client's button, their account, or through a spam complaint reported by the mail provider. The actor is the person, even without a session. |
 
 ## Filter and export
 

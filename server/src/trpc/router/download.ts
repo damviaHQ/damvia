@@ -25,9 +25,10 @@ import {
 	DownloadVideoFormat,
 	DownloadVideoResolution
 } from "../../entity/download"
-import {apiURL, dataSource} from "../../env"
+import { apiURL, assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { userCollectionFilesQuery } from "../../services/collection"
-import { createDownloadArchive, DOWNLOAD_LIMITS, downloadDelivery } from "../../services/download"
+import { createDownloadArchive, DOWNLOAD_LIMITS, downloadContents, downloadDelivery } from "../../services/download"
+import { SIGNED_URL_SECONDS } from "../../services/signed-url"
 import { downloadCreateArchiveQueue } from "../../worker"
 import { recordAudit } from "../../services/audit"
 import { authMiddleware, publicProcedure, router, userApproved } from "../index"
@@ -90,6 +91,22 @@ export default router({
 				order: { createdAt: 'desc' },
 			})
 			return Promise.all(downloads.map(formatDownload))
+		}),
+	// The files a download holds, for its owner only, read when the row is opened.
+	contents: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.object({ id: z.uuid() }))
+		.query(async ({ input, ctx }) => {
+			const download = await dataSource.getRepository(Download).findOneBy({ id: input.id, userId: ctx.user.id })
+			if (!download) throw new TRPCError({ code: 'NOT_FOUND' })
+			const contents = await downloadContents(dataSource.manager, ctx.user, download)
+			return {
+				...contents,
+				entries: await Promise.all(contents.entries.map(async ({ thumbnailStorageKey, ...entry }) => ({
+					...entry,
+					thumbnailURL: thumbnailStorageKey ? await assetsS3().presignedGetObject(assetsS3Bucket(), thumbnailStorageKey, SIGNED_URL_SECONDS) : null,
+				}))),
+			}
 		}),
 	create: publicProcedure
 		.use(authMiddleware(userApproved))

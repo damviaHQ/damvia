@@ -355,7 +355,7 @@ test('a combined ZIP prepares in the background while navigation stays available
   await expect(page.getByText('Preparing your download… You can keep browsing.')).toHaveCount(0)
 })
 
-test('a ready archive appears in the top bar and opens downloads', async ({ page, mockTrpc }) => {
+test('a ready archive appears in the top bar and lists recent downloads', async ({ page, mockTrpc }) => {
   const api = await fixture(page, mockTrpc, { products: 2 })
   await expect.poll(() => api.count('download.list') > 0).toBe(true)
   let archiveReady = false
@@ -382,8 +382,11 @@ test('a ready archive appears in the top bar and opens downloads', async ({ page
   await expect(readyButton).toBeVisible()
   await expect(readyButton.locator('.download-status__dot')).toHaveCount(0)
   await readyButton.click()
-  await expect(page.getByRole('dialog').getByRole('heading', { name: 'Downloads' })).toBeVisible()
-  await page.keyboard.press('Escape')
+  const popover = page.getByRole('dialog', { name: 'Downloads' })
+  await expect(popover.getByRole('link', { name: 'Download', exact: true })).toHaveAttribute('href', '/archive.zip')
+  await popover.getByRole('link', { name: 'All downloads' }).click()
+  await expect(page).toHaveURL(/\/account\/downloads$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Downloads' })).toBeVisible()
   await page.reload()
   await expect(readyButton).toBeVisible()
 })

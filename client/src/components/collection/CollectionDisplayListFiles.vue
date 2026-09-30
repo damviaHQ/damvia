@@ -19,7 +19,6 @@ import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import CollectionCheckbox from "@/components/collection/CollectionCheckbox.vue"
 import TableSortHeader from "@/components/TableSortHeader.vue"
 import CollectionModalGallery from "@/components/collection/CollectionModalDownloadUnique.vue"
-import CollectionVariantBand from "@/components/collection/CollectionVariantBand.vue"
 import { useVariantGroups } from "@/composables/useVariantGroups"
 import { Button } from "@/components/ui/button"
 import {
@@ -51,7 +50,7 @@ import {
   useTable,
 } from "@tanstack/vue-table"
 import dayjs from "dayjs"
-import { Star, StarOff, Trash2 } from "@lucide/vue"
+import { ChevronDown, Star, StarOff, Trash2 } from "@lucide/vue"
 import { computed, ref } from "vue"
 
 type File = RouterOutput["collection"]["findById"]["files"][number]
@@ -84,6 +83,13 @@ const removable = computed(
 const files = computed(() => props.files ?? props.collection?.files ?? [])
 const variants = useVariantGroups(computed(() => files.value as File[]), computed(() => props.allFiles))
 const { openGroupId } = variants
+// An open group unfolds as rows under its cover, in every column of the list.
+const openCover = computed(() => (files.value as File[]).find(file => variants.grouped(file) && file.variantGroup!.id === openGroupId.value && variants.groups[openGroupId.value!]))
+const openVariants = computed(() => openCover.value ? variants.members(openCover.value).filter(member => member.id !== openCover.value!.id) as File[] : [])
+const variantIds = computed(() => new Set(openVariants.value.map(file => file.id)))
+// Once open, the cover is one of the variants listed under the group's header.
+const isVariantRow = (file: File) => variantIds.value.has(file.id) || file === openCover.value
+const tableData = computed(() => [...(files.value as File[]), ...openVariants.value])
 // Selecting the whole list takes the variants folded under each row too.
 const everyFile = computed<File[]>(() => props.allFiles ?? files.value)
 function variantLabel(file: File) {
@@ -252,8 +258,10 @@ const columns = computed<ColumnDef<typeof features, File, any>[]>(() => [
 ])
 
 const table = useTable<typeof features, File>({
+  // Rows keep their key when a group opens and its variants join the data.
+  getRowId: (row) => row.id,
   features,
-  get data() { return files.value },
+  get data() { return tableData.value },
   get columns() { return columns.value },
   onSortingChange: (updater: Updater<SortingState>) => {
     sorting.value = typeof updater === "function" ? updater(sorting.value) : updater
@@ -269,6 +277,14 @@ const table = useTable<typeof features, File>({
   },
 })
 
+// Sorting places the files; the variants of the open group follow their cover.
+const orderedRows = computed(() => {
+  const rows = table.getRowModel().rows
+  const variantRows = openVariants.value.map(file => rows.find(row => row.id === file.id)).filter(row => !!row)
+  return rows.filter(row => !variantIds.value.has(row.original.id)).flatMap(row => row.original === openCover.value
+    ? [{ row, header: true }, { row, header: false }, ...variantRows.map(variant => ({ row: variant, header: false }))]
+    : [{ row, header: false }])
+})
 </script>
 
 <template>
@@ -296,11 +312,20 @@ const table = useTable<typeof features, File>({
         </tr>
       </thead>
       <tbody>
-        <template v-if="table.getRowModel().rows.length" v-for="row in table.getRowModel().rows" :key="row.id">
-        <tr @mouseenter="hoveredRowId = row.id" @mouseleave="hoveredRowId = null" class="group">
+        <template v-if="orderedRows.length" v-for="{ row, header } in orderedRows" :key="header ? `group:${row.id}` : row.id">
+        <tr v-if="header" class="bg-neutral-50">
+          <td :colspan="row.getVisibleCells().length" class="text-body">
+            <div class="flex items-center gap-4">
+              <CollectionCheckbox :label="`Select all ${variants.members(row.original).length} variants of ${row.original.variantGroup!.displayName}`" :state="variants.groupState(row.original)" @click="variants.toggleGroup(row.original)" />
+              <span class="truncate font-medium text-neutral-900">{{ row.original.variantGroup!.displayName }}</span>
+              <button type="button" class="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-800 hover:bg-neutral-300" :aria-label="`Hide the ${variants.members(row.original).length} variants of ${row.original.variantGroup!.displayName}`" aria-expanded="true" @click="openGroupId = null">{{ variantLabel(row.original) }}<ChevronDown class="-mr-0.5 ml-0.5 inline size-3 rotate-180" aria-hidden="true" /></button>
+            </div>
+          </td>
+        </tr>
+        <tr v-else @mouseenter="hoveredRowId = row.id" @mouseleave="hoveredRowId = null" class="group" :class="isVariantRow(row.original) && 'bg-neutral-50'">
           <td v-for="cell in row.getVisibleCells()" :key="cell.id" class="text-body">
-            <div v-if="cell.column.id === 'name'" class="flex flex-row items-center gap-4">
-              <CollectionCheckbox v-if="variants.grouped(cell.row.original)" :label="`Select all ${cell.row.original.variantGroup!.memberCount} variants of ${cell.row.original.variantGroup!.displayName}`" @click="variants.toggleGroup(cell.row.original)" :class="[
+            <div v-if="cell.column.id === 'name'" class="flex flex-row items-center gap-4" :class="isVariantRow(cell.row.original) && 'pl-7'">
+              <CollectionCheckbox v-if="variants.grouped(cell.row.original) && !isVariantRow(cell.row.original)" :label="`Select all ${cell.row.original.variantGroup!.memberCount} variants of ${cell.row.original.variantGroup!.displayName}`" @click="variants.toggleGroup(cell.row.original)" :class="[
                 'collection-list-files__file-selection',
                 variants.groupState(cell.row.original) &&
                 'collection-list-files__file-selection--selected',
@@ -333,7 +358,7 @@ const table = useTable<typeof features, File>({
                         >
                           {{ cell.row.original.name }}
                         </button>
-                        <button v-if="variants.grouped(cell.row.original)" type="button" class="ml-2 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-800 hover:bg-neutral-300" :aria-label="`Show the ${cell.row.original.variantGroup!.memberCount} variants of ${cell.row.original.variantGroup!.displayName}`" :aria-expanded="openGroupId === cell.row.original.variantGroup!.id" @click.stop="variants.toggleBand(cell.row.original)">{{ variantLabel(cell.row.original) }}</button>
+                        <button v-if="variants.grouped(cell.row.original) && !isVariantRow(cell.row.original)" type="button" class="ml-2 rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-800 hover:bg-neutral-300" :aria-label="`Show the ${cell.row.original.variantGroup!.memberCount} variants of ${cell.row.original.variantGroup!.displayName}`" :aria-expanded="openGroupId === cell.row.original.variantGroup!.id" @click.stop="variants.toggleBand(cell.row.original)">{{ variantLabel(cell.row.original) }}<ChevronDown class="-mr-0.5 ml-0.5 inline size-3 transition-transform" :class="openGroupId === cell.row.original.variantGroup!.id && 'rotate-180'" aria-hidden="true" /></button>
                         <div v-if="copiedCellId === `${cell.row.id}-filename`"
                              class="absolute -top-8 left-0 text-xs text-neutral-500 bg-white px-2 py-1 rounded shadow-xs border border-neutral-200 z-20 copied-indicator animate-in fade-in-0 duration-150">
                           copied
@@ -400,11 +425,6 @@ const table = useTable<typeof features, File>({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          </td>
-        </tr>
-        <tr v-if="variants.grouped(row.original) && openGroupId === row.original.variantGroup!.id && variants.groups[openGroupId!]" class="variant-band-row">
-          <td :colspan="row.getVisibleCells().length" class="py-3">
-            <CollectionVariantBand :group="variants.groups[openGroupId!]" :members="variants.members(row.original)" @close="openGroupId = null" />
           </td>
         </tr>
         </template>

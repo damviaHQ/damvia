@@ -101,6 +101,7 @@ export function formatPublicUserForAdmin(user: User, viewer: User) {
 		updatedAt: user.updatedAt,
 		lastLoginAt: user.lastLoginAt,
 		suspendedAt: user.suspendedAt,
+		emailBouncedAt: user.emailBouncedAt,
 		mfaEnabled: !!user.mfaEnabledAt,
 		groups: user.userGroups.map((userGroup) => ({
 			id: userGroup.group.id,

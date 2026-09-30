@@ -3,7 +3,7 @@ title: Reverse proxy
 description: Put HTTPS in front of the API and the client, and expose the S3 endpoint browsers must reach.
 sidebar:
   order: 4
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-29
 ---
 
 The server speaks plain HTTP on one port and expects a proxy to terminate TLS. Three hostnames are involved: the client (`APP_URL`), the API (`API_URL`) and the S3 endpoint from the bucket URLs, and all three must be reachable by browsers.
@@ -14,6 +14,10 @@ The server speaks plain HTTP on one port and expects a proxy to terminate TLS. T
 |---|---|
 | `/trpc/*` | Every application call, `GET` for queries and `POST` for mutations. Auth is the `damvia_session` cookie. |
 | `/v1/downloads/:id` | Checks the download and that its owner can still reach every file on each click, then redirects to a presigned S3 URL valid 5 minutes, or to `APP_URL/link-expired`. Linked from the client and from emails. |
+| `GET /v1/branding/email-logo.png` | The client logo shown in emails. Public, loaded by mail clients and their image proxies. |
+| `GET /v1/newsletter-images/:id.(jpg\|png)` | Images in newsletters. Public and cached for a year; emails already sent keep loading them, so keep the path reachable, and redirect it from the old host if `API_URL` changes. |
+| `POST /v1/unsubscribe/:token` | One-click unsubscribe, posted by mail providers without cookies or an `Origin`. Rate-limited per address. |
+| `POST /v1/email-events/:secret` | Bounce and spam reports from the mail provider, up to 1 MB. `404` unless `EMAIL_EVENTS_SECRET` is set and matches. |
 
 Two Fastify settings matter for the proxy:
 

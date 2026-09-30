@@ -121,13 +121,13 @@ test('desktop collection preserves selection, previews, search and account contr
   await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'My account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Display preferences', exact: true }).click()
-  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Display preferences' })).toBeVisible()
   await page.getByRole('radio', { name: 'List', exact: true }).nth(1).click()
-  await page.keyboard.press('Escape')
+  await page.getByRole('link', { name: 'Back to library', exact: true }).click()
   await expect(page.locator('table')).toBeVisible()
   await page.getByRole('button', { name: 'My account', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Profile', exact: true }).click()
-  await expect(page.getByRole('dialog')).toContainText('Manage your profile and account details.')
+  await expect(page.locator('[data-account-content]')).toContainText('Your name, company and email, and a copy of your data.')
 })
 
 test('neutral authentication uses shared controls and keeps account links accessible', async ({ page, mockTrpc }) => {

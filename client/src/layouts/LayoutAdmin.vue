@@ -41,6 +41,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Mail,
+  Megaphone,
   Settings,
   Users,
   X,
@@ -70,6 +71,7 @@ const adminParents: Record<string, string> = {
   'admin-record-import': 'admin-records',
   'admin-page': 'admin-pages',
   'admin-email': 'admin-emails',
+  'admin-newsletter': 'admin-newsletters',
 }
 const pageParent = computed(() => {
   const name = String(route.name ?? '')
@@ -236,6 +238,10 @@ const storageLevel = computed(() => {
             <router-link :to="{ name: 'admin-emails' }" class="menu-item">
               <Mail class="w-4 h-4 mr-2" />
               Emails
+            </router-link>
+            <router-link :to="{ name: 'admin-newsletters' }" class="menu-item">
+              <Megaphone class="w-4 h-4 mr-2" />
+              Newsletters
             </router-link>
             <router-link :to="{ name: 'admin-settings' }" class="menu-item">
               <Settings class="w-4 h-4 mr-2" />
