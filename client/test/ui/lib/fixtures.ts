@@ -160,6 +160,7 @@ export const defaults: Record<string, unknown> = {
   'variantAxis.listFacets': [],
   'asset.listRecordViews': [],
   'analytics.trackView': null,
+  'catalogue.fileRecords': { keyColumnName: null, cardTitleField: null, fields: [], records: [], ranges: [] },
   'settings.getAuthBackgroundImage': { imageUrl: null, exists: false },
   // The administration layout, for admins and managers.
   'dashboard.summary': dashboardSummary,

@@ -17,6 +17,7 @@ import * as fileType from "@/utils/fileType.ts"
 import thumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import PathBreadcrumb, { type PathBreadcrumbItem } from "@/components/navigation/PathBreadcrumb.vue"
 import { Button } from "@/components/ui/button/index.js"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Tooltip,
   TooltipContent,
@@ -29,14 +30,17 @@ import { useGlobalToast } from "@/composables/useGlobalToast.ts"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { RouterInput, RouterOutput, trpc } from "@/services/server.ts"
 import { formatFileSize } from "@/utils/fileSize"
+import { formatRecordValue } from "@/utils/recordValues"
 import { DOWNLOAD_MAX_BYTES } from "@/utils/downloadDelivery"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import {
+  ArrowUpRight,
   Check,
   ChevronLeft,
   ChevronRight,
   Copy,
   Download,
+  ImageOff,
   SquareArrowLeft,
   SquareArrowRight,
   Star,
@@ -48,9 +52,11 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue"
 import CollectionDownloadFileOptions from './CollectionDownloadFileOptions.vue'
 import { useDownloadStore } from '@/stores/downloadStore'
 import { FocusScope } from "reka-ui"
+import { RouterLink } from "vue-router"
 
 type File = RouterOutput["collection"]["getFiles"]["files"][number]
 type Collection = RouterOutput["collection"]["findById"]
+type Panel = "download" | "product"
 
 type Props = {
   files?: File[]
@@ -156,6 +162,51 @@ watch([() => props.modelValue, () => props.recordId, resolvesSelection, retry], 
   }
 }, { immediate: true })
 watch(downloadFiles, () => { form.value.isAcceptingTerms = false })
+
+// A file linked to records, whatever its asset type, shows them in a second
+// tab. The picture and views come only with a record the reader can see in a
+// product catalogue; until the links load, the file's own record stands in.
+const panel = ref<Panel>("download")
+const shownVisual = ref<string | null>(null)
+const selectedRecordId = ref<string | null>(null)
+const linkedFileId = computed(() => props.recordId ? null : currentFile.value?.id ?? null)
+const { data: linked, isFetching: isLoadingLinked } = useQuery({
+  queryKey: computed(() => ["file-records", linkedFileId.value]),
+  queryFn: () => trpc.catalogue.fileRecords.query(linkedFileId.value as string),
+  enabled: computed(() => !!linkedFileId.value),
+  retry: false,
+})
+const linkedRecords = computed(() => linked.value?.records ?? [])
+// A file covering a range, such as every product of one style, lists them too.
+const linkedRanges = computed(() => linked.value?.ranges ?? [])
+const hasLinkedRecords = computed(() => !!linkedFileId.value && (!!linkedRecords.value.length || !!linkedRanges.value.length || (!linked.value && !!currentFile.value?.record)))
+const productTabLabel = computed(() => linkedRecords.value.length > 1
+  ? `${recordLabel.plural.value} · ${linkedRecords.value.length}`
+  : linkedRanges.value.length && !linkedRecords.value.length ? recordLabel.plural.value : recordLabel.singular.value)
+const activePanel = computed<Panel>(() => hasLinkedRecords.value ? panel.value : "download")
+const product = computed(() => linkedRecords.value.find(record => record.id === selectedRecordId.value) ?? linkedRecords.value[0] ?? null)
+const productPicture = computed(() => shownVisual.value ?? product.value?.visuals[0]?.thumbnailURL ?? null)
+function recordTitle(record: { recordKey: string, metaData: Record<string, string> }) {
+  return (linked.value?.cardTitleField ? record.metaData[linked.value.cardTitleField] : null) || record.recordKey
+}
+const linkedProductTitle = computed(() => product.value ? recordTitle(product.value) : recordLabel.singular.value)
+const linkedProductFacts = computed(() => product.value
+  ? [
+      ...(linkedProductTitle.value !== product.value.recordKey ? [{ id: "recordKey", label: linked.value?.keyColumnName || "Reference", value: product.value.recordKey }] : []),
+      ...(linked.value?.fields ?? [])
+        .filter(field => field.name !== linked.value?.keyColumnName)
+        .map(field => ({ id: field.name, label: field.displayName, value: formatRecordValue({ ...field, options: [] }, product.value?.metaData[field.name]) })),
+    ].filter(fact => fact.value)
+  : (currentFile.value?.record?.attributes ?? [])
+      .filter(attribute => !!attribute)
+      .map(attribute => ({ id: attribute.id, label: attribute.displayName || attribute.name, value: attribute.value ?? "" }))
+      .filter(fact => fact.value))
+watch(() => product.value?.id, () => { shownVisual.value = null })
+watch(linkedFileId, () => { selectedRecordId.value = null })
+
+function copyLinkedProductData() {
+  return copyValue(linkedProductFacts.value.map(fact => `${fact.label}: ${fact.value}`).join('\n'), 'all')
+}
 
 const { data: fileCollection } = useQuery({
   queryKey: computed(() => ["file-collection", props.modelValue]),
@@ -528,7 +579,12 @@ watch(() => props.modelValue, (newValue) => {
         </div>
       </div>
       <aside class="gallery-modal__download-container" aria-label="Download options">
-        <template v-if="!isResolving && !loadError">
+        <Tabs v-if="!isResolving && !loadError" :model-value="activePanel" class="download-panels" @update:model-value="(value) => panel = value as Panel">
+          <TabsList v-if="hasLinkedRecords" class="download-panels__list">
+            <TabsTrigger value="download">Download</TabsTrigger>
+            <TabsTrigger value="product">{{ productTabLabel }}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="download" class="download-panels__content">
           <div v-if="recordId && productFacts.length">
             <div class="facts-heading"><h3>{{ recordLabel.singular.value }}</h3><button type="button" :aria-label="`Copy all ${recordLabel.lower.value} data`" :title="copiedField === 'all' ? 'Copied' : 'Copy all data'" @click="copyProductData"><Check v-if="copiedField === 'all'" :size="16" /><Copy v-else :size="16" /></button></div>
             <div class="product-facts"><button v-for="fact in productFacts" :key="fact.id" type="button" class="product-fact" :aria-label="`Copy ${fact.label} value`" :title="`Copy ${fact.label}`" @click="copyValue(fact.value || '', fact.id)"><span class="fact-label">{{ fact.label }}</span><span class="fact-value">{{ fact.value }}</span><Check v-if="copiedField === fact.id" :size="15" aria-hidden="true" /><Copy v-else :size="15" aria-hidden="true" /></button></div>
@@ -542,15 +598,54 @@ watch(() => props.modelValue, (newValue) => {
             v-model:image-format="form.imageFormat" v-model:image-resolution="form.imageResolution"
             v-model:video-format="form.videoFormat" v-model:video-resolution="form.videoResolution"
             v-model:delivery="form.downloadType" v-model:accepted="form.isAcceptingTerms" />
-          <div v-if="!recordId && (currentFile?.record?.attributes?.length || currentFile?.metadata?.length)" class="grid gap-4">
-            <div v-if="currentFile?.record?.attributes?.length"><h3 class="mb-2 text-[13px] font-semibold">{{ recordLabel.singular.value }}</h3>
-              <dl class="file-facts"><template v-for="attribute in currentFile.record.attributes" :key="attribute?.id"><dt>{{ attribute?.displayName || attribute?.name }}</dt><dd>{{ attribute?.value }}</dd></template></dl>
-            </div>
-            <div v-if="currentFile?.metadata?.length"><h3 class="mb-2 text-[13px] font-semibold">From the file</h3>
-              <dl class="file-facts"><template v-for="field in currentFile.metadata" :key="field.id"><dt>{{ field.displayName || field.name }}</dt><dd>{{ field.value }}</dd></template></dl>
-            </div>
+          <div v-if="!recordId && currentFile?.metadata?.length"><h3 class="mb-2 text-[13px] font-semibold">From the file</h3>
+            <dl class="file-facts"><template v-for="field in currentFile.metadata" :key="field.id"><dt>{{ field.displayName || field.name }}</dt><dd>{{ field.value }}</dd></template></dl>
           </div>
-        </template>
+          </TabsContent>
+          <TabsContent v-if="hasLinkedRecords" value="product" class="download-panels__content">
+            <p v-if="isLoadingLinked && !linked && !currentFile?.record" role="status" class="text-[13px] text-neutral-500">Loading…</p>
+            <template v-else>
+              <template v-if="product || currentFile?.record">
+              <div v-if="linkedRecords.length > 1" class="linked-product__records" role="group" :aria-label="`Linked ${recordLabel.lowerPlural.value}`">
+                <button v-for="record in linkedRecords" :key="record.id" type="button" :aria-pressed="product?.id === record.id" :title="recordTitle(record)" @click="selectedRecordId = record.id">{{ record.recordKey }}</button>
+              </div>
+              <figure v-if="product?.inCatalogue" class="linked-product__picture">
+                <img v-if="productPicture" :src="productPicture" :alt="linkedProductTitle" />
+                <ImageOff v-else :size="28" aria-hidden="true" />
+              </figure>
+              <div v-if="product?.inCatalogue && product.visuals.length > 1" class="linked-product__views" aria-label="Product views">
+                <button v-for="visual in product.visuals" :key="visual.id" type="button" :aria-pressed="productPicture === visual.thumbnailURL"
+                  :aria-label="`Show view ${visual.view ?? visual.id}`" @click="shownVisual = visual.thumbnailURL">
+                  <img :src="visual.thumbnailURL ?? ''" alt="" loading="lazy" /><span v-if="visual.view">{{ visual.view }}</span>
+                </button>
+              </div>
+              <div>
+                <div class="facts-heading"><h3>{{ linkedProductTitle }}</h3><button v-if="linkedProductFacts.length" type="button" :aria-label="`Copy all ${recordLabel.lower.value} data`" :title="copiedField === 'all' ? 'Copied' : 'Copy all data'" @click="copyLinkedProductData"><Check v-if="copiedField === 'all'" :size="16" /><Copy v-else :size="16" /></button></div>
+                <div v-if="linkedProductFacts.length" class="product-facts"><button v-for="fact in linkedProductFacts" :key="fact.id" type="button" class="product-fact" :aria-label="`Copy ${fact.label} value`" :title="`Copy ${fact.label}`" @click="copyValue(fact.value, fact.id)"><span class="fact-label">{{ fact.label }}</span><span class="fact-value">{{ fact.value }}</span><Check v-if="copiedField === fact.id" :size="15" aria-hidden="true" /><Copy v-else :size="15" aria-hidden="true" /></button></div>
+                <p v-else class="text-[13px] text-neutral-500">No {{ recordLabel.lower.value }} data to show.</p>
+              </div>
+              <RouterLink v-if="product?.inCatalogue" :to="{ name: 'product', params: { id: product.id } }" class="linked-product__link" @click="$emit('update:modelValue', null)">
+                Open the {{ recordLabel.lower.value }} page<ArrowUpRight :size="14" aria-hidden="true" />
+              </RouterLink>
+              </template>
+              <section v-for="range in linkedRanges" :key="`${range.attributeName}=${range.value}`" class="linked-range" :aria-label="`${range.label} ${range.value}`">
+                <h3>Covers every {{ recordLabel.lower.value }} where {{ range.label }} is {{ range.value }}</h3>
+                <p class="linked-range__count">{{ range.total ? `${range.total} ${range.total === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value}` : `No ${recordLabel.lower.value} you can see in the catalogue.` }}</p>
+                <ul v-if="range.records.length" class="linked-range__records">
+                  <li v-for="record in range.records" :key="record.id">
+                    <RouterLink :to="{ name: 'product', params: { id: record.id } }" @click="$emit('update:modelValue', null)">
+                      <img v-if="record.thumbnailURL" :src="record.thumbnailURL" alt="" loading="lazy" />
+                      <ImageOff v-else :size="16" aria-hidden="true" />
+                      <span class="linked-range__key">{{ record.recordKey }}</span>
+                      <span v-if="recordTitle(record) !== record.recordKey" class="linked-range__title">{{ recordTitle(record) }}</span>
+                    </RouterLink>
+                  </li>
+                </ul>
+                <p v-if="range.total > range.records.length" class="linked-range__count">and {{ range.total - range.records.length }} more</p>
+              </section>
+            </template>
+          </TabsContent>
+        </Tabs>
       </aside>
     </div>
     <div class="gallery-modal__footer">
@@ -602,6 +697,31 @@ watch(() => props.modelValue, (newValue) => {
 .gallery-modal__actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
 .gallery-modal__limit { padding:0 28px 8px; }
 .gallery-modal button:focus-visible, .gallery-modal input:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:3px; }
+.download-panels { display:flex; flex-direction:column; gap:16px; }
+.download-panels__list { display:grid; grid-template-columns:1fr 1fr; width:100%; }
+.download-panels__content { display:flex; flex-direction:column; gap:20px; margin-top:0; }
+.download-panels__content[hidden] { display:none; }
+.linked-product__records { display:flex; flex-wrap:wrap; gap:6px; max-height:96px; overflow-y:auto; }
+.linked-product__records button { border:1px solid hsl(var(--border)); padding:4px 8px; font-size:12px; }
+.linked-product__records button[aria-pressed=true] { border-color:hsl(var(--foreground)); box-shadow:inset 0 0 0 1px hsl(var(--foreground)); }
+.linked-product__picture { display:grid; place-items:center; aspect-ratio:4/3; overflow:hidden; background:hsl(var(--muted)); color:hsl(var(--muted-foreground)); }
+.linked-product__picture img { width:100%; height:100%; object-fit:contain; }
+.linked-product__views { display:flex; flex-wrap:wrap; gap:6px; margin-top:-10px; }
+.linked-product__views button { display:flex; flex-direction:column; align-items:center; width:52px; border:1px solid hsl(var(--border)); padding:3px; font-size:10px; }
+.linked-product__views button[aria-pressed=true] { border-color:hsl(var(--foreground)); }
+.linked-product__views img { width:100%; height:40px; object-fit:contain; }
+.linked-range { display:flex; flex-direction:column; gap:8px; }
+.linked-range h3 { font-size:13px; font-weight:600; }
+.linked-range__count { font-size:12px; color:hsl(var(--muted-foreground)); }
+.linked-range__records { border-top:1px solid hsl(var(--border)); }
+.linked-range__records a { display:grid; grid-template-columns:32px max-content minmax(0,1fr); align-items:center; gap:10px; padding:6px 4px; border-bottom:1px solid hsl(var(--border)); font-size:12px; }
+.linked-range__records a:hover, .linked-range__records a:focus-visible { background:hsl(var(--muted)); }
+.linked-range__records a:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:-2px; }
+.linked-range__records img, .linked-range__records svg { width:32px; height:32px; object-fit:contain; color:hsl(var(--muted-foreground)); }
+.linked-range__key { font-weight:600; }
+.linked-range__title { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:hsl(var(--muted-foreground)); }
+.linked-product__link { display:inline-flex; align-items:center; gap:4px; font-size:12px; text-decoration:underline; text-underline-offset:3px; }
+.linked-product__link:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:3px; }
 .file-facts { display:grid; grid-template-columns:minmax(0,max-content) minmax(0,1fr); gap:4px 16px; font-size:var(--dv-size-caption); }
 .file-facts dt { color:var(--dv-text-secondary); }
 .file-facts dd { overflow-wrap:anywhere; }
