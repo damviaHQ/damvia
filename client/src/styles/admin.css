@@ -43,6 +43,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 @media(max-width:540px) { .dv-admin .admin-form-grid { grid-template-columns:1fr; } .dv-admin.admin-dialog { padding:22px; } }
 
 .dv-admin.admin-dialog.user-details-dialog { max-width:640px; }
+.dv-admin.admin-dialog.link-folder-dialog { max-width:1040px; }
 .dv-admin.admin-dialog .text-muted-foreground { color:var(--dv-text-secondary); overflow-wrap:anywhere; }
 .dv-admin .admin-form select:disabled { opacity:1; color:var(--dv-text-secondary); background:var(--dv-surface-canvas); }
 

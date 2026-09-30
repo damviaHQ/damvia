@@ -34,7 +34,6 @@ import {
   KeyRound,
   Layers,
   Link2,
-  ListChecks,
   LayoutDashboard,
   Menu,
   Package,
@@ -43,7 +42,6 @@ import {
   PanelLeftOpen,
   Mail,
   Settings,
-  Unlink,
   Users,
   X,
 } from "@lucide/vue"
@@ -203,10 +201,15 @@ const storageLevel = computed(() => {
               <Copyright class="w-4 h-4 mr-2" />
               Licenses
             </router-link>
+            <router-link :to="{ name: 'admin-variants' }" class="menu-item">
+              <Layers class="w-4 h-4 mr-2" />
+              Variants
+              <span v-if="badges?.unnamedAxes" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${badges.unnamedAxes} axes waiting for a name`">{{ badges.unnamedAxes }}</span>
+            </router-link>
           </div>
-          <!-- Data enrichment: daily work, then the setup in the order of its steps -->
+          <!-- The records and the fields read from the files -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
-            <div class="menu-section-title">Data Enrichment</div>
+            <div class="menu-section-title">Database</div>
             <router-link :to="{ name: 'admin-records' }" class="menu-item">
               <Package class="w-4 h-4 mr-2" />
               {{ recordLabel.plural.value }}
@@ -215,18 +218,10 @@ const storageLevel = computed(() => {
               <Blocks class="w-4 h-4 mr-2" />
               File metadata
             </router-link>
-            <router-link :to="{ name: 'admin-unmatched' }" class="menu-item">
-              <Unlink class="w-4 h-4 mr-2" />
-              To review
-              <span v-if="unmatchedBadge" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${unmatchedBadge} files unmatched or in conflict`">{{ unmatchedBadge }}</span>
-            </router-link>
           </div>
+          <!-- What gives every file its type and its record -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
-            <div class="menu-section-title">Enrichment Setup</div>
-            <router-link :to="{ name: 'admin-enrichment-overview' }" class="menu-item" active-class="" exact-active-class="router-link-active">
-              <ListChecks class="w-4 h-4 mr-2" />
-              Setup guide
-            </router-link>
+            <div class="menu-section-title">Data Enrichment</div>
             <router-link :to="{ name: 'admin-asset-types' }" class="menu-item">
               <FileCog class="w-4 h-4 mr-2" />
               Asset types
@@ -234,11 +229,7 @@ const storageLevel = computed(() => {
             <router-link :to="{ name: 'admin-matching' }" class="menu-item">
               <Link2 class="w-4 h-4 mr-2" />
               Link to {{ recordLabel.lowerPlural.value }}
-            </router-link>
-            <router-link :to="{ name: 'admin-variants' }" class="menu-item">
-              <Layers class="w-4 h-4 mr-2" />
-              Variants
-              <span v-if="badges?.unnamedAxes" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${badges.unnamedAxes} axes waiting for a name`">{{ badges.unnamedAxes }}</span>
+              <span v-if="unmatchedBadge" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${unmatchedBadge} files unmatched or in conflict`">{{ unmatchedBadge }}</span>
             </router-link>
           </div>
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">

@@ -14,6 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
+import EnrichmentPass from "@/components/admin/EnrichmentPass.vue"
+import LinkReview from "@/components/admin/LinkReview.vue"
 import Loader from "@/components/Loader.vue"
 import {
   AlertDialog,
@@ -38,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
@@ -53,9 +56,22 @@ import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { CirclePlus, GripVertical, Trash2 } from "@lucide/vue"
 import type { AcceptableValue } from "reka-ui"
 import { computed, ref, watch } from "vue"
+import { useRoute, useRouter } from "vue-router"
 import { parse } from "papaparse"
 import Treeselect from "vue3-treeselect-ts"
 import Draggable from "vuedraggable"
+
+// Rules: how each asset type finds its record. To review: what the rules could
+// not settle. Linked by hand: what an admin linked. One tab, kept in the address.
+const route = useRoute()
+const router = useRouter()
+const SECTIONS = ["rules", "review", "manual"] as const
+const section = computed(() => SECTIONS.find((name) => name === route.query.tab) ?? "rules")
+function selectSection(value: string | number) {
+  router.replace({ query: { ...route.query, tab: value === "rules" ? undefined : String(value) } })
+}
+const { data: badges } = useQuery({ queryKey: ["enrichment", "badges"], queryFn: () => trpc.enrichment.badges.query() })
+const { data: manualLinks } = useQuery({ queryKey: ["entity-resolution", "manual"], queryFn: () => trpc.entityResolution.manualLinks.query() })
 
 type StepInput = RouterInput["resolverStep"]["save"]["steps"][number]
 type Draft = StepInput & { key: string; lastError?: string | null }
@@ -97,9 +113,9 @@ const strategyHelp = (value: string) => strategies.find((strategy) => strategy.v
 function addStep(strategy: StepInput["strategy"], pattern = "") {
   drafts.value.push({ key: `new-${sequence++}`, strategy, enabled: true, config: strategy === "folder_regex" ? { pattern, target: "record", keyGroup: 1 } : strategy === "metadata" ? { metadataFieldId: data.value?.trustedFields[0]?.id } : { pattern, keyGroup: 1 } })
 }
-function useLegacy() {
-  drafts.value.unshift({ key: `new-${sequence++}`, strategy: "filename_regex", enabled: true, config: { pattern: data.value?.legacyPattern ?? "", keyGroup: 1, viewGroup: 2 } })
-}
+// A new file name rule starts from the pattern another type already uses:
+// a campaign shot usually carries the same key as the packshot.
+const knownFilenamePattern = computed(() => (data.value?.types ?? []).flatMap((type) => type.steps).find((step) => step.strategy === "filename_regex")?.config.pattern ?? "")
 function onStrategy(step: Draft, value: AcceptableValue) {
   step.strategy = String(value) as StepInput["strategy"]
   step.config = step.strategy === "folder_regex" ? { pattern: step.config.pattern, target: "record", keyGroup: 1 }
@@ -220,7 +236,7 @@ async function save() {
     await queryClient.invalidateQueries({ queryKey: ["resolver-steps"] })
     await queryClient.invalidateQueries({ queryKey: ["entity-resolution"] })
     await queryClient.invalidateQueries({ queryKey: ["enrichment"] })
-    toast.success(`Steps saved: ${result.applied.matched} files matched, ${result.applied.unmatched} unmatched, ${result.applied.conflicts} in conflict`)
+    toast.success(`Rules saved: ${result.applied.matched} files linked, ${result.applied.unmatched} ${label.lower.value} pictures without a ${label.lower.value}, ${result.applied.conflicts} with several ${label.lowerPlural.value}`)
   } catch (err) {
     toast.error(extractErrors(err as Error).message)
   } finally {
@@ -233,176 +249,190 @@ async function save() {
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
   <div v-else-if="status === 'error'" class="admin-error" role="alert">{{ error?.message }}</div>
   <div v-else-if="data" class="admin-page admin-resource-page">
-    <AdminPageHeader :title="`Link to ${label.lowerPlural.value}`" :description="`For each asset type, choose how a file finds its ${label.lower.value}: from its name, its folder or its metadata. Files that no step can link go to To review.`">
+    <AdminPageHeader :title="`Link to ${label.lowerPlural.value}`" :description="`For each asset type, choose how a file finds its ${label.lower.value}: from its name, its folder or its metadata. A picture that no rule can link goes to To review.`">
     </AdminPageHeader>
-    <p v-if="data.legacyEnabled && data.legacyPattern" class="admin-form-note mb-4">
-      The old job still applies <code>PRODUCT_MATCHING_REGEX</code> every 5 minutes to files of types without steps. Once every type related to {{ label.lowerPlural.value }} has steps, set <code>ENABLE_LEGACY_PRODUCT_MATCHING=false</code> on the server.
-    </p>
-    <div class="matching-layout">
-      <nav class="matching-types dv-panel" aria-label="Asset types">
-        <button v-for="type in types" :key="type.id" type="button" class="matching-type" :class="{ 'is-selected': type.id === selectedTypeId }" :aria-current="type.id === selectedTypeId ? 'true' : undefined" @click="selectedTypeId = type.id">
-          <strong>{{ type.name }}</strong>
-          <span class="admin-text-secondary">{{ type.isRelatedToRecords ? `${type.steps.length} ${type.steps.length === 1 ? "step" : "steps"} · ${type.files} files` : `Not related to ${label.lowerPlural.value}` }}</span>
-        </button>
-        <p v-if="!types.length" class="admin-text-secondary p-3">No asset type yet.</p>
-      </nav>
+    <Tabs :model-value="section" @update:model-value="selectSection">
+      <TabsList>
+        <TabsTrigger value="rules">Rules</TabsTrigger>
+        <TabsTrigger value="review">To review <Badge variant="secondary" class="ml-2">{{ badges?.unmatched ?? 0 }}</Badge></TabsTrigger>
+        <TabsTrigger value="manual">Linked by hand <Badge variant="secondary" class="ml-2">{{ manualLinks?.length ?? 0 }}</Badge></TabsTrigger>
+      </TabsList>
+      <TabsContent value="rules" class="mt-4 grid gap-6">
+        <div class="matching-layout">
+          <nav class="matching-types dv-panel" aria-label="Asset types">
+            <button v-for="type in types" :key="type.id" type="button" class="matching-type" :class="{ 'is-selected': type.id === selectedTypeId }" :aria-current="type.id === selectedTypeId ? 'true' : undefined" @click="selectedTypeId = type.id">
+              <strong>{{ type.name }}</strong>
+              <span class="admin-text-secondary">{{ type.steps.length ? `${type.isRelatedToRecords ? `${label.singular.value} pictures · ` : ""}${type.steps.length} ${type.steps.length === 1 ? "rule" : "rules"} · ${type.files} files` : type.isRelatedToRecords ? `${label.singular.value} pictures · no rule · ${type.files} files` : "Not matched" }}</span>
+            </button>
+            <p v-if="!types.length" class="admin-text-secondary p-3">No asset type yet.</p>
+          </nav>
 
-      <section v-if="selectedType" class="matching-steps" aria-labelledby="matching-steps-heading">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="matching-steps-heading" class="admin-heading">{{ selectedType.name }}</h2>
-          <div class="flex gap-2">
-            <Button v-if="data.legacyPattern && !drafts.some((step) => step.strategy === 'filename_regex')" variant="outline" size="sm" @click="useLegacy">Use PRODUCT_MATCHING_REGEX</Button>
-            <Button variant="outline" size="sm" @click="addStep('filename_regex')"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />File name step</Button>
-            <Button variant="outline" size="sm" @click="addStep('folder_regex')"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />Folder path step</Button>
-            <Button variant="outline" size="sm" @click="addStep('metadata')"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />Metadata step</Button>
-          </div>
-        </div>
-        <p v-if="!selectedType.isRelatedToRecords" class="admin-form-note">
-          Files of this type are not matched: mark the type “Related to {{ label.lowerPlural.value }}” in Asset types first.
-        </p>
-        <p class="admin-text-secondary">Every step runs on every file. When two steps give a different {{ label.lower.value }}, the file goes to To review as a conflict, nothing is chosen for you. Folders and files linked by hand in To review always apply and win.</p>
+          <section v-if="selectedType" class="matching-steps" aria-labelledby="matching-steps-heading">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="matching-steps-heading" class="admin-heading">{{ selectedType.name }}</h2>
+              <div class="flex gap-2">
+                <Button variant="outline" size="sm" @click="addStep('filename_regex', knownFilenamePattern)"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />File name rule</Button>
+                <Button variant="outline" size="sm" @click="addStep('folder_regex')"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />Folder path rule</Button>
+                <Button variant="outline" size="sm" @click="addStep('metadata')"><CirclePlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />Metadata rule</Button>
+              </div>
+            </div>
+            <p class="admin-form-note">
+              <template v-if="selectedType.isRelatedToRecords">Files of this type are the {{ label.lowerPlural.value }}' pictures: once linked, they show as their pictures and views.</template>
+              <template v-else>Files of this type take the data of their {{ label.lower.value }} but never show as its pictures. Only types marked “{{ label.singular.value }} pictures (packshots and views)” in Asset types do.</template>
+            </p>
+            <p class="admin-text-secondary">Every rule runs on every file. When two rules find a different {{ label.lower.value }}, the file goes to To review under “Several {{ label.lowerPlural.value }} found”, nothing is chosen for you. Folders and files linked by hand (see Linked by hand) always apply and win.</p>
 
-        <div v-if="!drafts.length" class="admin-empty dv-panel">
-          <h2>No matching steps.</h2>
-          <p>Files of this type are not matched to {{ label.lowerPlural.value }}.</p>
-        </div>
-        <Draggable v-else v-model="drafts" item-key="key" handle=".matching-step__handle" class="flex flex-col gap-3">
-          <template #item="{ element: step, index }">
-            <article class="matching-step dv-panel" :aria-label="`Step ${index + 1}`">
-              <div class="flex items-center gap-3">
-                <button type="button" class="matching-step__handle" :aria-label="`Drag step ${index + 1}`"><GripVertical class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" /></button>
-                <strong>Step {{ index + 1 }}</strong>
-                <Select :model-value="step.strategy" @update:model-value="(value: AcceptableValue) => onStrategy(step, value)">
-                  <SelectTrigger class="w-44" :aria-label="`Strategy of step ${index + 1}`"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem v-for="strategy in strategies" :key="strategy.value" :value="strategy.value">{{ strategy.label }}</SelectItem></SelectContent>
-                </Select>
-                <label class="flex items-center gap-2 ml-auto"><Checkbox v-model="step.enabled" />Enabled</label>
-                <AlertDialog>
-                  <AlertDialogTrigger as-child><Button variant="ghost" size="sm" :aria-label="`Remove step ${index + 1}`"><Trash2 class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" /></Button></AlertDialogTrigger>
+            <div v-if="!drafts.length" class="admin-empty dv-panel">
+              <h2>No matching rules.</h2>
+              <p>Files of this type are not matched to {{ label.lowerPlural.value }}.</p>
+            </div>
+            <Draggable v-else v-model="drafts" item-key="key" handle=".matching-step__handle" class="flex flex-col gap-3">
+              <template #item="{ element: step, index }">
+                <article class="matching-step dv-panel" :aria-label="`Rule ${index + 1}`">
+                  <div class="flex items-center gap-3">
+                    <button type="button" class="matching-step__handle" :aria-label="`Drag rule ${index + 1}`"><GripVertical class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" /></button>
+                    <strong>Rule {{ index + 1 }}</strong>
+                    <Select :model-value="step.strategy" @update:model-value="(value: AcceptableValue) => onStrategy(step, value)">
+                      <SelectTrigger class="w-44" :aria-label="`Strategy of rule ${index + 1}`"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem v-for="strategy in strategies" :key="strategy.value" :value="strategy.value">{{ strategy.label }}</SelectItem></SelectContent>
+                    </Select>
+                    <label class="flex items-center gap-2 ml-auto"><Checkbox v-model="step.enabled" />Enabled</label>
+                    <AlertDialog>
+                      <AlertDialogTrigger as-child><Button variant="ghost" size="sm" :aria-label="`Remove rule ${index + 1}`"><Trash2 class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" /></Button></AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove this rule?</AlertDialogTitle>
+                          <AlertDialogDescription>{{ drafts.length === 1 ? `Files of this type will keep their current links until you save, then be unmatched.` : "The other rules keep running." }} Nothing changes until you save.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="drafts.splice(index, 1)">Remove</AlertDialogAction></AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                  <p class="admin-text-secondary">{{ strategyHelp(step.strategy) }}</p>
+                  <div class="matching-step__fields">
+                    <div v-if="step.strategy === 'metadata'" class="matching-step__field matching-step__field--wide">
+                      <Label :for="`field-${step.key}`">Metadata field</Label>
+                      <Select :model-value="step.config.metadataFieldId ?? ''" @update:model-value="(value: AcceptableValue) => { step.config.metadataFieldId = String(value) }">
+                        <SelectTrigger :id="`field-${step.key}`"><SelectValue placeholder="Choose a trusted field" /></SelectTrigger>
+                        <SelectContent><SelectItem v-for="field in data.trustedFields" :key="field.id" :value="field.id">{{ field.displayName || field.name }}</SelectItem></SelectContent>
+                      </Select>
+                      <p v-if="!data.trustedFields.length" class="admin-text-secondary">No field can link yet: tick “Can link” on a field in <router-link :to="{ name: 'admin-file-metadata' }" class="underline">File metadata</router-link> first.</p>
+                      <p v-else class="admin-text-secondary">{{ fieldMeaning(step.config.metadataFieldId) }}</p>
+                    </div>
+                    <div v-else class="matching-step__field matching-step__field--wide">
+                      <Label :for="`pattern-${step.key}`">Pattern</Label>
+                      <Input :id="`pattern-${step.key}`" v-model="step.config.pattern" :placeholder="step.strategy === 'folder_regex' ? '/(EVT-\\d+) [^/]+$' : '^(EVT-\\d+)'" />
+                    </div>
+                    <template v-if="step.strategy === 'folder_regex'">
+                      <div class="matching-step__field">
+                        <Label :for="`target-${step.key}`">The group gives</Label>
+                        <Select :model-value="step.config.target ?? 'record'" @update:model-value="(value: AcceptableValue) => { step.config.target = String(value) as 'record' | 'attribute' }">
+                          <SelectTrigger :id="`target-${step.key}`"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="record">the {{ label.lower.value }} key</SelectItem>
+                            <SelectItem value="attribute">the value of an attribute (a range)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div v-if="step.config.target === 'attribute'" class="matching-step__field">
+                        <Label :for="`attribute-${step.key}`">Attribute</Label>
+                        <Select :model-value="step.config.attributeName ?? ''" @update:model-value="(value: AcceptableValue) => { step.config.attributeName = String(value) }">
+                          <SelectTrigger :id="`attribute-${step.key}`"><SelectValue placeholder="Choose" /></SelectTrigger>
+                          <SelectContent><SelectItem v-for="name in data.attributes" :key="name" :value="name">{{ name }}</SelectItem></SelectContent>
+                        </Select>
+                      </div>
+                    </template>
+                    <div v-if="step.strategy !== 'metadata'" class="matching-step__field matching-step__field--narrow">
+                      <Label :for="`group-${step.key}`">Group</Label>
+                      <Input v-if="step.strategy === 'folder_regex' && step.config.target === 'attribute'" :id="`group-${step.key}`" type="number" min="1" :model-value="step.config.valueGroup ?? 1" @update:model-value="(value) => { step.config.valueGroup = numberOrNull(value) ?? 1 }" />
+                      <Input v-else :id="`group-${step.key}`" type="number" min="1" :model-value="step.config.keyGroup ?? 1" @update:model-value="(value) => { step.config.keyGroup = numberOrNull(value) ?? 1 }" />
+                    </div>
+                    <div v-if="step.strategy === 'filename_regex'" class="matching-step__field matching-step__field--narrow">
+                      <Label :for="`view-${step.key}`">View group</Label>
+                      <Input :id="`view-${step.key}`" type="number" min="1" placeholder="—" :model-value="step.config.viewGroup ?? ''" @update:model-value="(value) => { step.config.viewGroup = numberOrNull(value) }" />
+                    </div>
+                  </div>
+                  <p v-if="generatedPattern(step)" class="admin-text-secondary">Full pattern with the view part from Settings: <code>{{ generatedPattern(step) }}</code></p>
+                  <p v-if="step.lastError" class="admin-form-error">{{ step.lastError }}</p>
+                </article>
+              </template>
+            </Draggable>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <AlertDialog>
+                <AlertDialogTrigger as-child><Button :disabled="saving || !dirty">{{ saving ? "Saving…" : "Save and re-run for this type" }}</Button></AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Re-run matching on {{ selectedType.files }} files?</AlertDialogTitle>
+                    <AlertDialogDescription>Links made by rules are recomputed. Links set by hand are kept. Nothing is written to Dropbox, OneDrive or Google Drive.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="save">Save and re-run</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <span v-if="dirty" class="admin-text-secondary">Unsaved changes</span>
+            </div>
+
+            <section class="matching-preview dv-panel" aria-labelledby="matching-preview-heading">
+              <h3 id="matching-preview-heading">Test on a folder</h3>
+              <p class="admin-text-secondary">Runs the rules above, saved or not, on up to 40 files of a folder and its subfolders. Nothing is written.</p>
+              <div class="flex flex-wrap items-end gap-3">
+                <div class="min-w-72 flex-1">
+                  <treeselect v-model="previewFolderId" placeholder="Choose a folder" :options="folderTree ?? []" :normalizer="(node: any) => ({ id: node.id, label: node.name })" />
+                </div>
+                <Button variant="outline" :disabled="!previewFolderId || previewing" @click="runPreview">{{ previewing ? "Testing…" : "Test" }}</Button>
+              </div>
+              <p v-if="previewError" class="admin-form-error">{{ previewError }}</p>
+              <p v-else-if="previewRows && !previewRows.length" class="admin-text-secondary">This folder has no files yet.</p>
+              <Table v-else-if="previewRows">
+                <TableHeader><TableRow><TableHead>File</TableHead><TableHead>Key found</TableHead><TableHead>Result</TableHead><TableHead>Links</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  <TableRow v-for="row in previewRows" :key="row.id">
+                    <TableCell>{{ row.name }}<span v-if="row.otherType" class="admin-text-secondary"> · other type</span></TableCell>
+                    <TableCell><code v-if="row.recordKey">{{ row.recordKey }}</code><span v-if="row.view" class="admin-text-secondary"> · view {{ row.view }}</span></TableCell>
+                    <TableCell><Badge :variant="statusVariant(row.status)">{{ row.status }}</Badge><p v-if="row.reason && row.status !== 'matched'" class="admin-text-secondary">{{ row.reason }}</p></TableCell>
+                    <TableCell class="admin-text-secondary">{{ row.links.map((link) => link.targetKind === 'record' ? `${link.recordKey} (${link.strategy})` : `${link.attributeName} = ${link.attributeValue} (${link.strategy})`).join(", ") }}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </section>
+
+            <section class="matching-preview dv-panel" aria-labelledby="matching-csv-heading">
+              <h3 id="matching-csv-heading">CSV mapping</h3>
+              <p class="admin-text-secondary">For files whose name and folder say nothing: a CSV with the columns <code>file_name</code> and <code>record_key</code>, or <code>file_name</code>, <code>attribute</code> and <code>value</code> for a range. The file name may leave out its extension; case does not matter. It applies to every asset type. A new import replaces the previous one entirely.</p>
+              <p v-if="csvSummary?.rows" class="admin-text-secondary">Current mapping: {{ csvSummary.rows }} rows<template v-if="csvSummary.importedBy">, imported by {{ csvSummary.importedBy }}</template><template v-if="csvSummary.importedAt"> on {{ new Date(csvSummary.importedAt).toLocaleDateString() }}</template>.</p>
+              <div class="flex flex-wrap items-center gap-3">
+                <Input type="file" accept=".csv,text/csv" class="max-w-sm" aria-label="Choose a CSV mapping" :disabled="csvBusy" @change="readCsv" />
+                <AlertDialog v-if="csvSummary?.rows">
+                  <AlertDialogTrigger as-child><Button variant="ghost" size="sm">Remove the mapping</Button></AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Remove this step?</AlertDialogTitle>
-                      <AlertDialogDescription>{{ drafts.length === 1 ? `Files of this type will keep their current links until you save, then be unmatched.` : "The other steps keep running." }} Nothing changes until you save.</AlertDialogDescription>
+                      <AlertDialogTitle>Remove the CSV mapping?</AlertDialogTitle>
+                      <AlertDialogDescription>The {{ csvSummary.rows }} rows go and the links they made are removed on the spot. Links set by hand are kept. Nothing is written to the cloud storage.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="drafts.splice(index, 1)">Remove</AlertDialogAction></AlertDialogFooter>
+                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="clearCsv">Remove</AlertDialogAction></AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
-              <p class="admin-text-secondary">{{ strategyHelp(step.strategy) }}</p>
-              <div class="matching-step__fields">
-                <div v-if="step.strategy === 'metadata'" class="matching-step__field matching-step__field--wide">
-                  <Label :for="`field-${step.key}`">Metadata field</Label>
-                  <Select :model-value="step.config.metadataFieldId ?? ''" @update:model-value="(value: AcceptableValue) => { step.config.metadataFieldId = String(value) }">
-                    <SelectTrigger :id="`field-${step.key}`"><SelectValue placeholder="Choose a trusted field" /></SelectTrigger>
-                    <SelectContent><SelectItem v-for="field in data.trustedFields" :key="field.id" :value="field.id">{{ field.displayName || field.name }}</SelectItem></SelectContent>
-                  </Select>
-                  <p v-if="!data.trustedFields.length" class="admin-text-secondary">No field can link yet: tick “Can link” on a field in <router-link :to="{ name: 'admin-file-metadata' }" class="underline">File metadata</router-link> first.</p>
-                  <p v-else class="admin-text-secondary">{{ fieldMeaning(step.config.metadataFieldId) }}</p>
-                </div>
-                <div v-else class="matching-step__field matching-step__field--wide">
-                  <Label :for="`pattern-${step.key}`">Pattern</Label>
-                  <Input :id="`pattern-${step.key}`" v-model="step.config.pattern" :placeholder="step.strategy === 'folder_regex' ? '/(EVT-\\d+) [^/]+$' : '^(EVT-\\d+)'" />
-                </div>
-                <template v-if="step.strategy === 'folder_regex'">
-                  <div class="matching-step__field">
-                    <Label :for="`target-${step.key}`">The group gives</Label>
-                    <Select :model-value="step.config.target ?? 'record'" @update:model-value="(value: AcceptableValue) => { step.config.target = String(value) as 'record' | 'attribute' }">
-                      <SelectTrigger :id="`target-${step.key}`"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="record">the {{ label.lower.value }} key</SelectItem>
-                        <SelectItem value="attribute">the value of an attribute (a range)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div v-if="step.config.target === 'attribute'" class="matching-step__field">
-                    <Label :for="`attribute-${step.key}`">Attribute</Label>
-                    <Select :model-value="step.config.attributeName ?? ''" @update:model-value="(value: AcceptableValue) => { step.config.attributeName = String(value) }">
-                      <SelectTrigger :id="`attribute-${step.key}`"><SelectValue placeholder="Choose" /></SelectTrigger>
-                      <SelectContent><SelectItem v-for="name in data.attributes" :key="name" :value="name">{{ name }}</SelectItem></SelectContent>
-                    </Select>
-                  </div>
-                </template>
-                <div v-if="step.strategy !== 'metadata'" class="matching-step__field matching-step__field--narrow">
-                  <Label :for="`group-${step.key}`">Group</Label>
-                  <Input v-if="step.strategy === 'folder_regex' && step.config.target === 'attribute'" :id="`group-${step.key}`" type="number" min="1" :model-value="step.config.valueGroup ?? 1" @update:model-value="(value) => { step.config.valueGroup = numberOrNull(value) ?? 1 }" />
-                  <Input v-else :id="`group-${step.key}`" type="number" min="1" :model-value="step.config.keyGroup ?? 1" @update:model-value="(value) => { step.config.keyGroup = numberOrNull(value) ?? 1 }" />
-                </div>
-                <div v-if="step.strategy === 'filename_regex'" class="matching-step__field matching-step__field--narrow">
-                  <Label :for="`view-${step.key}`">View group</Label>
-                  <Input :id="`view-${step.key}`" type="number" min="1" placeholder="—" :model-value="step.config.viewGroup ?? ''" @update:model-value="(value) => { step.config.viewGroup = numberOrNull(value) }" />
-                </div>
+              <p v-if="csvError" class="admin-form-error" role="alert">{{ csvError }}</p>
+              <p v-if="csvBusy" role="status" class="admin-text-secondary">Comparing…</p>
+              <div v-if="csvComparison" class="admin-form-note grid gap-2">
+                <p>{{ csvComparison.rows }} rows naming {{ csvComparison.filesFound }} files found in the library: {{ csvComparison.added }} new, {{ csvComparison.changed }} changed, {{ csvComparison.removed }} removed from the current mapping.</p>
+                <p v-if="csvComparison.unknownKeyCount">{{ csvComparison.unknownKeyCount }} keys have no {{ label.lower.value }} yet and will be listed as dangling: {{ csvComparison.unknownKeys.slice(0, 10).join(", ") }}<template v-if="csvComparison.unknownKeyCount > 10">, …</template></p>
+                <div><Button :disabled="csvBusy" @click="applyCsv">Replace the mapping with these {{ csvComparison.rows }} rows</Button></div>
               </div>
-              <p v-if="generatedPattern(step)" class="admin-text-secondary">Full pattern with the view part from Settings: <code>{{ generatedPattern(step) }}</code></p>
-              <p v-if="step.lastError" class="admin-form-error">{{ step.lastError }}</p>
-            </article>
-          </template>
-        </Draggable>
-
-        <div class="flex flex-wrap items-center gap-3">
-          <AlertDialog>
-            <AlertDialogTrigger as-child><Button :disabled="saving || !dirty">{{ saving ? "Saving…" : "Save and re-run for this type" }}</Button></AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Re-run matching on {{ selectedType.files }} files?</AlertDialogTitle>
-                <AlertDialogDescription>Links made by rules are recomputed. Links set by hand are kept. Nothing is written to Dropbox, OneDrive or Google Drive.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="save">Save and re-run</AlertDialogAction></AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          <span v-if="dirty" class="admin-text-secondary">Unsaved changes</span>
+            </section>
+          </section>
         </div>
-
-        <section class="matching-preview dv-panel" aria-labelledby="matching-preview-heading">
-          <h3 id="matching-preview-heading">Test on a folder</h3>
-          <p class="admin-text-secondary">Runs the steps above, saved or not, on up to 40 files of a folder and its subfolders. Nothing is written.</p>
-          <div class="flex flex-wrap items-end gap-3">
-            <div class="min-w-72 flex-1">
-              <treeselect v-model="previewFolderId" placeholder="Choose a folder" :options="folderTree ?? []" :normalizer="(node: any) => ({ id: node.id, label: node.name })" />
-            </div>
-            <Button variant="outline" :disabled="!previewFolderId || previewing" @click="runPreview">{{ previewing ? "Testing…" : "Test" }}</Button>
-          </div>
-          <p v-if="previewError" class="admin-form-error">{{ previewError }}</p>
-          <p v-else-if="previewRows && !previewRows.length" class="admin-text-secondary">This folder has no files yet.</p>
-          <Table v-else-if="previewRows">
-            <TableHeader><TableRow><TableHead>File</TableHead><TableHead>Key found</TableHead><TableHead>Result</TableHead><TableHead>Links</TableHead></TableRow></TableHeader>
-            <TableBody>
-              <TableRow v-for="row in previewRows" :key="row.id">
-                <TableCell>{{ row.name }}<span v-if="row.otherType" class="admin-text-secondary"> · other type</span></TableCell>
-                <TableCell><code v-if="row.recordKey">{{ row.recordKey }}</code><span v-if="row.view" class="admin-text-secondary"> · view {{ row.view }}</span></TableCell>
-                <TableCell><Badge :variant="statusVariant(row.status)">{{ row.status }}</Badge><p v-if="row.reason && row.status !== 'matched'" class="admin-text-secondary">{{ row.reason }}</p></TableCell>
-                <TableCell class="admin-text-secondary">{{ row.links.map((link) => link.targetKind === 'record' ? `${link.recordKey} (${link.strategy})` : `${link.attributeName} = ${link.attributeValue} (${link.strategy})`).join(", ") }}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </section>
-
-        <section class="matching-preview dv-panel" aria-labelledby="matching-csv-heading">
-          <h3 id="matching-csv-heading">CSV mapping</h3>
-          <p class="admin-text-secondary">For files whose name and folder say nothing: a CSV with the columns <code>file_name</code> and <code>record_key</code>, or <code>file_name</code>, <code>attribute</code> and <code>value</code> for a range. The file name may leave out its extension; case does not matter. It applies to every asset type related to {{ label.lowerPlural.value }}. A new import replaces the previous one entirely.</p>
-          <p v-if="csvSummary?.rows" class="admin-text-secondary">Current mapping: {{ csvSummary.rows }} rows<template v-if="csvSummary.importedBy">, imported by {{ csvSummary.importedBy }}</template><template v-if="csvSummary.importedAt"> on {{ new Date(csvSummary.importedAt).toLocaleDateString() }}</template>.</p>
-          <div class="flex flex-wrap items-center gap-3">
-            <Input type="file" accept=".csv,text/csv" class="max-w-sm" aria-label="Choose a CSV mapping" :disabled="csvBusy" @change="readCsv" />
-            <AlertDialog v-if="csvSummary?.rows">
-              <AlertDialogTrigger as-child><Button variant="ghost" size="sm">Remove the mapping</Button></AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Remove the CSV mapping?</AlertDialogTitle>
-                  <AlertDialogDescription>The {{ csvSummary.rows }} rows go and the links they made are removed on the spot. Links set by hand are kept. Nothing is written to the cloud storage.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction @click="clearCsv">Remove</AlertDialogAction></AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-          <p v-if="csvError" class="admin-form-error" role="alert">{{ csvError }}</p>
-          <p v-if="csvBusy" role="status" class="admin-text-secondary">Comparing…</p>
-          <div v-if="csvComparison" class="admin-form-note grid gap-2">
-            <p>{{ csvComparison.rows }} rows naming {{ csvComparison.filesFound }} files found in the library: {{ csvComparison.added }} new, {{ csvComparison.changed }} changed, {{ csvComparison.removed }} removed from the current mapping.</p>
-            <p v-if="csvComparison.unknownKeyCount">{{ csvComparison.unknownKeyCount }} keys have no {{ label.lower.value }} yet and will be listed as dangling: {{ csvComparison.unknownKeys.slice(0, 10).join(", ") }}<template v-if="csvComparison.unknownKeyCount > 10">, …</template></p>
-            <div><Button :disabled="csvBusy" @click="applyCsv">Replace the mapping with these {{ csvComparison.rows }} rows</Button></div>
-          </div>
-        </section>
-      </section>
-    </div>
+        <EnrichmentPass />
+      </TabsContent>
+      <TabsContent value="review" class="mt-4">
+        <p class="admin-form-note mb-4">{{ label.singular.value }} pictures that found no {{ label.lower.value }}, and the links to check. Choose the right {{ label.lower.value }} here.</p>
+        <LinkReview section="review" />
+      </TabsContent>
+      <TabsContent value="manual" class="mt-4">
+        <LinkReview section="manual" />
+      </TabsContent>
+    </Tabs>
   </div>
 </template>
 

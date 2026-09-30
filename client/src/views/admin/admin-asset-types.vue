@@ -268,7 +268,7 @@ async function onModalSubmit(event: Event) {
         <TableRow>
           <TableHead>Name</TableHead>
           <TableHead>Description</TableHead>
-          <TableHead>Related to {{ recordLabel.lowerPlural.value }}</TableHead>
+          <TableHead>{{ recordLabel.singular.value }} pictures (packshots and views)</TableHead>
           <TableHead>Include in search by default</TableHead>
           <TableHead>Group variants</TableHead>
           <TableHead></TableHead>
@@ -333,9 +333,9 @@ async function onModalSubmit(event: Event) {
             </FieldGroup>
             <div class="flex items-center space-x-2">
               <Checkbox id="isRelatedToRecords" v-model="form.isRelatedToRecords" />
-              <Label for="isRelatedToRecords">Related to {{ recordLabel.lowerPlural.value }}</Label>
+              <Label for="isRelatedToRecords">{{ recordLabel.singular.value }} pictures (packshots and views)</Label>
             </div>
-            <p class="text-body admin-text-secondary -mt-3">Enable automatic matching to {{ recordLabel.lowerPlural.value }}, then configure the rules in Link to {{ recordLabel.lowerPlural.value }}. Collections containing those {{ recordLabel.lowerPlural.value }} also give readers access to their linked pictures.</p>
+            <p class="text-body admin-text-secondary -mt-3">Files of this type are the {{ recordLabel.lowerPlural.value }}' own pictures, such as packshots and their views: they show on {{ recordLabel.lower.value }} cards and pages, and collections containing those {{ recordLabel.lowerPlural.value }} give readers access to them. Other types, such as campaign shots, are linked through their steps in Link to {{ recordLabel.lowerPlural.value }} without this option.</p>
             <div class="flex items-center space-x-2">
               <Checkbox id="groupVariants" v-model="form.groupVariants" />
               <Label for="groupVariants">Group variants</Label>

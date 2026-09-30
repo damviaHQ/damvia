@@ -356,7 +356,7 @@ const removeBackgroundImage = async () => {
                   <p class="admin-text-secondary">The view used as the picture of a {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }} in the admin list.</p>
                 </div>
               </div>
-              <p class="branding-note">Added after the key of every file name step: <code>{{ viewExample }}</code>. Turning views off hides the view filter from search; existing view values are kept until the next pass.</p>
+              <p class="branding-note">Added after the key of every file name rule: <code>{{ viewExample }}</code>. Turning views off hides the view filter from search; existing view values are kept until the next pass.</p>
             </template>
             <p v-else class="branding-note">Views are off: file names are read as the key only and the view filter is hidden from search.</p>
             <div class="flex flex-wrap gap-3">

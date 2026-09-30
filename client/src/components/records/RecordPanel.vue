@@ -110,7 +110,6 @@ function provenance(file: DirectFile) {
   if (file.strategy === "manual_file") return file.createdBy ? `set by hand by ${file.createdBy} on ${date}` : "set by hand"
   if (file.strategy === "csv") return "CSV mapping"
   if (file.strategy === "metadata") return "file metadata"
-  if (file.strategy === "legacy") return "file name, PRODUCT_MATCHING_REGEX job"
   return file.strategy
 }
 
@@ -185,8 +184,8 @@ function when(value: string | Date) {
           </TabsContent>
           <TabsContent value="files" class="record-panel-body">
             <p v-if="!record.files.direct.length && !record.files.range.length" class="admin-text-secondary">
-              No file is linked to this {{ recordLabel }} yet. Files link through the matching steps, or by hand from
-              <router-link :to="{ name: 'admin-unmatched' }" class="underline">To review</router-link>.
+              No file is linked to this {{ recordLabel }} yet. Files link through the matching rules, or by hand from
+              <router-link :to="{ name: 'admin-matching', query: { tab: 'review' } }" class="underline">To review</router-link>.
             </p>
             <ul v-if="record.files.direct.length" class="record-panel-files">
               <li v-for="file in record.files.direct" :key="file.id + file.strategy">

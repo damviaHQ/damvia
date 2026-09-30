@@ -145,7 +145,7 @@ const linkMeaning = (field: Field) => !field.canLink ? "—" : field.linkTarget 
       <AlertDialogContent v-if="trusting">
         <AlertDialogHeader>
           <AlertDialogTitle>Let {{ trusting.field.displayName || trusting.field.name }} link files?</AlertDialogTitle>
-          <AlertDialogDescription>{{ trusting.field.fileCount }} files carry this field. They are linked on the next pass once a Matching step names the field. Nothing is written to the files.</AlertDialogDescription>
+          <AlertDialogDescription>{{ trusting.field.fileCount }} files carry this field. They are linked on the next pass once a matching rule names the field. Nothing is written to the files.</AlertDialogDescription>
         </AlertDialogHeader>
         <div class="grid gap-2">
           <label for="trust-target" class="font-medium">The value is</label>

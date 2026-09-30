@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import AdminPageHeader from "@/components/admin/AdminPageHeader.vue"
+import LinkFolderDialog from "@/components/admin/LinkFolderDialog.vue"
 import RecordPicker, { type RecordTarget } from "@/components/admin/RecordPicker.vue"
 import Loader from "@/components/Loader.vue"
 import { Badge } from "@/components/ui/badge"
@@ -33,16 +33,18 @@ import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import Treeselect from "vue3-treeselect-ts"
 import { refDebounced } from "@vueuse/core"
+import { FolderPlus } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
-import { useRoute } from "vue-router"
 
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
 const label = useRecordLabel()
-const route = useRoute()
-const tab = ref(route.query.tab === "manual" ? "manual" : "folders")
+// To review: the four lists of what matching could not settle. Linked by hand:
+// the links an admin made. The Link to products page shows one or the other.
+const props = defineProps<{ section: "review" | "manual" }>()
+const tab = ref(props.section === "manual" ? "manual" : "folders")
+watch(() => props.section, (section) => { tab.value = section === "manual" ? "manual" : "folders" })
 const search = ref("")
 const debouncedSearch = refDebounced(search, 300)
 const page = ref(1)
@@ -57,8 +59,8 @@ const { data: files, status: filesStatus } = useQuery({
 const { data: conflicts, status: conflictsStatus } = useQuery({ queryKey: ["entity-resolution", "conflicts"], queryFn: () => trpc.entityResolution.conflicts.query() })
 const { data: dangling, status: danglingStatus } = useQuery({ queryKey: ["entity-resolution", "dangling"], queryFn: () => trpc.entityResolution.dangling.query() })
 const { data: manualLinks, status: manualStatus } = useQuery({ queryKey: ["entity-resolution", "manual"], queryFn: () => trpc.entityResolution.manualLinks.query() })
-const { data: folderTree } = useQuery({ queryKey: ["asset", "tree"], queryFn: () => trpc.asset.tree.query() })
-const folderToLink = ref<string | null>(null)
+// The folder dialog opens empty from Linked by hand, or on one folder of the list.
+const folderDialog = ref<{ folderId: string | null } | null>(null)
 
 const strategyLabel: Record<string, string> = {
   filename_regex: "file name",
@@ -78,18 +80,11 @@ function toggle(id: string, checked: boolean | "indeterminate") {
 const picker = ref<{ title: string; description: string; folderId?: string; fileIds?: string[]; name: string } | null>(null)
 const saving = ref(false)
 
-function attachFolder(folder: { id: string; path: string; files: number }) {
-  picker.value = { title: `Link ${folder.path}`, description: `Every file in this folder and its subfolders, ${folder.files} unmatched now, is linked, and files added later follow.`, folderId: folder.id, name: folder.path }
+function attachFolder(folder: { id: string }) {
+  folderDialog.value = { folderId: folder.id }
 }
 function attachFiles(ids: string[], name: string) {
   picker.value = { title: `Link ${name}`, description: `${ids.length} ${ids.length === 1 ? "file is" : "files are"} linked by hand. No matching rule changes this link later.`, fileIds: ids, name }
-}
-
-// Any folder, including one whose files are already matched, such as a pack
-// that covers a whole range.
-function attachAnyFolder() {
-  if (!folderToLink.value) return
-  picker.value = { title: "Link a folder", description: "Every file in this folder and its subfolders is linked, whatever the matching steps find, and files added later follow.", folderId: folderToLink.value, name: "the folder" }
 }
 
 async function refresh() {
@@ -106,7 +101,6 @@ async function confirm(target: RecordTarget) {
     toast.success(`${result.files} ${result.files === 1 ? "file" : "files"} linked to ${name}${result.recordCreated ? ` (${label.lower.value} created)` : ""}`)
     picker.value = null
     selected.value = []
-    folderToLink.value = null
     await refresh()
   } catch (error) {
     toast.error((error as Error).message)
@@ -115,6 +109,20 @@ async function confirm(target: RecordTarget) {
   }
 }
 
+async function confirmFolder({ folderId, target }: { folderId: string; target: RecordTarget }) {
+  saving.value = true
+  try {
+    const result = await trpc.entityResolution.attach.mutate({ target, folderId })
+    const name = target.kind === "record" ? target.key : `${target.name} = ${target.value}`
+    toast.success(`${result.files} ${result.files === 1 ? "file" : "files"} linked to ${name}${result.recordCreated ? ` (${label.lower.value} created)` : ""}`)
+    folderDialog.value = null
+    await refresh()
+  } catch (error) {
+    toast.error((error as Error).message)
+  } finally {
+    saving.value = false
+  }
+}
 async function useCandidate(fileId: string, key: string) {
   try {
     await trpc.entityResolution.attach.mutate({ target: { kind: "record", key }, fileIds: [fileId] })
@@ -160,23 +168,21 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
 
 <template>
   <div v-if="status === 'pending'"><Loader :text="true" /></div>
-  <div v-else class="admin-page admin-resource-page">
-    <AdminPageHeader :description="`Files Damvia could not link to a ${label.lower.value} on its own. Choose the right ${label.lower.value} for them here.`" />
+  <div v-else>
     <Tabs v-model="tab">
-      <TabsList>
-        <TabsTrigger value="folders">Folders <Badge variant="secondary" class="ml-2">{{ counts?.folders ?? 0 }}</Badge></TabsTrigger>
-        <TabsTrigger value="files">Files <Badge variant="secondary" class="ml-2">{{ counts?.unmatched ?? 0 }}</Badge></TabsTrigger>
-        <TabsTrigger value="conflicts">Conflicts <Badge variant="secondary" class="ml-2">{{ counts?.conflicts ?? 0 }}</Badge></TabsTrigger>
-        <TabsTrigger value="dangling">Dangling <Badge variant="secondary" class="ml-2">{{ counts?.dangling ?? 0 }}</Badge></TabsTrigger>
-        <TabsTrigger value="manual">Linked by hand <Badge variant="secondary" class="ml-2">{{ manualLinks?.length ?? 0 }}</Badge></TabsTrigger>
+      <TabsList v-if="section === 'review'">
+        <TabsTrigger value="folders">Folders without a {{ label.lower.value }} <Badge variant="secondary" class="ml-2">{{ counts?.folders ?? 0 }}</Badge></TabsTrigger>
+        <TabsTrigger value="files">Pictures without a {{ label.lower.value }} <Badge variant="secondary" class="ml-2">{{ counts?.unmatched ?? 0 }}</Badge></TabsTrigger>
+        <TabsTrigger value="conflicts">Several {{ label.lowerPlural.value }} found <Badge variant="secondary" class="ml-2">{{ counts?.conflicts ?? 0 }}</Badge></TabsTrigger>
+        <TabsTrigger value="dangling">{{ label.singular.value }} not imported <Badge variant="secondary" class="ml-2">{{ counts?.dangling ?? 0 }}</Badge></TabsTrigger>
       </TabsList>
 
-      <TabsContent value="folders" class="mt-4">
-        <p class="admin-form-note mb-4">Linking a folder links every file inside it and inside its subfolders, now and after each sync.</p>
+      <TabsContent v-if="section === 'review'" value="folders" class="mt-4">
+        <p class="admin-form-note mb-4">Folders holding {{ label.lower.value }} pictures that no rule could link. Linking a folder links every file inside it and inside its subfolders, now and after each sync.</p>
         <div v-if="foldersStatus === 'pending'"><Loader /></div>
-        <div v-else-if="!folders?.length" class="admin-empty dv-panel"><h2>{{ notScanned ? "No matching has run yet." : "Everything is matched." }}</h2></div>
+        <div v-else-if="!folders?.length" class="admin-empty dv-panel"><h2>{{ notScanned ? "No matching has run yet." : `Every ${label.lower.value} picture has its ${label.lower.value}.` }}</h2></div>
         <Table v-else>
-          <TableHeader><TableRow><TableHead>Folder</TableHead><TableHead>Asset type</TableHead><TableHead>Unmatched files</TableHead><TableHead></TableHead></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Folder</TableHead><TableHead>Asset type</TableHead><TableHead>Pictures without a {{ label.lower.value }}</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
             <TableRow v-for="folder in folders" :key="folder.id">
               <TableCell><code>{{ folder.path }}</code></TableCell>
@@ -188,13 +194,13 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
         </Table>
       </TabsContent>
 
-      <TabsContent value="files" class="mt-4">
+      <TabsContent v-if="section === 'review'" value="files" class="mt-4">
         <div class="flex flex-wrap items-center gap-3 mb-4">
           <Input v-model="search" type="search" placeholder="Search file names" aria-label="Search file names" class="max-w-sm" />
           <Button v-if="selected.length" size="sm" @click="attachFiles(selected, `${selected.length} files`)">Attach {{ selected.length }} selected</Button>
         </div>
         <div v-if="filesStatus === 'pending'"><Loader /></div>
-        <div v-else-if="!files?.files.length" class="admin-empty dv-panel"><h2>{{ search ? "No matching file." : "Everything is matched." }}</h2></div>
+        <div v-else-if="!files?.files.length" class="admin-empty dv-panel"><h2>{{ search ? "No matching file." : `Every ${label.lower.value} picture has its ${label.lower.value}.` }}</h2></div>
         <template v-else>
           <Table>
             <TableHeader><TableRow><TableHead class="w-8"><span class="sr-only">Select</span></TableHead><TableHead>File</TableHead><TableHead>Folder</TableHead><TableHead>Why</TableHead><TableHead></TableHead></TableRow></TableHeader>
@@ -221,10 +227,10 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
         </template>
       </TabsContent>
 
-      <TabsContent value="conflicts" class="mt-4">
-        <p class="admin-form-note mb-4">Two rules disagreed. Your choice is kept and never changed by a rule again.</p>
+      <TabsContent v-if="section === 'review'" value="conflicts" class="mt-4">
+        <p class="admin-form-note mb-4">Two rules found a different {{ label.lower.value }} for the same file. Your choice is kept and never changed by a rule again.</p>
         <div v-if="conflictsStatus === 'pending'"><Loader /></div>
-        <div v-else-if="!conflicts?.length" class="admin-empty dv-panel"><h2>No conflict.</h2></div>
+        <div v-else-if="!conflicts?.length" class="admin-empty dv-panel"><h2>No file with several {{ label.lowerPlural.value }}.</h2></div>
         <Table v-else>
           <TableHeader><TableRow><TableHead>File</TableHead><TableHead>Candidates</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
@@ -243,10 +249,10 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
         </Table>
       </TabsContent>
 
-      <TabsContent value="dangling" class="mt-4">
-        <p class="admin-form-note mb-4">These links point to a key or a value no {{ label.lower.value }} has. The key is kept: importing the {{ label.lower.value }} attaches the files on the next pass.</p>
+      <TabsContent v-if="section === 'review'" value="dangling" class="mt-4">
+        <p class="admin-form-note mb-4">These files name a {{ label.lower.value }} that is not imported yet. The key is kept: importing the {{ label.lower.value }} attaches the files on the next pass.</p>
         <div v-if="danglingStatus === 'pending'"><Loader /></div>
-        <div v-else-if="!dangling?.length" class="admin-empty dv-panel"><h2>No dangling link.</h2></div>
+        <div v-else-if="!dangling?.length" class="admin-empty dv-panel"><h2>Every {{ label.lower.value }} found is imported.</h2></div>
         <Table v-else>
           <TableHeader><TableRow><TableHead>File</TableHead><TableHead>Points to</TableHead><TableHead>Made by</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
@@ -265,16 +271,11 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
         </Table>
       </TabsContent>
 
-      <TabsContent value="manual" class="mt-4">
-        <p class="admin-form-note mb-4">A folder or a file linked by hand keeps its {{ label.lower.value }} whatever the matching steps find. Link a folder here when its files are already matched but you want them on something else, such as a pack that covers a whole range.</p>
-        <div class="mb-4 flex flex-wrap items-end gap-3">
-          <div class="min-w-72 flex-1">
-            <treeselect v-model="folderToLink" placeholder="Choose a folder" :options="folderTree ?? []" :normalizer="(node: any) => ({ id: node.id, label: node.name })" />
-          </div>
-          <Button variant="outline" :disabled="!folderToLink" @click="attachAnyFolder">Link this folder</Button>
-        </div>
+      <TabsContent v-if="section === 'manual'" value="manual" class="mt-4">
+        <p class="admin-form-note mb-4">Link a folder when all its files are about one {{ label.lower.value }}, or one range, and no rule can read it from their names: a shoot, a bonus content pack, a campaign. A folder or a file linked by hand keeps its {{ label.lower.value }} whatever the matching rules find.</p>
+        <div class="mb-4"><Button @click="folderDialog = { folderId: null }"><FolderPlus class="w-[var(--dv-icon-compact)] h-[var(--dv-icon-compact)]" />Link a folder</Button></div>
         <div v-if="manualStatus === 'pending'"><Loader /></div>
-        <div v-else-if="!manualLinks?.length" class="admin-empty dv-panel"><h2>Nothing linked by hand.</h2><p>Files are linked by the matching steps of their asset type.</p></div>
+        <div v-else-if="!manualLinks?.length" class="admin-empty dv-panel"><h2>Nothing linked by hand.</h2><p>Files are linked by the matching rules of their asset type.</p></div>
         <Table v-else>
           <TableHeader><TableRow><TableHead>Folder or file</TableHead><TableHead>Linked to</TableHead><TableHead>Files</TableHead><TableHead>By</TableHead><TableHead></TableHead></TableRow></TableHeader>
           <TableBody>
@@ -289,6 +290,7 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
         </Table>
       </TabsContent>
     </Tabs>
+    <LinkFolderDialog :open="!!folderDialog" :folder-id="folderDialog?.folderId" :saving="saving" @update:open="(open) => !open && (folderDialog = null)" @confirm="confirmFolder" />
     <RecordPicker :open="!!picker" :title="picker?.title ?? ''" :description="picker?.description ?? ''" :saving="saving" @update:open="(open) => !open && (picker = null)" @confirm="confirm" />
   </div>
 </template>

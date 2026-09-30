@@ -64,6 +64,10 @@ describe('routes', () => {
     expect(redirectOf(byPath('/admin/data-enrichment/fields'), { tab: 'metadata' })).toMatchObject({ name: 'admin-file-metadata', query: {} })
     expect(redirectOf(byPath('/admin/data-enrichment/records/attributes'))).toMatchObject({ name: 'admin-records', query: { fields: '1' } })
     expect(redirectOf(byPath('/admin/data-enrichment/settings')).name).toBe('admin-settings')
+    // The setup guide and To review are now tabs of Link to products.
+    expect(redirectOf(byPath('/admin/data-enrichment'))).toMatchObject({ name: 'admin-matching' })
+    expect(redirectOf(byPath('/admin/data-enrichment/unmatched'))).toMatchObject({ name: 'admin-matching', query: { tab: 'review' } })
+    expect(redirectOf(byPath('/admin/data-enrichment/unmatched'), { tab: 'manual' })).toMatchObject({ name: 'admin-matching', query: { tab: 'manual' } })
     expect(redirectOf(byPath('/admin/products')).name).toBe('admin-records')
     expect(redirectOf(byPath('/admin/products/import')).name).toBe('admin-record-import')
     // A redirect to another redirect: the attributes page ends on the records.
