@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-28
+lastUpdated: 2026-09-30
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -131,13 +131,14 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 
 ### `catalogue`
 
-The reader side of the record database. Every procedure is `approved` and returns only records the caller can reach through a collection, and only fields marked viewable.
+The reader side of the record database. Every procedure is `approved` and returns only records the caller can reach through a collection, or through a file they can open for `fileRecords`, and only fields marked viewable.
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
 | `list` | query | approved | A page of product cards: key, visible values, main visual, up to four visuals with an overflow count, visible file count, readiness and model. Takes `collectionId`, `search`, `filters`, `sort`, `readiness` and `familyKey` |
 | `get` | query | approved | One product with its visuals, visible values, configured `cardTitleField` and sibling products. `collectionFiles` uses the standard collection-file formatter and identities for previews, downloads and favourites; the existing `files` summary is retained |
 | `facets` | query | approved | Filterable field options and counts over the full visible scope, independent of pagination; each facet ignores its own selection and honours the other filters. Returns the unfiltered scope total and the shared page-facet shape |
+| `fileRecords` | query | approved | The records one collection file is linked to, for the download dialog, whatever its asset type: the record kept on the file and every active record link, primary first, up to 50. Each record carries its visible values and `inCatalogue`; visuals (up to 12) come only when the caller can see the record in a product catalogue. `ranges` lists the active range links whose field is viewable: `label`, `value`, `total` and the first 12 records the caller can see in a product catalogue, each with its main picture. `NOT_FOUND` when the caller cannot open the file |
 
 The filter model is the one of the records grid: conditions are combined with AND across fields, and `has_any` holds the OR inside a field. Field names and record-attribute IDs are accepted for filter columns; there is no OR across fields and no numeric or date range.
 
@@ -266,7 +267,7 @@ Values stay text in the `hstore`. A field's `valueType` fixes one stored form: `
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
-| `enrichment.overview` | query | `userAdmin` | `synced`, folder counts by origin of their type, file counts by resolution status, `assetTypes` (`total`, `relatedToRecords`, `withSteps` among them, `groupingVariants`), `records`, `metadataFields` (`total`, `shown`), `variantGroups`, `unnamedAxes` used by a group, `running` (the pass holding the lock, with its start and trigger) and `lastRun` (finished, with duration, per-stage `stats` or `error`) |
+| `enrichment.overview` | query | `userAdmin` | `synced`, `running` (the pass holding the lock, with its start and trigger) and `lastRun` (finished, with duration, per-stage `stats` or `error`) |
 | `enrichment.run` | mutation | `userAdmin` | Starts a pass without waiting for it; `queued: true` when one is running, in which case it runs next |
 | `enrichment.badges` | query | `userAdmin` | `unmatched` (unmatched and conflicts) and `unnamedAxes` used by a group, for the menu |
 
@@ -293,12 +294,14 @@ Every procedure requires `userAdmin`. Writes re-run the entity stage of the enri
 
 | Procedure | Kind | Purpose |
 |---|---|---|
-| `resolverStep.list` | query | Every asset type with `isRelatedToRecords`, its file count and its ordered steps (`strategy`, `config`, `enabled`, `lastError`), plus `legacyPattern` (`PRODUCT_MATCHING_REGEX`), `legacyEnabled`, the view settings, the generated view part and the attribute names of the records |
+| `entityResolution.folderSearch` | query | Up to 30 folders whose path contains `query`, shortest first, each with the files it holds with its subfolders |
+| `entityResolution.folderPreview` | query | What linking a folder by hand would change: its path, its files by asset type with how many are already linked to a record, the hand links on it (`linkedHere`), on the nearest parent (`linkedAbove`) and the number of subfolders linked by hand |
+| `resolverStep.list` | query | Every asset type with `isRelatedToRecords`, its file count and its ordered steps (`strategy`, `config`, `enabled`, `lastError`), plus the view settings, the generated view part and the attribute names of the records |
 | `resolverStep.save` | mutation | Replaces the steps of one asset type, in order (`filename_regex`, `folder_regex`; at most 20). Each step is compiled first; a broken one is refused with `BAD_REQUEST` naming its position |
 | `resolverStep.preview` | query | Runs unsaved steps on up to 40 files of a folder subtree and returns, per file, the key found, the view, the status and the links. Writes nothing |
 | `resolverStep.rerun` | mutation | Re-runs the entity stage |
 | `entityResolution.counts` | query | `unmatched`, `conflicts`, `dangling` and the number of folders holding unmatched files |
-| `entityResolution.unmatchedFolders`, `unmatchedFiles`, `conflicts`, `dangling` | query | Four tabs of the To review screen; files paginated by 100 with `search` and `folderId`, the others capped at 500 |
+| `entityResolution.unmatchedFolders`, `unmatchedFiles`, `conflicts`, `dangling` | query | Four tabs of the To review tab of Link to products; files paginated by 100 with `search` and `folderId`, the others capped at 500 |
 | `entityResolution.findTargets` | query | Records whose key or searchable attribute contains `query` (20), or the values of `attributeName` containing it, with their record count |
 | `entityResolution.manualLinks` | query | Every folder attachment and `manual_file` link, newest first, capped at 500, with `kind` (`folder` or `file`), name, path, target, author and the number of files covered |
 | `entityResolution.attach` | mutation | `target` is `{ kind: 'record', key, create? }` or `{ kind: 'attribute', name, value }`; with `folderId` it attaches the folder, with `fileIds` (at most 500) it pins `manual_file` links. `create: true` creates a missing record with the key only; without it a missing key is `NOT_FOUND`. Returns `files`, `recordCreated` and the stage counts |

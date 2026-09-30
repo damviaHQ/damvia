@@ -3,7 +3,7 @@ title: Variants
 description: Show the formats, languages and durations of one creative as a single card, name what differs between them and correct the grouping by hand.
 sidebar:
   order: 14
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-30
 ---
 
 Twelve formats of one banner are twelve files in the cloud storage. With variant grouping, search, collections, pages, favourites and product pages show them as one stacked card, and readers open the card to see, filter and download every version. Grouping reads file names only; nothing is renamed or moved in the cloud storage.
@@ -49,7 +49,7 @@ Readers who prefer every file on its own switch off **Group variants** in **Disp
 
 ## Name the axes and set the rules
 
-Open **Data enrichment → Variants** (`/admin/data-enrichment/variants`). The menu badge counts the axes waiting for a name.
+Open **Asset Management → Variants** (`/admin/data-enrichment/variants`). The menu badge counts the axes waiting for a name.
 
 | Tab | What it does |
 |---|---|

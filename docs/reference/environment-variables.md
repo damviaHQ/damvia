@@ -3,7 +3,7 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-29
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
@@ -121,9 +121,8 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PRODUCT_MATCHING_REGEX` | unset (job logs an error and skips) | Deprecated. Copied once, at the upgrade that added the matching screen, into a File name step of every record-related asset type (group 1 key, group 2 view); edit the steps in the admin afterwards. Until the old job is switched off it still applies to files no step owns. Example: `^(.{6}-\d{3})(?:\.(\d{2}))?`. |
-| `PIM_PRODUCT_VIEW` | unset | Deprecated. Copied once, at the same upgrade, into the thumbnail view of Settings (`00` when unset). |
-| `ENABLE_LEGACY_PRODUCT_MATCHING` | `true` | `false` stops the `asset/assign-products-to-asset-files` job. Set it once every record-related asset type has matching steps. |
+| `PRODUCT_MATCHING_REGEX` | unset | Deprecated, read only by migrations. When upgrading an install that linked files with it, it becomes the File name rule (group 1 key, group 2 view) of every asset type without rules; matching is then edited in **Data enrichment → Link to products**. Nothing reads it at run time. Example: `^(.{6}-\d{3})(?:\.(\d{2}))?`. |
+| `PIM_PRODUCT_VIEW` | unset | Deprecated, read only by the upgrade that added the matching screen: it became the thumbnail view of Settings (`00` when unset). |
 
 See [Records](../administration/records.md).
 

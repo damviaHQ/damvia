@@ -3,7 +3,7 @@ title: Contributing
 description: Set up a development environment, know the scripts and checks that exist, and submit a change with its license header and its documentation.
 sidebar:
   order: 1
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-30
 ---
 
 This page is the entry point for developers who want to change or extend Damvia. It covers the application packages, their scripts and checks, and what a pull request must contain. The other pages of this group describe the code itself: [Architecture](./architecture.md), [Data model](./data-model.md), [tRPC API](./api.md), [Writing a background job](./background-jobs.md) [Storage drivers](./storage-drivers.md) and the proposed [Design system](./design-system.md).
@@ -114,10 +114,12 @@ Run the same commands before opening a pull request. There is no ESLint or Prett
 | `record-picture-access.cjs` | Pictures published through record collections and their restrictions |
 | `families.cjs` | Product families and their grouping key |
 | `readiness.cjs` | The readiness score and its effects |
-| `matching.cjs`, `entity-resolution.cjs` | Matching files to records: the legacy job, resolution steps, merge rules, the unmatched screen |
+| `entity-resolution.cjs` | Matching files to records: rules, merge, links by hand, the upgrade from `PRODUCT_MATCHING_REGEX`, folder search and preview |
+| `record-links-other-types.cjs` | Linking any asset type with rules, while only product pictures give visuals, views and access |
+| `catalogue-file-records.cjs` | The products and ranges a file shows in the download dialog |
 | `asset-type-rules.cjs` | Folder rules for asset types |
 | `variant-grouping.cjs` | Variant grouping, axes and collapsed search |
-| `enrichment-overview.cjs` | Enrichment passes, the overview counts and badges |
+| `enrichment-overview.cjs` | Enrichment passes, the last-pass overview and the menu badges |
 | `file-metadata.cjs`, `xmp.cjs` | IPTC, EXIF and XMP parsing, metadata fields and search, CSV mappings, the metadata extraction job |
 | **Cloud sync** | |
 | `sync.cjs` | Folder and file upserts, inheritance, folder deletion, `synchronizeCollection`, conversions without a shell (B2), oversized images |

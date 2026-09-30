@@ -3,7 +3,7 @@ title: Server configuration
 description: What each group of server variables controls, and the values that trip people up.
 sidebar:
   order: 2
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-30
 ---
 
 `server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Any variable can instead be read from a file by setting `NAME_FILE=/path`, which suits Docker and Kubernetes secrets; a value set directly in `NAME` wins. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
@@ -98,7 +98,7 @@ A source key becomes part of every mirrored row. Changing a provider, root or ke
 
 ## Record matching
 
-Record matching is set in the admin, on **Data enrichment → Link to products**. `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` only seed it: at the upgrade that added that screen, the regex became the first File name step of every record-related asset type and the view became the thumbnail view in Settings. The old job that applies the regex every 5 minutes keeps running on the files no step owns until you set `ENABLE_LEGACY_PRODUCT_MATCHING=false`. See [Records](../administration/records.md).
+Record matching is set in the admin, on **Data Enrichment → Link to products**: each asset type has its own rules, and the enrichment pass after each sync applies them. `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` are only read when upgrading an install that used them: the regex becomes the File name rule of every asset type without rules, and the view became the thumbnail view in Settings. Nothing reads them afterwards. See [Records](../administration/records.md).
 
 ## Variables you rarely set
 

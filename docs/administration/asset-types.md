@@ -3,7 +3,7 @@ title: Asset types
 description: Classify source folders and choose how their files appear and participate in record search.
 sidebar:
   order: 6
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-30
 ---
 
 An asset type describes a family of files such as product packshots, campaign visuals or documents. It supplies display and search defaults; it does not grant access. Use groups and licences for access control.
@@ -16,7 +16,7 @@ Open `/admin/asset-types` and provide:
 |---|---|
 | Name | Identifies the type to admins and readers. Maximum 30 characters. |
 | Description | Explains when the type should be used. Maximum 255 characters. |
-| Related to records | Allows record-view filtering for files of this type. The checkbox shows the record label chosen in the Data enrichment settings, for example "Related to products". |
+| Product pictures (packshots and views) | Marks the files of this type as the pictures of the records themselves, such as packshots and their views: they show on product cards and pages, carry view numbers and open with the product. Any type is linked to records through its rules, with or without this option. The label starts with the record label chosen in Settings: "Product pictures" by default, "Event pictures" for events. See [Record and search effects](#record-and-search-effects). |
 | Search by default | Includes the type in a reader's initial search selection. |
 | Group variants | Shows files of this type that differ only by format, language or duration as one card in search, collections and pages. See [Variants](./variants.md). |
 | Default display | Chooses grid or list when a reader has no saved preference. |
@@ -81,7 +81,15 @@ Moving a file in the cloud changes its type to the destination folder's type on 
 
 ## Record and search effects
 
-Mark a type **Related to records** when its files should participate in record-view filters. Automatic matching runs for types with this option enabled, using the rules configured in **Link to records** (named after your records in Settings). The type identifies which files to match; record collections then grant access to the linked pictures, subject to licence dates and regional restrictions. A separate picture collection is optional.
+Linking a file to a record and making it one of the record's pictures are two separate things. Any asset type is linked through its own rules in **Link to records** (named after your records in Settings): a campaign shot then shows its product's fields in lists, filters and the download dialog. See [Records](./records.md#two-questions-two-tools).
+
+**Product pictures (packshots and views)** says that the files of a type *are* the records' own pictures: a packshot and its numbered views (`02351-008-M.00.jpg`, `.01`, `.02`…). Enable it only for such types. It gives their files three things the other linked files do not have:
+
+- **To review.** A file of this type that no rule links waits in **To review**, even while the type has no rule yet.
+- **Product pictures.** Every linked file with a thumbnail counts as a picture of its record: it can become the main picture of a catalogue card and the product page, and it appears among the product's views. Record collections then grant access to these pictures, subject to licence dates and regional restrictions. A separate picture collection is optional.
+- **Views.** A number after the key is read as a view only in the names of these files, and the record-view facet in search counts only them. A product download brings these files.
+
+Do not enable it for marketing shots, lifestyle photos, campaign videos or documents that merely carry a product reference in their name: give their type a rule instead. Their files would otherwise show as product pictures next to the packshots and open to every reader of the product.
 
 **Search by default** preselects the type for new search sessions. Readers can change the selection and Damvia remembers their preference. Use this setting for the core assets people normally expect, and leave decorative or supporting material unselected when it would make searches noisy.
 

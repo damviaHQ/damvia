@@ -3,53 +3,63 @@ title: Records
 description: Create, edit and import a catalogue of records (products, events, venues), organise it in tables, type its fields, see the files matched to each record and its history, and choose which fields power search and display.
 sidebar:
   order: 10
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-30
 ---
 
 The Data enrichment area adds context to mirrored assets. Damvia keeps a catalogue of **records**, organised in tables and created on screen or imported from CSV or Excel files, extracts a record key and optional view from each filename, and uses selected record fields for search, filters and display.
 
 A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), section **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
 
-## Daily work and setup
+## Where things are in the menu
 
-The menu splits data enrichment in two. **Data Enrichment** holds the screens used every day: **Products** (your record label), the catalogue that some teams run as their PIM, with its fields; **File metadata**, the fields read from the files themselves; and **To review**, where the files no step could link arrive after each sync. **Enrichment Setup** holds four settings, made once in order and adjusted when the folders or the catalogue change. Each setup screen names its step at the top.
+The admin menu spreads this work over three sections:
+
+- **Database** holds the screens used every day on your data: **Products** (your record label), the catalogue that some teams run as their PIM, with its fields, and **File metadata**, the fields read from the files themselves.
+- **Data Enrichment** holds the two settings that give every file its type and its record: **Asset types** and **Link to products**. Make them once, in that order, and adjust them when the folders or the catalogue change. **Link to products** has three tabs: **Rules**, **To review** and **Linked by hand**.
+- **Asset Management** holds **Assets**, **Licenses** and **Variants**.
 
 | Step | Screen | Question it answers |
 |---|---|---|
 | 1 | **Asset types**, with the **Folder rules** tab | What kind of file is this? The other settings are made per type. |
 | 2 | **Link to products** | How does a file of each type find its record? Needs records to link to. |
-| 3 | **File metadata**, optional, under Data Enrichment | Which metadata read from photos do readers see and search? Record fields are set from the records page. |
-| 4 | **Variants**, optional | Which files are versions of one creative? |
+| 3 | **File metadata**, optional, under Database | Which metadata read from photos do readers see and search? Record fields are set from the records page. |
+| 4 | **Variants**, optional, under Asset Management | Which files are versions of one creative? |
 
-**Enrichment Setup → Setup guide** (`/admin/data-enrichment`) lists the four steps with where each stands: types defined and folders still without one, types with matching steps (or that no record exists yet), photo metadata fields shown, types grouping variants and axes waiting for a name. A step is ticked when it is done, and its button opens its screen. It also shows the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, and the axes waiting for a name.
+The enrichment pass runs by itself after every sync. **Link to products → Rules** ends with the last pass: when it ran, who started it (the sync or an admin), how long it took and what each stage changed, or the error that stopped it. **Run enrichment now** starts a pass straight away; while one runs, the button says since when and by whom, and a second request waits for it and runs next. The menu badges count the files unmatched or in conflict, on **Link to products**, and the axes waiting for a name, on **Variants**.
 
 ## Two questions, two tools
 
 - **Folder rules** (setup step 1) answer "what kind of file is this?": they give an [asset type](./asset-types.md) from the folder path (packshot, video, logo).
 - **Link to products** (setup step 2) answers "which record is this file about?": it finds a record key in the file name or the folder path (product `WX5678-100`, event `EVT-25028`).
 
-Matching only runs on files whose asset type is marked **Related to records**. Files of other types, such as logos or fonts, are left out and never appear in **To review**.
+Each asset type has its own rules, and matching runs on every type that has at least one. A campaign shot named `02351-008-M_SS25_BS_02.jpg` is linked to product `02351-008-M` as soon as its type has a File name rule that reads that key; it then shows the product's fields in lists, filters and the download dialog.
 
-## Set the matching steps
+Linking a file to a record is not the same as making it one of the record's pictures. Only the types marked **Product pictures (packshots and views)** in [Asset types](./asset-types.md#record-and-search-effects) hold the pictures: packshots and their views. Their files show on catalogue cards and product pages, carry a view number, and are opened to readers by the product collections. A marketing shot linked to the same product keeps the access of the collections that hold it and never shows as a product picture.
 
-Open **Data enrichment → Link to products** (the menu uses your record label, `/admin/data-enrichment/matching`). Choose an asset type on the left, then add its steps:
+Only pictures wait in **To review**: a file of a type marked Product pictures that nothing links. A file of another type that no rule can read, a logo or a moodboard, is simply not linked, as with the old regex. Folders and files linked by hand, and the CSV mapping, apply to any type.
 
-| Step | What it reads | What its group gives |
+## Set the matching rules
+
+Open **Data Enrichment → Link to products**, tab **Rules** (the menu uses your record label, `/admin/data-enrichment/matching`). Choose an asset type on the left, then add its rules:
+
+| Rule | What it reads | What its group gives |
 |---|---|---|
 | File name | The file name, without its folder, case-sensitive | The record key. An optional **view group** gives the view, for example `02` in `ABC123-001.02.jpg`. |
 | Folder path | The full folder path, such as `/Dropbox/EVENTS/2025/EVT-25028 Festival Aurora 2025`, case-insensitive | Either the record key, or the value of an attribute, which links the file to a **range**: every record sharing that value, such as every product of a collection. |
 
-Every enabled step runs on every file. When two steps find a different record key, the file becomes a **conflict** and nothing is chosen for you. Steps are refused when the pattern has no group in parentheses, names a group it does not have, or takes more than 50 ms on a sample.
+Every enabled rule runs on every file. When two rules find a different record key, the file goes under **Several products found** in the To review tab and nothing is chosen for you. Rules are refused when the pattern has no group in parentheses, names a group it does not have, or takes more than 50 ms on a sample.
 
-**Test on a folder** runs the steps on screen, saved or not, on up to 40 files of a folder and its subfolders, and shows the key found, the record and the result of each file. **Save and re-run** writes the steps and recomputes the links of every file straight away. Nothing is ever written to the cloud storage.
+**Test on a folder** runs the rules on screen, saved or not, on up to 40 files of a folder and its subfolders, and shows the key found, the record and the result of each file. **Save and re-run** writes the rules and recomputes the links of every file straight away. Nothing is ever written to the cloud storage.
 
-A pattern such as `^(.{6}-\d{3})` with views enabled in Settings reads `ABC123-001.02.jpg` as key `ABC123-001` and view `02`: the view part is added after the key from the **Views** settings (separator `.` and two digits by default). A step that names its own view group keeps it.
+A pattern such as `^(.{6}-\d{3})` with views enabled in Settings reads `ABC123-001.02.jpg` as key `ABC123-001` and view `02`: the view part is added after the key from the **Views** settings (separator `.` and two digits by default). A rule that names its own view group keeps it.
 
-### The old `PRODUCT_MATCHING_REGEX` becomes the first step
+**File name rule** starts from the pattern another type already uses, so giving the campaign shots the same rule as the packshots is one click.
 
-At the upgrade that brought this screen, `PRODUCT_MATCHING_REGEX` was copied into a **File name** step, group 1 key and group 2 view, for every asset type then marked Related to records, and `PIM_PRODUCT_VIEW` became the thumbnail view in Settings. From then on the admin screen is where they are edited.
+A file's record is always the one its links give: the enrichment pass writes it, and a file nothing links has none.
 
-The old job that applied the regex every 5 minutes still runs, but only on files that no step owns: files of a type without steps, or of a type not related to records. It leaves alone files linked by hand. Once every record-related type has steps, set `ENABLE_LEGACY_PRODUCT_MATCHING=false` to stop it. The **Use PRODUCT_MATCHING_REGEX** button adds the old regex as a step to a type that has none.
+### From `PRODUCT_MATCHING_REGEX` to rules
+
+Before this screen, one regex in `PRODUCT_MATCHING_REGEX` linked every file whose name matched, whatever its type. When upgrading an install that set it, the regex becomes the **File name** rule (group 1 key, group 2 view) of every asset type that has no rule, so the same files are linked again after the first enrichment pass, and `PIM_PRODUCT_VIEW` became the thumbnail view in Settings. Nothing reads either variable afterwards: edit the rules here.
 
 ## Organise records in tables
 
@@ -66,7 +76,7 @@ At the upgrade that brought tables, every record and field went into a first tab
 
 ## Work on records like a spreadsheet
 
-**Data enrichment → Products** (the menu uses your record label, `/admin/data-enrichment/records`) lists the records of the open table in a grid. Every change is saved as soon as it is made and written to the record's history.
+**Database → Products** (the menu uses your record label, `/admin/data-enrichment/records`) lists the records of the open table in a grid. Every change is saved as soon as it is made and written to the record's history.
 
 There are no pages: the grid scrolls through the whole table and loads rows as they come on screen. Search, filters and sort always run on the whole table, not on the rows already loaded. The count under the grid gives the number of records, or how many of them match.
 
@@ -90,10 +100,10 @@ A paste, fill or clear over several cells is checked before anything is sent: on
 The ↗ button next to a key, or Enter on the key, opens the record as a card on the right. Its address carries `?record=`, so a link to it can be shared with another admin.
 
 - **Fields** lists the fields of the table with an input of their type; a value is saved when you leave the field or pick an option. Fields the table does not show but that hold a value for this record follow under **Not shown in this table**. The pencil next to a field's name edits the field itself (display name, type, options, switches), and **Add a field** at the bottom adds one, shown in the open table.
-- **Files** shows the files linked to the record with their thumbnail, the primary one marked, and what linked each of them: a matching step and its pattern, a folder, a file set by hand, the CSV mapping or the file metadata. Files linked to a range the record belongs to follow under **Covering the range**. Files are attached from [Unmatched](#fix-what-matching-could-not), not from the card.
+- **Files** shows the files linked to the record with their thumbnail, the primary one marked, and what linked each of them: a matching rule and its pattern, a folder, a file set by hand, the CSV mapping or the file metadata. Files linked to a range the record belongs to follow under **Covering the range**. Files are attached from [Unmatched](#fix-what-matching-could-not), not from the card.
 - **History** lists who created, changed, moved or deleted the record, when, where (grid, card, bulk edit, CSV import, Unmatched, removal of a field) and each value before and after, or the tables of a move. A record deleted and created again under the same key shows its earlier life. History started with this version; earlier changes are not listed, and it is never pruned.
 
-**Delete product** at the bottom of the card, or **Delete** on a selection, removes records. Their last values stay in the history. Files linked to their key stay linked and appear as dangling in Unmatched until a record with that key exists again.
+**Delete product** at the bottom of the card, or **Delete** on a selection, removes records. Their last values stay in the history. Files linked to their key stay linked and appear under **Product not imported** in the To review tab of Link to products until a record with that key exists again.
 
 ## Give each field a type
 
@@ -156,21 +166,24 @@ After every sync, and straight away after an admin change, Damvia computes the l
 - A file can be linked to several records and to ranges. Each link remembers what made it: file name, folder path, folder set by hand, file set by hand.
 - One of the record links is the **primary**; it decides the thumbnail, the view and the record attributes shown on the file. Links set on the file by hand come first, then links set on a folder by hand, then file name, then folder path.
 - A key that no record has is kept as a **dangling** link, with its reason ("no record with key EVT-25041"). Importing the record later attaches the file on the next pass. Deleting a record does the reverse.
-- Changing a step or moving a file in the cloud recomputes the links made by steps. Links set by hand are never touched by a step.
+- Changing a rule or moving a file in the cloud recomputes the links made by rules. Links set by hand are never touched by a rule.
 
 The **Files** tab of a record's card shows every file linked to it and what linked it, with the files covering its ranges.
 
 ## Fix what matching could not
 
-Open **Data enrichment → To review** (`/admin/data-enrichment/unmatched`). The menu badge counts unmatched files and conflicts.
+Open **Data Enrichment → Link to products**, tab **To review** (`/admin/data-enrichment/matching?tab=review`). It lists the product pictures that found no product, and the links worth checking. The **Link to products** menu badge and the tab count pictures without a product and files with several products. The tab names use your record label. The old `/admin/data-enrichment/unmatched` address redirects here.
 
 | Tab | Lists | Action |
 |---|---|---|
-| Folders | Folders holding unmatched files, largest first | **Attach** links every file of the folder and its subfolders, now and after each sync, to one record or one range |
-| Files | Every unmatched file and why | **Attach** one file or the selected ones by hand |
-| Conflicts | Files where steps found different keys | **Use** one of the keys, or **Other**. The choice is kept and no step changes it later |
-| Dangling | Links to a key or value no record has | **Create record** with the key only, filled by the next CSV import, or **Detach** a link set by hand |
-| Linked by hand | Every folder and file linked by hand, newest first, with the number of files, the target and who set it | **Link this folder** links any folder, including one whose files are already matched, such as a pack that covers a whole range. **Detach** removes a link |
+| Folders without a product | Folders holding product pictures no rule could link, largest first | **Attach** links every file of the folder and its subfolders, now and after each sync, to one record or one range |
+| Pictures without a product | Every product picture no rule could link, and why | **Attach** one file or the selected ones by hand |
+| Several products found | Files where two rules found different keys | **Use** one of the keys, or **Other**. The choice is kept and no rule changes it later |
+| Product not imported | Links to a key or value no record has yet | **Create record** with the key only, filled by the next CSV import, or **Detach** a link set by hand |
+
+The **Linked by hand** tab of the same page lists every folder and file linked by hand, newest first, with the number of files, the target and who set it. **Link a folder** links any folder, including one whose files are already matched, such as a pack that covers a whole range. **Detach** removes a link.
+
+**Link a folder**, and **Attach** on a folder of the first tab, open the same dialog. First the folder: search it by any part of its path, or browse the tree. The dialog then shows how many files it holds with its subfolders, by asset type, how many are already linked to a record, and whether a parent folder or subfolders are linked by hand; a folder of 500 files or more is flagged. Then what the files are linked to, and a summary of what happens before **Link**.
 
 The attach dialog searches records by key and by searchable attribute, or picks a range by attribute and value. When the key does not exist, **Create record with this key** creates it.
 
@@ -185,7 +198,7 @@ Damvia reads the EXIF (camera, lens, date taken, GPS), IPTC (title, caption, key
 | Visible | The value is shown under **From the file** in the file preview and can be chosen as a list column on an asset type. |
 
 Search and filters use a field only while it is also **Visible**: a hidden field is never searched or offered as a filter, because matching on it would reveal its values. Filter values, and the date bounds of a date filter, come only from files the reader can open.
-| Can link | The field may link files to records, through a **Metadata** step on the Link to products screen. Say whether the value is a record key or the value of an attribute (a range). |
+| Can link | The field may link files to records, through a **Metadata** rule on the Link to products screen. Say whether the value is a record key or the value of an attribute (a range). |
 
 Metadata belongs to the file, so these filters also work on files no record is linked to. Cameras write some fields reliably; people write others, which can be wrong or outdated. Only tick **Can link** for a field your team fills reliably: until then, a value equal to a record key links nothing. When a trusted field has a record key on an unmatched file, the Unmatched screen suggests it with **Accept**. Dates are stored as the camera wrote them, without time zone conversion.
 
@@ -201,12 +214,12 @@ Views are made for brands that sell products. A product is usually shot several 
 
 | Setting | Effect |
 |---|---|
-| Files show several views of each record | Off on new installs; turned on at the upgrade when `PRODUCT_MATCHING_REGEX` or `PIM_PRODUCT_VIEW` was set. Off hides the view filter from search and stops reading views, except in steps that name their own view group. |
+| Files show several views of each record | Off on new installs; turned on at the upgrade when `PRODUCT_MATCHING_REGEX` or `PIM_PRODUCT_VIEW` was set. Off hides the view filter from search and stops reading views, except in rules that name their own view group. Only the types marked Product pictures have views: a number after the key in the name of a campaign shot is not a view. |
 | Separator | One character, `.` by default. |
 | Digits | 1 to 4, `2` by default. |
 | Thumbnail view | The view used as the record's picture in the admin list, `00` by default or the old `PIM_PRODUCT_VIEW`. |
 
-The view part is added after the pattern of every file name step that does not name its own view group, and the Link to products screen shows the full pattern. Changing the separator, the digits or the switch re-runs matching straight away.
+The view part is added after the pattern of every file name rule that does not name its own view group, and the Link to products screen shows the full pattern. Changing the separator, the digits or the switch re-runs matching straight away.
 
 ## Search shows exact files and range files apart
 
@@ -229,7 +242,7 @@ As for file metadata, **Search** and **Filter** apply only while **Show** is on,
 
 Choose facetable columns with a manageable set of values such as category, colour family or season. Very high-cardinality values produce unwieldy filters even though the interface hides options that would yield no result.
 
-Search words are alternatives within the text query, while selected values from different attributes narrow the result together. Record-view filters apply only to files whose [asset type](./asset-types.md) is marked **Related to records** (shown with your label, for example "Related to products").
+Search words are alternatives within the text query, while selected values from different attributes narrow the result together. Record-view filters apply only to files whose [asset type](./asset-types.md) is marked **Product pictures (packshots and views)** (named after your record label).
 
 ## Validate the result
 
@@ -239,7 +252,7 @@ On a small fixture:
 2. Change one value and confirm it is reported as changed before approving it.
 3. Repeat one key and confirm the duplicate is reported.
 4. Add source files whose names exercise the record key and view capture groups.
-5. Confirm the intended type is related to records, the attribute filters appear, and the representative view is used.
+5. Confirm the intended type is marked Product pictures, the attribute filters appear, and the representative view is used.
 
 If matching fails, check the exact filename, captured key, scheduled job, record key and asset type in that order. The [Environment variables](../reference/environment-variables.md) page contains the exact configuration names; [Background jobs](../reference/background-jobs.md) contains the schedule.
 

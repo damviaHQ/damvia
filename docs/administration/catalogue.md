@@ -3,7 +3,7 @@ title: Product catalogue
 description: Open the record database to readers as a catalogue, with product collections, readiness and models.
 sidebar:
   order: 15
-lastUpdated: 2026-09-23
+lastUpdated: 2026-09-30
 ---
 
 The record database is an administrative tool until you open part of it to readers. A **product collection** does that: it holds records instead of files, and readers browse those records as a catalogue of cards, each carrying its main visual, the visuals attached to it and the field values you made visible. This is the route to take when your readers think in products rather than in folders.
@@ -18,11 +18,11 @@ Product collections start at the top level unless you choose a parent. A parent 
 
 One rule decides everything: **a reader sees a product when at least one collection they can open holds it.** Product collections use the same visibility as every other collection, so a hidden collection, a draft, or one limited to groups hides its products exactly as it hides its files. See [Roles and access](../introduction/roles-and-access.md).
 
-**That same collection gives readers access to the products’ linked pictures**, including previews, favourites and downloads. You do not need a separate PACKSHOTS file collection. Picture access follows current membership: removing or excluding a product closes that route to its pictures, unless another accessible record or file collection still grants access. New linked pictures become available automatically.
+**That same collection gives readers access to the products’ linked pictures**, including previews, favourites and downloads. You do not need a separate PACKSHOTS file collection. The pictures are the files of the asset types marked [Product pictures (packshots and views)](./asset-types.md#record-and-search-effects). Other files linked to a product, such as campaign shots or videos, keep the access of the collections that hold them. Picture access follows current membership: removing or excluding a product closes that route to its pictures, unless another accessible record or file collection still grants access. New linked pictures become available automatically.
 
 Licence dates and regional restrictions still apply to each picture. A picture in a private file collection can also be published through an accessible product collection: either collection can grant access. Other file types, such as PDFs and videos, still need access through a file collection. Counts and thumbnails only use files the reader may open.
 
-For automatic linking, keep the **Packshot** asset type assigned to the source folder, enable **Related to products**, and configure the rules in **Link to products**. The collection publishes the matches; it does not create them. These labels use the record name in Settings, so the same setup works for events, properties or venues. **Views** is optional and is not required for matching or picture access.
+For automatic linking, keep the **Packshot** asset type assigned to the source folder, enable **Product pictures (packshots and views)**, and configure the rules in **Link to products**. The collection publishes the matches; it does not create them. These labels use the record name in Settings, so the same setup works for events, properties or venues. **Views** is optional and is not required for matching or picture access.
 
 A product no collection holds is invisible to everybody, administrators included. Opening `/products/<id>` for it answers "not found".
 
@@ -88,7 +88,7 @@ The filter icon of the action bar works on products exactly as it works on files
 
 ## What a card shows
 
-A catalogue card carries the main visual, the reference and the visuals attached to the product. Settings → **Card title field** names the one field shown under the reference, on a single line, for example *Style name*; leaving it on **Reference only** shows the reference alone.
+A catalogue card carries the main visual, the reference and the visuals attached to the product: the product pictures linked to it, the thumbnail view first. Settings → **Card title field** names the one field shown under the reference, on a single line, for example *Style name*; leaving it on **Reference only** shows the reference alone.
 
 One field, one line, deliberately. A card that grew with its content left a product carrying a long description towering over an empty neighbour, and the grid stopped reading as a grid. Every other field is on the product page. **Display preferences** switches products between grid and list and chooses additional field columns. These preferences are saved independently of file layouts. The reference and configured title stay visible in both views.
 
@@ -100,7 +100,7 @@ The image and reference both open the product page. Its heading uses the same ti
 
 The **Files** section offers every populated filterable field of the current product, including **Product Type** when that field is marked **Filter** in Records. A single-value facet stays available here; open the filter icon to add its chip. Fields left empty, hidden or not filterable are not offered. This also works for files attached through record links.
 
-The **Files** section uses the collection file renderer: grid, list or masonry, filter chips, previews, favourites and file selection. Linked pictures inherit access through the product collection; all files retain their licence dates and regional restrictions. Adding the product itself to a collection uses the separate **Add to collection** action in the product header.
+The **Files** section uses the collection file renderer: grid, list or masonry, filter chips, previews, favourites and file selection. It lists every file linked to the product that the reader may open, grouped by asset type. Product pictures inherit access through the product collection; other files need a collection of their own; all files retain their licence dates and regional restrictions. Adding the product itself to a collection uses the separate **Add to collection** action in the product header.
 
 ## Choose related products
 

@@ -3,7 +3,7 @@ title: Integrations
 description: "How Damvia talks to the outside world: one or more cloud storage sources, an SMTP server, and two S3 buckets."
 sidebar:
   order: 1
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-30
 ---
 
 Damvia integrates with three kinds of external services, plus an optional identity provider. The cloud storage is where your files already live; Damvia only reads it. SMTP carries every account and notification email. S3-compatible storage holds Damvia's own copies, previews and archives. An OpenID Connect provider can handle sign-in.
@@ -33,11 +33,11 @@ One run of one source does the following:
 After the last source of the cycle, the enrichment pass runs once (`services/enrichment.ts`), in stages that each commit on their own and log one line with their counts:
 
 1. `enrichment.asset-types`: refreshes the stored path of every folder, applies the [folder rules](../administration/asset-types.md#assign-it-by-a-rule-on-the-folder-path) and writes the resulting asset type to the changed folders and their files.
-2. `enrichment.entities`: runs the [matching steps](../administration/records.md#set-the-matching-steps) and the links set by hand, and writes the record links, the unmatched queue and each file's primary record.
+2. `enrichment.entities`: runs the [matching rules](../administration/records.md#set-the-matching-rules) and the links set by hand, and writes the record links, the unmatched queue and each file's primary record.
 3. `enrichment.metadata`: refreshes how many files carry each metadata field.
 4. `enrichment.variants`: groups the [variants](../administration/variants.md) of the asset types that ask for it, keeping group ids stable.
 
-Each pass leaves a row in `enrichment_runs` (trigger, start, end, the counts of every stage or the error), shown on **Enrichment Setup → Setup guide**; the last 50 are kept. A failed stage logs `failed to run enrichment pass` and the next sync retries. One pass runs at a time, through a Postgres advisory lock; a save, attach or re-apply from the admin waits for a running pass. Every stage writes only what changed, so a pass on unchanged data writes nothing. The pass reads the database only and never calls a provider.
+Each pass leaves a row in `enrichment_runs` (trigger, start, end, the counts of every stage or the error), shown at the end of **Data Enrichment → Link to products → Rules**; the last 50 are kept. A failed stage logs `failed to run enrichment pass` and the next sync retries. One pass runs at a time, through a Postgres advisory lock; a save, attach or re-apply from the admin waits for a running pass. Every stage writes only what changed, so a pass on unchanged data writes nothing. The pass reads the database only and never calls a provider.
 
 Step 3 is why every driver stops before it on an empty listing, and when any item failed to upsert: either would delete part or all of the library.
 

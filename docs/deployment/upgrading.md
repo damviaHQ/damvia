@@ -3,7 +3,7 @@ title: Upgrading
 description: Pull, build, restart; migrations run on their own at startup.
 sidebar:
   order: 6
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-30
 ---
 
 To upgrade an instance, rebuild the server image and client files, then deploy them together. There is no migrate command: TypeORM is configured with `migrationsRun: true` and applies every pending migration from `server/src/migrations/` before the HTTP server starts listening.
@@ -135,7 +135,7 @@ Back up first and apply the migration with application writers stopped. Validate
 
 - Keep `PRODUCT_MATCHING_REGEX` and `PIM_PRODUCT_VIEW` set for the first start: the migration copies the regex into a File name step of every asset type marked Related to records, and the view into Settings, and turns views on in Settings (new installs start with views off). Types that are not marked get no step; mark them in Asset types, then add a step on the Matching screen, or use its **Use PRODUCT_MATCHING_REGEX** button.
 - The first pass after the restart finds the existing links in place and changes no `record_id` on files the step agrees with. Files of record-related types that no step can match appear in the new Unmatched queue.
-- The old every-5-minutes job keeps linking the files no step owns. Set `ENABLE_LEGACY_PRODUCT_MATCHING=false` once every record-related type has steps; the two variables can then be removed.
+- The old every-5-minutes job keeps linking the files no step owns. Set `ENABLE_LEGACY_PRODUCT_MATCHING=false` once every record-related type has steps; the two variables can then be removed. A later upgrade removes this job; see [Matching on every asset type](#matching-on-every-asset-type-in-this-upgrade).
 - Search lists each file once even when it sits in several collections, and facet counts count files rather than collection entries: totals can drop on instances where the same folder is mirrored by more than one collection.
 
 ## Record fields and history in this upgrade
@@ -194,6 +194,26 @@ Emails are now branded HTML, with their wording edited under **Admin → Emails*
 - **Choose an accent colour** under **Admin → Settings**. It colours the email buttons and, from this release, the buttons and links of the client portal. Without one, emails and the portal keep the neutral dark colour.
 - The `email-templates` migration creates `brand_settings`, `email_settings` (one row each) and `email_templates` (empty). Rolling it back drops them and the customised wording.
 
+## Matching on every asset type in this upgrade
+
+Files are linked to records only by the rules of **Data Enrichment → Link to products**, now on any asset type that has rules. The old job that applied `PRODUCT_MATCHING_REGEX` every 5 minutes, `asset/assign-products-to-asset-files`, is removed, with `ENABLE_LEGACY_PRODUCT_MATCHING`.
+
+- **Keep `PRODUCT_MATCHING_REGEX` set for the first start** if the install still relied on it. The `single-matching` migration makes it the File name rule (group 1 key, group 2 view) of every asset type that has no rule, so the files the old job linked are linked again by the first enrichment pass. Then remove `PRODUCT_MATCHING_REGEX`, `PIM_PRODUCT_VIEW` and `ENABLE_LEGACY_PRODUCT_MATCHING`.
+- **No existing link is lost.** A link that no rule can find again, on a file without an asset type (which cannot have rules) or of a type left without rules, becomes a link set by hand; it is listed under **Link to products → Linked by hand**, where it can be removed. With `PRODUCT_MATCHING_REGEX` unset at the first start, every type is in that case: the links survive, but the packshots lose their view numbers until their type gets a rule.
+- **To review lists only pictures.** A file of a type marked Product pictures that nothing links waits there; a logo or a campaign shot whose name holds no key is left alone, as the old job left it.
+- **"Related to products" is renamed "Product pictures (packshots and views)"** and means only that: the files of the type are the products' pictures. Only those types give catalogue visuals, the admin thumbnail, the Excel picture column, the files of a product download and view numbers, and only their images are opened to readers by a product collection. A campaign shot linked to a product keeps the access of the collections that hold it. See [Asset types](../administration/asset-types.md#record-and-search-effects).
+- The migration also deletes the schedules of the removed job from pg-boss, `asset/assign-products-to-asset-files` and its older name `asset/assign-records-to-asset-files`. Rolling it back changes nothing: the steps stay.
+
+## Admin menu in this upgrade
+
+The data enrichment screens are regrouped. Nothing is lost and old addresses redirect.
+
+- **Database**, formerly Data Enrichment, holds the records (your record label) and File metadata.
+- **Data Enrichment**, formerly Enrichment Setup, holds Asset types and Link to products.
+- **Link to products** has three tabs: **Rules**, **To review** and **Linked by hand**. To review is no longer a menu entry; `/admin/data-enrichment/unmatched` opens its tab. The menu badge of unmatched files moves to Link to products.
+- **Setup guide** is gone; `/admin/data-enrichment` opens Link to products. The last enrichment pass and **Run enrichment now** are at the end of its Rules tab.
+- **Variants** moves to **Asset Management**; its address does not change.
+
 ## Migrations that exist
 
 | Migration | What it did |
@@ -234,6 +254,7 @@ Emails are now branded HTML, with their wording edited under **Admin → Emails*
 | `1790553600000-records` | Renames `products` to `records` (`product_key` to `record_key`, `primary_key_name` to `key_column_name`), `product_attributes` to `record_attributes`, `asset_files.product_id` and `product_view` to `record_id` and `record_view`, `asset_types.is_related_to_products` to `is_related_to_records`; rewrites the `product_attribute.` prefix of `list_display_items` to `record_attribute.`; creates the single-row `enrichment_settings` table holding the record label. Renames only; rolling back reverses them |
 | `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |
 | `1790467200000-asset-type-rules` | `asset_type_rules` table; `asset_type_source` and `asset_type_rule_id` on `asset_folders`. Existing typed folders whose type differs from their parent's, and typed roots, are marked `manual`; the others `inherited`. Rolling back drops the table and the three columns and loses nothing the previous version reads |
+| `1792886400000-single-matching` | A File name rule from `PRODUCT_MATCHING_REGEX`, when set, on every asset type without rules; deletes the pg-boss schedules of the removed `asset/assign-products-to-asset-files` job. Rolling back changes nothing |
 | `1792627200000-brand-name` | `brand_name` on `brand_settings`, null, so the name stays `APP_NAME` until an admin sets one. Rolling back drops it |
 | `1792540800000-email-templates` | `brand_settings` (accent colour) and `email_settings` (sender and footer), one row each, and `email_templates`, empty: a row exists only for an email whose wording was changed. Rolling back drops the three tables and the customised wording |
 | `1792454400000-download-license-acceptance` | `license_accepted_at` and `license_ids` on `downloads`, empty for earlier downloads. Rolling back drops them |
