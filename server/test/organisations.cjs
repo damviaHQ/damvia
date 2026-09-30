@@ -29,11 +29,14 @@ const organisationRow = id => db.getRepository(Organisation).findOneBy({ id })
 const userRow = id => db.getRepository(User).findOneByOrFail({ id })
 const edit = (user, extra) => ({ id: user.id, name: user.name, company: user.company, regionId: user.regionId, email: user.email, role: user.role, groupIds: [], ...extra })
 
-test('organisations are managed by an approved, verified admin only', async () => {
+test('an approved manager lists organisations; only an approved, verified admin changes them', async () => {
     const organisation = await caller(fixtures.admin).organisation.create({ name: `Guarded ${randomUUID()}` })
+    assert((await caller(fixtures.manager).organisation.list()).some(row => row.id === organisation.id))
+    for (const user of [null, fixtures.guest, fixtures.member, { ...fixtures.manager, approved: false }]) {
+        await forbidden(caller(user).organisation.list())
+    }
     for (const user of [null, fixtures.guest, fixtures.member, fixtures.manager, { ...fixtures.admin, approved: false }, { ...fixtures.admin, emailVerified: false }]) {
         const as = caller(user)
-        await forbidden(as.organisation.list())
         await forbidden(as.organisation.create({ name: 'Refused' }))
         await forbidden(as.organisation.update({ id: organisation.id, name: 'Refused' }))
         await forbidden(as.organisation.remove(organisation.id))
@@ -77,14 +80,26 @@ test('an admin sets or clears the organisation of a user, which the list counts 
     assert(csv.split('\r\n').find(line => line.startsWith(people[1].email)).includes(`,${organisation.name},`))
 })
 
-test('a manager cannot move a user into or out of an organisation', async () => {
-    const organisation = await caller(fixtures.admin).organisation.create({ name: `Managed ${randomUUID()}` })
+test('a manager moves the members and guests of their region between organisations, and nobody else', async () => {
+    const admin = caller(fixtures.admin)
+    const manager = caller(fixtures.manager)
+    const [first, second] = [await admin.organisation.create({ name: `First ${randomUUID()}` }), await admin.organisation.create({ name: `Second ${randomUUID()}` })]
     const person = await makeUser('member')
-    await caller(fixtures.manager).user.update(edit(person, { organisationId: organisation.id }))
+    await manager.user.update(edit(person, { organisationId: first.id }))
+    assert.equal((await userRow(person.id)).organisationId, first.id)
+    await manager.user.update(edit(person, { organisationId: second.id }))
+    assert.equal((await userRow(person.id)).organisationId, second.id)
+    await assert.rejects(manager.user.update(edit(person, { organisationId: randomUUID() })), error => error.code === 'NOT_FOUND')
+    await manager.user.update(edit(person, { organisationId: null }))
     assert.equal((await userRow(person.id)).organisationId, null)
-    await caller(fixtures.admin).user.update(edit(person, { organisationId: organisation.id }))
-    await caller(fixtures.manager).user.update(edit(person, { organisationId: null }))
-    assert.equal((await userRow(person.id)).organisationId, organisation.id)
+    const otherManager = await makeUser('manager')
+    await forbidden(manager.user.update(edit(otherManager, { organisationId: first.id })))
+    const region = await harness.save(harness.entities.Region, { name: `Elsewhere ${randomUUID()}`, defaultGroupId: fixtures.group.id })
+    const outsider = await makeUser('member', { regionId: region.id })
+    await assert.rejects(manager.user.update(edit(outsider, { organisationId: first.id })), error => error.code === 'NOT_FOUND')
+    for (const user of [otherManager, outsider]) assert.equal((await userRow(user.id)).organisationId, null)
+    await manager.user.update(edit(fixtures.manager, { organisationId: first.id }))
+    assert.equal((await userRow(fixtures.manager.id)).organisationId, null, 'a manager does not change their own')
 })
 
 test('removing an organisation keeps its members, without an organisation', async () => {

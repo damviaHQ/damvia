@@ -314,10 +314,6 @@ export default router({
 
 			let shouldUpdateUserGroups = false
 			if (ctx.user.role === UserRole.ADMIN) {
-				if (input.organisationId && !await dataSource.getRepository(Organisation).existsBy({ id: input.organisationId })) {
-					throw new TRPCError({ code: 'NOT_FOUND', message: 'Organisation not found.' })
-				}
-				if (input.organisationId !== undefined) user.organisationId = input.organisationId
 				user.regionId = input.regionId
 				user.role = input.role
 				user.maintenanceContact = input.role === UserRole.ADMIN && (input.maintenanceContact ?? false)
@@ -338,14 +334,22 @@ export default router({
 					}
 				}
 			}
+			// Whoever sets the groups sets the organisation: an admin, or a
+			// manager for the members and guests of their region.
+			if (shouldUpdateUserGroups && input.organisationId !== undefined) {
+				if (input.organisationId && !await dataSource.getRepository(Organisation).existsBy({ id: input.organisationId })) {
+					throw new TRPCError({ code: 'NOT_FOUND', message: 'Organisation not found.' })
+				}
+				user.organisationId = input.organisationId
+			}
 
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(User).update(user.id, {
 					name: user.name, company: user.company, email: user.email,
 					emailVerified: user.emailVerified, emailVerificationCode: user.emailVerificationCode,
 					...(emailChanged ? { resetPasswordToken: null, resetPasswordExpiresAt: null } : {}),
-					...(shouldUpdateUserGroups ? { regionId: user.regionId, role: user.role } : {}),
-					...(ctx.user.role === UserRole.ADMIN ? { maintenanceContact: user.maintenanceContact, organisationId: user.organisationId } : {}),
+					...(shouldUpdateUserGroups ? { regionId: user.regionId, role: user.role, organisationId: user.organisationId } : {}),
+					...(ctx.user.role === UserRole.ADMIN ? { maintenanceContact: user.maintenanceContact } : {}),
 				})
 				if (shouldUpdateUserGroups) {
 					await em.getRepository(UserGroup).delete({userId: user.id})

@@ -102,7 +102,7 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `changeUnverifiedEmail` | mutation | login | While the caller's email is unverified: sets a new address, voids the old link and reset token, decides `approved` from the new domain, queues a new verification email. 5 per hour |
 | `removeAccount` | mutation | login | Deletes own account (`FORBIDDEN` for any other id) |
 | `findById` | query | `userManagerOrAdmin` | One user (managers: own region) |
-| `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user; `maintenanceContact` is applied by admins on admin profiles only. Only admins change region, organisation or another user's email. `organisationId` is optional: left out, the organisation is kept; `null` takes the user out of it; an unknown id is `NOT_FOUND`; a manager's value is ignored; an email change by an admin ends that user's sessions and clears their reset and email-link tokens |
+| `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user; `maintenanceContact` is applied by admins on admin profiles only. Only admins change region or another user's email. `organisationId` is optional: left out, the organisation is kept; `null` takes the user out of it; an unknown id is `NOT_FOUND`. It is applied wherever the groups are, so a manager's value on their own profile is ignored; an email change by an admin ends that user's sessions and clears their reset and email-link tokens |
 | `list` | query | `userManagerOrAdmin` | Users (managers: own region), with `organisationId` and the `organisation` name, `lastLoginAt`, `suspendedAt` and `mfaEnabled`; `maintenanceContact` is only returned to admins |
 | `approve` | mutation | `userManagerOrAdmin` | Approves a verified account (`BAD_REQUEST` before verification) and pushes `email/user-approved` |
 | `remove` | mutation | `userManagerOrAdmin` | Deletes a user with their personal collections, invitations and downloads; their public collections lose their owner. Managers can delete only members and guests in their region |
@@ -126,7 +126,7 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `region.list` | query | `userAdmin` | Regions |
 | `region.create`, `region.update`, `region.remove` | mutation | `userAdmin` | CRUD |
 | `region.moveUsers` | mutation | `userAdmin` | Moves every user of one region to another; `NOT_FOUND` when either region does not exist |
-| `organisation.list` | query | `userAdmin` | Organisations ordered by name, each with its `userCount` |
+| `organisation.list` | query | `userManagerOrAdmin` | Organisations ordered by name, each with its `userCount`; managers read it to set the organisation of their users |
 | `organisation.create`, `organisation.update` | mutation | `userAdmin` | Name trimmed, 1 to 80 characters; `CONFLICT` when another organisation has it, whatever its case |
 | `organisation.remove` | mutation | `userAdmin` | Deletes it; its users stay, without an organisation. Returns `unassignedUsers` |
 | `authorizedDomain.list` | query | `userAdmin` | Domains allowed to sign up |

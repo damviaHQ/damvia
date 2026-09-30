@@ -17,7 +17,7 @@ import { z } from "zod"
 import { Organisation } from "../../entity/organisation"
 import { User } from "../../entity/user"
 import { dataSource } from "../../env"
-import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
+import { authMiddleware, publicProcedure, router, userAdmin, userManagerOrAdmin } from "../index"
 
 async function assertNameFree(name: string, id?: string) {
 	const [taken] = await dataSource.query(
@@ -30,8 +30,9 @@ async function assertNameFree(name: string, id?: string) {
 }
 
 export default router({
+	// Managers read it to set the organisation of the users they manage.
 	list: publicProcedure
-		.use(authMiddleware(userAdmin))
+		.use(authMiddleware(userManagerOrAdmin))
 		.query(async () => {
 			return dataSource.query(`
 				SELECT organisations.id, organisations.name, count(users.id)::int AS "userCount"

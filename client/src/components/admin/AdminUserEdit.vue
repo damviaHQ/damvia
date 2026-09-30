@@ -32,7 +32,7 @@ const isSelf = computed(() => store.user?.id === props.user.id)
 const isOwnManagerProfile = computed(() => isSelf.value && store.user?.role === 'manager')
 const { data: groups, status: groupsStatus, refetch: retryGroups } = useQuery({ queryKey: ['groups'], queryFn: () => trpc.group.list.query(), enabled: computed(() => !isOwnManagerProfile.value) })
 const { data: regions, status: regionsStatus, refetch: retryRegions } = useQuery({ queryKey: ['regions'], queryFn: () => trpc.region.list.query(), enabled: computed(() => !isOwnManagerProfile.value) })
-const { data: organisations } = useQuery({ queryKey: ['organisations'], queryFn: () => trpc.organisation.list.query(), enabled: computed(() => store.user?.role === 'admin') })
+const { data: organisations } = useQuery({ queryKey: ['organisations'], queryFn: () => trpc.organisation.list.query(), enabled: computed(() => !isOwnManagerProfile.value) })
 const draft = reactive({ name: '', email: '', company: '', regionId: '', organisationId: '', role: props.user.role, groupIds: [] as string[], maintenanceContact: false })
 const saving = ref(false)
 watch(saving, value => emit('saving', value), { flush: 'sync' })
@@ -57,7 +57,7 @@ async function save() {
   }
   saving.value = true
   try {
-    await trpc.user.update.mutate({ id: props.user.id, ...values, organisationId: store.user?.role === 'admin' ? values.organisationId || null : undefined })
+    await trpc.user.update.mutate({ id: props.user.id, ...values, organisationId: isOwnManagerProfile.value ? undefined : values.organisationId || null })
     await Promise.all([queryClient.invalidateQueries({ queryKey: ['users'] }), queryClient.invalidateQueries({ queryKey: ['dashboard'] })])
     if (isSelf.value) await store.fetchUser()
     toast.success('User updated')
@@ -78,13 +78,13 @@ async function save() {
     <div><label for="edit-user-company">Company</label><Input id="edit-user-company" v-model="draft.company" autocomplete="organization" :aria-invalid="!!errors.company" :aria-describedby="errors.company ? 'edit-company-error' : undefined" /><p v-if="errors.company" id="edit-company-error" class="admin-form-error">{{ errors.company }}</p></div>
    </div>
    <div><label for="edit-user-email">Email address</label><Input id="edit-user-email" v-model="draft.email" type="email" autocomplete="email" :aria-invalid="!!errors.email" aria-describedby="edit-email-note edit-email-error" /><p v-if="draft.email !== user.email" id="edit-email-note" class="admin-form-note">Changing this address requires the user to verify their new email before they can access the DAM again.</p><p v-if="errors.email" id="edit-email-error" class="admin-form-error">{{ errors.email }}</p></div>
-   <p v-if="isOwnManagerProfile" class="admin-form-note">An administrator manages your role, region and groups.</p>
+   <p v-if="isOwnManagerProfile" class="admin-form-note">An administrator manages your role, region, organisation and groups.</p>
    <template v-else>
     <div class="admin-form-grid">
      <div><label for="edit-user-role">Role</label><select id="edit-user-role" v-model="draft.role" :disabled="isSelf"><option value="guest">Guest</option><option value="member">Member</option><template v-if="store.user?.role === 'admin'"><option value="manager">Manager</option><option value="admin">Admin</option></template></select><p v-if="isSelf" class="admin-form-note">Ask another administrator to change your role.</p><p v-if="errors.role" class="admin-form-error">{{ errors.role }}</p></div>
      <div><label for="edit-user-region">Region</label><select id="edit-user-region" v-model="draft.regionId" :disabled="regionsStatus !== 'success'" :aria-invalid="!!errors.regionId"><option disabled value="">Choose a region</option><option v-for="region in regions" :key="region.id" :value="region.id">{{ region.name }}</option></select><p v-if="regionsStatus === 'pending'">Loading regions…</p><p v-if="regionsStatus === 'error'" class="admin-form-error">Regions could not be loaded. <button type="button" class="underline" @click="retryRegions()">Retry</button></p><p v-if="errors.regionId" class="admin-form-error">{{ errors.regionId }}</p></div>
     </div>
-    <div v-if="store.user?.role === 'admin'"><label for="edit-user-organisation">Organisation</label><select id="edit-user-organisation" v-model="draft.organisationId" :aria-invalid="!!errors.organisationId"><option value="">No organisation</option><option v-for="organisation in organisations" :key="organisation.id" :value="organisation.id">{{ organisation.name }}</option></select><p v-if="errors.organisationId" class="admin-form-error">{{ errors.organisationId }}</p></div>
+    <div><label for="edit-user-organisation">Organisation</label><select id="edit-user-organisation" v-model="draft.organisationId" :aria-invalid="!!errors.organisationId"><option value="">No organisation</option><option v-for="organisation in organisations" :key="organisation.id" :value="organisation.id">{{ organisation.name }}</option></select><p v-if="errors.organisationId" class="admin-form-error">{{ errors.organisationId }}</p></div>
     <div><span id="edit-user-groups-label">Groups</span><Input v-if="(groups?.length ?? 0) > 5" id="edit-user-group-search" aria-label="Find a group" v-model="groupSearch" type="search" placeholder="Find a group" /><p v-if="groupsStatus === 'pending'">Loading groups…</p><p v-else-if="groupsStatus === 'error'" class="admin-form-error">Groups could not be loaded. <button type="button" class="underline" @click="retryGroups()">Retry</button></p><div v-else class="admin-group-options" role="group" aria-labelledby="edit-user-groups-label"><label v-for="group in visibleGroups" :key="group.id"><input v-model="draft.groupIds" type="checkbox" :value="group.id" />{{ group.name }}</label><p v-if="!visibleGroups.length">{{ groupSearch ? 'No matching groups.' : 'No groups configured.' }}</p></div><p v-if="errors.groupIds" class="admin-form-error">{{ errors.groupIds }}</p></div>
    </template>
    <label v-if="store.user?.role === 'admin' && draft.role === 'admin'" class="maintenance-toggle"><input v-model="draft.maintenanceContact" type="checkbox" />Receives storage and maintenance emails</label>

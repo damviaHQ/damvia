@@ -62,7 +62,7 @@ test('an admin creates, renames and removes organisations from the User Manageme
   expect(api.last('organisation.remove')).toBe('o1')
 })
 
-test('an admin sets or clears the organisation of a user; a manager is never offered it', async ({ page, mockTrpc }) => {
+test('an admin or a manager sets or clears the organisation of a user; a manager never changes their own', async ({ page, mockTrpc }) => {
   const api = await mockTrpc({
     'user.list': people,
     'region.list': [{ id: '6f1c2d3e-4b5a-4c6d-8e9f-0a1b2c3d4e5f', name: 'Europe', defaultGroupId: 'g1', licenseCount: 0, userCount: 1 }],
@@ -87,19 +87,24 @@ test('an admin sets or clears the organisation of a user; a manager is never off
   await expect(details).toBeHidden()
   expect(api.last('user.update')).toMatchObject({ id: 'u1', organisationId: null })
 
-  const organisationLists = api.count('organisation.list')
   await mockTrpc({
     'user.me': { id: 'manager', name: 'Morgan', email: 'morgan@example.test', role: 'manager', regionId: '6f1c2d3e-4b5a-4c6d-8e9f-0a1b2c3d4e5f', approved: true, emailVerified: true },
-    'user.list': people,
+    'user.list': [...people, { ...people[0], id: 'manager', name: 'Morgan', email: 'morgan@example.test', role: 'manager', organisation: null, organisationId: null }],
     'region.list': [{ id: '6f1c2d3e-4b5a-4c6d-8e9f-0a1b2c3d4e5f', name: 'Europe', defaultGroupId: 'g1', licenseCount: 0, userCount: 1 }],
+    'organisation.list': organisations,
     'user.update': null,
   })
   await page.goto('/admin/users')
   await page.getByRole('button', { name: 'View Alex Morgan' }).click()
-  await expect(details.getByLabel('Region')).toBeVisible()
-  await expect(details.getByLabel('Organisation')).toHaveCount(0)
+  await details.getByLabel('Organisation').selectOption('o2')
   await details.getByRole('button', { name: 'Save changes' }).click()
   await expect(details).toBeHidden()
+  expect(api.last('user.update')).toMatchObject({ id: 'u1', organisationId: 'o2' })
+  await page.getByRole('button', { name: 'View Morgan' }).click()
+  const own = page.getByRole('dialog', { name: 'Morgan' })
+  await expect(own.getByText('An administrator manages your role, region, organisation and groups.')).toBeVisible()
+  await expect(own.getByLabel('Organisation')).toHaveCount(0)
+  await own.getByRole('button', { name: 'Save changes' }).click()
+  await expect(own).toBeHidden()
   expect(api.last('user.update')).not.toHaveProperty('organisationId')
-  expect(api.count('organisation.list')).toBe(organisationLists)
 })

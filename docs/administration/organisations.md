@@ -12,7 +12,7 @@ Organisations change no access rule on their own. They are used by features that
 
 ## Create organisations
 
-Open **Organisations** under **User Management** (`/admin/organisations`). Only admins see it.
+Open **Organisations** under **User Management** (`/admin/organisations`). Only admins see it and change the list.
 
 - **Add organisation** creates one. A name has 1 to 80 characters, and two organisations cannot share a name, whatever its case: `Brandfolio` and `BRANDFOLIO` are the same organisation.
 - **Rename** changes the name everywhere it is shown.
@@ -24,8 +24,8 @@ The list shows how many users belong to each organisation.
 
 A user belongs to one organisation, or to none. Open the user from **Users**, choose it under **Organisation** and save. **No organisation** takes the user out of it.
 
-Only admins set the organisation. Managers see it in the users list, but the field is not offered to them, and a change they send is ignored.
+Admins set the organisation of anyone. Managers set it for the members and guests of their region, as they set their groups: they choose among every organisation, and cannot create one. A manager does not change their own organisation, nor that of another manager or an admin.
 
-The organisation is not the **Company** field. **Company** is the free text people type when they sign up, and they can change it from their account. The organisation is chosen by an admin from the list, so every member of a team points to the same record. The Users screen shows the organisation under the region, and its search box also finds users by organisation.
+The organisation is not the **Company** field. **Company** is the free text people type when they sign up, and they can change it from their account. The organisation is chosen from the list by an admin or a manager, so every member of a team points to the same record. The Users screen shows the organisation under the region, and its search box also finds users by organisation.
 
 The organisation is also a column of the users CSV export and of the access review export. See [Users and approval](./users-and-approval.md).
