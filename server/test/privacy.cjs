@@ -39,8 +39,11 @@ async function personWithHistory() {
 
 test('a person downloads everything held about them, without secrets or other people\'s addresses', async () => {
     const { user, personal } = await personWithHistory()
+    const organisation = await caller(fixtures.admin).organisation.create({ name: `Exported ${randomUUID()}` })
+    await db.query('UPDATE users SET organisation_id = $1 WHERE id = $2', [organisation.id, user.id])
     const data = await caller(user).user.exportMyData()
     assert.equal(data.account.email, user.email)
+    assert.equal(data.account.organisation, organisation.name)
     assert.deepEqual(data.groups, ['Default'])
     assert.deepEqual(data.collections.map(c => c.name), [personal.name])
     assert.equal(data.activity[0].metadata.query, 'red shoes')

@@ -126,8 +126,8 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `region.list` | query | `userAdmin` | Regions |
 | `region.create`, `region.update`, `region.remove` | mutation | `userAdmin` | CRUD |
 | `region.moveUsers` | mutation | `userAdmin` | Moves every user of one region to another; `NOT_FOUND` when either region does not exist |
-| `organisation.list` | query | `userManagerOrAdmin` | Organisations ordered by name, each with its `userCount`; managers read it to set the organisation of their users |
-| `organisation.create`, `organisation.update` | mutation | `userAdmin` | Name trimmed, 1 to 80 characters; `CONFLICT` when another organisation has it, whatever its case |
+| `organisation.list` | query | `userManagerOrAdmin` | Organisations ordered by name, each with its `userCount`; managers read it to set the organisation of their users, and their `userCount` only counts their region |
+| `organisation.create`, `organisation.update` | mutation | `userAdmin` | Name trimmed, 1 to 80 characters; `CONFLICT` when another organisation has it, whatever its case, including when two requests write it at once |
 | `organisation.remove` | mutation | `userAdmin` | Deletes it; its users stay, without an organisation. Returns `unassignedUsers` |
 | `authorizedDomain.list` | query | `userAdmin` | Domains allowed to sign up |
 | `authorizedDomain.create`, `authorizedDomain.remove` | mutation | `userAdmin` | CRUD |

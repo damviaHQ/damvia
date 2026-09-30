@@ -18,7 +18,7 @@ Open **Organisations** under **User Management** (`/admin/organisations`). Only 
 - **Rename** changes the name everywhere it is shown.
 - **Remove** deletes the organisation. Its users keep their account, their region and their groups, and belong to no organisation. Data a module kept for that organisation follows the rules of that module.
 
-The list shows how many users belong to each organisation.
+The list shows how many users belong to each organisation. A manager who reads it, to choose the organisation of a user, only counts the users of their region.
 
 ## Put users in an organisation
 

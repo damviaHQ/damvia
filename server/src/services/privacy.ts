@@ -22,10 +22,10 @@ import { dataSource } from '../env'
 export async function exportUserData(userId: string) {
 	const query = (sql: string) => dataSource.query(sql, [userId])
 	const [account] = await query(`
-		SELECT u.id, u.name, u.company, u.email, u.role, r.name AS region, u.approved, u.email_verified AS "emailVerified",
+		SELECT u.id, u.name, u.company, o.name AS organisation, u.email, u.role, r.name AS region, u.approved, u.email_verified AS "emailVerified",
 			u.maintenance_contact AS "maintenanceContact", u.mfa_enabled_at AS "mfaEnabledAt", u.oidc_subject IS NOT NULL AS "singleSignOn",
 			u.suspended_at AS "suspendedAt", u.last_login_at AS "lastLoginAt", u.created_at AS "createdAt", u.updated_at AS "updatedAt"
-		FROM users u LEFT JOIN regions r ON r.id = u.region_id WHERE u.id = $1`)
+		FROM users u LEFT JOIN regions r ON r.id = u.region_id LEFT JOIN organisations o ON o.id = u.organisation_id WHERE u.id = $1`)
 	if (!account) return null
 	const [groups, fileFavorites, collectionFavorites, collections, invitationsReceived, invitationsSent, downloads, activity, recordChanges, sessions, audit, newsletters, [subscription]] = await Promise.all([
 		query(`SELECT g.name FROM user_groups ug JOIN groups g ON g.id = ug.group_id WHERE ug.user_id = $1 ORDER BY g.name`),

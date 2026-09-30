@@ -3,7 +3,7 @@ title: Privacy and personal data
 description: What personal data Damvia stores, for how long, which settings reduce it, and how to answer access, correction and deletion requests.
 sidebar:
   order: 6
-lastUpdated: 2026-09-29
+lastUpdated: 2026-09-30
 ---
 
 The organisation that runs a Damvia instance is responsible for the personal data in it. This page lists what the software stores, so you can write your record of processing and your privacy notice, and shows how to answer requests from the people concerned. It describes the software, not a legal assessment.
@@ -12,7 +12,7 @@ The organisation that runs a Damvia instance is responsible for the personal dat
 
 | Data | Where | Kept | Purpose |
 |---|---|---|---|
-| Name, email, company, region, role, groups, approval and verification status | `users`, `user_groups` | Until the account is deleted | Access to the library |
+| Name, email, company, organisation, region, role, groups, approval and verification status | `users`, `organisations`, `user_groups` | Until the account is deleted | Access to the library |
 | Password (salted scrypt hash), two-step verification key (encrypted with `APP_SECRET`) and hashed recovery codes | `users` | Until changed or the account is deleted | Sign-in |
 | Sessions: sign-in time, last use, method, browser (user agent) | `user_sessions` | Until sign-out, `SESSION_IDLE_HOURS` without use, or `SESSION_MAX_HOURS`; pruned nightly | Keeping people signed in; letting them sign out elsewhere |
 | Failed sign-in count and lockout | `users` | Cleared at the next successful sign-in | Protection against password guessing |

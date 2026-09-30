@@ -66,6 +66,9 @@ test('a module router is served at modules.<name> behind the core role checks', 
     assert((await caller(fixtures.admin).modules.hello.list()).some(note => note.id === added.id))
     const response = await harness.server.inject({ method: 'GET', url: '/trpc/modules.hello.list' })
     assert.equal(response.statusCode, 401)
+    const forged = await harness.server.inject({ method: 'POST', url: '/trpc/modules.hello.add', headers: { origin: 'https://evil.example', 'content-type': 'application/json' }, payload: { text: 'forged' } })
+    assert.equal(forged.statusCode, 403)
+    assert.equal(response.headers['cache-control'], 'no-store')
 })
 
 test('module queues are named after the module and run like core queues', async () => {

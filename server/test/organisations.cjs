@@ -112,3 +112,41 @@ test('removing an organisation keeps its members, without an organisation', asyn
     assert.equal((await userRow(person.id)).organisationId, null)
     await assert.rejects(admin.organisation.remove(organisation.id), error => error.code === 'NOT_FOUND')
 })
+
+test('two organisations created or renamed at once to the same name end in one conflict, never a server error', async () => {
+    const admin = caller(fixtures.admin)
+    const name = `Race ${randomUUID()}`
+    const created = await Promise.allSettled([admin.organisation.create({ name }), admin.organisation.create({ name: name.toUpperCase() })])
+    assert.deepEqual(created.map(result => result.status).sort(), ['fulfilled', 'rejected'])
+    assert.equal(created.find(result => result.status === 'rejected').reason.code, 'CONFLICT')
+    const [first, second] = [await admin.organisation.create({ name: `A ${randomUUID()}` }), await admin.organisation.create({ name: `B ${randomUUID()}` })]
+    const target = `Renamed ${randomUUID()}`
+    const renamed = await Promise.allSettled([admin.organisation.update({ id: first.id, name: target }), admin.organisation.update({ id: second.id, name: target })])
+    assert.deepEqual(renamed.map(result => result.status).sort(), ['fulfilled', 'rejected'])
+    assert.equal(renamed.find(result => result.status === 'rejected').reason.code, 'CONFLICT')
+})
+
+test('a manager counts only the users of their region in each organisation', async () => {
+    const admin = caller(fixtures.admin)
+    const organisation = await admin.organisation.create({ name: `Counted ${randomUUID()}` })
+    const region = await harness.save(harness.entities.Region, { name: `Far ${randomUUID()}`, defaultGroupId: fixtures.group.id })
+    for (const person of [await makeUser('member'), await makeUser('member', { regionId: region.id }), await makeUser('guest', { regionId: region.id })]) {
+        await admin.user.update(edit(person, { organisationId: organisation.id }))
+    }
+    assert.equal((await admin.organisation.list()).find(row => row.id === organisation.id).userCount, 3)
+    assert.equal((await caller(fixtures.manager).organisation.list()).find(row => row.id === organisation.id).userCount, 1)
+})
+
+test('nobody joins an organisation by signing up or editing their own profile, and a name cannot run as a formula', async () => {
+    const organisation = await caller(fixtures.admin).organisation.create({ name: `=HYPERLINK("http://evil") ${randomUUID()}` })
+    const email = `${randomUUID()}@example.test`
+    await caller(null, { res: harness.fakeReply() }).user.create({ name: 'N', company: 'C', regionId: fixtures.region.id, email, password: 'a long enough passphrase', organisationId: organisation.id })
+    const signedUp = await db.getRepository(User).findOneByOrFail({ email })
+    assert.equal(signedUp.organisationId, null)
+    const member = await makeUser('member')
+    await caller(member).user.updateProfile({ name: 'Me', company: 'Mine', email: member.email, organisationId: organisation.id })
+    assert.equal((await userRow(member.id)).organisationId, null)
+    await caller(fixtures.admin).user.update(edit(member, { organisationId: organisation.id }))
+    const csv = await caller(fixtures.admin).user.accessReview()
+    assert(csv.split('\r\n').find(line => line.startsWith(member.email)).includes(`"'=HYPERLINK(""http://evil"")`))
+})
