@@ -354,9 +354,35 @@ async function setFieldOnSelection(field: GridField, value: string) {
   toast.success(`${fieldLabel(field)} set on ${updated} ${updated === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value}`)
 }
 
+// A write takes at most 50 fields per record, and patchMany at most 500
+// records and 5000 cells, so suggestions go in as many calls as they need.
+function fillBatches(changes: { id: string, values: Record<string, string> }[]) {
+  const batches: { id: string, values: Record<string, string> }[][] = [[]]
+  let cells = 0
+  for (const change of changes) {
+    const entries = Object.entries(change.values)
+    for (let start = 0; start < entries.length; start += 50) {
+      const values = Object.fromEntries(entries.slice(start, start + 50))
+      const size = Object.keys(values).length
+      if (batches.at(-1)!.length === 500 || cells + size > 5000) {
+        batches.push([])
+        cells = 0
+      }
+      batches.at(-1)!.push({ id: change.id, values })
+      cells += size
+    }
+  }
+  return batches
+}
+
 async function fillPanelFields(recordId: string, values: Record<string, string>) {
-  await trpc.record.patch.mutate({ id: recordId, values, source: "panel" })
-  refreshRecord(recordId)
+  try {
+    for (const change of fillBatches([{ id: recordId, values }]).flat()) {
+      await trpc.record.patch.mutate({ id: recordId, values: change.values, source: "panel" })
+    }
+  } finally {
+    refreshRecord(recordId)
+  }
 }
 
 // Empty fields of the selection take the value records with a look-alike key
@@ -371,9 +397,10 @@ async function fillSelectionFromSimilar() {
       return
     }
     for (const item of suggestions) byRecord.set(item.recordId, { ...byRecord.get(item.recordId), [item.field]: item.value })
-    await trpc.record.patchMany.mutate({ changes: [...byRecord].map(([id, values]) => ({ id, values })) })
+    for (const batch of fillBatches([...byRecord].map(([id, values]) => ({ id, values })))) await trpc.record.patchMany.mutate({ changes: batch })
   } catch (failure) {
     toast.error((failure as Error).message)
+    await refreshAll()
     return
   }
   const changes = [...byRecord].map(([id, values]) => ({ id, values }))
@@ -381,9 +408,15 @@ async function fillSelectionFromSimilar() {
   sonner(`${suggestions.length} ${suggestions.length === 1 ? "field" : "fields"} filled on ${changes.length} ${changes.length === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value}.`, {
     action: {
       label: "Undo",
-      onClick: () => trpc.record.patchMany.mutate({ changes: changes.map((change) => ({ id: change.id, values: Object.fromEntries(Object.keys(change.values).map((name) => [name, ""])) })) })
-        .then(() => refreshAll())
-        .catch((failure: Error) => toast.error(failure.message)),
+      onClick: async () => {
+        try {
+          const cleared = changes.map((change) => ({ id: change.id, values: Object.fromEntries(Object.keys(change.values).map((name) => [name, ""])) }))
+          for (const batch of fillBatches(cleared)) await trpc.record.patchMany.mutate({ changes: batch })
+        } catch (failure) {
+          toast.error((failure as Error).message)
+        }
+        await refreshAll()
+      },
     },
   })
 }

@@ -148,6 +148,34 @@ test('the card offers the values similar products agree on', async ({ page, mock
   await expect.poll(() => api.inputs('record.patch')[1]).toEqual({ id: records[0].id, values: { price: '49', story: 'Made in Porto.' }, source: 'panel' })
 })
 
+test('filling a card with more than 50 fields saves them all', async ({ page, mockTrpc }) => {
+  const many = Array.from({ length: 60 }, (_, index) => ({ id: `f-extra${index}`, name: `extra${index}`, displayName: `Extra ${index}`, valueType: 'text', options: [], position: index, facetable: false, viewable: true, searchable: false }))
+  const api = await mockTrpc({
+    ...recordsApi,
+    'recordAttribute.list': many,
+    'recordTable.list': [{ ...tables[0], fieldIds: many.map(field => field.id) }],
+    'record.get': { ...recordsApi['record.get'], metaData: { SKU: 'WX5678-100' } },
+    'record.suggestions': many.map(field => ({ recordId: records[0].id, field: field.name, value: 'x', support: 1, example: 'WX5678-200' })),
+  }, { role: 'admin' })
+  await page.goto(`/admin/data-enrichment/records?record=${records[0].id}`)
+  await page.getByRole('dialog').getByRole('button', { name: 'Fill 60 fields' }).click()
+  await expect.poll(() => api.inputs('record.patch').map(input => Object.keys(input.values).length)).toEqual([50, 10])
+})
+
+test('filling a selection sends batches the server accepts', async ({ page, mockTrpc }) => {
+  const suggestions = records.flatMap(record => Array.from({ length: 1800 }, (_, index) => ({ recordId: record.id, field: `extra${index}`, value: 'x', support: 1, example: 'WX5678-100' })))
+  const api = await mockTrpc({ ...recordsApi, 'record.suggestions': suggestions }, { role: 'admin' })
+  await page.goto('/admin/data-enrichment/records')
+  for (const record of records) await page.getByRole('checkbox', { name: `Select ${record.recordKey}` }).click()
+  await page.getByRole('button', { name: 'Fill from similar' }).click()
+  await expect(page.getByText('5400 fields filled on 3 products.')).toBeVisible()
+  const calls: { changes: { id: string, values: Record<string, string> }[] }[] = api.inputs('record.patchMany')
+  const cells = calls.map(call => call.changes.reduce((total, change) => total + Object.keys(change.values).length, 0))
+  expect(cells.reduce((total, count) => total + count, 0)).toBe(5400)
+  expect(Math.max(...cells)).toBeLessThanOrEqual(5000)
+  expect(calls.every(call => call.changes.every(change => Object.keys(change.values).length <= 50))).toBe(true)
+})
+
 test('a filter value offers the values the field already holds', async ({ page, mockTrpc }) => {
   await mockTrpc(recordsApi, { role: 'admin' })
   await page.goto('/admin/data-enrichment/records')
