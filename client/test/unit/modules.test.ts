@@ -16,25 +16,23 @@ import { describe, expect, test, vi } from 'vitest'
 import { defineComponent } from 'vue'
 
 const Note = defineComponent({ name: 'Note', render: () => null })
-const Other = defineComponent({ name: 'Other', render: () => null })
 vi.mock('virtual:damvia-modules', () => ({
   default: [
-    { name: 'hello', routes: [{ path: '/notes', component: Note }], nav: [{ label: 'Notes', to: '/notes' }], adminNav: [{ section: 'users', label: 'All notes', to: '/admin/notes' }], slots: { 'product.details': Note } },
-    { name: 'other', adminNav: [{ section: 'content', label: 'Other', to: '/admin/other' }], slots: { 'product.details': Other } },
+    { name: 'hello', routes: [{ path: '/notes', component: Note }], nav: [{ label: 'Notes', to: '/notes' }], adminNav: [{ section: 'users', label: 'All notes', to: '/admin/notes' }] },
+    { name: 'other', adminNav: [{ section: 'content', label: 'Other', to: '/admin/other' }] },
     { name: 'empty' },
   ],
 }))
 
 describe('client modules', () => {
-  test('routes, menu entries and slot components are gathered from every module, in the order they are listed', async () => {
-    const { clientModules, moduleAdminNav, moduleNav, moduleRoutes, moduleSlot } = await import('@/modules')
+  test('routes and menu entries are gathered from every module, in the order they are listed', async () => {
+    const { clientModules, moduleAdminNav, moduleNav, moduleRoutes } = await import('@/modules')
     expect(clientModules.map(module => module.name)).toEqual(['hello', 'other', 'empty'])
     expect(moduleRoutes.map(route => route.path)).toEqual(['/notes'])
     expect(moduleNav.map(item => item.label)).toEqual(['Notes'])
     expect(moduleAdminNav('users').map(item => item.label)).toEqual(['All notes'])
     expect(moduleAdminNav('content').map(item => item.label)).toEqual(['Other'])
     expect(moduleAdminNav('settings')).toEqual([])
-    expect(moduleSlot('product.details')).toEqual([Note, Other])
   })
 
   test('a module client prefixes its procedures with modules.<name>', async () => {

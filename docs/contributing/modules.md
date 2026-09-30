@@ -1,6 +1,6 @@
 ---
 title: Modules
-description: Add screens, tables, procedures, jobs and event hooks to Damvia from a separate package, without changing the core, and build it into an instance.
+description: Add screens, tables, procedures and jobs to Damvia from a separate package, without changing the core, and build it into an instance.
 sidebar:
   order: 8
 lastUpdated: 2026-09-30
@@ -17,10 +17,8 @@ This page is the contract between the two. It is written for developers of a mod
 | Server | `entities`, `migrations` | Its own tables, created and upgraded with the core's |
 | Server | `router` | Its procedures, served at `modules.<name>.*` behind the core's roles and sessions |
 | Server | `createQueue` | Background jobs and crons, run by the core's worker |
-| Server | `hooks` | Code run after an event of the core, such as a record change |
 | Client | `routes` | Screens in the main layout, the administration or any other layout |
 | Client | `nav`, `adminNav` | Entries in the main menu and in a section of the administration menu |
-| Client | `slots` | A component shown inside a core screen, such as a product page |
 
 A need that none of these covers is a change to the core: see [Adding an extension point](#adding-an-extension-point).
 
@@ -63,9 +61,6 @@ const forecast: DamviaModule = {
 					.use(damvia.authMiddleware(damvia.userApproved))
 					.query(({ ctx }) => damvia.dataSource.getRepository(Forecast).findBy({ organisationId: ctx.user.organisationId })),
 			}),
-			hooks: {
-				'records.changed': ({ changes }) => linkNewColourways(changes),
-			},
 		}
 	},
 }
@@ -96,17 +91,6 @@ Entities and migrations are written as in the core: see [Data model](./data-mode
 
 Migrations of every module run with the core's at startup, in timestamp order, and are recorded in the same `migrations` table. Removing a module from `DAMVIA_MODULES` leaves its tables in place.
 
-### Events
-
-A hook runs after an event of the core:
-
-| Event | When | Payload |
-|---|---|---|
-| `assets.synced` | A sync pass over every source has finished, about every 5 minutes | `{}` |
-| `records.changed` | Records were created, edited, moved or deleted: in the grid, the card, an import, a bulk action or a link review | `{ changes: [{ recordId, recordKey, action }], changedById }`. `action` is `create`, `update`, `delete` or `move`; `recordId` is null for a deleted record |
-
-Hooks do not run in the request. Each event gives each module that has a hook for it one `modules/event` job, run by the worker. A hook that throws is retried by pg-boss, alone: the change that caused the event is already saved, and the other modules have their own jobs. An event raised inside a transaction is only delivered once the transaction commits. A hook must therefore accept being run more than once for the same event.
-
 ### Loading and errors
 
 The server reads `DAMVIA_MODULES` when it starts: package names, or paths starting with `.` or `/` read from the server folder, separated by commas. It refuses to start when a module cannot be loaded, has no camelCase name or no `setup` function, or when two modules share a name. The log shows `module loaded` for each module.
@@ -118,7 +102,6 @@ The client entry exports a `ClientModule` by default:
 ```ts
 import type { ClientModule } from "@/modules"
 import { ChartColumn } from "@lucide/vue"
-import ProductForecast from "./ProductForecast.vue"
 
 export default {
 	name: 'forecast',
@@ -128,7 +111,6 @@ export default {
 	],
 	nav: [{ label: 'Forecast', to: { name: 'forecast' }, icon: ChartColumn }],
 	adminNav: [{ section: 'database', label: 'Forecast', to: { name: 'admin-forecast' }, icon: ChartColumn }],
-	slots: { 'product.details': ProductForecast },
 } satisfies ClientModule
 ```
 
@@ -141,16 +123,6 @@ The files of the client part import the core with `@/`, like the core's own file
 - `adminNav` entries show at the end of a section of the administration menu: `overview` (Dashboard, Insights), `content`, `users`, `assets`, `database`, `enrichment` or `settings` (Emails, Newsletters, Settings).
 
 A menu entry shows only to the roles its route allows. The server checks the role again on every procedure.
-
-### Slots
-
-A slot is a place in a core screen where a module's component is shown, with props given by the core:
-
-| Slot | Where | Props |
-|---|---|---|
-| `product.details` | Under the fields of a product, on its page, on a computer and on a phone | `product`: the product as `catalogue.get` returns it |
-
-Components of several modules in the same slot show one under the other, in the order of `DAMVIA_MODULES`.
 
 ### Calling the module's procedures
 
@@ -188,14 +160,21 @@ Upgrading Damvia is then a change of version in the image and the client checkou
 
 ## The contract changes like a public API
 
-What this page lists is the contract: `ModuleApi`, the events and their payloads, `ClientModule`, the admin menu sections, the slots and their props, and `moduleClient`. Adding one of them, or a field to a payload, is a minor change. Renaming or removing one, or changing what it receives, is a breaking change: it is announced in the release notes, with the version from which it applies.
+What this page lists is the contract: `ModuleApi`, `ClientModule`, the admin menu sections and `moduleClient`. Adding one of them, or a field to one, is a minor change. Renaming or removing one, or changing what it receives, is a breaking change: it is announced in the release notes, with the version from which it applies.
 
 ## Adding an extension point
 
-A module needs a place the contract does not offer: another slot, event or admin section. The place is added to the core, in the open, for every module:
+The contract has no event and no slot yet. They are added when a module needs them, not before: a point nobody uses is a promise the core keeps for nothing.
 
-- Name it after where it is or what happened (`collection.header`, `downloads.created`), never after the module that needs it.
+A module that needs a place the contract does not offer gets it in the core, in the open, for every module:
+
+- Name it after where it is or what happened (`product.details`, `records.changed`), never after the module that needs it.
 - Give it the smallest props or payload that make sense without that module.
-- Add it to the tables of this page, and cover it with a test in `server/test/modules.cjs` or `client/test/ui/modules.spec.ts`.
+- Add it to this page, and cover it with a test in `server/test/modules.cjs` or `client/test/ui/modules.spec.ts`.
+
+Two kinds of points are expected:
+
+- **An event**, when a module must react to something the core did, with nobody opening the module: a record changed, a sync finished. Deliver each event to each module as its own job on a queue, not in the request: a failing module is then retried alone and never slows down or breaks the core. Insert the job in the transaction of the change, through pg-boss's `db` option on `send`, so a change that rolls back sends nothing.
+- **A slot**, when a module must show something inside a core screen rather than on its own page: a block on the product page, a column in a list. The core places one component at that spot, which renders the components modules registered for it with the props the core gives.
 
 A behaviour of one customer never goes into the core. The core gets the point where that behaviour can plug in, and the behaviour stays in the module.

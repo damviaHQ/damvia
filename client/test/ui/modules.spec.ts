@@ -17,12 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 // client, in its menus, its routes and its screens.
 import { expect, test } from './lib/trpc'
 
-const product = {
-  id: 'bot-1', recordKey: 'BOT-1', metaData: { name: 'Citron' }, fields: [], cardTitleField: null,
-  readinessLabels: { ready: 'Ready', incomplete: 'To complete', defined: false },
-  thumbnailURL: null, visuals: [], siblings: [], relatedTotal: 0, collectionFiles: [], files: [],
-}
-
 test('a module page opens from the main menu and calls its own procedures', async ({ page, mockTrpc }) => {
   const notes = [{ id: 'n1', text: 'First note' }]
   const api = await mockTrpc({
@@ -53,14 +47,4 @@ test('a module admin entry sits in its menu section and shows only to the roles 
   await page.goto('/admin/users')
   await expect(menu.getByRole('link', { name: 'Users' })).toBeVisible()
   await expect(menu.getByRole('link', { name: 'All notes' })).toHaveCount(0)
-})
-
-test('a module component shows under the fields of a product, on a computer and on a phone', async ({ page, mockTrpc }) => {
-  await mockTrpc({ 'catalogue.get': product })
-  await page.goto('/products/bot-1')
-  await expect(page.getByRole('heading', { name: 'BOT-1', exact: true })).toBeVisible()
-  await expect(page.getByText('Hello from a module about BOT-1.')).toBeVisible()
-  await page.setViewportSize({ width: 390, height: 844 })
-  await page.reload()
-  await expect(page.getByText('Hello from a module about BOT-1.')).toBeVisible()
 })

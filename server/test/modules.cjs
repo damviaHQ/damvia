@@ -12,10 +12,10 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-// Modules: private packages listed in DAMVIA_MODULES that add tables, a
-// router, queues and event hooks to the core. See docs/contributing/modules.md.
+// Modules: packages listed in DAMVIA_MODULES that add tables, a router and
+// queues to the core. See docs/contributing/modules.md.
 // The suite runs against the fixtures in test/fixtures, loaded like packages.
-process.env.DAMVIA_MODULES = ' ./test/fixtures/module-hello.cjs, ,./test/fixtures/module-broken.cjs '
+process.env.DAMVIA_MODULES = ' ./test/fixtures/module-hello.cjs, , '
 const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { execFileSync } = require('node:child_process')
@@ -23,7 +23,6 @@ const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
 const { db, save, caller, makeUser, forbidden, state, worker, fixtures } = harness
 const { Group, Region } = harness.entities
-const { emitModuleEvent } = require('../dist/modules/events')
 const { moduleEntries, modules } = require('../dist/modules')
 const hello = require('./fixtures/module-hello.cjs')
 
@@ -44,13 +43,10 @@ after(async () => {
     await harness.teardown()
 })
 
-const deliver = job => state.processors.get('modules/event')([{ id: randomUUID(), name: 'modules/event', data: job }])
-const moduleJobs = () => state.queued.filter(job => job.name === 'moduleEventQueue')
-
 test('DAMVIA_MODULES lists packages or paths separated by commas, blanks ignored', () => {
     assert.deepEqual(moduleEntries(' a, ,./b ,@scope/c'), ['a', './b', '@scope/c'])
     assert.deepEqual(moduleEntries(undefined), [])
-    assert.deepEqual(modules.map(module => module.name), ['hello', 'broken'])
+    assert.deepEqual(modules.map(module => module.name), ['hello'])
 })
 
 test('a module migration creates its table after the core ones, and its entity is usable', async () => {
@@ -78,31 +74,6 @@ test('module queues are named after the module and run like core queues', async 
     assert.deepEqual(hello.received.at(-1), { digest: { reason: 'test' } })
 })
 
-test('a record change queues one job per subscribed module, and a failing hook fails only its own job', async () => {
-    state.queued.length = 0
-    const key = `HELLO-${randomUUID()}`
-    const record = await caller(fixtures.admin).record.create({ recordKey: key })
-    const jobs = moduleJobs()
-    assert.deepEqual(jobs.map(job => [job.module, job.event]), [['hello', 'records.changed'], ['broken', 'records.changed']])
-    assert.deepEqual(jobs[0].payload, { changes: [{ recordId: record.id, recordKey: key, action: 'create' }], changedById: fixtures.admin.id })
-    await assert.rejects(deliver(jobs[1]), /broken hook/)
-    await deliver(jobs[0])
-    assert.deepEqual(hello.received.at(-1), { records: jobs[0].payload })
-})
-
-test('an event only goes to the modules with a hook for it, and a job for a module no longer loaded is dropped', async () => {
-    state.queued.length = 0
-    await emitModuleEvent('assets.synced', {})
-    assert.deepEqual(moduleJobs().map(job => job.module), ['hello'])
-    const send = worker.boss.send
-    worker.boss.send = async (name, data) => { state.queued.push({ name, ...data }) }
-    try {
-        await deliver(moduleJobs()[0])
-    } finally { worker.boss.send = send }
-    assert.deepEqual(state.queued.at(-1), { name: 'hello/digest', reason: 'sync' })
-    await deliver({ module: 'removed', event: 'assets.synced', payload: {} })
-})
-
 test('the server refuses to start with an invalid or a duplicated module', () => {
     const start = modules => {
         try {
@@ -111,7 +82,7 @@ test('the server refuses to start with an invalid or a duplicated module', () =>
         } catch (error) { return error.stderr.toString() }
     }
     assert.match(start('./test/fixtures/module-invalid.cjs'), /Module \.\/test\/fixtures\/module-invalid\.cjs must export a name in camelCase/)
-    assert.match(start('./test/fixtures/module-broken.cjs,./test/fixtures/module-broken.cjs'), /Two modules are named broken/)
+    assert.match(start('./test/fixtures/module-hello.cjs,./test/fixtures/module-hello.cjs'), /Two modules are named hello/)
     assert.match(start('./test/fixtures/missing.cjs'), /Cannot find module/)
     assert.equal(start(''), 'started')
 })

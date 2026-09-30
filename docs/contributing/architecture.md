@@ -52,7 +52,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `load-env.ts` | Loads `.env` with dotenv, then `loadFileVariables()` fills each `NAME` from the file named by `NAME_FILE` |
 | `env.ts` | `logger` (winston, console transport, `timestamp` + `splat` + `simple` format), `dataSource`, S3 clients, mail transporter, `assetUpdater()` selection, session, cookie, proxy and MFA settings |
 | `worker.ts` | pg-boss instance, `createQueue` helper, every queue definition |
-| `modules/` | `index.ts` loads the [modules](./modules.md) listed in `DAMVIA_MODULES` when the tRPC router is built, before the data source starts: their entities and migrations, their routers under `modules`, their queues, and the `ModuleApi` they receive. `events.ts` holds their hooks and `emitModuleEvent()` |
+| `modules/` | `index.ts` loads the [modules](./modules.md) listed in `DAMVIA_MODULES` when the tRPC router is built, before the data source starts: their entities and migrations, their routers under `modules`, their queues, and the `ModuleApi` they receive |
 | `cli.ts` | `commander` program: `check-integrity`, the source commands and `metadata:backfill` |
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
 | `entity/` | 47 TypeORM entities and their enums |
@@ -76,7 +76,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `components/ui/` | shadcn-vue primitives (button, dialog, form, table, tabs...) generated from `components.json`; `lib/utils.ts` holds the `cn()` helper they use |
 | `stores/` | Pinia stores: `globalStore.ts` (current user from `user.me`, `authChecked` and `whenReady()` that the router guard awaits, `signedIn()` after a sign-in procedure, the one-time exchange of a legacy `dam_token`, `env`, selection, display preferences) and `downloadStore.ts` (polls `download.list` with Vue Query) |
 | `services/server.ts` | The tRPC client (`credentials: 'include'`), `upgradeLegacyToken()`, `RouterInput` / `RouterOutput` types, `extractErrors()` |
-| `modules.ts` | The client parts of the [modules](./modules.md), compiled in by the `damviaModules()` plugin of `vite.config.ts` from `DAMVIA_MODULES`: their routes (added by `router/index.ts`), menu entries (`MainNavigation.vue`, `LayoutAdmin.vue`), slot components (`components/ModuleSlot.vue`), and `moduleClient()` |
+| `modules.ts` | The client parts of the [modules](./modules.md), compiled in by the `damviaModules()` plugin of `vite.config.ts` from `DAMVIA_MODULES`: their routes (added by `router/index.ts`), menu entries (`MainNavigation.vue`, `LayoutAdmin.vue`) and `moduleClient()` |
 | `composables/` | `useGlobalToast`, `useIsTruncated` |
 | `utils/` | `fileExtention.ts`, `fileSize.ts` |
 | `assets/` | SVG logo and placeholders |

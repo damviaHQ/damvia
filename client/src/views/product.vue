@@ -22,7 +22,6 @@ import PageFilterBar from "@/components/PageFilterBar.vue"
 import PathBreadcrumb from "@/components/navigation/PathBreadcrumb.vue"
 import { providePageFilter } from "@/composables/usePageFilter"
 import Loader from "@/components/Loader.vue"
-import ModuleSlot from "@/components/ModuleSlot.vue"
 import { Button } from "@/components/ui/button"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { trpc } from "@/services/server.ts"
@@ -130,7 +129,6 @@ function addToCollection() {
             <dd class="m-0 break-words whitespace-pre-wrap text-body text-neutral-900">{{ entry.value }}</dd>
           </div>
         </dl>
-        <ModuleSlot name="product.details" :props="{ product }" class="mt-6" />
       </section>
     </div>
 

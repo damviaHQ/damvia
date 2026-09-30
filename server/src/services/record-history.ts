@@ -14,7 +14,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { EntityManager } from "typeorm"
 import { RecordChangeAction, RecordChanges, RecordChangeSource } from "../entity/record-change"
-import { emitModuleEvent } from "../modules/events"
 
 export type RecordChangeRow = {
 	recordId: string | null
@@ -53,11 +52,5 @@ export async function writeRecordChanges(em: EntityManager, rows: RecordChangeRo
 			batch.map((row) => row.changedById),
 			batch.map((row) => row.importBatchId ?? null),
 		])
-	}
-	if (rows.length) {
-		await emitModuleEvent('records.changed', {
-			changes: rows.map((row) => ({ recordId: row.recordId, recordKey: row.recordKey, action: row.action })),
-			changedById: rows[0].changedById,
-		}, em)
 	}
 }

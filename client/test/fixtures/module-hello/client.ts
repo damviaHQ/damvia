@@ -13,11 +13,9 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 // A module as a private package would ship its client part, built into the
-// client for test/ui/modules.spec.ts: a page with a menu entry, an admin page
-// and a component under the fields of a product.
+// client for test/ui/modules.spec.ts: a page with a menu entry and an admin page.
 import type { ClientModule } from "@/modules"
 import { NotebookPen } from "@lucide/vue"
-import ProductNote from "./ProductNote.vue"
 
 export default {
 	name: 'hello',
@@ -27,5 +25,4 @@ export default {
 	],
 	nav: [{ label: 'Notes', to: { name: 'hello-notes' }, icon: NotebookPen }],
 	adminNav: [{ section: 'users', label: 'All notes', to: { name: 'admin-hello' }, icon: NotebookPen }],
-	slots: { 'product.details': ProductNote },
 } satisfies ClientModule

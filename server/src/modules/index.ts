@@ -19,9 +19,6 @@ import { dataSource, logger } from "../env"
 import { recordAudit } from "../services/audit"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved, userManagerOrAdmin, userMember } from "../trpc"
 import { createQueue } from "../worker"
-import { ModuleHooks, subscribeModule } from "./events"
-
-export type { ModuleEvents, ModuleHooks } from "./events"
 
 // Everything a module may use from the core. A module gets nothing else, so
 // the core can change freely behind this object.
@@ -33,7 +30,6 @@ export type ModuleSetup = {
 	migrations?: MixedList<Function | string>
 	// Served at modules.<name>.
 	router?: AnyRouter
-	hooks?: ModuleHooks
 }
 
 export type DamviaModule = {
@@ -78,7 +74,6 @@ function loadModules() {
 		if (modules.findIndex((other) => other.name === module.name) !== index) {
 			throw new Error(`Two modules are named ${module.name}.`)
 		}
-		subscribeModule(module.name, module.hooks ?? {})
 		logger.info('module loaded', { module: module.name })
 	}
 	// Before the data source initializes, so their tables and migrations join the core's.

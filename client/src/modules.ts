@@ -17,15 +17,7 @@ import type { AnyRouter } from "@trpc/server"
 import type { Component } from "vue"
 import type { RouteLocationRaw, RouteRecordRaw } from "vue-router"
 import loaded from "virtual:damvia-modules"
-import { endpoint, type RouterOutput } from "@/services/server"
-
-// Places in the core screens where a module can show its own component, with
-// the props each one receives. Adding one is a minor change of the module
-// contract; renaming or removing one is a breaking change.
-export type ModuleSlots = {
-	// Under the fields of a product, on its page.
-	'product.details': { product: RouterOutput['catalogue']['get'] }
-}
+import { endpoint } from "@/services/server"
 
 // Admin menu sections, top to bottom.
 export type AdminSection = 'overview' | 'content' | 'users' | 'assets' | 'database' | 'enrichment' | 'settings'
@@ -39,7 +31,6 @@ export type ClientModule = {
 	// In the main menu, under Favorites.
 	nav?: ModuleNavItem[]
 	adminNav?: (ModuleNavItem & { section: AdminSection })[]
-	slots?: { [S in keyof ModuleSlots]?: Component }
 }
 
 // Filled at build time from DAMVIA_MODULES, see vite.config.ts.
@@ -48,7 +39,6 @@ export const clientModules: ClientModule[] = loaded
 export const moduleRoutes = clientModules.flatMap((module) => module.routes ?? [])
 export const moduleNav = clientModules.flatMap((module) => module.nav ?? [])
 export const moduleAdminNav = (section: AdminSection) => clientModules.flatMap((module) => module.adminNav ?? []).filter((item) => item.section === section)
-export const moduleSlot = (name: keyof ModuleSlots) => clientModules.flatMap((module) => module.slots?.[name] ?? [])
 
 // The module's own procedures, typed by its router: moduleClient<HelloRouter>('hello').add.mutate(...)
 export function moduleClient<TRouter extends AnyRouter>(name: string) {

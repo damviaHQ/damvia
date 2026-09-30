@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 // A module as a private package would ship it, compiled to CommonJS, for
-// test/modules.cjs: a table, a migration, a router, a queue and two hooks.
+// test/modules.cjs: a table, a migration, a router and a queue.
 const { EntitySchema } = require('typeorm')
 const { z } = require('zod')
 
@@ -43,7 +43,7 @@ module.exports = {
     received,
     setup(damvia) {
         const notes = () => damvia.dataSource.getRepository(HelloNote)
-        const digestQueue = damvia.createQueue({ name: 'digest', processor: async (data) => { received.push({ digest: data }) } })
+        damvia.createQueue({ name: 'digest', processor: async (data) => { received.push({ digest: data }) } })
         return {
             entities: [HelloNote],
             migrations: [HelloNotes1893456000000],
@@ -56,10 +56,6 @@ module.exports = {
                     .use(damvia.authMiddleware(damvia.userAdmin))
                     .query(() => notes().find()),
             }),
-            hooks: {
-                'records.changed': (payload) => { received.push({ records: payload }) },
-                'assets.synced': () => digestQueue.push({ reason: 'sync' }),
-            },
         }
     },
 }
