@@ -294,8 +294,10 @@ const FILE_COUNT = `(SELECT count(*) FROM (
 ) linked)::int`
 
 // The record's picture: a file at the thumbnail view first, else any linked
-// file with a thumbnail.
-const THUMBNAIL = `(SELECT a.id FROM asset_files a WHERE a.record_id = r.id AND a.has_thumbnail
+// picture with a thumbnail. Only a type holding the records' pictures counts.
+const THUMBNAIL = `(SELECT a.id FROM asset_files a
+	INNER JOIN asset_types t ON t.id = a.asset_type_id AND t.is_related_to_records
+	WHERE a.record_id = r.id AND a.has_thumbnail
 	ORDER BY (a.record_view IS NOT DISTINCT FROM $1) DESC, a.record_view NULLS LAST, a.name LIMIT 1)`
 
 export async function listRecords(em: EntityManager, query: RecordQuery, page: { offset: number, limit: number }, thumbnailView: string | null): Promise<{ rows: RecordRow[], total: number, fields: RecordAttribute[], keyColumnName: string | null }> {

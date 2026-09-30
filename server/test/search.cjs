@@ -18,6 +18,7 @@ const harness = require('./lib/helpers.cjs')
 const { db, save, makeUser, makeCollection, makeFolder, makeFile } = harness
 const { CollectionFile, AssetType, DataRecord, RecordAttribute, Group, UserGroup } = harness.entities
 const { caller } = harness
+const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
 let fixtures, root, child, color, related, unrelated, colorAttr, sizeAttr
 const names = result => result.results.map(file => file.name).sort()
 const searchAs = input => caller(fixtures.member).collection.search(input)
@@ -231,6 +232,8 @@ async function linkedRecord(admin, key, values, collectionExtra = {}) {
     const folder = await makeFolder()
     const collection = await makeCollection({ assetFolderId: folder.id, ...collectionExtra })
     const file = await makeFile(folder, { recordId: id })
+    // A file's record comes from its links; matching clears a bare record_id.
+    await save(AssetEntityLink, { assetFileId: file.id, targetKind: 'record', recordId: id, recordKey: key, strategy: 'manual_file', isPrimary: true })
     await save(CollectionFile, { collectionId: collection.id, assetFileId: file.id })
 }
 

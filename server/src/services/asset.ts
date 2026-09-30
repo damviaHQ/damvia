@@ -25,7 +25,6 @@ import {AssetFile, AssetFileStatus} from "../entity/asset-file"
 import {AssetFolder, AssetFolderStatus} from "../entity/asset-folder"
 import {AssetSource} from "../entity/asset-source"
 import {CollectionFile} from "../entity/collection-file"
-import {DataRecord} from "../entity/data-record"
 import {assetsS3, assetsS3Bucket, assetUpdaterFor, dataSource, logger} from "../env"
 import {assetUpdateContentQueue, collectionSynchronizationQueue} from "../worker"
 import {destroySynchronizedCollections, moveSynchronizedCollections, reparentSubtree} from "./collection"
@@ -588,45 +587,4 @@ export async function deleteFile(fileId: string): Promise<void> {
 		await em.getRepository(AssetFile).remove(file)
 		await assetsS3().removeObjects(assetsS3Bucket(), storageKeys)
 	})
-}
-
-export async function assignProductsToAssetFiles() {
-	if (process.env.ENABLE_LEGACY_PRODUCT_MATCHING === 'false') {
-		return
-	}
-	const regexString = process.env.PRODUCT_MATCHING_REGEX
-	if (!regexString) {
-		logger.error('PRODUCT_MATCHING_REGEX is not defined in the environment variables')
-		return
-	}
-	const regex = new RegExp(regexString)
-	const assetFiles = await dataSource.getRepository(AssetFile).find({
-		relations: { assetType: true },
-	})
-	// Files the matching steps own: one writer per record link.
-	const handled: { id: string }[] = await dataSource.query(`
-		SELECT a.id FROM asset_files a INNER JOIN asset_types t ON t.id = a.asset_type_id
-		WHERE t.is_related_to_records AND (
-			EXISTS (SELECT 1 FROM asset_type_resolver_steps s WHERE s.asset_type_id = t.id AND s.enabled)
-			OR EXISTS (SELECT 1 FROM asset_entity_links l WHERE l.asset_file_id = a.id AND l.strategy IN ('manual_file', 'manual_folder'))
-		)
-	`)
-	const handledIds = new Set(handled.map((row) => row.id))
-
-	for (const assetFile of assetFiles) {
-		if (handledIds.has(assetFile.id)) {
-			continue
-		}
-		const match = assetFile.name.match(regex)
-		if (!match) {
-			continue
-		}
-
-		const [, recordKey, recordView] = match
-		const record = await dataSource.getRepository(DataRecord).findOneBy({ recordKey })
-		assetFile.record = record
-		assetFile.recordView = recordView || null
-
-		await dataSource.getRepository(AssetFile).save(assetFile)
-	}
 }

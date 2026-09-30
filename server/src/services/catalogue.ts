@@ -48,6 +48,11 @@ export const CATALOGUE_PAGE_MAX = 96
 // How many visuals a card carries before it shows a "+N" badge.
 export const CARD_VISUALS = 4
 const DETAIL_VISUALS = 60
+// A spec sheet or a range shot can hold many products; the download dialog
+// lists this many and their first views.
+export const LINKED_RECORDS_MAX = 50
+const LINKED_RECORD_VISUALS = 12
+const LINKED_RANGE_RECORDS = 12
 const FACET_VALUES = 200
 
 export type CatalogueVisual = { id: string, view: string | null, thumbnailStorageKey: string }
@@ -156,17 +161,21 @@ async function visualsOf(em: EntityManager, user: User, recordIds: string[], thu
 	// A file reaches a product through a link or, for files older than links,
 	// through the column the matching used to write. Only the files the reader
 	// may open are counted, so a card never promises media it cannot show.
-	const rows: { record_id: string, id: string, record_view: string | null, has_thumbnail: boolean, position: string, visual_count: string, file_count: string }[] = await em.query(`
+	// Only a type holding the records' pictures gives visuals; the other linked
+	// files, a campaign shot or a spec sheet, are counted as files.
+	const rows: { record_id: string, id: string, record_view: string | null, visual: boolean, position: string, visual_count: string, file_count: string }[] = await em.query(`
 		WITH linked AS (
-			SELECT DISTINCT coalesce(l.record_id, a.record_id) AS record_id, a.id, a.record_view, a.has_thumbnail, a.name
+			SELECT DISTINCT coalesce(l.record_id, a.record_id) AS record_id, a.id, a.record_view,
+				a.has_thumbnail AND coalesce(t.is_related_to_records, false) AS visual, a.name
 			FROM asset_files a
+			LEFT JOIN asset_types t ON t.id = a.asset_type_id
 			LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
 			WHERE coalesce(l.record_id, a.record_id) = ANY($1::uuid[])
 			AND a.id IN (${visibleFiles})
 		)
-		SELECT record_id, id, record_view, has_thumbnail,
-			row_number() OVER (PARTITION BY record_id, has_thumbnail ORDER BY (record_view IS NOT DISTINCT FROM $2) DESC, record_view NULLS LAST, name) AS position,
-			count(*) FILTER (WHERE has_thumbnail) OVER (PARTITION BY record_id) AS visual_count,
+		SELECT record_id, id, record_view, visual,
+			row_number() OVER (PARTITION BY record_id, visual ORDER BY (record_view IS NOT DISTINCT FROM $2) DESC, record_view NULLS LAST, name) AS position,
+			count(*) FILTER (WHERE visual) OVER (PARTITION BY record_id) AS visual_count,
 			count(*) OVER (PARTITION BY record_id) AS file_count
 		FROM linked
 		ORDER BY record_id, position
@@ -175,7 +184,7 @@ async function visualsOf(em: EntityManager, user: User, recordIds: string[], thu
 	for (const row of rows) {
 		const entry = byRecord.get(row.record_id)
 			?? { visuals: [], visualCount: Number(row.visual_count), fileCount: Number(row.file_count) }
-		if (row.has_thumbnail && Number(row.position) <= perRecord) {
+		if (row.visual && Number(row.position) <= perRecord) {
 			entry.visuals.push({ id: row.id, view: row.record_view, thumbnailStorageKey: `asset-file/${row.id}-thumbnail` })
 		}
 		byRecord.set(row.record_id, entry)
@@ -209,6 +218,7 @@ async function relatedCondition(em: EntityManager, user: User, related: NonNulla
 			conditions.push(`EXISTS (
 				SELECT 1 FROM asset_files a
 				LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
+				INNER JOIN asset_types t ON t.id = a.asset_type_id AND t.is_related_to_records
 				WHERE coalesce(l.record_id, a.record_id) = r.id AND a.mime_type LIKE 'image/%' AND a.id IN (${files})
 			)`)
 		}
@@ -269,6 +279,86 @@ export async function listCatalogue(
 		}
 	})
 	return { rows: cards, total: rows.length ? Number(rows[0].total) : 0, fields, keyColumnName }
+}
+
+// Every record a file is linked to, whatever its asset type: the record kept
+// on the file and each active record link, primary first. The reader already
+// sees the visible values of a file's record; the visuals come only with a
+// record the reader can also see in a product catalogue.
+export async function linkedRecordsOfFile(em: EntityManager, user: User, assetFileId: string, thumbnailView: string | null) {
+	const [fields, keyColumnName] = await Promise.all([readableFields(em), catalogueKeyColumnName(em)])
+	const rows: { id: string, record_key: string, meta_data: Record<string, string>, primary: boolean }[] = await em.query(`
+		WITH linked AS (
+			SELECT record_id, is_primary FROM asset_entity_links
+			WHERE asset_file_id = $1 AND target_kind = 'record' AND status = 'active' AND record_id IS NOT NULL
+			UNION ALL
+			SELECT record_id, true FROM asset_files WHERE id = $1 AND record_id IS NOT NULL
+		)
+		SELECT r.id, r.record_key, hstore_to_json(r.meta_data) AS meta_data, bool_or(linked.is_primary) AS primary
+		FROM linked
+		INNER JOIN records r ON r.id = linked.record_id
+		GROUP BY r.id
+		ORDER BY bool_or(linked.is_primary) DESC, r.record_key
+		LIMIT ${LINKED_RECORDS_MAX}
+	`, [assetFileId])
+	const parameters: unknown[] = [rows.map((row) => row.id)]
+	const visible = visibleRecordsCondition(user, 'r', parameters, em)
+	const inCatalogue = new Set(rows.length
+		? (await em.query(`SELECT r.id FROM records r WHERE r.id = ANY($1::uuid[]) AND ${visible}`, parameters) as { id: string }[]).map((row) => row.id)
+		: [])
+	const visuals = await visualsOf(em, user, [...inCatalogue], thumbnailView, LINKED_RECORD_VISUALS)
+	return {
+		fields,
+		keyColumnName,
+		records: rows.map((row) => ({
+			id: row.id,
+			recordKey: row.record_key,
+			metaData: readableValues(row.meta_data ?? {}, fields, keyColumnName),
+			primary: row.primary,
+			inCatalogue: inCatalogue.has(row.id),
+			visuals: visuals.get(row.id)?.visuals ?? [],
+		})),
+	}
+}
+
+// The ranges a file covers: every product sharing a value, such as a style.
+// A range on a field readers cannot read is left out, and only the products
+// the reader can see in a product catalogue are counted and listed.
+export async function linkedRangesOfFile(em: EntityManager, user: User, assetFileId: string, thumbnailView: string | null) {
+	const fields = await readableFields(em)
+	const links: { attribute_name: string, attribute_value: string }[] = await em.query(`
+		SELECT DISTINCT attribute_name, attribute_value FROM asset_entity_links
+		WHERE asset_file_id = $1 AND target_kind = 'attribute' AND status = 'active'
+		ORDER BY attribute_name, attribute_value
+	`, [assetFileId])
+	const ranges: { attributeName: string, label: string, value: string, total: number, records: { id: string, recordKey: string, metaData: Record<string, string>, thumbnailStorageKey: string | null }[] }[] = []
+	for (const link of links) {
+		const field = fields.find((candidate) => candidate.name === link.attribute_name)
+		if (!field) continue
+		const parameters: unknown[] = [link.attribute_name, link.attribute_value]
+		const visible = visibleRecordsCondition(user, 'r', parameters, em)
+		const rows: { id: string, record_key: string, meta_data: Record<string, string>, total: string }[] = await em.query(`
+			SELECT r.id, r.record_key, hstore_to_json(r.meta_data) AS meta_data, count(*) OVER () AS total
+			FROM records r
+			WHERE (r.meta_data -> $1) = $2 AND ${visible}
+			ORDER BY r.record_key
+			LIMIT ${LINKED_RANGE_RECORDS}
+		`, parameters)
+		const visuals = await visualsOf(em, user, rows.map((row) => row.id), thumbnailView, 1)
+		ranges.push({
+			attributeName: field.name,
+			label: field.displayName ?? field.name,
+			value: link.attribute_value,
+			total: rows.length ? Number(rows[0].total) : 0,
+			records: rows.map((row) => ({
+				id: row.id,
+				recordKey: row.record_key,
+				metaData: readableValues(row.meta_data ?? {}, fields, null),
+				thumbnailStorageKey: visuals.get(row.id)?.visuals[0]?.thumbnailStorageKey ?? null,
+			})),
+		})
+	}
+	return ranges
 }
 
 export async function catalogueFacets(em: EntityManager, user: User, query: CatalogueQuery, hideWithoutMedia = false) {

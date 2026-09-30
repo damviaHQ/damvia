@@ -18,7 +18,7 @@ import { CollectionInvitation } from "./entity/collection-invitation"
 import { Download, DownloadStatus } from "./entity/download"
 import { User } from "./entity/user"
 import {dataSource, logger} from "./env"
-import { assignProductsToAssetFiles, processDeletion, updateFileContent } from "./services/asset"
+import { processDeletion, updateFileContent } from "./services/asset"
 import { extractStoredFileMetadata } from "./services/file-metadata"
 import { synchronizeCollection } from "./services/collection"
 import { pruneActivityEvents } from "./services/analytics"
@@ -273,12 +273,6 @@ export const assetProcessDeletionQueue = createQueue<void>({
 	name: 'asset/process-deletion',
 	processor: () => processDeletion(),
 	cron: '* * * * *',
-})
-
-export const assetAssignProductsToAssetFilesQueue = createQueue<void>({
-	name: 'asset/assign-products-to-asset-files',
-	processor: () => assignProductsToAssetFiles(),
-	cron: '*/5 * * * *',
 })
 
 export const collectionSynchronizationQueue = createQueue<{ collectionId: string }>({

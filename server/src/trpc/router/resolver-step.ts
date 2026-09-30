@@ -100,8 +100,6 @@ export default router({
 					files: counts.find((count) => count.asset_type_id === type.id)?.files ?? 0,
 					steps: steps.filter((step) => step.assetTypeId === type.id).map(formatResolverStep),
 				})),
-				legacyPattern: process.env.PRODUCT_MATCHING_REGEX || null,
-				legacyEnabled: process.env.ENABLE_LEGACY_PRODUCT_MATCHING !== 'false',
 				views,
 				generatedViewPart: views.enabled ? fullFilenamePattern('', views) : null,
 				attributes: attributes.map((row) => row.name),

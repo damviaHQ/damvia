@@ -66,6 +66,7 @@ export async function resolveDownloadSelection(em: EntityManager, user: User, it
         SELECT coalesce(l.record_id, a.record_id) AS record_id, a.id AS asset_id,
           a.record_view, a.name
         FROM asset_files a
+        INNER JOIN asset_types t ON t.id = a.asset_type_id AND t.is_related_to_records
         LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id
           AND l.target_kind = 'record' AND l.status = 'active'
         WHERE coalesce(l.record_id, a.record_id) = ANY($1::uuid[])
@@ -84,8 +85,11 @@ export async function resolveDownloadSelection(em: EntityManager, user: User, it
     .andWhere(new Brackets(q => {
       q.where({ id: In(items.filter(item => item.type === 'file').map(item => item.id)) })
         .orWhere({ collectionId: In(selectedCollections.map(collection => collection.id)) })
+      // A product brings its pictures; the other files linked to it are
+      // downloaded on their own.
       if (records.length) q.orWhere(`asset_file.id IN (
         SELECT a.id FROM asset_files a
+        INNER JOIN asset_types t ON t.id = a.asset_type_id AND t.is_related_to_records
         LEFT JOIN asset_entity_links l ON l.asset_file_id = a.id AND l.target_kind = 'record' AND l.status = 'active'
         WHERE coalesce(l.record_id, a.record_id) IN (:...downloadRecordIds)
           ${settings.viewsEnabled ? "AND NULLIF(a.record_view, '') IS NOT NULL" : ''}

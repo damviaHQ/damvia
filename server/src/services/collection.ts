@@ -114,7 +114,10 @@ export function userCollectionFilesQuery(user: User, em: EntityManager = dataSou
 			}))
 			// Identity rows grant nothing themselves. Check current membership,
 			// exclusions and invitations again when a queued download executes.
-			access.orWhere(`collection_file.collection_id IS NULL AND asset_file.mime_type LIKE 'image/%' AND EXISTS (
+			// A visible record opens only its pictures: files of a type holding
+			// the records' pictures. A campaign shot linked to the same record
+			// keeps the access of the collections that hold it.
+			access.orWhere(`collection_file.collection_id IS NULL AND asset_file.mime_type LIKE 'image/%' AND asset_type.is_related_to_records IS TRUE AND EXISTS (
 				SELECT 1 FROM asset_files picture_file
 				LEFT JOIN asset_entity_links picture_link ON picture_link.asset_file_id = picture_file.id
 					AND picture_link.target_kind = 'record' AND picture_link.status = 'active'

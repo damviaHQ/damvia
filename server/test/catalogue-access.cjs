@@ -22,7 +22,7 @@ const { db, env, save, caller, makeUser, makeCollection, makeFolder, makeFile, p
 const { Group, UserGroup, CollectionFile, License } = harness.entities
 const { addRecords } = harness.services.productCollections
 const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
-let fixtures, admin, insider, group
+let fixtures, admin, insider, group, packshot
 const listed = async (user, input = {}) => (await caller(user).catalogue.list({ offset: 0, limit: 50, ...input }))
 const keysOf = async (user, input = {}) => (await listed(user, input)).products.map(product => product.recordKey).sort()
 const notFound = promise => assert.rejects(promise, error => error.code === 'NOT_FOUND')
@@ -32,6 +32,8 @@ before(async () => {
     admin = caller(fixtures.admin)
     env.assetsS3 = () => ({ presignedGetObject: async (_bucket, key) => `https://example.test/${key}` })
     group = await save(Group, { name: 'Retail' })
+    // Only a type holding the products' pictures gives visuals and opens with the product.
+    packshot = await harness.makeType('Packshot', { isRelatedToRecords: true })
     insider = await makeUser('member', { name: 'insider' })
     await save(UserGroup, { userId: insider.id, groupId: group.id })
     await admin.recordAttribute.create({ name: 'season', displayName: 'Season', valueType: 'text', facetable: true, viewable: true, searchable: false })
@@ -101,8 +103,10 @@ test('linked pictures keep licence restrictions while the product stays visible'
     const license = await save(License, { name: 'Restricted', scopes: [], allowedRegionIds: [other.id] })
     const folder = await makeFolder({ name: 'Packshots' })
     const product = await productId('CA-PUB')
-    const open = await makeFile(folder, { name: 'CA-PUB-00.jpg', hasThumbnail: true, recordId: product, recordView: '00' })
-    const restricted = await makeFile(folder, { name: 'CA-PUB-01.jpg', hasThumbnail: true, recordId: product, recordView: '01', licenseId: license.id })
+    const open = await makeFile(folder, { name: 'CA-PUB-00.jpg', hasThumbnail: true, recordId: product, recordView: '00', assetTypeId: packshot.id })
+    const restricted = await makeFile(folder, { name: 'CA-PUB-01.jpg', hasThumbnail: true, recordId: product, recordView: '01', licenseId: license.id, assetTypeId: packshot.id })
+    // A file's record comes from its links; matching clears a bare record_id.
+    for (const file of [open, restricted]) await save(AssetEntityLink, { assetFileId: file.id, targetKind: 'record', recordId: product, recordKey: 'CA-PUB', strategy: 'manual_file', isPrimary: true })
     const library = await makeCollection({ name: 'Library files' })
     await save(CollectionFile, { collectionId: library.id, assetFileId: open.id })
     await save(CollectionFile, { collectionId: library.id, assetFileId: restricted.id })
@@ -222,7 +226,7 @@ test('related records combine scoped AND groups with OR, exclusions and permitte
     const region = await save(harness.entities.Region, { name: 'Related region', defaultGroupId: fixtures.group.id })
     const license = await save(License, { name: 'Related licence', scopes: [], allowedRegionIds: [region.id] })
     for (const key of ['ELSEWHERE', 'PRIVATE', 'PDF', 'RESTRICTED']) {
-        const file = await makeFile(folder, { name: `RELATED-${key}`, recordId: ids[key], mimeType: key === 'PDF' ? 'application/pdf' : 'image/jpeg', licenseId: key === 'RESTRICTED' ? license.id : null })
+        const file = await makeFile(folder, { name: `RELATED-${key}`, assetTypeId: packshot.id, recordId: ids[key], mimeType: key === 'PDF' ? 'application/pdf' : 'image/jpeg', licenseId: key === 'RESTRICTED' ? license.id : null })
         await save(CollectionFile, { collectionId: library.id, assetFileId: file.id })
     }
     const group = { scope: 'current', matchField: null, hasPhoto: false, filters: [{ column: 'recordKey', op: 'contains', value: 'RELATED-' }], excludeFilters: [{ column: 'season', op: 'has_any', values: ['SS24'] }] }

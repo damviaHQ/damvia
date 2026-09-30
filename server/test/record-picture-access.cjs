@@ -23,8 +23,12 @@ const { addRecords, setRecordsExcluded, removeRecords } = harness.services.produ
 const { userCollectionFilesQuery } = harness.services.collections
 const { createDownloadArchive } = harness.services.download
 const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
-let users
-before(async () => { users = await harness.setup() })
+// A record publishes the pictures of a type marked related to records.
+let users, packshot
+before(async () => {
+    users = await harness.setup()
+    packshot = await harness.makeType('Packshot', { isRelatedToRecords: true })
+})
 after(() => harness.teardown())
 
 async function fixture(extra = {}) {
@@ -32,7 +36,7 @@ async function fixture(extra = {}) {
     const collection = await makeCollection({ catalogueMode: 'products', ...extra })
     await addRecords(db.manager, collection.id, [record.id])
     const folder = await makeFolder()
-    const file = await makeFile(folder, { recordId: record.id, hasThumbnail: true })
+    const file = await makeFile(folder, { assetTypeId: packshot.id, recordId: record.id, hasThumbnail: true })
     const identity = await db.getRepository(CollectionFile).findOneByOrFail({ assetFileId: file.id, collectionId: IsNull() })
     return { record, collection, folder, file, identity }
 }
@@ -60,7 +64,7 @@ test('a record collection publishes pictures without file collections, including
 
 test('active explicit links work with views disabled and without a legacy record column', async () => {
     const { record, folder } = await fixture()
-    const file = await makeFile(folder, { recordId: null })
+    const file = await makeFile(folder, { assetTypeId: packshot.id, recordId: null })
     const link = await save(AssetEntityLink, { assetFileId: file.id, recordId: record.id, recordKey: record.recordKey, targetKind: 'record', strategy: 'manual_file', status: 'active' })
     const identity = await db.getRepository(CollectionFile).findOneByOrFail({ assetFileId: file.id, collectionId: IsNull() })
     assert.equal(await canRead(users.member, identity.id), true)
@@ -130,15 +134,15 @@ test('region and date restrictions still apply, even when a separate file collec
 test('whole-catalogue lists include new pictures; unmatched images and documents are not published', async () => {
     const record = await save(DataRecord, { keyColumnName: 'SKU', recordKey: 'PICTURE-WHOLE-CATALOGUE' })
     const folder = await makeFolder()
-    const file = await makeFile(folder, { recordId: record.id })
-    await makeFile(folder)
-    await makeFile(folder, { recordId: record.id, mimeType: 'application/pdf' })
+    const file = await makeFile(folder, { assetTypeId: packshot.id, recordId: record.id })
+    await makeFile(folder, { assetTypeId: packshot.id })
+    await makeFile(folder, { assetTypeId: packshot.id, recordId: record.id, mimeType: 'application/pdf' })
     const identity = await db.getRepository(CollectionFile).findOneByOrFail({ assetFileId: file.id, collectionId: IsNull() })
     assert.equal(await canRead(users.member, identity.id), false)
     const collection = await makeCollection({ includesAllRecords: true, catalogueMode: 'products' })
     const files = await userCollectionFilesQuery(users.member).andWhere('asset_file.folder_id = :folder', { folder: folder.id }).getMany()
     assert.deepEqual(files.map(row => row.assetFileId), [file.id])
-    const late = await makeFile(folder, { recordId: record.id })
+    const late = await makeFile(folder, { assetTypeId: packshot.id, recordId: record.id })
     const lateIdentity = await db.getRepository(CollectionFile).findOneByOrFail({ assetFileId: late.id, collectionId: IsNull() })
     assert.equal(await canRead(users.member, lateIdentity.id), true)
     await db.getRepository(Collection).update(collection.id, { includesAllRecords: false })
@@ -155,7 +159,7 @@ test('a separately published file remains accessible when record membership is r
 
 test('multiple record-only pictures export together and deleting an asset cleans up its identity', async () => {
     const { record, folder, identity } = await fixture()
-    const second = await makeFile(folder, { recordId: record.id })
+    const second = await makeFile(folder, { assetTypeId: packshot.id, recordId: record.id })
     const secondIdentity = await db.getRepository(CollectionFile).findOneByOrFail({ assetFileId: second.id, collectionId: IsNull() })
     const result = await caller(users.member).download.create({ ...options, downloadType: 'direct', collectionFileIds: [identity.id, secondIdentity.id] })
     assert.equal(result.status, 'ready')

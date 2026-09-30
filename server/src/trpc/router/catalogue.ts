@@ -12,6 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { TRPCError } from "@trpc/server"
 import { z } from "zod"
 import { Collection } from "../../entity/collection"
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
@@ -22,6 +23,8 @@ import {
 	CatalogueCard,
 	catalogueFacets,
 	getCatalogueRecord,
+	linkedRangesOfFile,
+	linkedRecordsOfFile,
 	listCatalogue,
 } from "../../services/catalogue"
 import { userCollectionFilesQuery } from "../../services/collection"
@@ -163,6 +166,40 @@ export default router({
 				}))),
 				readinessLabels: await readinessLabels(),
 				siblings: await Promise.all(siblings.map(formatCard)),
+			}
+		}),
+	// The records one file of a collection is linked to, for the download dialog.
+	fileRecords: publicProcedure
+		.use(authMiddleware(userApproved))
+		.input(z.uuid())
+		.query(async ({ input, ctx }) => {
+			const file = await userCollectionFilesQuery(ctx.user).andWhere('collection_file.id = :id', { id: input }).getOne()
+			if (!file) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'File not found.' })
+			}
+			const enrichment = await settings()
+			const { fields, keyColumnName, records } = await linkedRecordsOfFile(dataSource.manager, ctx.user, file.assetFileId, enrichment.thumbnailView)
+			const ranges = await linkedRangesOfFile(dataSource.manager, ctx.user, file.assetFileId, enrichment.thumbnailView)
+			return {
+				keyColumnName,
+				cardTitleField: fields.some(field => field.name === enrichment.cardTitleAttributeName) ? enrichment.cardTitleAttributeName : null,
+				fields: fields.map((field) => ({
+					name: field.name,
+					displayName: field.displayName ?? field.name,
+					valueType: field.valueType,
+					position: field.position,
+				})),
+				records: await Promise.all(records.map(async ({ visuals, ...record }) => ({
+					...record,
+					visuals: await Promise.all(visuals.map(formatVisual)),
+				}))),
+				ranges: await Promise.all(ranges.map(async (range) => ({
+					...range,
+					records: await Promise.all(range.records.map(async ({ thumbnailStorageKey, ...record }) => ({
+						...record,
+						thumbnailURL: await presign(thumbnailStorageKey),
+					}))),
+				}))),
 			}
 		}),
 })

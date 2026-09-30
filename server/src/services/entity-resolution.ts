@@ -38,7 +38,12 @@ export type FileToResolve = {
 	mpath: string
 	path: string
 	assetTypeId: string | null
-	related: boolean
+	// Its type holds the records' pictures: a file nothing links goes to To
+	// review. Other types link when a step finds a key and are left alone
+	// otherwise, as a logo is.
+	expectsMatch: boolean
+	// Its type holds the records' pictures, so a view in its name counts.
+	pictures: boolean
 	recordId: string | null
 	recordView: string | null
 }
@@ -115,8 +120,8 @@ export function fullFilenamePattern(pattern: string, views: ViewSettings): strin
 	return `${pattern}(?:${separator}(\\d{${views.digits}}))?`
 }
 
-// The old cron matched the whole file name, case-sensitive; this step keeps
-// that exactly so switching the cron off changes no link.
+// Matched on the whole file name, case-sensitive, as PRODUCT_MATCHING_REGEX
+// was: the step seeded from it links the same files.
 export function resolveByFilenameRegex(name: string, step: CompiledStep): ResolutionCandidate[] {
 	const match = step.regex?.exec(name)
 	const keyGroup = step.config.keyGroup ?? 1
@@ -248,7 +253,7 @@ export function mergeCandidates(candidates: ResolutionCandidate[], manual: Exist
 			? dangling.map((link) => link.targetKind === 'record' ? `no record with key ${link.recordKey}` : `no record where ${link.attributeName} = ${link.attributeValue}`).join('; ')
 			: 'no strategy found a key'
 	}
-	// Like the old job, a view found in the name is kept even when its key has
+	// As with PRODUCT_MATCHING_REGEX, a view found in the name is kept even when its key has
 	// no record yet.
 	const primaryCandidate = primary
 		? candidates.find((candidate) => candidate.kind === 'record' && candidate.key === primary!.recordKey && candidate.view)
@@ -275,7 +280,8 @@ export function resolveFile(file: FileToResolve, steps: CompiledStep[], attachme
 		else if (step.strategy === 'folder_regex') candidates.push(...resolveByFolderRegex(file.path, step))
 		else if (step.strategy === 'metadata' && sources) candidates.push(...resolveByMetadata(sources.metadata.get(file.id), step, sources.fields))
 	}
-	return mergeCandidates(candidates, manual, catalogue, folder.folderId)
+	const resolution = mergeCandidates(candidates, manual, catalogue, folder.folderId)
+	return file.pictures ? resolution : { ...resolution, primaryView: null }
 }
 
 export async function loadCatalogue(em: EntityManager, attributeNames: string[]): Promise<Catalogue> {
@@ -359,7 +365,8 @@ export async function loadViewSettings(em: EntityManager): Promise<ViewSettings>
 export async function loadFilesToResolve(em: EntityManager, where = '', parameters: unknown[] = []): Promise<FileToResolve[]> {
 	return em.query(`
 		SELECT a.id, a.name, a.folder_id AS "folderId", f.mpath, coalesce(f.path, '') AS path, a.asset_type_id AS "assetTypeId",
-			coalesce(t.is_related_to_records, false) AS related, a.record_id AS "recordId", a.record_view AS "recordView"
+			coalesce(t.is_related_to_records, false) AS "expectsMatch",
+			coalesce(t.is_related_to_records, false) AS pictures, a.record_id AS "recordId", a.record_view AS "recordView"
 		FROM asset_files a
 		INNER JOIN asset_folders f ON f.id = a.folder_id
 		LEFT JOIN asset_types t ON t.id = a.asset_type_id
@@ -418,41 +425,32 @@ export async function runEntityStage(em: EntityManager, extraCandidates: (file: 
 		const manual = existing.filter((link) => link.strategy === 'manual_file')
 		const automatic = existing.filter((link) => link.strategy !== 'manual_file')
 		const typeSteps = file.assetTypeId ? steps.get(file.assetTypeId) ?? [] : []
-		let resolution: FileResolution
-		if (!file.related) {
-			resolution = { links: [], status: 'not_applicable', reason: null, candidates: [], primaryRecordId: null, primaryView: null, keepRecord: true }
-			for (const link of manual) {
-				const recordId = link.targetKind === 'record' ? catalogue.recordIds.get(link.recordKey ?? '') ?? null : link.recordId
-				if (recordId !== link.recordId) updates.push({ ...link, recordId, status: recordId || link.targetKind === 'attribute' ? 'active' : 'dangling' })
-			}
-		} else {
-			resolution = resolveFile(file, typeSteps, attachments, manual, catalogue, sources, extraCandidates(file))
-			// A type with no step and a file nobody linked by hand stays with the
-			// old filename job, which still owns its record link.
-			if (!typeSteps.length && !manual.length && !resolution.links.some((link) => link.strategy === 'manual_folder' || link.strategy === 'csv')) {
-				resolution.keepRecord = true
-				if (resolution.status === 'unmatched') resolution.reason = 'this asset type has no matching step'
-			}
-			const byIdentity = new Map(existing.map((link) => [linkIdentity(link), link]))
-			const wanted = new Set<string>()
-			for (const link of resolution.links) {
-				const identity = linkIdentity(link)
-				wanted.add(identity)
-				const current = byIdentity.get(identity)
-				if (!current) {
-					inserts.push({ ...link, assetFileId: file.id })
-				} else if (current.recordId !== link.recordId || current.status !== link.status || current.isPrimary !== link.isPrimary
-					|| current.resolverStepId !== link.resolverStepId || current.sourceFolderId !== link.sourceFolderId) {
-					updates.push({ ...link, id: current.id })
-				}
-			}
-			for (const link of automatic) if (!wanted.has(linkIdentity(link))) deletes.push(link.id)
-			if (!resolution.keepRecord && (resolution.primaryRecordId !== file.recordId || resolution.primaryView !== file.recordView)) {
-				fileWrites.push({ id: file.id, recordId: resolution.primaryRecordId, recordView: resolution.primaryView })
+		const resolution = resolveFile(file, typeSteps, attachments, manual, catalogue, sources, extraCandidates(file))
+		if (resolution.status === 'unmatched' && !file.expectsMatch) {
+			// A logo or a campaign shot without a key: only a missing picture
+			// waits for someone in To review.
+			resolution.status = 'not_applicable'
+			resolution.reason = null
+		} else if (resolution.status === 'unmatched' && !typeSteps.length) {
+			resolution.reason = 'this asset type has no matching step'
+		}
+		const byIdentity = new Map(existing.map((link) => [linkIdentity(link), link]))
+		const wanted = new Set<string>()
+		for (const link of resolution.links) {
+			const identity = linkIdentity(link)
+			wanted.add(identity)
+			const current = byIdentity.get(identity)
+			if (!current) {
+				inserts.push({ ...link, assetFileId: file.id })
+			} else if (current.recordId !== link.recordId || current.status !== link.status || current.isPrimary !== link.isPrimary
+				|| current.resolverStepId !== link.resolverStepId || current.sourceFolderId !== link.sourceFolderId) {
+				updates.push({ ...link, id: current.id })
 			}
 		}
-		if (!file.related) {
-			for (const link of automatic) deletes.push(link.id)
+		for (const link of automatic) if (!wanted.has(linkIdentity(link))) deletes.push(link.id)
+		// The file's record is its primary link, kept as it was while a conflict waits.
+		if (!resolution.keepRecord && (resolution.primaryRecordId !== file.recordId || resolution.primaryView !== file.recordView)) {
+			fileWrites.push({ id: file.id, recordId: resolution.primaryRecordId, recordView: resolution.primaryView })
 		}
 		if (resolution.status === 'matched') result.matched++
 		else if (resolution.status === 'unmatched') result.unmatched++

@@ -33,12 +33,8 @@ export async function linkedFilesOf(em: EntityManager, record: { id: string, rec
 		LEFT JOIN asset_type_resolver_steps s ON s.id = l.resolver_step_id
 		LEFT JOIN users u ON u.id = l.created_by_id
 		WHERE l.target_kind = 'record' AND l.record_key = $1
-		UNION ALL
-		SELECT a.id, a.name, f.path, 'legacy', 'active', true, a.has_thumbnail, NULL, NULL, NULL, NULL
-		FROM asset_files a INNER JOIN asset_folders f ON f.id = a.folder_id
-		WHERE a.record_id = $2 AND NOT EXISTS (SELECT 1 FROM asset_entity_links l WHERE l.asset_file_id = a.id AND l.target_kind = 'record')
-		ORDER BY 2 LIMIT ${LINKED_FILES_LIMIT}
-	`, [record.recordKey, record.id])
+		ORDER BY a.name LIMIT ${LINKED_FILES_LIMIT}
+	`, [record.recordKey])
 	const range: { id: string, name: string, path: string, attribute_name: string, attribute_value: string, strategy: string, has_thumbnail: boolean }[] = await em.query(`
 		SELECT a.id, a.name, f.path, l.attribute_name, l.attribute_value, l.strategy, a.has_thumbnail
 		FROM asset_entity_links l

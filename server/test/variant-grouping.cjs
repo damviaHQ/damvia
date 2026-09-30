@@ -122,8 +122,9 @@ test('the pass groups files of types that ask for it, keeps group ids and writes
     const groups = await groupRows()
     assert.deepEqual(groups.map(g => [g.display_name, g.member_count]), [['promo', 2], ['summer', 4]])
     assert.equal(groups[1].cover_asset_file_id, files[0].id)
-    const named = await db.query('SELECT name, "values", recognizer FROM variant_axes ORDER BY created_at')
-    assert.deepEqual(named.map(a => [a.name, a.values, a.recognizer]), [['Ratio', ['1x1', '9x16'], 'ratio'], ['Language', ['en', 'fr'], 'language'], ['Duration', ['15s', '30s'], 'duration']])
+    // One pass creates its axes in one transaction: they share created_at.
+    const named = await db.query('SELECT name, "values", recognizer FROM variant_axes ORDER BY created_at, name')
+    assert.deepEqual(named.map(a => [a.name, a.values, a.recognizer]), [['Duration', ['15s', '30s'], 'duration'], ['Language', ['en', 'fr'], 'language'], ['Ratio', ['1x1', '9x16'], 'ratio']])
     const second = (await runEnrichmentPass()).variants
     assert.deepEqual([second.groupsAdded, second.groupsRemoved, second.membersWritten, second.axesCreated, second.axesRemoved], [0, 0, 0, 0, 0])
     assert.deepEqual(await groupRows(), groups)

@@ -25,7 +25,6 @@ const { AssetEntityLink } = require('../dist/entity/asset-entity-link')
 const { AssetFileResolution } = require('../dist/entity/asset-file-resolution')
 const resolution = harness.services.entityResolution
 const { runEnrichmentPass } = harness.services.enrichment
-const { assignProductsToAssetFiles } = harness.services.assets
 let fixtures
 before(async () => { fixtures = await harness.setup() })
 after(() => harness.teardown())
@@ -121,15 +120,16 @@ test('the pass links files, derives record_id and view, writes nothing the secon
     assert.equal((await fileRow(known.id)).recordId, back.id)
 })
 
-test('files of a type not related to records are left to the old job, and so are files of a related type without steps', async () => {
+test('a file carries only the record its links give; a type without steps waits in To review only when it holds the pictures', async () => {
     const plain = await makeType('Logos', { isRelatedToRecords: false })
     const stepless = await makeType('No steps yet')
     const record = await makeRecord('EVT-20001')
     const logo = await makeFile(await typedFolder('Logos', plain), { name: 'EVT-20001-C-01.png', assetTypeId: plain.id, recordId: record.id })
     const waiting = await makeFile(await typedFolder('Waiting', stepless), { name: 'EVT-20001-C-02.png', assetTypeId: stepless.id, recordId: record.id })
     await runEnrichmentPass()
-    assert.deepEqual([await statusOf(logo.id), (await fileRow(logo.id)).recordId], ['not_applicable', record.id])
-    assert.deepEqual([await statusOf(waiting.id), (await fileRow(waiting.id)).recordId], ['unmatched', record.id])
+    // record_id written before links existed is dropped: nothing links these files.
+    assert.deepEqual([await statusOf(logo.id), (await fileRow(logo.id)).recordId], ['not_applicable', null])
+    assert.deepEqual([await statusOf(waiting.id), (await fileRow(waiting.id)).recordId], ['unmatched', null])
     assert.equal((await db.getRepository(AssetFileResolution).findOneByOrFail({ assetFileId: waiting.id })).reason, 'this asset type has no matching step')
 })
 
@@ -228,41 +228,31 @@ test('the matching screen saves ordered steps, refuses a broken one with its pos
     assert.equal(linked.direct[0].pattern, '^(SCR-\\d)')
 })
 
-test('the old filename job skips files the steps own, can be switched off, and gives the same links as the seeded step', async () => {
+test('the upgrade gives the product regex to every type still without steps, and matches its files without views', async () => {
+    const campaign = await harness.makeType('Campaign shots', { isRelatedToRecords: false })
+    const stepped = await makeType('Already stepped')
+    await save(AssetTypeResolverStep, { assetTypeId: stepped.id, position: 0, strategy: 'filename_regex', config: { pattern: '^(OWN-\\d+)', keyGroup: 1 } })
+    const record = await makeRecord('EVT-60001')
+    const folder = await typedFolder('Campaign', campaign)
+    const file = await makeFile(folder, { name: 'EVT-60001-C-02-campaign.jpg', assetTypeId: campaign.id })
+    const keyless = await makeFile(folder, { name: 'moodboard.jpg', assetTypeId: campaign.id })
+    // The old job linked files without a type too; no step can find them again.
+    const untyped = await makeFile(await harness.makeFolder({ name: 'Unsorted' }), { name: 'EVT-60001-C-04.jpg', recordId: record.id })
     process.env.PRODUCT_MATCHING_REGEX = LEGACY
     try {
-        const legacyType = await makeType('Legacy', { isRelatedToRecords: false })
-        const owned = await makeType('Owned')
-        await save(AssetTypeResolverStep, { assetTypeId: owned.id, position: 0, strategy: 'filename_regex', config: { pattern: LEGACY, keyGroup: 1, viewGroup: 2 } })
-        const record = await makeRecord('EVT-40001')
-        await makeRecord('EVT-40002')
-        const legacyFolder = await typedFolder('Legacy job', legacyType)
-        const ownedFolder = await typedFolder('Owned job', owned)
-        const names = ['EVT-40001-C-01-a.jpg', 'EVT-40002-C-07-b.jpg', 'EVT-49999-C-01-c.jpg', 'IMG_9.jpg']
-        const legacy = [], stepped = []
-        for (const name of names) {
-            legacy.push(await makeFile(legacyFolder, { name, assetTypeId: legacyType.id }))
-            stepped.push(await makeFile(ownedFolder, { name, assetTypeId: owned.id }))
-        }
-        const other = await makeRecord('EVT-40003')
-        await db.getRepository(AssetFile).update(stepped[3].id, { recordId: other.id })
-        await assignProductsToAssetFiles()
-        assert.equal((await fileRow(stepped[3].id)).recordId, other.id)
-        await runEnrichmentPass()
-        for (const [index, name] of names.entries()) {
-            const [a, b] = [await fileRow(legacy[index].id), await fileRow(stepped[index].id)]
-            if (index < 3) assert.deepEqual([b.recordId, b.recordView], [a.recordId, a.recordView], name)
-            else assert.deepEqual([b.recordId, a.recordId], [null, null], name)
-        }
-        assert.equal((await fileRow(legacy[0].id)).recordId, record.id)
-        process.env.ENABLE_LEGACY_PRODUCT_MATCHING = 'false'
-        await db.getRepository(AssetFile).update(legacy[0].id, { recordId: null })
-        await assignProductsToAssetFiles()
-        assert.equal((await fileRow(legacy[0].id)).recordId, null)
+        while ((await db.query("SELECT 1 FROM migrations WHERE name = 'SingleMatching1792886400000'")).length) await db.undoLastMigration()
+        await db.runMigrations()
     } finally {
         delete process.env.PRODUCT_MATCHING_REGEX
-        delete process.env.ENABLE_LEGACY_PRODUCT_MATCHING
     }
+    const stepsOf = async type => (await db.getRepository(AssetTypeResolverStep).findBy({ assetTypeId: type.id })).map(s => s.config)
+    assert.deepEqual(await stepsOf(campaign), [{ pattern: LEGACY, keyGroup: 1, viewGroup: 2 }])
+    assert.deepEqual(await stepsOf(stepped), [{ pattern: '^(OWN-\\d+)', keyGroup: 1 }], 'a type with steps keeps them')
+    await runEnrichmentPass()
+    assert.deepEqual([(await fileRow(file.id)).recordId, (await fileRow(file.id)).recordView, await statusOf(file.id)], [record.id, null, 'matched'])
+    assert.equal(await statusOf(keyless.id), 'not_applicable', 'only a missing picture waits in To review')
+    assert.deepEqual((await linksOf(untyped.id)).map(link => [link.recordId, link.strategy, link.isPrimary]), [[record.id, 'manual_file', true]])
+    assert.deepEqual([(await fileRow(untyped.id)).recordId, await statusOf(untyped.id)], [record.id, 'matched'])
 })
 
 test('search shows a file once across collections and lists files covering the range of the records a query finds', async () => {
@@ -341,4 +331,36 @@ test('the upgrade turns the product regex into a first step of every record-rela
     await runEnrichmentPass()
     assert.deepEqual(await db.query('SELECT id, updated_at FROM asset_entity_links WHERE asset_file_id = $1', [file.id]), before)
     assert.deepEqual([(await fileRow(file.id)).recordId, (await fileRow(file.id)).recordView, await statusOf(file.id)], [record.id, '03', 'matched'])
+})
+
+test('an admin finds a folder by its path and sees what linking it would change before linking it', async () => {
+    const admin = caller(fixtures.admin)
+    const photos = await makeType('Preview photos')
+    const campaign = await harness.makeType('Preview campaign', { isRelatedToRecords: false })
+    const root = await typedFolder('PREVIEW 100% SS25', photos)
+    const shoot = await childFolder(root, 'PREVIEW SHOOT')
+    const nested = await childFolder(shoot, 'PREVIEW NESTED')
+    await makeRecord('PRV-1')
+    await makeFile(shoot, { name: 'PRV-1.00.jpg', assetTypeId: photos.id })
+    await makeFile(shoot, { name: 'mood.jpg', assetTypeId: campaign.id })
+    await makeFile(nested, { name: 'mood 2.jpg', assetTypeId: campaign.id })
+    await runEnrichmentPass()
+    const before = await admin.entityResolution.folderPreview(shoot.id)
+    assert.deepEqual([before.files, before.types.map(row => [row.type, row.files, row.linked])], [3, [['Preview campaign', 2, 0], ['Preview photos', 1, 0]]])
+    assert.deepEqual([before.linkedAbove, before.subfoldersLinked], [null, 0])
+    await admin.entityResolution.attach({ target: { kind: 'record', key: 'PRV-1' }, folderId: root.id })
+    await admin.entityResolution.attach({ target: { kind: 'attribute', name: 'Collection', value: 'Aurora' }, folderId: nested.id })
+
+    const found = await admin.entityResolution.folderSearch({ query: 'preview shoot' })
+    assert.deepEqual(found.map(folder => [folder.id, folder.files]), [[shoot.id, 3], [nested.id, 1]])
+    assert.equal((await admin.entityResolution.folderSearch({ query: '100%' }))[0].id, root.id)
+    assert.deepEqual(await admin.entityResolution.folderSearch({ query: 'PREVIEW 1_0' }), [], '_ and % are characters, not wildcards')
+
+    const preview = await admin.entityResolution.folderPreview(shoot.id)
+    assert.deepEqual(preview.types.map(row => [row.type, row.files, row.linked]), [['Preview campaign', 2, 1], ['Preview photos', 1, 1]], 'the parent links every type below it, except where a nearer folder has its own link')
+    assert.deepEqual(preview.linkedHere, [])
+    assert.deepEqual(preview.linkedAbove, { path: (await db.getRepository(AssetFolder).findOneBy({ id: root.id })).path, target: 'PRV-1' })
+    assert.equal(preview.subfoldersLinked, 1)
+    await forbidden(caller(fixtures.member).entityResolution.folderPreview(shoot.id))
+    await forbidden(caller(fixtures.member).entityResolution.folderSearch({ query: 'preview' }))
 })

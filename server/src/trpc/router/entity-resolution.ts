@@ -20,6 +20,7 @@ import { AssetFolderEntityAttachment } from "../../entity/asset-folder-entity-at
 import { DataRecord } from "../../entity/data-record"
 import { dataSource } from "../../env"
 import { rerunEntityStage } from "../../services/enrichment"
+import { likePattern } from "../../services/records"
 import { createRecord } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
 
@@ -71,6 +72,61 @@ export default router({
 				GROUP BY f.id, f.path, t.name ORDER BY files DESC, f.path LIMIT $1
 			`, [LIST_LIMIT])
 			return rows
+		}),
+	// The folders an admin can link by hand, found by any part of their path,
+	// with the files each holds with its subfolders.
+	folderSearch: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(z.object({ query: z.string().max(200) }))
+		.query(async ({ input }) => {
+			const rows: { id: string, path: string, files: number }[] = await dataSource.query(`
+				SELECT f.id, f.path,
+					(SELECT count(*) FROM asset_files a INNER JOIN asset_folders d ON d.id = a.folder_id WHERE d.mpath LIKE f.mpath || '%' AND a.status <> 'pending_deletion')::int AS files
+				FROM asset_folders f
+				WHERE f.path ILIKE $1
+				ORDER BY length(f.path), f.path
+				LIMIT 30
+			`, [likePattern(input.query.trim())])
+			return rows
+		}),
+	// What linking a folder would change: its files by asset type, how many a
+	// rule already links, and the hand links above and below it.
+	folderPreview: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(z.uuid())
+		.query(async ({ input }) => {
+			const [folder]: { id: string, path: string, mpath: string }[] = await dataSource.query('SELECT id, path, mpath FROM asset_folders WHERE id = $1', [input])
+			if (!folder) {
+				throw new TRPCError({ code: 'NOT_FOUND', message: 'Asset folder not found.' })
+			}
+			const types: { type: string | null, files: number, linked: number }[] = await dataSource.query(`
+				SELECT t.name AS type, count(*)::int AS files, count(a.record_id)::int AS linked
+				FROM asset_files a
+				INNER JOIN asset_folders d ON d.id = a.folder_id
+				LEFT JOIN asset_types t ON t.id = a.asset_type_id
+				WHERE d.mpath LIKE $1 || '%' AND a.status <> 'pending_deletion'
+				GROUP BY t.name ORDER BY files DESC, t.name
+			`, [folder.mpath])
+			const target = (row: { target_kind: string, record_key: string | null, attribute_name: string | null, attribute_value: string | null }) =>
+				row.target_kind === 'record' ? row.record_key ?? '' : `${row.attribute_name} = ${row.attribute_value}`
+			const attachments: { path: string, mpath: string, target_kind: string, record_key: string | null, attribute_name: string | null, attribute_value: string | null }[] = await dataSource.query(`
+				SELECT f.path, f.mpath, at.target_kind, at.record_key, at.attribute_name, at.attribute_value
+				FROM asset_folder_entity_attachments at
+				INNER JOIN asset_folders f ON f.id = at.asset_folder_id
+				WHERE $1 LIKE f.mpath || '%' OR f.mpath LIKE $1 || '%'
+				ORDER BY length(f.mpath) DESC
+			`, [folder.mpath])
+			const here = attachments.filter((row) => row.mpath === folder.mpath)
+			const above = attachments.find((row) => row.mpath !== folder.mpath && folder.mpath.startsWith(row.mpath))
+			const below = new Set(attachments.filter((row) => row.mpath !== folder.mpath && row.mpath.startsWith(folder.mpath)).map((row) => row.path))
+			return {
+				path: folder.path,
+				files: types.reduce((total, row) => total + row.files, 0),
+				types: types.map((row) => ({ type: row.type, files: row.files, linked: row.linked })),
+				linkedHere: here.map(target),
+				linkedAbove: above ? { path: above.path, target: target(above) } : null,
+				subfoldersLinked: below.size,
+			}
 		}),
 	unmatchedFiles: publicProcedure
 		.use(authMiddleware(userAdmin))
