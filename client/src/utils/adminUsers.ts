@@ -26,7 +26,7 @@ export const userStateLabels = { active: 'Active', pending: 'Needs approval', un
 export function filterUsers(users: AdminUser[], filters: UserFilters, sort: UserSort, ascending: boolean) {
   const query = filters.search.trim().toLocaleLowerCase()
   return users.filter(user =>
-    (!query || [user.name, user.email, user.company].some(value => value.toLocaleLowerCase().includes(query))) &&
+    (!query || [user.name, user.email, user.company, user.organisation ?? ''].some(value => value.toLocaleLowerCase().includes(query))) &&
     (filters.view === 'all' || userState(user) === filters.view) &&
     (filters.role === 'all' || (filters.role === 'no-guests' ? user.role !== 'guest' : user.role === filters.role)) &&
     (filters.region === 'all' || user.regionId === filters.region) &&
@@ -52,8 +52,8 @@ export function csvCell(value: unknown) {
   return `"${safe.replace(/"/g, '""')}"`
 }
 export function usersCsv(users: AdminUser[]) {
-  const rows = [['Name', 'Email', 'Company', 'Role', 'Region', 'Groups', 'Status', 'Joined', 'Last login'], ...users.map(user => [
-    user.name, user.email, user.company, user.role, user.region, user.groups.map(group => group.name).join('; '), userStateLabels[userState(user)], user.createdAt, user.lastLoginAt,
+  const rows = [['Name', 'Email', 'Company', 'Organisation', 'Role', 'Region', 'Groups', 'Status', 'Joined', 'Last login'], ...users.map(user => [
+    user.name, user.email, user.company, user.organisation, user.role, user.region, user.groups.map(group => group.name).join('; '), userStateLabels[userState(user)], user.createdAt, user.lastLoginAt,
   ])]
   return '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n')
 }

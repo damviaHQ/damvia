@@ -12,9 +12,5 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-/// <reference types="vite/client" />
-
-declare module 'virtual:damvia-modules' {
-  const modules: import('@/modules').ClientModule[]
-  export default modules
-}
+// A module the loader must refuse: its name cannot be a router key.
+module.exports = { name: 'Not-Valid', setup: () => ({}) }

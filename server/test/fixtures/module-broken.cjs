@@ -12,9 +12,12 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-/// <reference types="vite/client" />
-
-declare module 'virtual:damvia-modules' {
-  const modules: import('@/modules').ClientModule[]
-  export default modules
+// A module whose hook always fails, for test/modules.cjs.
+module.exports = {
+    name: 'broken',
+    setup() {
+        return {
+            hooks: { 'records.changed': () => { throw new Error('broken hook') } },
+        }
+    },
 }

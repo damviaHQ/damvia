@@ -96,14 +96,14 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `sendResetPasswordEmail` | mutation | public | Pushes `mailer/password-reset` for an existing, non-suspended account; the job creates the token. Always answers the same |
 | `resetPassword` | mutation | public | Sets a new password given the email and the reset token, ends every session of the account, clears the lockout, then signs in |
 | `resendVerificationEmail` | mutation | login | Resends the caller’s verification email; no token is returned |
-| `me` | query | login | Current user, with `mfaEnabled`, `mfaSetupRequired` and `hasPassword`. Also stamps `users.last_login_at` and inserts a `login` activity event when the previous stamp is older than 30 minutes |
+| `me` | query | login | Current user, with `organisationId`, `mfaEnabled`, `mfaSetupRequired` and `hasPassword`. Also stamps `users.last_login_at` and inserts a `login` activity event when the previous stamp is older than 30 minutes |
 | `updateProfile` | mutation | login | Own name/company; changing email requires admin |
 | `verifyEmail` | mutation | public | Consumes `?verificationCode=`; the code alone identifies the account, so the link works signed out. Limited to 10 attempts per IP per 15 minutes |
 | `changeUnverifiedEmail` | mutation | login | While the caller's email is unverified: sets a new address, voids the old link and reset token, decides `approved` from the new domain, queues a new verification email. 5 per hour |
 | `removeAccount` | mutation | login | Deletes own account (`FORBIDDEN` for any other id) |
 | `findById` | query | `userManagerOrAdmin` | One user (managers: own region) |
-| `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user; `maintenanceContact` is applied by admins on admin profiles only. Only admins change region or another user's email; an email change by an admin ends that user's sessions and clears their reset and email-link tokens |
-| `list` | query | `userManagerOrAdmin` | Users (managers: own region), with `lastLoginAt`, `suspendedAt` and `mfaEnabled`; `maintenanceContact` is only returned to admins |
+| `update` | mutation | `userManagerOrAdmin` | Name, company, email, region, role, groups of a user; `maintenanceContact` is applied by admins on admin profiles only. Only admins change region, organisation or another user's email. `organisationId` is optional: left out, the organisation is kept; `null` takes the user out of it; an unknown id is `NOT_FOUND`; a manager's value is ignored; an email change by an admin ends that user's sessions and clears their reset and email-link tokens |
+| `list` | query | `userManagerOrAdmin` | Users (managers: own region), with `organisationId` and the `organisation` name, `lastLoginAt`, `suspendedAt` and `mfaEnabled`; `maintenanceContact` is only returned to admins |
 | `approve` | mutation | `userManagerOrAdmin` | Approves a verified account (`BAD_REQUEST` before verification) and pushes `email/user-approved` |
 | `remove` | mutation | `userManagerOrAdmin` | Deletes a user with their personal collections, invitations and downloads; their public collections lose their owner. Managers can delete only members and guests in their region |
 | `resendVerificationEmailFor` | mutation | `userManagerOrAdmin` | Resends the verification email of a managed, unverified user |
@@ -113,9 +113,9 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `resume` | mutation | `userManagerOrAdmin` | Clears `suspendedAt` and the lockout of a managed user |
 | `revokeSessions` | mutation | `userManagerOrAdmin` | Ends every session of a managed user |
 | `resetMfa` | mutation | `userAdmin` | Removes a user's two-step verification enrolment and ends their sessions |
-| `accessReview` | query | `userManagerOrAdmin` | CSV of every user (managers: own region, admins and managers included): `email`, `name`, `company`, `role`, `region`, `groups`, `approved`, `email_verified`, `mfa`, `mfa_required`, `suspended_at`, `last_login_at`, `created_at`; formula-like cells are prefixed with `'` |
+| `accessReview` | query | `userManagerOrAdmin` | CSV of every user (managers: own region, admins and managers included): `email`, `name`, `company`, `organisation`, `role`, `region`, `groups`, `approved`, `email_verified`, `mfa`, `mfa_required`, `suspended_at`, `last_login_at`, `created_at`; formula-like cells are prefixed with `'` |
 
-### `group`, `region`, `authorizedDomain`
+### `group`, `region`, `organisation`, `authorizedDomain`
 
 | Procedure | Kind | Auth | Purpose |
 |---|---|---|---|
@@ -126,6 +126,9 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `region.list` | query | `userAdmin` | Regions |
 | `region.create`, `region.update`, `region.remove` | mutation | `userAdmin` | CRUD |
 | `region.moveUsers` | mutation | `userAdmin` | Moves every user of one region to another; `NOT_FOUND` when either region does not exist |
+| `organisation.list` | query | `userAdmin` | Organisations ordered by name, each with its `userCount` |
+| `organisation.create`, `organisation.update` | mutation | `userAdmin` | Name trimmed, 1 to 80 characters; `CONFLICT` when another organisation has it, whatever its case |
+| `organisation.remove` | mutation | `userAdmin` | Deletes it; its users stay, without an organisation. Returns `unassignedUsers` |
 | `authorizedDomain.list` | query | `userAdmin` | Domains allowed to sign up |
 | `authorizedDomain.create`, `authorizedDomain.remove` | mutation | `userAdmin` | CRUD |
 
@@ -379,6 +382,10 @@ Every procedure requires `userAdmin`, except the four below the table. A `filter
 | `createImageUpload`, `finalizeImageUpload` | mutation | Presigned POST to `newsletters/uploads/{userId}/{uploadId}`, then re-encoded by sharp to JPEG, or PNG when transparent, at most 960 px wide |
 
 `mySubscription` (`{ subscribed, bouncedAt, bounceReason }`) and `setMySubscription` need only a session, as account management. `setMySubscription` raises `newsletterTokenVersion`, ending every unsubscribe link already sent, and subscribing clears a bounce. `subscription` (query) and `unsubscribe` (mutation, `{ token }`) are public and can only unsubscribe: the token is an HS256 JWT of `APP_SECRET` with `purpose: 'newsletter-unsubscribe'`, the user id and their `newsletterTokenVersion` (`v`), valid 90 days. Both are rate-limited per address and the query changes nothing. The mail clients' one-click button posts to the Fastify route `POST /v1/unsubscribe/:token` instead.
+
+### `modules`
+
+Each [module](./modules.md) listed in `DAMVIA_MODULES` mounts its own router under `modules.<name>`: the procedure `add` of the `hello` module is `modules.hello.add` on the wire. Its procedures use the same predicates, context and error format as the core's. The core's `AppRouter` types this branch loosely; the module's client types its calls with `moduleClient<TheModuleRouter>('<name>')`.
 
 ### `dashboard`
 

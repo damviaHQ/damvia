@@ -17,7 +17,7 @@ import { canApproveUser, canDeleteUser, canEditUser, canManageAccount, csvCell, 
 
 const base = { name: 'Alex', company: 'Studio', email: 'alex@example.test', regionId: 'eu', region: 'Europe', role: 'member', groups: [], approved: true, emailVerified: true, createdAt: '2026-09-01T00:00:00Z' }
 const users = [
-  { ...base, id: '1', name: 'Zoe', groups: [{ id: 'a', name: 'Retail' }] },
+  { ...base, id: '1', name: 'Zoe', organisation: 'Brandfolio', groups: [{ id: 'a', name: 'Retail' }] },
   { ...base, id: '2', name: 'Alex', approved: false, createdAt: '2026-09-03T00:00:00Z', groups: [{ id: 'a', name: 'Retail' }] },
   { ...base, id: '3', name: 'Jamie', emailVerified: false, regionId: 'us', region: 'USA', role: 'guest' },
 ] as unknown as AdminUser[]
@@ -29,6 +29,7 @@ describe('admin user helpers', () => {
   test('search, status, role, region and group filters combine and do not mutate the source', () => {
     expect(filterUsers(users, { ...filters, search: '  STUDIO ', view: 'pending', role: 'member', region: 'eu', group: 'a' }, 'name', true).map(u => u.id)).toEqual(['2'])
     expect(filterUsers(users, { ...filters, search: 'missing' }, 'name', true)).toHaveLength(0)
+    expect(filterUsers(users, { ...filters, search: 'brandfolio' }, 'name', true).map(u => u.id)).toEqual(['1'])
     expect(filterUsers(users, { ...filters, role: 'no-guests' }, 'createdAt', false).map(u => u.id)).toEqual(['2', '1'])
     expect(users.map(u => u.id)).toEqual(['1', '2', '3'])
   })
@@ -58,7 +59,8 @@ describe('admin user helpers', () => {
     expect(csvCell('A, "B"')).toBe('"A, ""B"""')
     for (const value of ['=1+1', '  =1+1', '+SUM(A1)', '-1', '@SUM(A1)', '\tvalue', '\rvalue']) expect(csvCell(value).startsWith('"\'')).toBe(true)
     const csv = usersCsv([{ ...users[0], name: 'Line 1\nLine 2', company: '=HYPERLINK("bad")' }])
-    expect(csv.startsWith('﻿"Name","Email"')).toBe(true)
+    expect(csv.startsWith('﻿"Name","Email","Company","Organisation"')).toBe(true)
+    expect(csv).toContain('"Brandfolio"')
     expect(csv).toContain('"Line 1\nLine 2"')
     expect(csv).toContain('"\'=HYPERLINK(""bad"")"')
     expect(csv).toContain('"Retail"')

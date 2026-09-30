@@ -16,6 +16,7 @@ import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { Region } from "../../entity/region"
 import { analyticsRetentionDays, analyticsSearchMode, auditLogIp, auditRetentionDays, dataSource, oidcSettings, passwordBreachCheck, passwordLessAuth, sessionIdleHours, sessionMaxHours } from "../../env"
 import { brandName } from "../../services/branding"
+import { moduleRouters } from "../../modules"
 import { publicProcedure, router } from "../index"
 import analyticsRouter from "./analytics"
 import assetRouter from "./asset"
@@ -37,6 +38,7 @@ import groupRouter from "./group"
 import licenseRouter from "./license"
 import menuItemRouter from "./menu-item"
 import newsletterRouter from "./newsletter"
+import organisationRouter from "./organisation"
 import metadataFieldRouter from "./metadata-field"
 import pageRouter from "./page"
 import recordRouter from "./record"
@@ -57,6 +59,7 @@ const appRouter = router({
 	group: groupRouter,
 	authorizedDomain: authorizedDomainRouter,
 	region: regionRouter,
+	organisation: organisationRouter,
 	catalogue: catalogueRouter,
 	collection: collectionRouter,
 	asset: assetRouter,
@@ -81,6 +84,7 @@ const appRouter = router({
 	emailTemplate: emailTemplateRouter,
 	newsletter: newsletterRouter,
 	dashboard: dashboardRouter,
+	modules: router(moduleRouters),
 	env: publicProcedure.query(async () => {
 		const regions = await dataSource.getRepository(Region).find()
 		const enrichment = await dataSource.getRepository(EnrichmentSettings).findOneByOrFail({ id: 1 })

@@ -24,7 +24,7 @@ const files = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
   return statSync(path).isDirectory() ? files(path) : /\.(vue|ts)$/.test(name) ? [path] : []
 })
 const imports = (path: string) => [...readFileSync(path, 'utf8').matchAll(/from\s+["']([^"']+)["']|import\(["']([^"']+)["']\)/g)].map((match) => match[1] ?? match[2])
-const SHARED = [/^@\/(composables|utils|stores|services)\//, /^@\/components\/ui\//, /^@\/components\/page-renderer\/(PageRenderer\.vue|filesRenderer)/, /^@\/components\/(ClientLogo|Loader)\.vue$/, /^@\/components\/layout-main\/MainNavigation\.vue$/]
+const SHARED = [/^@\/(composables|utils|stores|services)\//, /^@\/components\/ui\//, /^@\/components\/page-renderer\/(PageRenderer\.vue|filesRenderer)/, /^@\/components\/(ClientLogo|Loader|ModuleSlot)\.vue$/, /^@\/components\/layout-main\/MainNavigation\.vue$/]
 
 describe('mobile boundary', () => {
   test('phone screens import shared logic and primitives only', () => {

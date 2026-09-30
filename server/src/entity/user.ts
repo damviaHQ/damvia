@@ -24,6 +24,7 @@ import {
 } from "typeorm"
 import { CollectionInvitation } from "./collection-invitation"
 import { Group } from "./group"
+import { Organisation } from "./organisation"
 import { Region } from "./region"
 import { UserFavorite } from "./user-favorite"
 import {UserGroup} from "./user-group";
@@ -128,6 +129,12 @@ export class User {
 
 	@ManyToOne(() => Region, (r) => r.users)
 	region: Region
+
+	@Column({ type: 'uuid', nullable: true })
+	organisationId: string | null
+
+	@ManyToOne(() => Organisation, (o) => o.users, { onDelete: 'SET NULL' })
+	organisation: Organisation | null
 
 	@OneToMany(() => UserFavorite, (favorite) => favorite.user)
 	favorites: UserFavorite[]

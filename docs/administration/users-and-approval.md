@@ -3,7 +3,7 @@ title: Users and approval
 description: Approve accounts, assign roles, groups and regions, and remove access without confusing verification with approval.
 sidebar:
   order: 3
-lastUpdated: 2026-09-29
+lastUpdated: 2026-09-30
 ---
 
 An account normally needs two independent conditions before it can use the library: its email must be verified and the account must be approved. Roles then decide what the person can administer; regions, groups, collection rules and file licences decide what content they can see.
@@ -20,7 +20,7 @@ The first account cannot approve itself. Promote it through the database as desc
 
 Open `/admin/users`. A verified, unapproved account shows an **Approve** action. Approval enables normal access and sends the user-approved email, which carries a single-use sign-in link valid 7 days. An account that has not verified its email address cannot be approved; ask the user to follow the verification email, resend it with `user.resendVerificationEmailFor`, or, when the email never arrives (spam filtering, a blocked sender), use **Mark email as verified** once you know the address belongs to the person.
 
-Managers see and change users only in their own region. They may approve members and guests, edit their name/company/groups, and remove eligible accounts. They cannot grant `admin` or `manager`, change anyone's region (their own included), change another user's email address, or change/remove another manager or admin.
+Managers see and change users only in their own region. They may approve members and guests, edit their name/company/groups, and remove eligible accounts. They cannot grant `admin` or `manager`, change anyone's region (their own included) or [organisation](./organisations.md), change another user's email address, or change/remove another manager or admin.
 
 Admins can manage every region and assign all roles. Only an admin changes another user's email address; the change ends that user's sessions, cancels their pending reset and email links, and sends a verification email to the new address. Before granting an administrative role, check whether the person also receives sensitive operational data or maintenance email. To require two-step verification for administrative roles, set `MFA_REQUIRED_ROLES=admin,manager`; see [Accounts and links](./accounts-and-links.md#two-step-verification).
 
@@ -94,6 +94,6 @@ Removing a user deletes their personal (private) collections, the invitations ad
 
 ## Search and export
 
-The Users screen supports text search, role/region/status filters and CSV export of the displayed administrative fields. For a periodic access review, **Export access review** in the Users screen header saves `access-review-YYYY-MM-DD.csv`: `user.accessReview` returns a CSV of every account the caller can list (a manager: every account of their region) with the columns `email`, `name`, `company`, `role`, `region`, `groups`, `approved`, `email_verified`, `mfa`, `mfa_required`, `suspended_at`, `last_login_at` and `created_at`. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet does not run them as formulas. Treat exports as personal data: store them temporarily, restrict access and delete them according to the organisation's retention policy.
+The Users screen supports text search (name, email, company and organisation), role/region/status filters and CSV export of the displayed administrative fields, organisation included. For a periodic access review, **Export access review** in the Users screen header saves `access-review-YYYY-MM-DD.csv`: `user.accessReview` returns a CSV of every account the caller can list (a manager: every account of their region) with the columns `email`, `name`, `company`, `organisation`, `role`, `region`, `groups`, `approved`, `email_verified`, `mfa`, `mfa_required`, `suspended_at`, `last_login_at` and `created_at`. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet does not run them as formulas. Treat exports as personal data: store them temporarily, restrict access and delete them according to the organisation's retention policy.
 
 When diagnosing why someone cannot enter, check in this order: suspension, sign-in lockout, email verification, approval, two-step verification, current session validity, role/region, group membership, collection rule, then file licence. Admin accounts are poor test subjects for the last step because they bypass licence checks.

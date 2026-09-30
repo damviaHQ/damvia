@@ -19,6 +19,7 @@ import { z } from 'zod'
 import { ActivityEvent, ActivityEventType } from "../../entity/activity-event"
 import { AuthorizedDomain } from "../../entity/authorized-domain"
 import { LoginToken } from "../../entity/login-token"
+import { Organisation } from "../../entity/organisation"
 import { User, UserRole } from "../../entity/user"
 import { SessionMethod } from "../../entity/user-session"
 import { dataSource, mfaRequiredRoles, oidcSettings, passwordLessAuth } from "../../env"
@@ -59,7 +60,7 @@ async function managedUser(viewer: User, id: string) {
 function accountSnapshot(user: User, groupIds?: string[]) {
 	return {
 		email: user.email, name: user.name, company: user.company, role: user.role, regionId: user.regionId,
-		approved: user.approved, maintenanceContact: user.maintenanceContact,
+		organisationId: user.organisationId, approved: user.approved, maintenanceContact: user.maintenanceContact,
 		...(groupIds ? { groupIds: [...groupIds].sort() } : {}),
 	}
 }
@@ -93,6 +94,8 @@ export function formatPublicUserForAdmin(user: User, viewer: User) {
 		company: user.company,
 		region: user.region ? user.region.name : null,
 		regionId: user.regionId,
+		organisation: user.organisation ? user.organisation.name : null,
+		organisationId: user.organisationId,
 		role: user.role,
 		emailVerified: user.emailVerified,
 		approved: user.approved,
@@ -208,6 +211,7 @@ export default router({
 				approved: ctx.user.approved,
 				role: ctx.user.role,
 				regionId: ctx.user.regionId,
+				organisationId: ctx.user.organisationId,
 				mfaEnabled: !!ctx.user.mfaEnabledAt,
 				mfaSetupRequired: mfaEnrolmentRequired(ctx.user, ctx.session.method),
 				hasPassword: !!ctx.user.password,
@@ -269,6 +273,7 @@ export default router({
 			name: z.string().min(1).max(80),
 			company: z.string().min(1).max(80),
 			regionId: z.uuid('Invalid region'),
+			organisationId: z.uuid('Invalid organisation').nullable().optional(),
 			email: z.email(),
 			role: z.enum(UserRole),
 			groupIds: z.uuid('Invalid group').array(),
@@ -309,6 +314,10 @@ export default router({
 
 			let shouldUpdateUserGroups = false
 			if (ctx.user.role === UserRole.ADMIN) {
+				if (input.organisationId && !await dataSource.getRepository(Organisation).existsBy({ id: input.organisationId })) {
+					throw new TRPCError({ code: 'NOT_FOUND', message: 'Organisation not found.' })
+				}
+				if (input.organisationId !== undefined) user.organisationId = input.organisationId
 				user.regionId = input.regionId
 				user.role = input.role
 				user.maintenanceContact = input.role === UserRole.ADMIN && (input.maintenanceContact ?? false)
@@ -336,7 +345,7 @@ export default router({
 					emailVerified: user.emailVerified, emailVerificationCode: user.emailVerificationCode,
 					...(emailChanged ? { resetPasswordToken: null, resetPasswordExpiresAt: null } : {}),
 					...(shouldUpdateUserGroups ? { regionId: user.regionId, role: user.role } : {}),
-					...(ctx.user.role === UserRole.ADMIN ? { maintenanceContact: user.maintenanceContact } : {}),
+					...(ctx.user.role === UserRole.ADMIN ? { maintenanceContact: user.maintenanceContact, organisationId: user.organisationId } : {}),
 				})
 				if (shouldUpdateUserGroups) {
 					await em.getRepository(UserGroup).delete({userId: user.id})
@@ -421,6 +430,7 @@ export default router({
 					where: ctx.user.role === UserRole.ADMIN ? {} : { regionId: ctx.user.regionId },
 					relations: {
 						region: true,
+						organisation: true,
 						userGroups: {
 							group: true,
 						},
@@ -583,12 +593,12 @@ export default router({
 		.query(async ({ ctx }) => {
 			const users = await dataSource.getRepository(User).find({
 				where: ctx.user.role === UserRole.ADMIN ? {} : { regionId: ctx.user.regionId },
-				relations: { region: true, userGroups: { group: true } },
+				relations: { region: true, organisation: true, userGroups: { group: true } },
 				order: { email: 'ASC' },
 			})
-			const header = ['email', 'name', 'company', 'role', 'region', 'groups', 'approved', 'email_verified', 'mfa', 'mfa_required', 'suspended_at', 'last_login_at', 'created_at']
+			const header = ['email', 'name', 'company', 'organisation', 'role', 'region', 'groups', 'approved', 'email_verified', 'mfa', 'mfa_required', 'suspended_at', 'last_login_at', 'created_at']
 			const rows = users.map((user) => [
-				user.email, user.name, user.company, user.role, user.region?.name ?? '',
+				user.email, user.name, user.company, user.organisation?.name ?? '', user.role, user.region?.name ?? '',
 				user.userGroups.map((userGroup) => userGroup.group.name).sort().join('; '),
 				user.approved, user.emailVerified, !!user.mfaEnabledAt, mfaRequiredRoles().includes(user.role),
 				user.suspendedAt, user.lastLoginAt, user.createdAt,

@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { assetUpdaters, dataSource, logger } from "./env"
+import { emitModuleEvent } from "./modules/events"
 import { adoptUnassignedAssets, recordAssetSourceRun, registerAssetSources, staleAssetSourceKeys } from "./services/asset"
 import { runEnrichmentPass } from "./services/enrichment"
 import { logSecurityWarnings } from "./services/security-checks"
@@ -46,6 +47,7 @@ async function startAssetUpdater() {
 			ON CONFLICT DO NOTHING
 		`).catch((error) => logger.error('failed to link files to collections', { error }))
 		await runEnrichmentPass().catch((error) => logger.error('failed to run enrichment pass', { error }))
+		await emitModuleEvent('assets.synced', {}).catch((error) => logger.error('failed to notify modules of the sync', { error }))
 		setTimeout(fetchUpdates, 5 * 60 * 1000)
 	}
 	fetchUpdates()

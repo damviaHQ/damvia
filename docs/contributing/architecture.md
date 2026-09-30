@@ -3,7 +3,7 @@ title: Architecture
 description: The single server process, the path of a request from the Vue client to a TypeORM entity, the folder map of both packages, and where a new feature goes.
 sidebar:
   order: 2
-lastUpdated: 2026-09-29
+lastUpdated: 2026-09-30
 ---
 
 This page gives a developer the shape of the code: what runs, how a request travels, what each folder holds, and where to add something. The meaning of the objects (collections, pages, records) is in [Core concepts](../introduction/concepts.md).
@@ -52,6 +52,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `load-env.ts` | Loads `.env` with dotenv, then `loadFileVariables()` fills each `NAME` from the file named by `NAME_FILE` |
 | `env.ts` | `logger` (winston, console transport, `timestamp` + `splat` + `simple` format), `dataSource`, S3 clients, mail transporter, `assetUpdater()` selection, session, cookie, proxy and MFA settings |
 | `worker.ts` | pg-boss instance, `createQueue` helper, every queue definition |
+| `modules/` | `index.ts` loads the [modules](./modules.md) listed in `DAMVIA_MODULES` when the tRPC router is built, before the data source starts: their entities and migrations, their routers under `modules`, their queues, and the `ModuleApi` they receive. `events.ts` holds their hooks and `emitModuleEvent()` |
 | `cli.ts` | `commander` program: `check-integrity`, the source commands and `metadata:backfill` |
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
 | `entity/` | 47 TypeORM entities and their enums |
@@ -75,6 +76,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `components/ui/` | shadcn-vue primitives (button, dialog, form, table, tabs...) generated from `components.json`; `lib/utils.ts` holds the `cn()` helper they use |
 | `stores/` | Pinia stores: `globalStore.ts` (current user from `user.me`, `authChecked` and `whenReady()` that the router guard awaits, `signedIn()` after a sign-in procedure, the one-time exchange of a legacy `dam_token`, `env`, selection, display preferences) and `downloadStore.ts` (polls `download.list` with Vue Query) |
 | `services/server.ts` | The tRPC client (`credentials: 'include'`), `upgradeLegacyToken()`, `RouterInput` / `RouterOutput` types, `extractErrors()` |
+| `modules.ts` | The client parts of the [modules](./modules.md), compiled in by the `damviaModules()` plugin of `vite.config.ts` from `DAMVIA_MODULES`: their routes (added by `router/index.ts`), menu entries (`MainNavigation.vue`, `LayoutAdmin.vue`), slot components (`components/ModuleSlot.vue`), and `moduleClient()` |
 | `composables/` | `useGlobalToast`, `useIsTruncated` |
 | `utils/` | `fileExtention.ts`, `fileSize.ts` |
 | `assets/` | SVG logo and placeholders |
@@ -98,3 +100,4 @@ Everything is logged with `logger` from `server/src/env.ts`: `logger.info('serve
 | A mail template | An entry in `EMAIL_DEFINITIONS` (`server/src/mail/catalogue.ts`: trigger, recipients, variables, sample values, default content), a `send*` function in `services/mailer.ts` that calls `sendTemplate`, usually a queue in `worker.ts`, and the table in [Email templates](../configuration/email-templates.md). `mail/render.ts` renders it with the hardened Liquid engine into `mail/layout.ts` |
 | A newsletter feature | `server/src/services/newsletter.ts` (sending, unsubscribe tokens), `services/audience.ts` (filter to SQL), `services/email-events.ts` (provider reports), `trpc/router/newsletter.ts`, and `mail/render.ts` (`renderNewsletter`) for anything that changes the email itself |
 | A storage provider | See [Storage drivers](./storage-drivers.md) |
+| A feature for one customer | A [module](./modules.md) in its own repository. Only the extension point it needs, if missing, goes into the core |

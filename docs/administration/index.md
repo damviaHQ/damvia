@@ -26,6 +26,7 @@ The [Dashboard](./dashboard.md) is the first place to check storage, source sync
 
 - [Users and approval](./users-and-approval.md): approve accounts, assign roles and remove access.
 - [Groups and regions](./groups-and-regions.md): model teams and markets, and understand how group restrictions inherit through collection trees.
+- [Organisations](./organisations.md): record the company each user works for, so its members act as one team.
 - [Roles and access](../introduction/roles-and-access.md): exact visibility and edit rules.
 - [Accounts and links](./accounts-and-links.md): sessions, invitations, signed URLs and revocation limits.
 - [Audit log](./audit-log.md): who changed what, sign-ins, refusals, and how long entries are kept.

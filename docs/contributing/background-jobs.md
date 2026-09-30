@@ -3,7 +3,7 @@ title: Writing a background job
 description: Declare a pg-boss queue with createQueue, push jobs from the API, understand retries and deduplication, and run a job by hand.
 sidebar:
   order: 5
-lastUpdated: 2026-09-19
+lastUpdated: 2026-09-30
 ---
 
 This page explains the job mechanism in `server/src/worker.ts` so you can add a queue or debug one. The list of existing queues, their crons and what they do is in [Background jobs](../reference/background-jobs.md); how to run the worker in production is in [Worker and scaling](../deployment/worker-and-scaling.md).
@@ -36,7 +36,7 @@ export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({
 
 `createQueue` returns an object with two methods and nothing else:
 
-- `push(data, { uniqueKey? })` calls `boss.send` with `retryBackoff: true` and `singletonKey: uniqueKey`.
+- `push(data, { uniqueKey?, em? })` calls `boss.send` with `retryBackoff: true` and `singletonKey: uniqueKey`. Given `em`, the job is inserted through that transaction, so it only exists if the transaction commits: `emitModuleEvent` in `server/src/modules/events.ts` uses it for the `modules/event` jobs of a record change.
 - `bulkPush([{ data, uniqueKey? }])` calls `boss.insert` with the same two options on every entry, in one round trip. `upsertFolder` uses it to queue one `collection/synchronization` per affected collection, and the integrity check to re-queue every outdated file.
 
 `retryBackoff: true` makes pg-boss retry a failed job with exponential backoff, using pg-boss's default retry limit since none is set here. The installed pg-boss 12 defaults are two retries after the first attempt, a 15-minute active-job expiry and deletion of completed jobs after seven days. A `singletonKey` alone does not deduplicate the default `standard` queue: that requires an appropriate queue policy or `singletonSeconds` window and tests of its semantics. No current business call supplies `uniqueKey`.

@@ -32,7 +32,8 @@ const isSelf = computed(() => store.user?.id === props.user.id)
 const isOwnManagerProfile = computed(() => isSelf.value && store.user?.role === 'manager')
 const { data: groups, status: groupsStatus, refetch: retryGroups } = useQuery({ queryKey: ['groups'], queryFn: () => trpc.group.list.query(), enabled: computed(() => !isOwnManagerProfile.value) })
 const { data: regions, status: regionsStatus, refetch: retryRegions } = useQuery({ queryKey: ['regions'], queryFn: () => trpc.region.list.query(), enabled: computed(() => !isOwnManagerProfile.value) })
-const draft = reactive({ name: '', email: '', company: '', regionId: '', role: props.user.role, groupIds: [] as string[], maintenanceContact: false })
+const { data: organisations } = useQuery({ queryKey: ['organisations'], queryFn: () => trpc.organisation.list.query(), enabled: computed(() => store.user?.role === 'admin') })
+const draft = reactive({ name: '', email: '', company: '', regionId: '', organisationId: '', role: props.user.role, groupIds: [] as string[], maintenanceContact: false })
 const saving = ref(false)
 watch(saving, value => emit('saving', value), { flush: 'sync' })
 const rootError = ref('')
@@ -40,10 +41,10 @@ const errors = ref<Record<string, string>>({})
 const groupSearch = ref('')
 const visibleGroups = computed(() => (groups.value ?? []).filter(group => group.name.toLocaleLowerCase().includes(groupSearch.value.trim().toLocaleLowerCase())))
 watch(() => props.user.id, () => {
-  Object.assign(draft, { name: props.user.name, email: props.user.email, company: props.user.company, regionId: props.user.regionId, role: props.user.role, groupIds: props.user.groups.map(group => group.id), maintenanceContact: props.user.maintenanceContact ?? false })
+  Object.assign(draft, { name: props.user.name, email: props.user.email, company: props.user.company, regionId: props.user.regionId, organisationId: props.user.organisationId ?? '', role: props.user.role, groupIds: props.user.groups.map(group => group.id), maintenanceContact: props.user.maintenanceContact ?? false })
   errors.value = {}; rootError.value = ''
 }, { immediate: true })
-const schema = z.object({ name: z.string().min(1, 'Enter a name.').max(80), email: z.email('Enter a valid email address.'), company: z.string().min(1, 'Enter a company name.').max(80), regionId: z.uuid('Choose a region.'), role: z.enum(['admin', 'manager', 'member', 'guest']), groupIds: z.uuid().array(), maintenanceContact: z.boolean() })
+const schema = z.object({ name: z.string().min(1, 'Enter a name.').max(80), email: z.email('Enter a valid email address.'), company: z.string().min(1, 'Enter a company name.').max(80), regionId: z.uuid('Choose a region.'), organisationId: z.string(), role: z.enum(['admin', 'manager', 'member', 'guest']), groupIds: z.uuid().array(), maintenanceContact: z.boolean() })
 async function save() {
   if (saving.value || !canEditUser(store.user, props.user)) return
   rootError.value = ''; errors.value = {}
@@ -56,7 +57,7 @@ async function save() {
   }
   saving.value = true
   try {
-    await trpc.user.update.mutate({ id: props.user.id, ...values })
+    await trpc.user.update.mutate({ id: props.user.id, ...values, organisationId: store.user?.role === 'admin' ? values.organisationId || null : undefined })
     await Promise.all([queryClient.invalidateQueries({ queryKey: ['users'] }), queryClient.invalidateQueries({ queryKey: ['dashboard'] })])
     if (isSelf.value) await store.fetchUser()
     toast.success('User updated')
@@ -83,6 +84,7 @@ async function save() {
      <div><label for="edit-user-role">Role</label><select id="edit-user-role" v-model="draft.role" :disabled="isSelf"><option value="guest">Guest</option><option value="member">Member</option><template v-if="store.user?.role === 'admin'"><option value="manager">Manager</option><option value="admin">Admin</option></template></select><p v-if="isSelf" class="admin-form-note">Ask another administrator to change your role.</p><p v-if="errors.role" class="admin-form-error">{{ errors.role }}</p></div>
      <div><label for="edit-user-region">Region</label><select id="edit-user-region" v-model="draft.regionId" :disabled="regionsStatus !== 'success'" :aria-invalid="!!errors.regionId"><option disabled value="">Choose a region</option><option v-for="region in regions" :key="region.id" :value="region.id">{{ region.name }}</option></select><p v-if="regionsStatus === 'pending'">Loading regions…</p><p v-if="regionsStatus === 'error'" class="admin-form-error">Regions could not be loaded. <button type="button" class="underline" @click="retryRegions()">Retry</button></p><p v-if="errors.regionId" class="admin-form-error">{{ errors.regionId }}</p></div>
     </div>
+    <div v-if="store.user?.role === 'admin'"><label for="edit-user-organisation">Organisation</label><select id="edit-user-organisation" v-model="draft.organisationId" :aria-invalid="!!errors.organisationId"><option value="">No organisation</option><option v-for="organisation in organisations" :key="organisation.id" :value="organisation.id">{{ organisation.name }}</option></select><p v-if="errors.organisationId" class="admin-form-error">{{ errors.organisationId }}</p></div>
     <div><span id="edit-user-groups-label">Groups</span><Input v-if="(groups?.length ?? 0) > 5" id="edit-user-group-search" aria-label="Find a group" v-model="groupSearch" type="search" placeholder="Find a group" /><p v-if="groupsStatus === 'pending'">Loading groups…</p><p v-else-if="groupsStatus === 'error'" class="admin-form-error">Groups could not be loaded. <button type="button" class="underline" @click="retryGroups()">Retry</button></p><div v-else class="admin-group-options" role="group" aria-labelledby="edit-user-groups-label"><label v-for="group in visibleGroups" :key="group.id"><input v-model="draft.groupIds" type="checkbox" :value="group.id" />{{ group.name }}</label><p v-if="!visibleGroups.length">{{ groupSearch ? 'No matching groups.' : 'No groups configured.' }}</p></div><p v-if="errors.groupIds" class="admin-form-error">{{ errors.groupIds }}</p></div>
    </template>
    <label v-if="store.user?.role === 'admin' && draft.role === 'admin'" class="maintenance-toggle"><input v-model="draft.maintenanceContact" type="checkbox" />Receives storage and maintenance emails</label>

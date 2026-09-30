@@ -57,6 +57,7 @@ const screens: Record<string, Screen> = {
   'collection': { url: '/collections/campaign', ready: page => page.getByRole('button', { name: /^Preview / }).first() },
   'search': { url: '/search?q=Campaign', answers: results, ready: page => page.getByText('3 results', { exact: true }) },
   'admin users': { url: '/admin/users', role: 'admin', answers: { 'user.list': people, 'group.list': [], 'region.list': [{ id: 'r1', name: 'Europe' }] }, ready: page => page.getByText('sam@example.test') },
+  'admin organisations': { url: '/admin/organisations', role: 'admin', answers: { 'organisation.list': [{ id: 'o1', name: 'Brandfolio', userCount: 3 }] }, ready: page => page.getByRole('cell', { name: 'Brandfolio' }) },
   'admin audit log': { url: '/admin/audit-log', role: 'admin', answers: { 'audit.list': auditPage, 'audit.actions': ['auth.sign_in_failed', 'user.updated'] }, ready: page => page.getByText('198.51.100.7') },
   'phone collection': { url: '/collections/campaign', phone: true, ready: heading },
   'phone search': { url: '/search?q=Campaign', phone: true, answers: results, ready: page => page.getByText('3 files', { exact: true }) },

@@ -1,4 +1,4 @@
-/* Damvia - Open Source Digital Asset Manager
+<!-- Damvia - Open Source Digital Asset Manager
 Copyright (C) 2024  Arnaud DE SAINT JEAN
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as
@@ -11,10 +11,16 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-/// <reference types="vite/client" />
+along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
+<script setup lang="ts" generic="S extends keyof ModuleSlots">
+import { moduleSlot, type ModuleSlots } from "@/modules"
 
-declare module 'virtual:damvia-modules' {
-  const modules: import('@/modules').ClientModule[]
-  export default modules
-}
+const props = defineProps<{ name: S, props: ModuleSlots[S] }>()
+const components = moduleSlot(props.name)
+</script>
+
+<template>
+  <div v-if="components.length" class="grid gap-4">
+    <component :is="component" v-for="(component, index) in components" :key="index" v-bind="props.props" />
+  </div>
+</template>

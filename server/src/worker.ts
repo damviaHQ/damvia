@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { PgBoss, type WorkOptions } from "pg-boss"
+import { EntityManager } from "typeorm"
 import { AssetFile, AssetFileStatus } from "./entity/asset-file"
 import { CollectionInvitation } from "./entity/collection-invitation"
 import { Download, DownloadStatus } from "./entity/download"
@@ -28,6 +29,7 @@ import { notifyExpiringLicenses } from "./services/license-expiry"
 import { sendNewsletterBatch, SendBatch, startDueNewsletters } from "./services/newsletter"
 import { measureStorageUsage, StorageQuotaExceededError } from "./services/storage"
 import { integrityCheck as systemIntegrityCheck } from "./services/system"
+import { deliverModuleEvent, ModuleEventJob } from "./modules/events"
 import { createDownloadArchive, DownloadAccessError, processExpiredDownloads } from "./services/download"
 import {
 	sendDownloadReady,
@@ -102,10 +104,12 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 	})
 
 	return {
-		async push(data: T, opts?: { uniqueKey: string }) {
+		// Given a transaction, the job is written in it and only runs once it commits.
+		async push(data: T, opts?: { uniqueKey?: string, em?: EntityManager }) {
 			await boss.send(name, data as object, {
 				retryBackoff: true,
 				singletonKey: opts?.uniqueKey,
+				db: opts?.em && { executeSql: async (text, values) => ({ rows: await opts.em!.query(text, values) }) },
 			})
 		},
 		async bulkPush(jobs: { data: T, uniqueKey?: string }[]) {
@@ -364,4 +368,10 @@ export const authPruneSessionsQueue = createQueue<void>({
 	name: 'auth/prune-sessions',
 	processor: () => pruneExpiredSessions(),
 	cron: '45 4 * * *',
+})
+
+// One job per module and event: see modules/events.ts.
+export const moduleEventQueue = createQueue<ModuleEventJob>({
+	name: 'modules/event',
+	processor: (data) => deliverModuleEvent(data),
 })

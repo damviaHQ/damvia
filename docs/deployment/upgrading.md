@@ -29,6 +29,8 @@ To upgrade an instance, rebuild the server image and client files, then deploy t
    then copy `client/dist/` to the static host. Deploy the client **after** the server, since the client is built against the server's tRPC types and may call procedures the old server does not have.
 5. Check `docs/reference/environment-variables.md` of the new version (or the diff of `server/.env.template`) for new variables.
 
+An instance that runs [modules](../contributing/modules.md) rebuilds its server image and its client with the same `DAMVIA_MODULES` as before. Build and test the modules against the new version first: their migrations run with the core's at startup, and a module that no longer loads stops the server.
+
 ## Sign-in and sessions in this upgrade
 
 The `1792195200000-security-hardening` migration replaces signed tokens with sessions stored in the database, and adds two-step verification, sign-in lockout and account suspension.
@@ -267,6 +269,7 @@ The data enrichment screens are regrouped. Nothing is lost and old addresses red
 | `1790553600000-records` | Renames `products` to `records` (`product_key` to `record_key`, `primary_key_name` to `key_column_name`), `product_attributes` to `record_attributes`, `asset_files.product_id` and `product_view` to `record_id` and `record_view`, `asset_types.is_related_to_products` to `is_related_to_records`; rewrites the `product_attribute.` prefix of `list_display_items` to `record_attribute.`; creates the single-row `enrichment_settings` table holding the record label. Renames only; rolling back reverses them |
 | `1790380800000-asset-folder-paths` | `path` on `asset_folders`, backfilled from the tree, with `idx_asset_folders_path` |
 | `1790467200000-asset-type-rules` | `asset_type_rules` table; `asset_type_source` and `asset_type_rule_id` on `asset_folders`. Existing typed folders whose type differs from their parent's, and typed roots, are marked `manual`; the others `inherited`. Rolling back drops the table and the three columns and loses nothing the previous version reads |
+| `1793059200000-organisations` | The `organisations` table, empty, with a unique index on the lower-case name, and a nullable `organisation_id` on `users`, indexed, set to null when its organisation is deleted. No user belongs to an organisation until an admin sets one. Rolling back drops the column and the table, and every assignment is lost |
 | `1792972800000-record-key-head` | The `damvia_key_head()` function, the part of a record key before its first `-`, `_`, `.`, `/` or space, and the `idx_records_key_head` index on it, used to find records with a similar key. Rolling back drops both |
 | `1792886400000-single-matching` | A File name rule from `PRODUCT_MATCHING_REGEX`, when set, on every asset type without rules; deletes the pg-boss schedules of the removed `asset/assign-products-to-asset-files` job. Rolling back changes nothing |
 | `1792800000000-email-deliverability` | `newsletter_token_version` (0), `email_bounced_at` and `email_bounce_reason` (null) on `users`; `bounced` and `complained` added to the recipient statuses; the `users_clear_email_bounce` trigger, which clears a bounce when the address changes or is verified again; the `newsletter_recipients_sent` index. Rolling back turns bounced and complained recipients back into `sent` and drops the rest |

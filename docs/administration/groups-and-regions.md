@@ -3,10 +3,10 @@ title: Groups and regions
 description: Model organisational access with one region per user, multiple groups and inherited collection restrictions.
 sidebar:
   order: 4
-lastUpdated: 2026-09-27
+lastUpdated: 2026-09-30
 ---
 
-Regions and groups answer different questions. A region determines who administers a user and which file licences allow them. Groups determine which restricted collection branches they can open.
+Regions and groups answer different questions. A region determines who administers a user and which file licences allow them. Groups determine which restricted collection branches they can open. The company a user works for is a third notion, their [organisation](./organisations.md).
 
 ## Regions define administrative and licence scope
 

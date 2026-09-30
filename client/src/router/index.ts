@@ -14,6 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { isPhoneNow } from "@/composables/useIsPhone"
 import { guardNavigation } from "@/router/guard.ts"
+import { moduleRoutes } from "@/modules"
 import { useGlobalStore } from "@/stores/globalStore"
 import { defineAsyncComponent, nextTick, type Component } from 'vue'
 import { createRouter, createWebHistory, type RouteLocationRaw, type RouteRecordRaw } from 'vue-router'
@@ -69,6 +70,7 @@ const router = createRouter({
 		{ name: 'admin-analytics', path: '/admin/analytics', component: () => import('@/views/admin/admin-analytics.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Insights' } },
 		{ name: 'admin-groups', path: '/admin/groups', component: () => import('@/views/admin/admin-groups.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Groups' } },
 		{ name: 'admin-regions', path: '/admin/regions', component: () => import('@/views/admin/admin-regions.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Regions' } },
+		{ name: 'admin-organisations', path: '/admin/organisations', component: () => import('@/views/admin/admin-organisations.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Organisations' } },
 		{ name: 'admin-authorized-domains', path: '/admin/authorized-domains', component: () => import('@/views/admin/admin-authorized-domains.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Authorized domains' } },
 		{ name: 'admin-audit-log', path: '/admin/audit-log', component: () => import('@/views/admin/admin-audit-log.vue'), meta: { layout: 'admin', roles: ['admin'], title: 'Audit log' } },
 		{ name: 'admin-users', path: '/admin/users', component: () => import('@/views/admin/admin-users.vue'), meta: { layout: 'admin', title: 'Users', roles: ['admin', 'manager'], mobile: () => import('@/mobile/views/MobileUsers.vue') } },
@@ -105,6 +107,7 @@ const router = createRouter({
 		{ name: 'legal-information', path: '/legal-information', component: () => import('@/views/public/public-legal-information.vue'), meta: { layout: 'public', title: 'Legal Information' } },
 		{ name: 'link-expired', path: '/link-expired', component: () => import('@/views/public/public-link-expired.vue'), meta: { layout: 'public', title: 'Link expired' } },
 		{ name: 'unsubscribe', path: '/unsubscribe', component: () => import('@/views/public/public-unsubscribe.vue'), meta: { layout: 'public', title: 'Newsletters' } },
+		...moduleRoutes,
 	]),
 })
 

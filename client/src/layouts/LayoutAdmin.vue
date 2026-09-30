@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useRecordLabel } from "@/composables/useRecordLabel"
+import { moduleAdminNav, type AdminSection } from "@/modules"
 import { useGlobalStore } from "@/stores/globalStore"
 import { formatStorage } from "@/utils/fileSize"
 import { useQuery } from "@tanstack/vue-query"
@@ -22,6 +23,7 @@ import {
   AtSign,
   ScrollText,
   Blocks,
+  Building2,
   ContactRound,
   ChartColumn,
   ChevronRight,
@@ -84,6 +86,7 @@ export type Asset = RouterOutput["asset"]["tree"][number]
 
 const globalStore = useGlobalStore()
 const isAdmin = computed(() => globalStore.user?.role === 'admin')
+const moduleItems = (section: AdminSection) => moduleAdminNav(section).filter((item) => router.resolve(item.to).meta.roles?.includes(globalStore.user?.role ?? '') ?? true)
 const { data: summary } = useQuery({
   queryKey: ['dashboard'],
   queryFn: () => trpc.dashboard.summary.query(),
@@ -144,6 +147,10 @@ const storageLevel = computed(() => {
               <ChartColumn class="w-4 h-4 mr-2" />
               Insights
             </router-link>
+            <router-link v-for="item in moduleItems('overview')" :key="item.label" :to="item.to" class="menu-item">
+              <component :is="item.icon ?? Blocks" class="w-4 h-4 mr-2" />
+              {{ item.label }}
+            </router-link>
           </div>
           <!-- Content Management -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
@@ -165,6 +172,10 @@ const storageLevel = computed(() => {
               <FilePenLine class="w-4 h-4 mr-2" />
               Pages
             </router-link>
+            <router-link v-for="item in moduleItems('content')" :key="item.label" :to="item.to" class="menu-item">
+              <component :is="item.icon ?? Blocks" class="w-4 h-4 mr-2" />
+              {{ item.label }}
+            </router-link>
           </div>
           <!-- User Management -->
           <div class="menu-section" v-if="['admin', 'manager'].includes(globalStore.user?.role ?? '')">
@@ -182,6 +193,10 @@ const storageLevel = computed(() => {
                 <KeyRound class="w-4 h-4 mr-2" />
                 Regions
               </router-link>
+              <router-link :to="{ name: 'admin-organisations' }" class="menu-item">
+                <Building2 class="w-4 h-4 mr-2" />
+                Organisations
+              </router-link>
               <router-link :to="{ name: 'admin-authorized-domains' }" class="menu-item">
                 <AtSign class="w-4 h-4 mr-2" />
                 Authorized Domains
@@ -191,6 +206,10 @@ const storageLevel = computed(() => {
                 Audit log
               </router-link>
             </template>
+            <router-link v-for="item in moduleItems('users')" :key="item.label" :to="item.to" class="menu-item">
+              <component :is="item.icon ?? Blocks" class="w-4 h-4 mr-2" />
+              {{ item.label }}
+            </router-link>
           </div>
           <!-- Asset Management -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
@@ -208,6 +227,10 @@ const storageLevel = computed(() => {
               Variants
               <span v-if="badges?.unnamedAxes" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${badges.unnamedAxes} axes waiting for a name`">{{ badges.unnamedAxes }}</span>
             </router-link>
+            <router-link v-for="item in moduleItems('assets')" :key="item.label" :to="item.to" class="menu-item">
+              <component :is="item.icon ?? Blocks" class="w-4 h-4 mr-2" />
+              {{ item.label }}
+            </router-link>
           </div>
           <!-- The records and the fields read from the files -->
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
@@ -219,6 +242,10 @@ const storageLevel = computed(() => {
             <router-link :to="{ name: 'admin-file-metadata' }" class="menu-item">
               <Blocks class="w-4 h-4 mr-2" />
               File metadata
+            </router-link>
+            <router-link v-for="item in moduleItems('database')" :key="item.label" :to="item.to" class="menu-item">
+              <component :is="item.icon ?? Blocks" class="w-4 h-4 mr-2" />
+              {{ item.label }}
             </router-link>
           </div>
           <!-- What gives every file its type and its record -->
@@ -233,6 +260,10 @@ const storageLevel = computed(() => {
               Link to {{ recordLabel.lowerPlural.value }}
               <span v-if="unmatchedBadge" class="ml-auto rounded-full bg-neutral-200 px-1.5 text-xs tabular-nums text-neutral-900" :title="`${unmatchedBadge} files unmatched or in conflict`">{{ unmatchedBadge }}</span>
             </router-link>
+            <router-link v-for="item in moduleItems('enrichment')" :key="item.label" :to="item.to" class="menu-item">
+              <component :is="item.icon ?? Blocks" class="w-4 h-4 mr-2" />
+              {{ item.label }}
+            </router-link>
           </div>
           <div v-if="globalStore.user?.role === 'admin'" class="menu-section">
             <router-link :to="{ name: 'admin-emails' }" class="menu-item">
@@ -246,6 +277,10 @@ const storageLevel = computed(() => {
             <router-link :to="{ name: 'admin-settings' }" class="menu-item">
               <Settings class="w-4 h-4 mr-2" />
               Settings
+            </router-link>
+            <router-link v-for="item in moduleItems('settings')" :key="item.label" :to="item.to" class="menu-item">
+              <component :is="item.icon ?? Blocks" class="w-4 h-4 mr-2" />
+              {{ item.label }}
             </router-link>
           </div>
         </div>

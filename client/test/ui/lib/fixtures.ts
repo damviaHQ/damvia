@@ -170,6 +170,7 @@ export const defaults: Record<string, unknown> = {
   'collection.treeAdmin': [],
   'enrichment.badges': { unmatched: 0, unnamedAxes: 0 },
   'group.list': [],
+  'organisation.list': [],
   'page.list': [],
   'asset.tree': [],
 }

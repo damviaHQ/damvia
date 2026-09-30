@@ -3,12 +3,12 @@ title: Background jobs
 description: Every queue and cron the worker runs, what triggers it, and what it does.
 sidebar:
   order: 3
-lastUpdated: 2026-09-29
+lastUpdated: 2026-09-30
 ---
 
 Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. Every API process connects pg-boss and can queue jobs; jobs are processed inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
 
-All queues are declared in `server/src/worker.ts`. The push helpers set `retryBackoff: true`. In installed pg-boss 12, defaults allow two retries after the initial attempt, expire active jobs after 15 minutes and delete completed jobs after seven days (there is no archive table). `uniqueKey` is passed as `singletonKey`, but standard queues without a singleton window do not deduplicate it; no current business caller provides a key.
+All core queues are declared in `server/src/worker.ts`. A [module](../contributing/modules.md) declares its own, named after it (`forecast/reminders` for a module named `forecast`), and they run in the same worker. The push helpers set `retryBackoff: true`. In installed pg-boss 12, defaults allow two retries after the initial attempt, expire active jobs after 15 minutes and delete completed jobs after seven days (there is no archive table). `uniqueKey` is passed as `singletonKey`, but standard queues without a singleton window do not deduplicate it; no current business caller provides a key.
 
 ## Scheduled jobs
 
@@ -40,6 +40,7 @@ All queues are declared in `server/src/worker.ts`. The push helpers set `retryBa
 | `mailer/download-ready` | `download/create-archive` | Sends the `download-ready` template with an `API_URL/v1/downloads/{id}` link, which checks the download and its owner on every click. |
 | `newsletter/send` | `newsletter/dispatch`, and **Retry failed** on a sent newsletter | Sends a newsletter to up to 50 recipients, one message each. Each recipient still `pending` is locked (`FOR UPDATE SKIP LOCKED`) while their message is sent, so a retried or duplicated job never sends twice. Every send also takes the `newsletter/send` advisory lock, so messages leave one at a time across all workers: under it, the job stops when `NEWSLETTER_DAILY_LIMIT` messages left in the last 24 hours, and waits so that messages are `1 / NEWSLETTER_RATE_PER_SECOND` seconds apart. A person who unsubscribed, was suspended, lost approval or verification, was deleted or bounced since the start is marked `skipped`. A refused message is marked `failed` with the server's reply and does not fail the job. The last job to finish marks the newsletter `sent`. One job at a time per worker. |
 | `mailer/invitation` | Inviting a guest to a collection | Stores a new secret for the invitation and sends the `invitation` template with a `/login?invite=` link. The link signs the guest in for as long as the invitation exists and has not expired; the sessions it opened end when the invitation is removed or expires. Sending it again makes earlier links stop working. |
+| `modules/event` | A sync pass that finishes (`assets.synced`), and every write to `record_changes` (`records.changed`), only when a loaded [module](../contributing/modules.md) has a hook for that event | Runs the hook of one module for one event. Each module gets its own job, so a failing hook is retried alone and never delays the core or another module. A job pushed inside a transaction is only delivered once that transaction commits. A job for a module no longer loaded is logged as `module.event.unhandled` and dropped. |
 
 Template contents are configured in [Email templates](../configuration/email-templates.md).
 

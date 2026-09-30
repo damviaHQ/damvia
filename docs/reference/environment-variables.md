@@ -3,7 +3,7 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-29
+lastUpdated: 2026-09-30
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
@@ -40,6 +40,7 @@ Any variable can also be read from a file, the way Docker and Kubernetes mount s
 | `AUDIT_RETENTION_DAYS` | `730` | Days of [audit log](../administration/audit-log.md) entries kept. The `audit/prune` job deletes older entries every night. `0` keeps them forever. |
 | `AUDIT_LOG_IP` | `true` | `false` stops recording the client address and browser of each audit entry. |
 | `AUDIT_LOG_STREAM` | `false` | `true` also writes every audit entry to the server log as an `audit` line, for a log collector or SIEM. |
+| `DAMVIA_MODULES` | unset (no module) | Modules added to this server, separated by commas: installed package names such as `@acme/damvia-forecast`, or paths starting with `.` or `/`, read from the server folder. Each one adds its tables, migrations, procedures and jobs at startup. A module that cannot be loaded, or two with the same name, stop the server at startup. List the same modules in the client's `DAMVIA_MODULES`. See [Modules](../contributing/modules.md). |
 
 ### Sign-in and sessions
 
@@ -140,5 +141,6 @@ Client variables are read by Vite **at build time** and baked into the bundle. C
 | `VITE_BRAND_COLOR` | `#e5e5e5` | Accent colour. A Tailwind name (`red-500`), a hex colour without `#` (`e11d48`), or any CSS colour. In dotenv, quote values starting with `#`: `VITE_BRAND_COLOR="#e11d48"`. |
 | `VITE_BRAND_COLOR_HOVER` | `#f5f5f5` | Hover shade of the accent. |
 | `VITE_BRAND_COLOR_STRONG` | `#262626` | Strong shade of the accent. |
+| `DAMVIA_MODULES` | unset (no module) | Modules built into the client, separated by commas: the same package names as the server's `DAMVIA_MODULES`, or paths starting with `.` from the client folder. Their screens, menu entries and components are compiled with the core, so a change needs a rebuild. Read from the environment or from `client/.env`. See [Modules](../contributing/modules.md). |
 
 The brand colours are resolved in `client/tailwind.config.js`, which loads `client/.env` itself. See [Client configuration](../configuration/client-env.md).

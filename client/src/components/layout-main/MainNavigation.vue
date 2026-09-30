@@ -19,6 +19,7 @@ import MainMenuTree from "@/components/layout-main/MainMenuTree.vue"
 import { MENU_TOUCH, menuIconClasses, menuIconSlotClasses, treeRowClasses, treeActiveRowClasses, treeConnectorStartClasses } from "@/components/layout-main/navigationStyles"
 import { Button } from "@/components/ui/button"
 import { useMyCollections } from "@/composables/useMyCollections"
+import { moduleNav } from "@/modules"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useGlobalStore } from "@/stores/globalStore"
 import { useQuery } from "@tanstack/vue-query"
@@ -39,6 +40,7 @@ const isDialogCreateCollectionOpen = ref<boolean>(false)
 type Collection = RouterOutput["collection"]["tree"][number]
 
 const globalStore = useGlobalStore()
+const navItems = computed(() => moduleNav.filter((item) => router.resolve(item.to).meta.roles?.includes(globalStore.user?.role ?? '') ?? true))
 const { data: collections, myCollections } = useMyCollections()
 const { data: menuItems } = useQuery({
   queryKey: ["menu-items"],
@@ -185,6 +187,9 @@ const CollectionDialogCreate = defineAsyncComponent(() => import("@/components/c
     <div v-if="globalStore.user?.role !== 'guest'" class="mb-4 grid gap-1">
       <router-link :to="{ name: 'favorites' }" :class="treeRowClasses" :active-class="treeActiveRowClasses">
         <span :class="menuIconSlotClasses"><Star :class="menuIconClasses" aria-hidden="true" /></span><span class="min-w-0 truncate">Favorites</span>
+      </router-link>
+      <router-link v-for="item in navItems" :key="item.label" :to="item.to" :class="treeRowClasses" :active-class="treeActiveRowClasses">
+        <span :class="menuIconSlotClasses"><component :is="item.icon" v-if="item.icon" :class="menuIconClasses" aria-hidden="true" /></span><span class="min-w-0 truncate">{{ item.label }}</span>
       </router-link>
       <div>
         <div v-if="touch && myCollections.length" class="flex items-center gap-1">

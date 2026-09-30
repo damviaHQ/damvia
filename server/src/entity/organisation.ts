@@ -12,9 +12,35 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-/// <reference types="vite/client" />
+import {
+	Column,
+	CreateDateColumn,
+	Entity,
+	OneToMany,
+	PrimaryColumn,
+	PrimaryGeneratedColumn,
+	UpdateDateColumn
+} from "typeorm"
+import { User } from "./user"
 
-declare module 'virtual:damvia-modules' {
-  const modules: import('@/modules').ClientModule[]
-  export default modules
+// The company a person works for, such as a distributor or a subsidiary.
+// Its members act as one: whatever belongs to the organisation is shared by
+// all of them.
+@Entity('organisations')
+export class Organisation {
+	@PrimaryColumn()
+	@PrimaryGeneratedColumn("uuid")
+	id: string
+
+	@Column()
+	name: string
+
+	@OneToMany(() => User, (u) => u.organisation)
+	users: User[]
+
+	@CreateDateColumn({ type: 'timestamptz' })
+	createdAt: Date
+
+	@UpdateDateColumn({ type: 'timestamptz' })
+	updatedAt: Date
 }

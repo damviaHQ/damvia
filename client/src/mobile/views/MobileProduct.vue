@@ -18,6 +18,7 @@ import { useRoute } from "vue-router"
 import { useQuery } from "@tanstack/vue-query"
 import { ImageOff } from "@lucide/vue"
 import Loader from "@/components/Loader.vue"
+import ModuleSlot from "@/components/ModuleSlot.vue"
 import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { useRecordLabel } from "@/composables/useRecordLabel"
@@ -103,6 +104,7 @@ function swipe(event: TouchEvent, phase: "start" | "end") {
         <dd class="m-0"><button type="button" class="w-full break-words whitespace-pre-wrap bg-transparent p-0 text-left text-inherit" :aria-label="`Copy ${fact.label}: ${fact.value}`" @click="copy(fact.value, fact.label)">{{ fact.value }}</button></dd>
       </div>
     </dl>
+    <ModuleSlot name="product.details" :props="{ product }" class="px-4" />
     <section v-if="product.siblings.length" aria-labelledby="related-heading" class="grid gap-2">
       <h2 id="related-heading" class="px-4 text-sm font-semibold text-[var(--dv-text-secondary)]">Related {{ plural }}</h2>
       <div class="flex gap-3 overflow-x-auto px-4 pb-2">

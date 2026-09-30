@@ -6,7 +6,7 @@ sidebar:
 lastUpdated: 2026-09-30
 ---
 
-This page is the entry point for developers who want to change or extend Damvia. It covers the application packages, their scripts and checks, and what a pull request must contain. The other pages of this group describe the code itself: [Architecture](./architecture.md), [Data model](./data-model.md), [tRPC API](./api.md), [Writing a background job](./background-jobs.md) [Storage drivers](./storage-drivers.md) and the proposed [Design system](./design-system.md).
+This page is the entry point for developers who want to change or extend Damvia. It covers the application packages, their scripts and checks, and what a pull request must contain. The other pages of this group describe the code itself: [Architecture](./architecture.md), [Data model](./data-model.md), [tRPC API](./api.md), [Writing a background job](./background-jobs.md), [Storage drivers](./storage-drivers.md), [Modules](./modules.md) and the proposed [Design system](./design-system.md).
 
 ## The development environment is the local setup
 
@@ -38,10 +38,10 @@ The two application packages have their own `package.json` and `node_modules`. A
 | `client/` | `npm run dev` | `vite`, on port 5173 |
 | `client/` | `npm run build` | `vite build` into `client/dist/` |
 | `server/` | `node test/bench/catalogue.cjs` | Seeds a catalogue of `RECORDS` products with three files each and reports the timing of every reader-facing query. Not part of `npm test`; recreate the `_test` database first |
-| `client/` | `npm run typecheck` | `vue-tsc --noEmit` over `src/` and `test/unit/`, then over `test/ui/` and `playwright.config.ts` with `tsconfig.playwright.json`; needs `npm run build` in `server/` first |
+| `client/` | `npm run typecheck` | `vue-tsc --noEmit` over `src/`, `test/unit/` and the module fixture in `test/fixtures/`, then over `test/ui/` and `playwright.config.ts` with `tsconfig.playwright.json`; needs `npm run build` in `server/` first |
 | `client/` | `npm run ui:check` | Type check of the shadcn-vue components and the design preview with `tsconfig.ui.json` |
 | `client/` | `npm test` | Vitest over `client/test/unit/**/*.test.ts`; `npm run test:watch` keeps it running |
-| `client/` | `npm run test:ui` | Playwright over `client/test/ui/*.spec.ts` in Chromium, against a Vite server it starts on port 5176; set `UI_SHOTS=1` to also write screenshots |
+| `client/` | `npm run test:ui` | Playwright over `client/test/ui/*.spec.ts` in Chromium, against a Vite server it starts on port 5176; `modules.spec.ts` runs against a second one on port 5177, built with the module in `client/test/fixtures/module-hello`. Set `UI_SHOTS=1` to also write screenshots |
 | `client/` | `npm run preview` | `vite preview` of the built bundle |
 | `client/` | `npm run design:dev` | Isolated design proposal on port 5174 at `/design-system.html` |
 | `client/` | `npm run design:check` | Strict type check of the isolated design proposal |

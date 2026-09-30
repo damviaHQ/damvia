@@ -29,5 +29,14 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     trace: 'retain-on-failure',
   },
-  webServer: { command: 'npm run dev -- --host 127.0.0.1 --port 5176 --strictPort', url: 'http://127.0.0.1:5176/design-system.html', reuseExistingServer: false },
+  // modules.spec.ts runs against a second client built with the hello module
+  // of test/fixtures; every other spec sees the client as shipped.
+  projects: [
+    { name: 'core', testIgnore: /modules\.spec\.ts/ },
+    { name: 'modules', testMatch: /modules\.spec\.ts/, use: { baseURL: 'http://127.0.0.1:5177' } },
+  ],
+  webServer: [
+    { command: 'npm run dev -- --host 127.0.0.1 --port 5176 --strictPort', url: 'http://127.0.0.1:5176/design-system.html', reuseExistingServer: false },
+    { command: 'npm run dev -- --host 127.0.0.1 --port 5177 --strictPort', env: { DAMVIA_MODULES: './test/fixtures/module-hello' }, url: 'http://127.0.0.1:5177/design-system.html', reuseExistingServer: false },
+  ],
 })
