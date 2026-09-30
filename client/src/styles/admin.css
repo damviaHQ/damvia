@@ -207,7 +207,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .records-grid-resize { position:absolute; right:-3px; top:0; bottom:0; width:6px; cursor:col-resize; z-index:5; touch-action:none; }
 .dv-admin .records-grid-resize:hover, .dv-admin .records-grid-resize:focus-visible { background:var(--dv-action-primary); outline:none; }
 .dv-admin .records-grid-thumbnail { display:grid; place-items:center; width:100%; height:36px; }
-.dv-admin .records-grid-thumbnail img, .dv-admin .records-grid-thumbnail svg { width:30px; height:30px; object-fit:contain; border-radius:4px; background:var(--dv-surface-canvas); }
+.dv-admin .records-grid-thumbnail img, .dv-admin .records-grid-thumbnail .record-picture-placeholder { width:30px; height:30px; object-fit:contain; border-radius:4px; background:var(--dv-surface-canvas); }
+.dv-admin .records-grid-heading-button--icon { justify-content:center; padding:0; }
+.dv-admin .records-grid-heading-button--icon .records-grid-heading-chevron { margin-left:0; }
 .dv-admin .records-grid-key { display:flex; align-items:center; gap:6px; height:100%; padding:0 10px; font-weight:500; }
 .dv-admin .records-grid-open { display:grid; place-items:center; width:22px; height:22px; margin-left:auto; color:var(--dv-text-secondary); opacity:0; }
 .dv-admin .records-grid tr:hover .records-grid-open, .dv-admin .records-grid td:focus .records-grid-open { opacity:1; }
@@ -217,13 +219,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .records-grid-filled { display:flex; align-items:center; gap:8px; height:100%; padding:0 10px; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); font-variant-numeric:tabular-nums; }
 .dv-admin .records-grid-meter { flex:1; height:4px; background:var(--dv-color-line); border-radius:2px; overflow:hidden; }
 .dv-admin .records-grid-meter > span { display:block; height:100%; background:var(--dv-action-primary); }
-.dv-admin .records-grid-new td { background:var(--dv-surface-canvas); }
-.dv-admin .records-grid-new-form { display:flex; align-items:center; gap:12px; height:100%; }
-.dv-admin .records-grid-new-form input { flex:0 1 420px; height:36px; padding:0 10px; background:transparent; border:0; font:inherit; }
-.dv-admin .records-grid-new-form input:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:-2px; background:var(--dv-surface-panel); }
-.dv-admin .records-grid-new-form .admin-form-error { margin:0; }
-.dv-admin .records-grid-reveal { margin-left:8px; color:var(--dv-action-primary); font-weight:500; text-decoration:underline; text-underline-offset:2px; }
-.dv-admin .records-grid-reveal:hover { text-decoration-thickness:2px; }
 .dv-admin .records-grid tbody tr.is-flashed td { animation:records-row-flash 2s ease-out; }
 @keyframes records-row-flash { 0%, 40% { background:var(--dv-action-soft); } }
 @media (prefers-reduced-motion: reduce) { .dv-admin .records-grid tbody tr.is-flashed td { animation:none; background:var(--dv-action-soft); } }
@@ -267,6 +262,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin.record-panel { display:flex; flex-direction:column; }
 .dv-admin .record-panel-header { display:flex; align-items:center; gap:16px; padding:24px 56px 16px 24px; border-bottom:1px solid var(--dv-color-line); }
 .dv-admin .record-placeholder { padding:12%; fill:var(--dv-text-secondary); opacity:.55; }
+.dv-admin .record-picture-placeholder { display:grid; place-items:center; border:1px dashed var(--dv-color-line-strong); color:var(--dv-text-secondary); }
+.dv-admin .record-picture-placeholder svg { width:58%; height:58%; opacity:.65; }
 .dv-admin .record-panel-picture { width:72px; height:72px; flex-shrink:0; object-fit:contain; border-radius:var(--dv-radius-graphic); background:var(--dv-surface-canvas); }
 .dv-admin .record-panel-tabs { display:flex; flex-direction:column; flex:1; min-height:0; padding:0 24px; }
 .dv-admin .record-panel-tablist { display:flex; justify-content:flex-start; gap:24px; height:auto; padding:0; border-bottom:1px solid var(--dv-color-line); background:transparent; border-radius:0; }
@@ -291,6 +288,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .record-panel-field .record-field-control, .dv-admin .record-panel-field .record-field-select { border-color:var(--dv-color-line); border-radius:var(--dv-radius-field); }
 .dv-admin .record-panel-field .record-field-control:hover, .dv-admin .record-panel-field .record-field-select:hover { border-color:var(--dv-color-line-strong); }
 @media (max-width: 480px) { .dv-admin .record-panel-field { grid-template-columns:minmax(0, 1fr); } .dv-admin .record-panel-field-label { min-height:0; } }
+.dv-admin .record-panel-field > .record-field-hints { grid-column:-2; }
+.dv-admin .record-panel-suggestions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; padding:10px 12px; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-field); background:var(--dv-surface-canvas); font-size:var(--dv-size-caption); }
 .dv-admin .record-panel-subheading { font-size:var(--dv-size-body); font-weight:600; margin-top:8px; }
 .dv-admin .record-panel-files { display:grid; gap:10px; }
 .dv-admin .record-panel-files li { display:grid; grid-template-columns:64px 1fr; gap:12px; align-items:center; font-size:var(--dv-size-caption); }
@@ -302,6 +301,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 .dv-admin .record-history ul li { display:flex; flex-wrap:wrap; gap:6px; }
 .dv-admin .record-history-old { color:var(--dv-text-secondary); text-decoration:line-through; }
 .dv-admin .record-panel-footer { padding:12px 24px; border-top:1px solid var(--dv-color-line); }
+.dv-admin .record-panel-footer--actions { display:flex; justify-content:flex-end; gap:8px; padding-inline:0; }
+.dv-admin .record-field-hints { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:var(--dv-size-caption); }
+.dv-admin .record-field-hint { padding:1px 8px; border:1px solid var(--dv-color-line); border-radius:999px; background:var(--dv-surface-canvas); font:inherit; }
+.dv-admin .record-field-hint:hover { border-color:var(--dv-action-primary); color:var(--dv-action-primary); }
+.dv-admin .record-field-hint:focus-visible { outline:2px solid var(--dv-action-primary); outline-offset:1px; }
 
 .dv-admin .record-filters { display:grid; gap:12px; }
 .dv-admin .record-filter-row { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, .8fr) 28px; gap:8px; align-items:center; }

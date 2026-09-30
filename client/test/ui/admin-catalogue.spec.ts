@@ -19,8 +19,8 @@ function fixture(mockTrpc: MockTrpc) {
   const relatedRecords = { enabled: true, groups: [{ scope: 'all', matchField: '$family', hasPhoto: false, filters: [], excludeFilters: [] }] }
   const collection = { ...source, id: 'catalogue', name: 'Winter shoes', canEdit: true, synchronized: false, catalogueMode: 'products', recordFilters: [], includesAllRecords: false, relatedRecords: null as unknown }
   const rows = [
-    { id: 'shoe-1', recordKey: 'SHOE-001', metaData: { name: 'Canvas sneaker', season: 'Winter' }, source: 'manual', excluded: false, readiness: { filled: 3, total: 3, ready: true } },
-    { id: 'shoe-2', recordKey: 'SHOE-002', metaData: { name: 'Leather boot', season: 'Winter' }, source: 'rule', excluded: false, readiness: { filled: 1, total: 3, ready: false } },
+    { id: 'shoe-1', recordKey: 'SHOE-001', metaData: { name: 'Canvas sneaker', season: 'Winter' }, source: 'manual', excluded: false, readiness: { filled: 3, total: 3, ready: true, missing: { fields: [], views: [] } } },
+    { id: 'shoe-2', recordKey: 'SHOE-002', metaData: { name: 'Leather boot', season: 'Winter' }, source: 'rule', excluded: false, readiness: { filled: 1, total: 3, ready: false, missing: { fields: ['Description'], views: ['front'] } } },
   ]
   return mockTrpc({
     'collection.findById': collection,
@@ -49,6 +49,8 @@ test('the builder preserves excluded rows and counts readiness across the whole 
   await expect(page.getByRole('heading', { name: 'Winter shoes', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Exclude all not ready (24)' })).toBeVisible()
   const row = page.getByRole('row', { name: /SHOE-002/ })
+  await expect(row.getByText('Missing: Description, front picture')).toBeVisible()
+  await expect(page.getByRole('row', { name: /SHOE-001/ }).getByText(/Missing:/)).toHaveCount(0)
   await row.getByRole('switch').click()
   await expect.poll(() => api.inputs('collection.setRecordsExcluded')[0]).toEqual({ id: 'catalogue', recordIds: ['shoe-2'], excluded: true })
   await expect(row).toBeVisible()

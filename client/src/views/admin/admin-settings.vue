@@ -111,6 +111,9 @@ const viewExample = computed(() => {
   const separator = recordLabel.value.viewSeparator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return `(key)(?:${separator}(\\d{${recordLabel.value.viewDigits}}))?`
 })
+const singularLower = computed(() => recordLabel.value.recordLabelSingular.trim().toLowerCase() || 'product')
+const plural = computed(() => recordLabel.value.recordLabelPlural.trim() || 'Products')
+const pluralLower = computed(() => plural.value.toLowerCase())
 const viewNumber = (view: number) => String(view).padStart(Math.max(1, recordLabel.value.viewDigits), '0')
 const viewFile = (view: number) => `ABC123-001${recordLabel.value.viewSeparator}${viewNumber(view)}.jpg`
 const recordLabelErrors = ref<Record<string, string>>({})
@@ -130,8 +133,6 @@ function toggleRequiredField(id: string, checked: boolean) {
   readiness.value.requiredAttributeIds = checked ? [...ids, id] : ids.filter((current) => current !== id)
 }
 
-// The catalogue reads the setting that hides empty products, so both are saved
-// together from this one form.
 async function saveReadiness() {
   if (isSavingReadiness.value) return
   isSavingReadiness.value = true
@@ -140,9 +141,7 @@ async function saveReadiness() {
       ...readiness.value,
       requiredViews: requiredViewsText.value.split(',').map((view) => view.trim()).filter(Boolean),
     })
-    await trpc.settings.updateEnrichment.mutate(recordLabel.value)
     await queryClient.invalidateQueries({ queryKey: ['readiness-definition'] })
-    await queryClient.invalidateQueries({ queryKey: ['enrichment-settings'] })
     toast.success('Readiness saved')
   } catch (error) {
     toast.error((error as Error).message)
@@ -234,194 +233,294 @@ const removeBackgroundImage = async () => {
     <div class="settings-sections">
       <AdminPageHeader />
 
-      <section class="dv-panel branding-settings" aria-labelledby="brand-name-heading">
-        <h2 id="brand-name-heading">Brand name</h2>
-        <p>Shown in the browser tab, and in every email: as the sender, at the top when there is no logo, and in the footer.</p>
-        <form class="brand-name-form" @submit.prevent="saveBrandName">
-          <div class="record-label-field">
-            <Label for="brandName">Name</Label>
-            <Input id="brandName" v-model="brandNameInput" maxlength="120" :placeholder="store.env?.appName ?? 'Your brand'" />
+      <section class="settings-group" aria-labelledby="branding-heading">
+        <header class="settings-group-header">
+          <h2 id="branding-heading">Branding</h2>
+          <p>How the client portal, login pages and emails look to your readers.</p>
+        </header>
+        <div class="dv-panel settings-panel">
+          <div class="setting-row">
+            <div class="setting-main">
+              <h3 id="brand-name-heading">Brand name</h3>
+              <form class="setting-form" aria-labelledby="brand-name-heading" @submit.prevent="saveBrandName">
+                <div class="record-label-field setting-narrow">
+                  <Label for="brandName" class="sr-only">Brand name</Label>
+                  <Input id="brandName" v-model="brandNameInput" maxlength="120" :placeholder="store.env?.appName ?? 'Your brand'" />
+                </div>
+                <div class="setting-actions">
+                  <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingBrandName || brandNameInput.trim() === (brandTheme?.brandName ?? '')">{{ isSavingBrandName ? 'Saving…' : 'Save name' }}</Button>
+                </div>
+              </form>
+            </div>
+            <div class="setting-help">
+              <p>Shown in the browser tab, and in every email: as the sender, at the top when there is no logo, and in the footer.</p>
+              <p>Leave empty to use the name your hosting provider set.</p>
+            </div>
           </div>
-          <p class="branding-note">Leave empty to use the name your hosting provider set.</p>
-          <div class="flex flex-wrap gap-3">
-            <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingBrandName || brandNameInput.trim() === (brandTheme?.brandName ?? '')">{{ isSavingBrandName ? 'Saving…' : 'Save name' }}</Button>
+  
+          <div class="setting-row">
+            <div class="setting-main">
+              <h3>Brand logo</h3>
+              <p v-if="logoStatus === 'pending'" role="status">Loading brand logo…</p>
+              <div v-else-if="logoStatus === 'error'" role="alert">The logo could not be loaded. <Button class="dv-button" variant="outline" @click="refetchLogo()">Try again</Button></div>
+              <div v-else class="setting-form">
+                <div v-if="logo?.imageUrl" class="logo-preview"><img :src="logo.imageUrl" alt="Current brand logo" /></div>
+                <input ref="logoInput" type="file" accept="image/svg+xml,image/png,image/webp" class="hidden" aria-label="Choose brand logo" @change="uploadLogo" />
+                <div class="setting-actions">
+                  <Button class="dv-button dv-button--primary" :disabled="isSavingLogo" @click="logoInput?.click()">{{ isSavingLogo ? 'Updating…' : logo?.exists ? 'Replace logo' : 'Upload logo' }}</Button>
+                  <Button v-if="logo?.exists" class="dv-button" variant="outline" :disabled="isSavingLogo" @click="removeLogo">Remove logo</Button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-help">
+              <p>Appears in the client portal and on login pages. Your hosting provider controls whether it also appears in the admin sidebar.</p>
+              <p>SVG, PNG or WebP, up to 5 MB. A new logo replaces the previous one.</p>
+            </div>
           </div>
-        </form>
+  
+          <div class="setting-row">
+            <div class="setting-main">
+              <h3 id="accent-heading">Accent colour</h3>
+              <form class="setting-form" aria-labelledby="accent-heading" @submit.prevent="saveAccent(accent.toLowerCase())">
+                <div class="accent-fields">
+                  <input v-model="accent" type="color" class="accent-swatch" aria-label="Pick the accent colour" />
+                  <div class="record-label-field">
+                    <Label for="accentHex">Hex code</Label>
+                    <Input id="accentHex" v-model.trim="accent" maxlength="7" placeholder="#171717" :aria-invalid="!accentValid" class="accent-hex" />
+                  </div>
+                  <div class="accent-sample" aria-hidden="true">
+                    <span class="accent-sample-button" :style="{ background: accentPreview, color: textOn(accentPreview) }">Download</span>
+                    <span class="accent-sample-link" :style="{ color: accentPreview }">View collection</span>
+                  </div>
+                </div>
+                <p v-if="!accentValid" class="admin-form-error">Enter a colour as # followed by six hexadecimal digits, such as #0044f4.</p>
+                <p v-else-if="accentTooLight" class="setting-warning" role="status">This colour is light: buttons get dark text, and links may be hard to read on white.</p>
+                <div class="setting-actions">
+                  <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingAccent || !accentValid">{{ isSavingAccent ? 'Saving…' : 'Save colour' }}</Button>
+                  <Button v-if="brandTheme?.accentColor" type="button" class="dv-button" variant="outline" :disabled="isSavingAccent" @click="saveAccent(null)">Use the default</Button>
+                </div>
+              </form>
+            </div>
+            <div class="setting-help">
+              <p>Colours buttons and links in the client portal and in every email. The administration keeps its own colours.</p>
+            </div>
+          </div>
+  
+          <div class="setting-row">
+            <div class="setting-main">
+              <h3>Login background</h3>
+              <div class="setting-form">
+                <img v-if="backgroundImageUrl" :src="backgroundImageUrl" alt="Current background" class="background-preview" />
+                <input type="file" ref="fileInput" @change="handleFileUpload" accept="image/jpeg,image/png,image/webp" class="hidden" aria-label="Choose login background" />
+                <div class="setting-actions">
+                  <Button class="dv-button dv-button--primary" :disabled="isLoading" @click="fileInput?.click()">{{ isLoading ? 'Updating…' : backgroundImageUrl ? 'Replace background' : 'Upload background' }}</Button>
+                  <Button v-if="backgroundImageUrl" class="dv-button" variant="outline" :disabled="isLoading" @click="removeBackgroundImage">Remove background</Button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-help">
+              <p>The image displayed behind the login screen.</p>
+              <p>JPEG, PNG or WebP, up to 20 MB.</p>
+            </div>
+          </div>
+        </div>
       </section>
-      <section class="dv-panel branding-settings">
-        <h2>Brand Logo</h2>
-        <p>Your logo appears in the client portal and on login pages. Your hosting provider controls whether it also appears in the admin sidebar.</p>
-        <p v-if="logoStatus === 'pending'" role="status">Loading brand logo…</p>
-        <div v-else-if="logoStatus === 'error'" role="alert">The logo could not be loaded. <Button class="dv-button" variant="outline" @click="refetchLogo()">Try again</Button></div>
+
+      <section class="settings-group" aria-labelledby="enrichment-heading">
+        <header class="settings-group-header">
+          <h2 id="enrichment-heading">Data enrichment</h2>
+          <p>How {{ pluralLower }} are named, matched to files and shown in the catalogue.</p>
+        </header>
+        <section v-if="enrichmentStatus !== 'success'" class="dv-panel settings-panel">
+          <p v-if="enrichmentStatus === 'pending'" role="status">Loading record settings…</p>
+          <div v-else role="alert">The record settings could not be loaded. <Button class="dv-button" variant="outline" @click="refetchEnrichment()">Try again</Button></div>
+        </section>
         <template v-else>
-          <div v-if="logo?.imageUrl" class="logo-preview"><img :src="logo.imageUrl" alt="Current brand logo" /></div>
-          <p class="branding-note">SVG, PNG or WebP · up to 5 MB. Uploading a new logo replaces the previous one.</p>
-          <input ref="logoInput" type="file" accept="image/svg+xml,image/png,image/webp" class="hidden" aria-label="Choose brand logo" @change="uploadLogo" />
-          <div class="flex flex-wrap gap-3">
-            <Button class="dv-button dv-button--primary" :disabled="isSavingLogo" @click="logoInput?.click()">{{ isSavingLogo ? 'Updating…' : logo?.exists ? 'Replace logo' : 'Upload logo' }}</Button>
-            <Button v-if="logo?.exists" class="dv-button" variant="outline" :disabled="isSavingLogo" @click="removeLogo">Remove logo</Button>
-          </div>
-        </template>
-      </section>
-      <section class="dv-panel branding-settings" aria-labelledby="accent-heading">
-        <h2 id="accent-heading">Accent colour</h2>
-        <p>Colours buttons and links in the client portal and in every email. The administration keeps its own colours.</p>
-        <form class="accent-form" @submit.prevent="saveAccent(accent.toLowerCase())">
-          <div class="accent-fields">
-            <input v-model="accent" type="color" class="accent-swatch" aria-label="Pick the accent colour" />
-            <div class="record-label-field">
-              <Label for="accentHex">Hex code</Label>
-              <Input id="accentHex" v-model.trim="accent" maxlength="7" placeholder="#171717" :aria-invalid="!accentValid" class="accent-hex" />
+          <section class="dv-panel settings-panel" aria-labelledby="records-heading">
+            <header class="settings-panel-header">
+              <h3 id="records-heading">Naming and views</h3>
+              <p>What your records are called, and how their files are named.</p>
+            </header>
+  
+            <div class="setting-row">
+              <div class="setting-main">
+                <h4 id="record-label-heading">Record label</h4>
+                <form class="setting-form" aria-labelledby="record-label-heading" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
+                  <div class="record-label-fields">
+                    <div class="record-label-field">
+                      <Label for="recordLabelSingular">Singular</Label>
+                      <Input id="recordLabelSingular" v-model="recordLabel.recordLabelSingular" placeholder="Product" :aria-invalid="!!recordLabelErrors.recordLabelSingular" />
+                      <p v-if="recordLabelErrors.recordLabelSingular" class="admin-form-error">{{ recordLabelErrors.recordLabelSingular }}</p>
+                    </div>
+                    <div class="record-label-field">
+                      <Label for="recordLabelPlural">Plural</Label>
+                      <Input id="recordLabelPlural" v-model="recordLabel.recordLabelPlural" placeholder="Products" :aria-invalid="!!recordLabelErrors.recordLabelPlural" />
+                      <p v-if="recordLabelErrors.recordLabelPlural" class="admin-form-error">{{ recordLabelErrors.recordLabelPlural }}</p>
+                    </div>
+                  </div>
+                  <div class="setting-actions">
+                    <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || !recordLabel.recordLabelSingular.trim() || !recordLabel.recordLabelPlural.trim()">{{ isSavingRecordLabel ? 'Saving…' : 'Save label' }}</Button>
+                  </div>
+                </form>
+              </div>
+              <div class="setting-help">
+                <p>The name of the things your records describe, such as products, events or venues.</p>
+                <p>It replaces the word everywhere records appear: the admin menu, the search filters and the asset type settings. The menu entry will read "{{ plural }}".</p>
+              </div>
             </div>
-            <div class="accent-sample" aria-hidden="true">
-              <span class="accent-sample-button" :style="{ background: accentPreview, color: textOn(accentPreview) }">Download</span>
-              <span class="accent-sample-link" :style="{ color: accentPreview }">View collection</span>
+  
+            <div class="setting-row">
+              <div class="setting-main">
+                <h4 id="views-heading">Views</h4>
+                <form class="setting-form" aria-labelledby="views-heading" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
+                  <label class="views-switch"><Switch v-model="recordLabel.viewsEnabled" />Files show several views of each {{ singularLower }}</label>
+                  <template v-if="recordLabel.viewsEnabled">
+                    <div class="record-label-fields">
+                      <div class="record-label-field">
+                        <Label for="viewSeparator">Separator</Label>
+                        <Input id="viewSeparator" v-model="recordLabel.viewSeparator" maxlength="1" placeholder="." :aria-invalid="!!recordLabelErrors.viewSeparator" />
+                        <p v-if="recordLabelErrors.viewSeparator" class="admin-form-error">{{ recordLabelErrors.viewSeparator }}</p>
+                      </div>
+                      <div class="record-label-field">
+                        <Label for="viewDigits">Digits</Label>
+                        <Input id="viewDigits" v-model.number="recordLabel.viewDigits" type="number" min="1" max="4" :aria-invalid="!!recordLabelErrors.viewDigits" />
+                        <p v-if="recordLabelErrors.viewDigits" class="admin-form-error">{{ recordLabelErrors.viewDigits }}</p>
+                      </div>
+                      <div class="record-label-field">
+                        <Label for="thumbnailView">Thumbnail view</Label>
+                        <Input id="thumbnailView" v-model="recordLabel.thumbnailView" placeholder="00" :aria-invalid="!!recordLabelErrors.thumbnailView" />
+                      </div>
+                    </div>
+                    <ul class="views-example" aria-label="File name examples">
+                      <li><code>{{ viewFile(1) }}</code><span>view {{ viewNumber(1) }}, the front for example</span></li>
+                      <li><code>{{ viewFile(2) }}</code><span>view {{ viewNumber(2) }}, the back</span></li>
+                      <li><code>{{ viewFile(3) }}</code><span>view {{ viewNumber(3) }}, the side</span></li>
+                    </ul>
+                  </template>
+                  <div class="setting-actions">
+                    <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || (recordLabel.viewsEnabled && recordLabel.viewSeparator.length !== 1)">{{ isSavingRecordLabel ? 'Saving…' : 'Save views' }}</Button>
+                  </div>
+                </form>
+              </div>
+              <div class="setting-help">
+                <p>Optional. Tells apart several pictures of the same {{ singularLower }} (front, back, side, close-up) by a number after its reference in the file name.</p>
+                <p>With views on, these files link to the same {{ singularLower }}, search can be filtered by view, and one view is used as the {{ singularLower }}'s picture.</p>
+                <template v-if="recordLabel.viewsEnabled">
+                  <p><strong>Separator</strong> and <strong>digits</strong> describe the number, added after the key of every file name rule: <code>{{ viewExample }}</code></p>
+                  <p><strong>Thumbnail view</strong> is the picture of a {{ singularLower }} in the admin list.</p>
+                </template>
+                <p v-else>Views are off: file names are read as the key only and the view filter is hidden from search.</p>
+                <p>Matching and picture access through collections work either way.</p>
+              </div>
             </div>
-          </div>
-          <p v-if="!accentValid" class="admin-form-error">Enter a colour as # followed by six hexadecimal digits, such as #0044f4.</p>
-          <p v-else-if="accentTooLight" class="branding-note accent-warning" role="status">This colour is light: buttons get dark text, and links may be hard to read on white.</p>
-          <div class="flex flex-wrap gap-3">
-            <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingAccent || !accentValid">{{ isSavingAccent ? 'Saving…' : 'Save colour' }}</Button>
-            <Button v-if="brandTheme?.accentColor" type="button" class="dv-button" variant="outline" :disabled="isSavingAccent" @click="saveAccent(null)">Use the default</Button>
-          </div>
-        </form>
-      </section>
-      <div class="dv-panel branding-settings">
-        <h2>Login background</h2>
-        <p class="branding-note">The image displayed behind your login screen.</p>
-
-        <div v-if="backgroundImageUrl" class="mb-4">
-          <img :src="backgroundImageUrl" alt="Current background" class="branding-background-preview w-full max-w-md" />
-        </div>
-
-        <div class="flex flex-wrap gap-4">
-          <input type="file" ref="fileInput" @change="handleFileUpload" accept="image/jpeg,image/png,image/webp" class="hidden" aria-label="Choose login background" />
-          <Button @click="fileInput?.click()" :disabled="isLoading">
-            {{ isLoading ? 'Updating…' : backgroundImageUrl ? 'Replace background' : 'Upload background' }}
-          </Button>
-          <Button v-if="backgroundImageUrl" @click="removeBackgroundImage" variant="destructive" :disabled="isLoading">
-            Remove background
-          </Button>
-        </div>
-      </div>
-      <section class="dv-panel branding-settings" aria-labelledby="record-label-heading">
-        <h2 id="record-label-heading">Record label</h2>
-        <p>The name of the things your records describe, such as products, events or venues. It replaces the word everywhere records appear: the admin menu, the search filters and the asset type settings.</p>
-        <p v-if="enrichmentStatus === 'pending'" role="status">Loading record label…</p>
-        <div v-else-if="enrichmentStatus === 'error'" role="alert">The record label could not be loaded. <Button class="dv-button" variant="outline" @click="refetchEnrichment()">Try again</Button></div>
-        <form v-else class="record-label-form" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
-          <div class="record-label-fields">
-            <div class="record-label-field">
-              <Label for="recordLabelSingular">Singular</Label>
-              <Input id="recordLabelSingular" v-model="recordLabel.recordLabelSingular" placeholder="Product" :aria-invalid="!!recordLabelErrors.recordLabelSingular" />
-              <p v-if="recordLabelErrors.recordLabelSingular" class="admin-form-error">{{ recordLabelErrors.recordLabelSingular }}</p>
-            </div>
-            <div class="record-label-field">
-              <Label for="recordLabelPlural">Plural</Label>
-              <Input id="recordLabelPlural" v-model="recordLabel.recordLabelPlural" placeholder="Products" :aria-invalid="!!recordLabelErrors.recordLabelPlural" />
-              <p v-if="recordLabelErrors.recordLabelPlural" class="admin-form-error">{{ recordLabelErrors.recordLabelPlural }}</p>
-            </div>
-          </div>
-          <p class="branding-note">For example, the menu entry will read "{{ recordLabel.recordLabelPlural.trim() || 'Products' }}".</p>
-          <div class="flex flex-wrap gap-3">
-            <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || !recordLabel.recordLabelSingular.trim() || !recordLabel.recordLabelPlural.trim()">{{ isSavingRecordLabel ? 'Saving…' : 'Save label' }}</Button>
-          </div>
-        </form>
-        <template v-if="enrichmentStatus === 'success'">
-          <h3 id="views-heading" class="views-heading">Views</h3>
-          <p>Optional: distinguish several pictures of the same record by view. For example, a product may have front, back, side and close-up pictures. A number after its reference in the file name tells them apart:</p>
-          <ul class="views-example">
-            <li><code>{{ viewFile(1) }}</code> product <code>ABC123-001</code>, view <code>{{ viewNumber(1) }}</code>, the front for example</li>
-            <li><code>{{ viewFile(2) }}</code> same product, view <code>{{ viewNumber(2) }}</code>, the back</li>
-            <li><code>{{ viewFile(3) }}</code> same product, view <code>{{ viewNumber(3) }}</code>, the side</li>
-          </ul>
-          <p>With views on, all these files are linked to the same {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }}, search can be filtered by view (only the fronts, for example), and one view is used as the {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }}'s picture. Matching and picture access through collections also work with views off.</p>
-          <form class="record-label-form" aria-labelledby="views-heading" :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
-            <label class="views-switch"><Switch v-model="recordLabel.viewsEnabled" />Files show several views of each {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }}</label>
-            <template v-if="recordLabel.viewsEnabled">
-              <div class="record-label-fields">
-                <div class="record-label-field">
-                  <Label for="viewSeparator">Separator</Label>
-                  <Input id="viewSeparator" v-model="recordLabel.viewSeparator" maxlength="1" placeholder="." :aria-invalid="!!recordLabelErrors.viewSeparator" />
-                  <p v-if="recordLabelErrors.viewSeparator" class="admin-form-error">{{ recordLabelErrors.viewSeparator }}</p>
+          </section>
+  
+          <section class="dv-panel settings-panel" aria-labelledby="catalogue-heading">
+            <header class="settings-panel-header">
+              <h3 id="catalogue-heading">Catalogue</h3>
+              <p>How {{ pluralLower }} are shown to readers in the catalogue.</p>
+            </header>
+            <form :aria-busy="isSavingRecordLabel" @submit.prevent="saveRecordLabel">
+              <div class="setting-row">
+                <div class="setting-main">
+                  <div class="record-label-field setting-narrow">
+                    <Label for="cardTitleAttributeName">Card title field</Label>
+                    <select id="cardTitleAttributeName" v-model="recordLabel.cardTitleAttributeName" class="record-native-select">
+                      <option :value="null">Reference only</option>
+                      <option v-for="field in fields ?? []" :key="field.id" :value="field.name">{{ field.displayName ?? field.name }}</option>
+                    </select>
+                  </div>
                 </div>
-                <div class="record-label-field">
-                  <Label for="viewDigits">Digits</Label>
-                  <Input id="viewDigits" v-model.number="recordLabel.viewDigits" type="number" min="1" max="4" :aria-invalid="!!recordLabelErrors.viewDigits" />
-                  <p v-if="recordLabelErrors.viewDigits" class="admin-form-error">{{ recordLabelErrors.viewDigits }}</p>
-                </div>
-                <div class="record-label-field">
-                  <Label for="thumbnailView">Thumbnail view</Label>
-                  <Input id="thumbnailView" v-model="recordLabel.thumbnailView" placeholder="00" :aria-invalid="!!recordLabelErrors.thumbnailView" />
-                  <p class="admin-text-secondary">The view used as the picture of a {{ recordLabel.recordLabelSingular.toLowerCase() || 'record' }} in the admin list.</p>
+                <div class="setting-help">
+                  <p>The one field shown under the reference on a catalogue card, on a single line. Every other field is read on the {{ singularLower }} page.</p>
                 </div>
               </div>
-              <p class="branding-note">Added after the key of every file name rule: <code>{{ viewExample }}</code>. Turning views off hides the view filter from search; existing view values are kept until the next pass.</p>
-            </template>
-            <p v-else class="branding-note">Views are off: file names are read as the key only and the view filter is hidden from search.</p>
-            <div class="flex flex-wrap gap-3">
-              <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel || (recordLabel.viewsEnabled && recordLabel.viewSeparator.length !== 1)">{{ isSavingRecordLabel ? 'Saving…' : 'Save views' }}</Button>
-            </div>
-          </form>
-        </template>
-
-        <template v-if="enrichmentStatus === 'success'">
-          <RelatedRecordsSettings class="mt-6 border-t border-neutral-200 pt-6" />
-          <h3 id="readiness-heading" class="views-heading">Ready to use</h3>
-          <p>Say what a {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} must carry to count as ready. The catalogue then shows how far each one is, and readers can keep only the ones that are ready. Requiring nothing leaves every {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} ready.</p>
-          <div class="record-label-field">
-            <Label for="cardTitleAttributeName">Card title field</Label>
-            <select id="cardTitleAttributeName" v-model="recordLabel.cardTitleAttributeName" class="record-native-select">
-              <option :value="null">Reference only</option>
-              <option v-for="field in fields ?? []" :key="field.id" :value="field.name">{{ field.displayName ?? field.name }}</option>
-            </select>
-            <p class="admin-text-secondary">
-              The one field shown under the reference on a catalogue card, on a single line. Every other field is read on the
-              {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} page, so a long text cannot stretch one card past its neighbours.
-            </p>
-          </div>
-          <div class="record-label-field">
-            <Label for="familyAttributeName">Model field</Label>
-            <select id="familyAttributeName" v-model="recordLabel.familyAttributeName" class="record-native-select">
-              <option :value="null">No model grouping</option>
-              <option v-for="field in fields ?? []" :key="field.id" :value="field.name">{{ field.displayName ?? field.name }}</option>
-            </select>
-            <p class="admin-text-secondary">
-              {{ recordLabel.recordLabelPlural.toLowerCase() || 'products' }} sharing this value are one model, whatever the case, accents or spacing.
-              The catalogue can then be read model by model, and each {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} page lists the others of its model.
-            </p>
-          </div>
-          <form class="record-label-form" aria-labelledby="readiness-heading" :aria-busy="isSavingReadiness" @submit.prevent="saveReadiness">
-            <div class="record-label-field">
-              <Label for="requiredFields">Required fields</Label>
-              <div id="requiredFields" role="group" aria-labelledby="readiness-heading" class="flex flex-wrap gap-3">
-                <label v-for="field in fields ?? []" :key="field.id" class="flex items-center gap-2 text-body">
-                  <Checkbox :model-value="readiness.requiredAttributeIds.includes(field.id)"
-                    @update:model-value="toggleRequiredField(field.id, !!$event)" />
-                  {{ field.displayName ?? field.name }}
-                </label>
+              <div class="setting-row">
+                <div class="setting-main">
+                  <div class="record-label-field setting-narrow">
+                    <Label for="familyAttributeName">Model field</Label>
+                    <select id="familyAttributeName" v-model="recordLabel.familyAttributeName" class="record-native-select">
+                      <option :value="null">No model grouping</option>
+                      <option v-for="field in fields ?? []" :key="field.id" :value="field.name">{{ field.displayName ?? field.name }}</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="setting-help">
+                  <p>{{ plural }} sharing this value are one model, whatever the case, accents or spacing. The catalogue can then be read model by model, and each {{ singularLower }} page lists the others of its model.</p>
+                </div>
               </div>
-            </div>
-            <div class="record-label-fields">
-              <div class="record-label-field">
-                <Label for="requiredViews">Required views</Label>
-                <Input id="requiredViews" v-model="requiredViewsText" placeholder="00, 01" />
-                <p class="admin-text-secondary">View numbers separated by commas. A {{ recordLabel.recordLabelSingular.toLowerCase() || 'product' }} needs one file per view listed here.</p>
+              <div class="setting-row">
+                <div class="setting-main">
+                  <label class="views-switch"><Switch v-model="recordLabel.hideRecordsWithoutMedia" />Hide {{ pluralLower }} with no visible file</label>
+                </div>
+                <div class="setting-help">
+                  <p>Keeps {{ pluralLower }} that have no file the reader can see out of the catalogue.</p>
+                </div>
               </div>
-              <div class="record-label-field">
-                <Label for="readyLabel">Ready label</Label>
-                <Input id="readyLabel" v-model="readiness.readyLabel" placeholder="Ready to use" />
+              <div class="setting-actions setting-footer">
+                <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingRecordLabel">{{ isSavingRecordLabel ? 'Saving…' : 'Save catalogue' }}</Button>
               </div>
-              <div class="record-label-field">
-                <Label for="incompleteLabel">Incomplete label</Label>
-                <Input id="incompleteLabel" v-model="readiness.incompleteLabel" placeholder="To complete" />
+            </form>
+          </section>
+  
+          <section class="dv-panel settings-panel" aria-labelledby="readiness-heading">
+            <header class="settings-panel-header">
+              <h3 id="readiness-heading">Ready to use</h3>
+              <p>What a {{ singularLower }} must carry to count as ready. The catalogue shows how far each one is, and readers can keep only the ready ones. Requiring nothing leaves every {{ singularLower }} ready.</p>
+            </header>
+            <form :aria-busy="isSavingReadiness" @submit.prevent="saveReadiness">
+              <div class="setting-row">
+                <div class="setting-main">
+                  <div class="record-label-field">
+                    <span id="requiredFieldsLabel" class="setting-label">Required fields</span>
+                    <div role="group" aria-labelledby="requiredFieldsLabel" class="required-fields">
+                      <label v-for="field in fields ?? []" :key="field.id" class="flex items-center gap-2 text-body">
+                        <Checkbox :model-value="readiness.requiredAttributeIds.includes(field.id)"
+                          @update:model-value="toggleRequiredField(field.id, !!$event)" />
+                        {{ field.displayName ?? field.name }}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div class="setting-help">
+                  <p>A {{ singularLower }} is ready once every checked field has a value.</p>
+                </div>
               </div>
-            </div>
-            <label class="views-switch"><Switch v-model="recordLabel.hideRecordsWithoutMedia" />Keep {{ recordLabel.recordLabelPlural.toLowerCase() || 'products' }} with no visible file out of the catalogue</label>
-            <div class="flex flex-wrap gap-3">
-              <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingReadiness">{{ isSavingReadiness ? 'Saving…' : 'Save readiness' }}</Button>
-            </div>
-          </form>
+              <div class="setting-row">
+                <div class="setting-main">
+                  <div class="record-label-field setting-narrow">
+                    <Label for="requiredViews">Required views</Label>
+                    <Input id="requiredViews" v-model="requiredViewsText" placeholder="00, 01" />
+                  </div>
+                </div>
+                <div class="setting-help">
+                  <p>View numbers separated by commas. A {{ singularLower }} needs one file per view listed here.</p>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-main">
+                  <div class="record-label-fields">
+                    <div class="record-label-field">
+                      <Label for="readyLabel">Ready label</Label>
+                      <Input id="readyLabel" v-model="readiness.readyLabel" placeholder="Ready to use" />
+                    </div>
+                    <div class="record-label-field">
+                      <Label for="incompleteLabel">Incomplete label</Label>
+                      <Input id="incompleteLabel" v-model="readiness.incompleteLabel" placeholder="To complete" />
+                    </div>
+                  </div>
+                </div>
+                <div class="setting-help">
+                  <p>The words readers see on each {{ singularLower }} and in the catalogue filter.</p>
+                </div>
+              </div>
+              <div class="setting-actions setting-footer">
+                <Button type="submit" class="dv-button dv-button--primary" :disabled="isSavingReadiness">{{ isSavingReadiness ? 'Saving…' : 'Save readiness' }}</Button>
+              </div>
+            </form>
+          </section>
+  
+          <RelatedRecordsSettings class="dv-panel settings-panel related-panel" />
         </template>
       </section>
     </div>
@@ -429,30 +528,44 @@ const removeBackgroundImage = async () => {
 </template>
 
 <style scoped>
-.branding-settings { padding:28px; max-width:780px; margin-top:0; }
-.settings-sections { display:grid; gap:24px; }
-.branding-settings h2 { font-size:var(--dv-size-section); margin-bottom:12px; }
-.branding-settings p { color:var(--dv-text-secondary); font-size:var(--dv-size-body); margin-top:8px; }
-.logo-preview { display:flex; align-items:center; justify-content:center; height:110px; max-width:300px; margin:24px 0; background:white; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-graphic); }
-.logo-preview img { max-width:260px; max-height:80px; object-fit:contain; }
-.branding-background-preview { border-radius:var(--dv-radius-graphic); }
-.branding-settings .branding-note { margin-bottom:20px; }
-.record-label-fields { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-top:20px; }
-.branding-settings .views-heading { font-size:var(--dv-size-body); font-weight:600; margin-top:28px; padding-top:24px; border-top:1px solid var(--dv-color-line); }
-.views-example { display:grid; gap:6px; margin-top:12px; padding-left:0; list-style:none; color:var(--dv-text-secondary); font-size:var(--dv-size-body); }
-.views-switch { display:flex; align-items:center; gap:10px; margin-top:16px; }
-.branding-settings code { font-size:var(--dv-size-caption); }
+.settings-sections { display:grid; gap:40px; }
+.settings-group { display:grid; gap:16px; max-width:1080px; }
+.settings-group-header h2 { font-size:var(--dv-size-section); }
+.settings-group-header p { margin-top:4px; color:var(--dv-text-secondary); font-size:var(--dv-size-body); }
+.settings-panel { padding:4px 28px 24px; max-width:1080px; margin-top:0; }
+.settings-panel-header { padding:20px 0; }
+.settings-panel-header h3 { font-size:var(--dv-size-body); font-weight:600; }
+.settings-panel-header p { max-width:640px; margin-top:6px; color:var(--dv-text-secondary); font-size:var(--dv-size-body); }
+.settings-panel > .setting-row:first-child { border-top:0; }
+.setting-row { display:grid; grid-template-columns:minmax(0, 1fr) minmax(240px, 340px); gap:40px; padding:24px 0; border-top:1px solid var(--dv-color-line); }
+.setting-main { display:grid; gap:14px; align-content:start; min-width:0; }
+.setting-main :is(h3, h4), .setting-label { font-size:var(--dv-size-body); font-weight:600; }
+.setting-help { display:grid; gap:8px; align-content:start; color:var(--dv-text-secondary); font-size:var(--dv-size-caption); line-height:1.5; }
+.setting-help strong { color:var(--dv-text-primary, inherit); font-weight:600; }
+.setting-help code { overflow-wrap:anywhere; }
+.setting-form { display:grid; gap:14px; }
+.setting-narrow { max-width:360px; }
+.setting-actions { display:flex; flex-wrap:wrap; gap:12px; }
+.setting-footer { padding-top:20px; border-top:1px solid var(--dv-color-line); }
+.setting-warning { color:var(--dv-text-secondary); font-size:var(--dv-size-caption); }
+.logo-preview { display:flex; align-items:center; justify-content:center; width:220px; height:88px; background:white; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-graphic); }
+.logo-preview img { max-width:190px; max-height:60px; object-fit:contain; }
+.background-preview { width:220px; aspect-ratio:16 / 10; object-fit:cover; border:1px solid var(--dv-color-line); border-radius:var(--dv-radius-graphic); }
+.record-label-fields { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:16px; max-width:560px; }
 .record-label-field { display:grid; gap:8px; align-content:start; }
-.branding-settings .record-label-field p { margin-top:0; }
-.branding-settings :deep(.dv-button) { height:auto; padding:9px 14px; box-shadow:none; border-radius:0; }
-.brand-name-form { display:grid; gap:12px; margin-top:20px; max-width:420px; }
-.branding-settings .brand-name-form .branding-note { margin:0; }
-.accent-fields { display:flex; flex-wrap:wrap; align-items:flex-end; gap:16px; margin:20px 0 12px; }
+.required-fields { display:flex; flex-wrap:wrap; gap:10px 20px; }
+.views-switch { display:flex; align-items:center; gap:10px; font-size:var(--dv-size-body); }
+.views-example { display:grid; gap:6px; padding:12px 14px; list-style:none; background:var(--dv-surface-canvas); border:1px solid var(--dv-color-line); max-width:560px; font-size:var(--dv-size-caption); color:var(--dv-text-secondary); }
+.views-example li { display:flex; flex-wrap:wrap; gap:4px 12px; }
+.settings-panel code { font-size:var(--dv-size-caption); }
+.settings-panel :deep(.dv-button) { height:auto; padding:9px 14px; box-shadow:none; border-radius:0; }
+.accent-fields { display:flex; flex-wrap:wrap; align-items:flex-end; gap:16px; }
 .accent-swatch { width:44px; height:40px; padding:0; border:1px solid var(--dv-color-line); background:none; cursor:pointer; }
 .accent-hex { width:130px; font-family:var(--dv-font-mono, ui-monospace, monospace); }
 .accent-sample { display:flex; align-items:center; gap:16px; padding:10px 16px; border:1px solid var(--dv-color-line); background:white; }
 .accent-sample-button { padding:8px 14px; border-radius:6px; font-size:var(--dv-size-caption); font-weight:600; }
 .accent-sample-link { font-size:var(--dv-size-caption); text-decoration:underline; }
-.branding-settings .accent-warning { margin-bottom:16px; }
-@media(max-width:600px) { .branding-settings { padding:20px; } .record-label-fields { grid-template-columns:1fr; } }
+.related-panel { padding-top:28px; }
+@media(max-width:900px) { .setting-row { grid-template-columns:1fr; gap:12px; } }
+@media(max-width:600px) { .settings-panel { padding:4px 20px 20px; } .record-label-fields { grid-template-columns:1fr; } }
 </style>

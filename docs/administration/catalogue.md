@@ -56,9 +56,9 @@ Whichever way a collection is built, it only ever stores a list of references. T
 
 **Products collections** → **Build** opens the catalogue builder. **View collection** opens its reader view. It shows every product the collection holds, one row each, with no value editing: that stays in the records grid.
 
-The **References / CSV** and **Automatic rules** tabs distinguish the two membership sources. Switching tabs does not change membership. Rules are applied with **Save rules**; incomplete rules cannot be saved, and the preview continues to show the saved membership while changes are pending. Clearing and saving the rules removes automatic membership while keeping manually added references.
+The **References / CSV** and **Automatic rules** tabs distinguish the two membership sources. Switching tabs does not change membership. Rules are applied with **Save rules**; while typing a rule's value, the values the field already holds are offered, most used first; incomplete rules cannot be saved, and the preview continues to show the saved membership while changes are pending. Clearing and saving the rules removes automatic membership while keeping manually added references.
 
-Each preview row carries its reference, record fields, source and **readiness** score. Wide tables scroll horizontally within the panel. That score is production information, which is why it lives here and never on a reader's card.
+Each preview row carries its reference, record fields, source and **readiness** score. Wide tables scroll horizontally within the panel. That score is production information, which is why it lives here and never on a reader's card. A product that is not ready also lists what it lacks, such as `Missing: Description, front picture`: the required fields left empty and the required views with no file.
 
 The switch in the first column decides whether a product reaches readers. Turning it off **takes the product out of the catalogue without removing it**: the row stays in the same reference order, greyed, and the count readers see drops by one. This matters for a rule-driven collection, where a deletion would be undone at the next pass; an exclusion is a decision, and a refresh leaves it alone.
 
@@ -88,7 +88,7 @@ The filter icon of the action bar works on products exactly as it works on files
 
 ## What a card shows
 
-A catalogue card carries the main visual, the reference and the visuals attached to the product: the product pictures linked to it, the thumbnail view first. Settings → **Card title field** names the one field shown under the reference, on a single line, for example *Style name*; leaving it on **Reference only** shows the reference alone.
+A catalogue card carries the main visual, the reference and the visuals attached to the product: the product pictures linked to it, the thumbnail view first. Settings → Catalogue → **Card title field** names the one field shown under the reference, on a single line, for example *Style name*; leaving it on **Reference only** shows the reference alone.
 
 One field, one line, deliberately. A card that grew with its content left a product carrying a long description towering over an empty neighbour, and the grid stopped reading as a grid. Every other field is on the product page. **Display preferences** switches products between grid and list and chooses additional field columns. These preferences are saved independently of file layouts. The reference and configured title stay visible in both views.
 
@@ -122,7 +122,7 @@ The current product is always omitted and overlapping groups produce no duplicat
 
 ## Say what makes a product ready to use
 
-Settings → **Ready to use** describes what a complete product is in your organisation:
+Settings → **Ready to use** (group Data enrichment) describes what a complete product is in your organisation:
 
 - **Required fields**: the record fields a product must carry a value for.
 - **Required views**: the view numbers it must have a file for, for example `00` for the front and `01` for the back. Views are configured in the same screen; see [Records](./records.md).
@@ -132,11 +132,11 @@ Each product then carries a score, which you read in administration to see what 
 
 The score is recomputed when a record is edited or imported, when files are linked during a sync, and when you save the definition. A required view counts as filled as soon as one file carries that view, whether it reaches the record through a link or through the older matching column.
 
-**Keep products with no visible file out of the catalogue** hides, from listings, every product none of whose files the reader may open. A direct link to such a product still opens it: a listing choice is not a refusal, and readers who received a link should not meet a dead end.
+Settings → Catalogue → **Hide products with no visible file** hides, from listings, every product none of whose files the reader may open. A direct link to such a product still opens it: a listing choice is not a refusal, and readers who received a link should not meet a dead end.
 
 ## Group several keys under one model
 
-A brand usually sells one model in several colours or formats: one style with three colourways, one flavour in a single can and in a four-pack. Settings → **Model field** names the field holding that model, for example *Style name*. Products sharing its value form one model.
+A brand usually sells one model in several colours or formats: one style with three colourways, one flavour in a single can and in a four-pack. Settings → Catalogue → **Model field** names the field holding that model, for example *Style name*. Products sharing its value form one model.
 
 The value is matched on a normalised key: case, accents and stray spaces are ignored, so `Pampa`, ` pampa ` and `PAMPÁ` are the same model. The name shown to readers is the value as it was typed. This grouping supplies the **Same model** option in related-product settings.
 

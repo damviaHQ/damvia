@@ -27,6 +27,8 @@ const props = defineProps<{
   modelValue: string
   save?: (value: string) => Promise<void>
   addOption?: (option: string) => Promise<void>
+  // Values other records hold in this field, shown under a text input.
+  hints?: string[]
 }>()
 const emit = defineEmits<{ "update:modelValue": [value: string] }>()
 
@@ -36,6 +38,8 @@ const saving = ref(false)
 const open = ref(false)
 watch(() => props.modelValue, (value) => { if (!saving.value) draft.value = value })
 
+const isTextual = computed(() => props.field.valueType === "text" || props.field.valueType === "long_text")
+const shownHints = computed(() => isTextual.value ? (props.hints ?? []).filter((hint) => hint !== draft.value) : [])
 const isSelect = computed(() => props.field.valueType === "single_select" || props.field.valueType === "multi_select")
 const chips = computed(() => props.field.valueType === "multi_select" ? splitMulti(draft.value) : draft.value ? [draft.value] : [])
 const errorId = computed(() => `${props.id}-error`)
@@ -98,6 +102,10 @@ async function create(option: string) {
     <input v-else :id="id" v-model="draft" class="record-field-control" :type="field.valueType === 'date' ? 'date' : field.valueType === 'url' ? 'url' : 'text'"
       :inputmode="field.valueType === 'number' ? 'decimal' : undefined" :aria-invalid="!!error || undefined" :aria-describedby="error ? errorId : undefined"
       @blur="commit(draft)" @keydown.enter.prevent="commit(draft)" />
+    <p v-if="shownHints.length" class="record-field-hints">
+      <span class="admin-text-secondary">Already used:</span>
+      <button v-for="hint in shownHints" :key="hint" type="button" class="record-field-hint" @click="draft = hint; commit(hint)">{{ hint }}</button>
+    </p>
     <p v-if="error" :id="errorId" role="alert" class="admin-form-error">{{ error }}</p>
   </div>
 </template>

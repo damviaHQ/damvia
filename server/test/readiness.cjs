@@ -93,3 +93,17 @@ test('the definition is an administrator matter', async () => {
         await forbidden(caller(user).settings.saveReadiness({ requiredAttributeIds: [], requiredViews: [], readyLabel: 'a', incompleteLabel: 'b' }))
     }
 })
+
+test('the catalogue preview names what a product still lacks', async () => {
+    await admin.record.create({ recordKey: 'RD-BARE', values: {} })
+    const collection = await makeCollection({ name: 'Preview' })
+    const ids = [await productId('RD-FULL'), await productId('RD-EMPTY'), await productId('RD-BARE')]
+    await db.transaction(em => harness.services.productCollections.addRecords(em, collection.id, ids))
+
+    const preview = await admin.collection.recordPreview({ id: collection.id, offset: 0, limit: 50 })
+    const missing = Object.fromEntries(preview.rows.map(row => [row.recordKey, row.readiness.missing]))
+    assert.deepEqual(missing['RD-FULL'], { fields: [], views: [] }, 'a ready product lacks nothing')
+    assert.deepEqual(missing['RD-EMPTY'], { fields: [], views: ['00'] })
+    assert.deepEqual(missing['RD-BARE'].fields.toSorted(), ['ingredients', 'name'])
+    assert.deepEqual(missing['RD-BARE'].views, ['00'])
+})

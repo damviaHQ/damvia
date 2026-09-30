@@ -16,6 +16,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 import LinkFolderDialog from "@/components/admin/LinkFolderDialog.vue"
 import RecordPicker, { type RecordTarget } from "@/components/admin/RecordPicker.vue"
 import Loader from "@/components/Loader.vue"
+import FieldEditorDialog from "@/components/records/FieldEditorDialog.vue"
+import RecordPanel from "@/components/records/RecordPanel.vue"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -30,6 +32,7 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useGlobalToast } from "@/composables/useGlobalToast"
+import { useRecordFields } from "@/composables/useRecordFields"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
@@ -133,14 +136,34 @@ async function useCandidate(fileId: string, key: string) {
   }
 }
 
-async function createRecord(key: string) {
+// Quick create makes the product with its key only; Create and fill opens the
+// product card, and nothing exists until Save.
+async function quickCreate(key: string) {
   try {
     await trpc.entityResolution.createRecord.mutate({ key })
-    toast.success(`${label.singular.value} ${key} created. Fill its data on the next CSV import.`)
+    toast.success(`${label.singular.value} ${key} created. Fill its data later in ${label.plural.value}.`)
     await refresh()
   } catch (error) {
     toast.error((error as Error).message)
   }
+}
+
+const draftKey = ref<string | null>(null)
+const drafting = computed(() => draftKey.value !== null)
+const { allFields, addOption } = useRecordFields(drafting)
+const { data: tables } = useQuery({ queryKey: ["records", "tables"], queryFn: () => trpc.recordTable.list.query(), enabled: drafting })
+const draftTable = computed(() => tables.value?.[0] ?? null)
+const draftFields = computed(() => {
+  const byId = new Map(allFields.value.map((field) => [field.id, field]))
+  return (draftTable.value?.fieldIds ?? []).map((id) => byId.get(id)).filter((field) => !!field)
+})
+const fieldDialog = ref(false)
+async function createFilled(key: string, values: Record<string, string>) {
+  const created = await trpc.record.create.mutate({ recordKey: key, values, tableId: draftTable.value?.id, source: "unmatched" })
+  draftKey.value = null
+  toast.success(`${label.singular.value} ${created.recordKey} created`)
+  await queryClient.invalidateQueries({ queryKey: ["records"] })
+  await refresh()
 }
 
 async function detach(linkId: string) {
@@ -174,7 +197,7 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
         <TabsTrigger value="folders">Folders without a {{ label.lower.value }} <Badge variant="secondary" class="ml-2">{{ counts?.folders ?? 0 }}</Badge></TabsTrigger>
         <TabsTrigger value="files">Pictures without a {{ label.lower.value }} <Badge variant="secondary" class="ml-2">{{ counts?.unmatched ?? 0 }}</Badge></TabsTrigger>
         <TabsTrigger value="conflicts">Several {{ label.lowerPlural.value }} found <Badge variant="secondary" class="ml-2">{{ counts?.conflicts ?? 0 }}</Badge></TabsTrigger>
-        <TabsTrigger value="dangling">{{ label.singular.value }} not imported <Badge variant="secondary" class="ml-2">{{ counts?.dangling ?? 0 }}</Badge></TabsTrigger>
+        <TabsTrigger value="dangling">Missing {{ label.lowerPlural.value }} <Badge variant="secondary" class="ml-2">{{ counts?.dangling ?? 0 }}</Badge></TabsTrigger>
       </TabsList>
 
       <TabsContent v-if="section === 'review'" value="folders" class="mt-4">
@@ -262,7 +285,10 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
               <TableCell>{{ strategyLabel[link.strategy] ?? link.strategy }}</TableCell>
               <TableCell>
                 <div class="flex gap-2">
-                  <Button v-if="link.targetKind === 'record' && link.recordKey" variant="outline" size="sm" @click="createRecord(link.recordKey)">Create {{ label.lower.value }} {{ link.recordKey }}</Button>
+                  <template v-if="link.targetKind === 'record' && link.recordKey">
+                    <Button variant="outline" size="sm" @click="draftKey = link.recordKey">Create and fill</Button>
+                    <Button variant="ghost" size="sm" :title="`Create ${link.recordKey} with its key only`" @click="quickCreate(link.recordKey)">Quick create</Button>
+                  </template>
                   <Button v-if="link.manual" variant="ghost" size="sm" @click="detach(link.id)">Detach</Button>
                 </div>
               </TableCell>
@@ -290,6 +316,10 @@ const notScanned = computed(() => status.value === "success" && !counts.value?.u
         </Table>
       </TabsContent>
     </Tabs>
+    <RecordPanel :record-id="null" tab="fields" :fields="draftFields" :all-fields="allFields" :record-label="label.lower.value"
+      :save="async () => {}" :add-option="addOption" :remove="async () => {}" :draft="draftKey ? { recordKey: draftKey } : null" :create="createFilled"
+      @close="draftKey = null" @add-field="fieldDialog = true" />
+    <FieldEditorDialog v-model:open="fieldDialog" :field="null" :table-id="draftTable?.id" />
     <LinkFolderDialog :open="!!folderDialog" :folder-id="folderDialog?.folderId" :saving="saving" @update:open="(open) => !open && (folderDialog = null)" @confirm="confirmFolder" />
     <RecordPicker :open="!!picker" :title="picker?.title ?? ''" :description="picker?.description ?? ''" :saving="saving" @update:open="(open) => !open && (picker = null)" @confirm="confirm" />
   </div>

@@ -31,10 +31,11 @@ import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
 import { useGlobalToast } from "@/composables/useGlobalToast"
+import { useRecordFields } from "@/composables/useRecordFields"
 import { useRecordLabel } from "@/composables/useRecordLabel"
 import { useRecordsGridPreferences } from "@/composables/useRecordsGridPreferences"
 import { trpc, type RouterOutput } from "@/services/server"
-import { filterIsComplete, operatorsFor, type RecordFilter } from "@/utils/recordFilters"
+import { filterIsComplete, operatorsFor, PICTURE_COLUMN, type RecordFilter } from "@/utils/recordFilters"
 import { csvSafe, fieldLabel, normaliseValue } from "@/utils/recordValues"
 import { useQueries, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { refDebounced } from "@vueuse/core"
@@ -132,11 +133,9 @@ const status = computed(() => {
 const error = computed(() => tablesError.value ?? firstChunk.value?.error ?? null)
 const isFetching = computed(() => chunkQueries.value.some((result) => result.isFetching))
 
-const { data: attributes } = useQuery({ queryKey: ["records", "attributes"], queryFn: () => trpc.recordAttribute.list.query() })
+const { attributes, allFields, addOption } = useRecordFields()
 const { data: undeclared } = useQuery({ queryKey: ["records", "available-attributes"], queryFn: () => trpc.recordAttribute.listAvailable.query() })
 
-const toGridField = (field: Field): GridField => ({ id: field.id, name: field.name, displayName: field.displayName, valueType: field.valueType, options: field.options })
-const allFields = computed<GridField[]>(() => (attributes.value ?? []).map(toGridField))
 // The fields the open table shows, in its order.
 const fields = computed<GridField[]>(() => {
   const byId = new Map(allFields.value.map((field) => [field.id, field]))
@@ -294,19 +293,12 @@ async function savePanelField(recordId: string, field: GridField, value: string)
   refreshRecord(recordId)
 }
 
-async function addOption(field: GridField, option: string) {
-  try {
-    await trpc.recordAttribute.update.mutate({ id: field.id, options: [...field.options, option] })
-    await queryClient.invalidateQueries({ queryKey: ["records", "attributes"] })
-  } catch (failure) {
-    toast.error((failure as Error).message)
-    throw failure
-  }
-}
-
-// A new record goes to the open table and opens straight away as a card.
-async function createRecord(key: string) {
-  const created = await trpc.record.create.mutate({ recordKey: key, tableId: activeTableId.value ?? undefined })
+// A new record is filled in the card, then goes to the open table on Save and
+// stays open as a normal card.
+const drafting = ref(false)
+async function createRecord(key: string, values: Record<string, string>) {
+  const created = await trpc.record.create.mutate({ recordKey: key, values, tableId: activeTableId.value ?? undefined })
+  drafting.value = false
   await refreshAll()
   announce(`${recordLabel.singular.value} ${created.recordKey} added`)
   openRecord(created.id, "fields")
@@ -362,6 +354,40 @@ async function setFieldOnSelection(field: GridField, value: string) {
   toast.success(`${fieldLabel(field)} set on ${updated} ${updated === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value}`)
 }
 
+async function fillPanelFields(recordId: string, values: Record<string, string>) {
+  await trpc.record.patch.mutate({ id: recordId, values, source: "panel" })
+  refreshRecord(recordId)
+}
+
+// Empty fields of the selection take the value records with a look-alike key
+// agree on. Suggestions are all empty cells, so undo empties them again.
+async function fillSelectionFromSimilar() {
+  let suggestions: Awaited<ReturnType<typeof trpc.record.suggestions.query>>
+  const byRecord = new Map<string, Record<string, string>>()
+  try {
+    suggestions = await trpc.record.suggestions.query({ ids: selected.value })
+    if (!suggestions.length) {
+      sonner(`No empty field has a value that similar ${recordLabel.lowerPlural.value} agree on.`)
+      return
+    }
+    for (const item of suggestions) byRecord.set(item.recordId, { ...byRecord.get(item.recordId), [item.field]: item.value })
+    await trpc.record.patchMany.mutate({ changes: [...byRecord].map(([id, values]) => ({ id, values })) })
+  } catch (failure) {
+    toast.error((failure as Error).message)
+    return
+  }
+  const changes = [...byRecord].map(([id, values]) => ({ id, values }))
+  await refreshAll()
+  sonner(`${suggestions.length} ${suggestions.length === 1 ? "field" : "fields"} filled on ${changes.length} ${changes.length === 1 ? recordLabel.lower.value : recordLabel.lowerPlural.value}.`, {
+    action: {
+      label: "Undo",
+      onClick: () => trpc.record.patchMany.mutate({ changes: changes.map((change) => ({ id: change.id, values: Object.fromEntries(Object.keys(change.values).map((name) => [name, ""])) })) })
+        .then(() => refreshAll())
+        .catch((failure: Error) => toast.error(failure.message)),
+    },
+  })
+}
+
 async function moveSelection(tableId: string) {
   const { moved } = await trpc.record.moveToTable.mutate({ ids: selected.value, tableId })
   selected.value = []
@@ -412,8 +438,8 @@ const fieldsOpen = computed({
 })
 
 function filterBy(column: GridColumn) {
-  const name = column.kind === "key" ? "recordKey" : column.field!.name
-  const type = column.kind === "key" ? "key" : column.field!.valueType
+  const name = column.kind === "key" ? "recordKey" : column.kind === "thumbnail" ? PICTURE_COLUMN : column.field!.name
+  const type = column.kind === "key" ? "key" : column.kind === "thumbnail" ? "picture" : column.field!.valueType
   filters.value = [...filters.value, { column: name, op: operatorsFor(type)[0], value: "", values: [] }]
   filtersOpen.value = true
 }
@@ -539,7 +565,7 @@ watch(() => firstChunk.value?.data?.total, (count) => {
   <div class="admin-page admin-resource-page admin-records">
     <AdminPageHeader :title="recordLabel.plural.value" :description="`Create, correct and complete your ${recordLabel.lowerPlural.value}. Changes save as you go and are kept in each ${recordLabel.lower.value}'s history.`">
       <Button as-child variant="outline"><router-link :to="{ name: 'admin-record-import', query: activeTableId ? { table: activeTableId } : {} }"><FileUp class="size-4" />Import</router-link></Button>
-      <Button class="dv-button dv-button--primary" @click="grid?.focusNewRow()"><Plus />Add {{ recordLabel.lower.value }}</Button>
+      <Button class="dv-button dv-button--primary" @click="drafting = true"><Plus />Add {{ recordLabel.lower.value }}</Button>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button variant="ghost" size="icon" aria-label="More actions"><EllipsisVertical class="size-5" /></Button>
@@ -593,7 +619,7 @@ watch(() => firstChunk.value?.data?.total, (count) => {
     <template v-else>
       <section v-if="!total && !narrowed && !isFetching" class="dv-panel admin-empty">
         <h2>No {{ recordLabel.lowerPlural.value }} in {{ activeTable?.name ?? "this table" }} yet</h2>
-        <p>Add a {{ recordLabel.lower.value }} by typing its {{ keyLabel }} in the last row below, import a CSV or Excel file, or move {{ recordLabel.lowerPlural.value }} here from another table.</p>
+        <p>Add a {{ recordLabel.lower.value }} with the Add button, import a CSV or Excel file, or move {{ recordLabel.lowerPlural.value }} here from another table.</p>
         <Button as-child class="dv-button dv-button--primary"><router-link :to="{ name: 'admin-record-import', query: activeTableId ? { table: activeTableId } : {} }"><FileUp class="size-4" />Import</router-link></Button>
       </section>
       <section v-else-if="!total && !isFetching" class="dv-panel admin-empty">
@@ -603,11 +629,11 @@ watch(() => firstChunk.value?.data?.total, (count) => {
       </section>
       <div class="dv-panel records-panel">
         <RecordsGrid ref="grid" v-model:selected="selected" :rows="rows" :list-key="listKey" :columns="columns" :field-count="fields.length" :frozen="frozenCount" :wrap="preferences.wrap"
-          :sort="preferences.sort" :record-label="recordLabel.lower.value" :key-label="keyLabel"
-          :commit="commitCell" :commit-many="commitCells" :add-option="addOption" :create="createRecord"
+          :sort="preferences.sort" :record-label="recordLabel.lower.value"
+          :commit="commitCell" :commit-many="commitCells" :add-option="addOption"
           @open="(row, tab) => openRecord(row.id, tab)" @sort="(sort: GridSort) => preferences.sort = sort"
           @resize="(id, width) => preferences.widths = { ...preferences.widths, [id]: width }" @hide="(id) => toggleColumn(id, false)"
-          @filter="filterBy" @edit-field="editField" @remove-field="askRemoveField" @reveal="revealRecord" @range="(start, end) => visible = [start, end]" />
+          @filter="filterBy" @edit-field="editField" @remove-field="askRemoveField" @range="(start, end) => visible = [start, end]" />
       </div>
       <footer class="records-footer admin-text-secondary">
         <span v-if="narrowed && activeTable">{{ total.toLocaleString() }} of {{ countLabel(activeTable.recordCount) }} match</span>
@@ -618,12 +644,13 @@ watch(() => firstChunk.value?.data?.total, (count) => {
     </template>
 
     <RecordsBulkBar v-if="selected.length" :count="selected.length" :fields="fields" :record-label="recordLabel.lower.value" :record-label-plural="recordLabel.lowerPlural.value"
-      :tables="otherTables" :move="moveSelection"
+      :tables="otherTables" :move="moveSelection" :fill="fillSelectionFromSimilar"
       :set-field="setFieldOnSelection" :remove="() => removeRecords(selected)" @export="exportCsv" @clear="selected = []" />
 
     <RecordPanel :record-id="panelId" :tab="panelTab" :fields="fields" :all-fields="allFields" :record-label="recordLabel.lower.value"
-      :save="savePanelField" :add-option="addOption" :remove="(id) => removeRecords([id])"
-      @close="closeRecord" @update:tab="(tab) => openRecord(panelId!, tab)" @edit-field="editField" @add-field="editField(null)" />
+      :save="savePanelField" :fill="fillPanelFields" :add-option="addOption" :remove="(id) => removeRecords([id])"
+      :draft="drafting ? { recordKey: null } : null" :create="createRecord"
+      @close="drafting ? drafting = false : closeRecord()" @update:tab="(tab) => openRecord(panelId!, tab)" @edit-field="editField" @add-field="editField(null)" />
 
     <RecordFieldsSheet v-model:open="fieldsOpen" :fields="attributes ?? []" :tables="tables ?? []" :record-label="recordLabel.singular.value"
       @add="editField(null)" @edit="editField" @remove="askRemoveField" />

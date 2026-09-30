@@ -224,6 +224,15 @@ export function likePattern(value: string): string {
 	return `%${value.replace(/[\\%_]/g, '\\$&')}%`
 }
 
+// Filters on whether a record has a picture; a field of that exact name is
+// shadowed in filters.
+export const PICTURE_COLUMN = '@picture'
+
+// Whether the record has a picture, as the THUMBNAIL subquery finds it.
+const HAS_PICTURE = `EXISTS (SELECT 1 FROM asset_files a
+	INNER JOIN asset_types t ON t.id = a.asset_type_id AND t.is_related_to_records
+	WHERE a.record_id = r.id AND a.has_thumbnail)`
+
 // The WHERE and ORDER BY of the records list. Column names are checked
 // against the declared fields and always sent as parameters.
 export function recordQuerySql(query: RecordQuery, fields: RecordAttribute[], keyColumnName: string | null, parameters: unknown[]): { where: string, orderBy: string } {
@@ -247,6 +256,11 @@ export function recordQuerySql(query: RecordQuery, fields: RecordAttribute[], ke
 		conditions.push(`(r.record_key ILIKE ${pattern} OR EXISTS (SELECT 1 FROM each(r.meta_data) e WHERE e.value ILIKE ${pattern}))`)
 	}
 	for (const filter of query.filters ?? []) {
+		if (filter.column === PICTURE_COLUMN) {
+			if (filter.op !== 'is_empty' && filter.op !== 'is_not_empty') throw new TRPCError({ code: 'BAD_REQUEST', message: 'The picture filter is has a picture or has no picture.' })
+			conditions.push(`${filter.op === 'is_empty' ? 'NOT ' : ''}${HAS_PICTURE}`)
+			continue
+		}
 		const { expression, field } = columnExpression(filter.column)
 		const value = filter.value ?? ''
 		switch (filter.op) {

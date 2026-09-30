@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
+import { In } from "typeorm"
 import { z } from "zod"
 import { DataRecord } from "../../entity/data-record"
 import { RECORD_VALUE_TYPES, RecordAttribute } from "../../entity/record-attribute"
@@ -23,6 +24,10 @@ import { attachNewField, tableExists } from "../../services/record-tables"
 import { catalogueKeyColumnName, fieldIsLinked } from "../../services/records"
 import { visibleAttributeValues } from "../../services/search"
 import { authMiddleware, publicProcedure, router, userAdmin, userApproved } from "../index"
+
+const HINT_MAX_LENGTH = 40
+const HINT_MAX_DISTINCT = 30
+const HINT_COUNT = 6
 
 export function formatRecordAttribute(attribute: RecordAttribute) {
 	return {
@@ -64,6 +69,43 @@ export default router({
 				.select('distinct skeys(records.meta_data) as name')
 				.getRawMany<{ name: string }>()
 			return records.map((record) => record.name)
+		}),
+	// The values a short text field already holds, most used first, so an admin
+	// typing a new record sees the house style (FW25 or 25H). A field with many
+	// different values is free text and gets no hint.
+	hints: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.query(async () => {
+			const fields = await dataSource.getRepository(RecordAttribute).find({ where: { valueType: In(['text', 'long_text']) } })
+			if (!fields.length) return {} as Record<string, string[]>
+			const rows: { name: string, value: string, uses: string }[] = await dataSource.query(`
+				SELECT kv.key AS name, kv.value AS value, count(*) AS uses
+				FROM records, each(records.meta_data) AS kv
+				WHERE kv.key = ANY($1) AND kv.value <> '' AND length(kv.value) <= ${HINT_MAX_LENGTH}
+				GROUP BY kv.key, kv.value
+			`, [fields.map((field) => field.name)])
+			const byName = new Map<string, { value: string, uses: number }[]>()
+			for (const row of rows) byName.set(row.name, [...(byName.get(row.name) ?? []), { value: row.value, uses: Number(row.uses) }])
+			const hints: Record<string, string[]> = {}
+			for (const [name, values] of byName) {
+				if (values.length > HINT_MAX_DISTINCT) continue
+				hints[name] = values.sort((a, b) => b.uses - a.uses || a.value.localeCompare(b.value)).slice(0, HINT_COUNT).map((item) => item.value)
+			}
+			return hints
+		}),
+	// The values a field holds, most used first, offered while an admin types a
+	// filter value.
+	values: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(z.object({ name: z.string().min(1).max(200) }))
+		.query(async ({ input }) => {
+			const rows: { value: string }[] = await dataSource.query(`
+				SELECT meta_data -> $1 AS value
+				FROM records
+				WHERE meta_data ? $1 AND btrim(meta_data -> $1) <> '' AND length(meta_data -> $1) <= 200
+				GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 100
+			`, [input.name])
+			return rows.map((row) => row.value)
 		}),
 	list: publicProcedure
 		.use(authMiddleware(userAdmin))

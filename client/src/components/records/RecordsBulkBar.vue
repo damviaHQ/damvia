@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { fieldLabel } from "@/utils/recordValues"
-import { ArrowRightLeft, Download, PencilLine, Trash2, X } from "@lucide/vue"
+import { ArrowRightLeft, Download, PencilLine, Sparkles, Trash2, X } from "@lucide/vue"
 import { computed, ref } from "vue"
 import RecordFieldInput from "./RecordFieldInput.vue"
 import type { GridField } from "./RecordsGrid.vue"
@@ -34,6 +34,8 @@ const props = defineProps<{
   // The other tables the selection can move to.
   tables?: { id: string, name: string }[]
   move?: (tableId: string) => Promise<void>
+  // Fills empty fields with the values records with a look-alike key agree on.
+  fill?: () => Promise<void>
 }>()
 const emit = defineEmits<{ export: [], clear: [] }>()
 
@@ -79,6 +81,7 @@ async function run(action: () => Promise<void>, done: () => void) {
   <div class="records-bulk-bar" role="region" :aria-label="`${count} selected`">
     <strong>{{ count }} {{ noun }} selected</strong>
     <Button variant="outline" size="sm" :disabled="!fields.length" @click="openSet"><PencilLine class="size-4" />Set a field</Button>
+    <Button v-if="fill" variant="outline" size="sm" :disabled="busy" @click="run(fill, () => {})"><Sparkles class="size-4" />Fill from similar</Button>
     <Button v-if="tables?.length && move" variant="outline" size="sm" @click="openMove"><ArrowRightLeft class="size-4" />Move to table</Button>
     <Button variant="outline" size="sm" @click="emit('export')"><Download class="size-4" />Export CSV</Button>
     <Button variant="outline" size="sm" class="text-destructive" @click="error = ''; confirmRemove = true"><Trash2 class="size-4" />Delete</Button>

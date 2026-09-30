@@ -8,7 +8,7 @@ lastUpdated: 2026-09-30
 
 The Data enrichment area adds context to mirrored assets. Damvia keeps a catalogue of **records**, organised in tables and created on screen or imported from CSV or Excel files, extracts a record key and optional view from each filename, and uses selected record fields for search, filters and display.
 
-A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), section **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
+A record is whatever the files are about: a product for a brand, an event for a venue, a property for an agency. Open **Settings** (`/admin/settings`), group **Data enrichment**, panel **Naming and views**, setting **Record label**, to give records the name your team uses, singular and plural ("Product" and "Products" by default). The label is used in the menu, the search filters, the asset type settings and the record screens. It does not change the tables, the API or the environment variables, which keep the record and product names below.
 
 ## Where things are in the menu
 
@@ -82,7 +82,7 @@ There are no pages: the grid scrolls through the whole table and loads rows as t
 
 | To | Do |
 |---|---|
-| Add a record | Type its key in the last row and press Enter, or use **Add product** at the top. The record goes to the open table and opens as a card to fill in. A key already taken is refused in the row, with a **Go to** link that scrolls to that record and highlights its row; its table opens if it is another one, and search and filters that hide it are cleared first. |
+| Add a record | **Add product** at the top opens an empty card on the right. Type the key, fill the fields you know and click **Save**; nothing exists until then. The record goes to the open table and stays open as a card. A key already taken is refused in the card. |
 | Edit a value | Click a cell to select it, then click again, double-click, press Enter or Space to continue the value, or start typing to replace it. Enter saves and moves down, Tab saves and moves right, Esc cancels. A select opens its list of options; type to narrow it and add a missing option from there. |
 | Select several cells | Drag across them, Shift+click the far corner, or hold Shift with the arrow keys. Ctrl+A or ⌘+A selects every cell of the table, Esc goes back to one cell. |
 | Copy and paste | Ctrl+C or ⌘+C copies the selected cells as tab-separated rows, the form Sheets and Excel use, so a block goes both ways. Ctrl+V or ⌘+V pastes: one value fills every selected cell, a block the selection holds a whole number of times is repeated across it, and any other block is laid from the top-left cell. |
@@ -91,19 +91,29 @@ There are no pages: the grid scrolls through the whole table and loads rows as t
 | Undo an edit | Use **Undo** on the notice that confirms the edit. The undo is a change of its own in the history. |
 
 A paste, fill or clear over several cells is checked before anything is sent: one value its field refuses and nothing is saved. It is saved in one go, can be undone in one go, and each record it changes gets one history entry. The key, picture and count columns are never written; the notice says how many of their cells were left out. Rows not loaded yet, far from the part of the grid on screen, are left as they are. A paste or fill stops at the last row.
-| Find records | The search box looks in the key and every value. **Filters** narrow by field (contains, is, is not, is empty, is any of the options), and several filters narrow each other. |
+| Find records | The search box looks in the key and every value. **Filters** narrow by field (contains, is, is not, is empty, is any of the options) or by **Picture** (has a picture, has no picture: a Product pictures file with a thumbnail), and several filters narrow each other. While you type a value, the values the field already holds are offered, most used first, or its options for a select field. **Filter by this field** in a column's menu, or **Filter by picture** in the picture column's menu, opens Filters with that field already chosen. A record without a picture shows an empty frame. |
 | Sort | Open a column's menu. Numbers and dates sort by value; values that do not fit their type come last. |
 | Arrange columns | **Columns** shows, hides and reorders them, and each column can be resized from its right edge; a long value never widens its column. Columns above the **Frozen** line in **Columns** stay in place when the grid scrolls sideways; drag the line, or move it with its arrows, to freeze more or fewer columns. It starts just after the key column, which can be moved but not hidden. **Wrap text** at the top of **Columns** shows up to four lines per cell, line breaks included, instead of one. The layout is kept for each table, in this browser only. **Files** counts the files linked to each record and **Filled** how many of its fields hold a value. |
-| Act on several records | Tick them, anywhere in the table: **Set a field** gives them one value, **Move to table** moves them to another table, **Export CSV** exports them, **Delete** removes them. The header box ticks every row loaded. |
+| Act on several records | Tick them, anywhere in the table: **Set a field** gives them one value, **Move to table** moves them to another table, **Fill from similar** fills their empty fields with [suggested values](#suggested-values) (the notice offers **Undo**), **Export CSV** exports them, **Delete** removes them. The header box ticks every row loaded. |
 | Export | **Export CSV** in the ⋮ menu exports every record of the open table the search and filters find, with the fields the table shows, or the selection when there is one, never only the rows loaded. At most 10,000 records per export. Cells starting with `=`, `+`, `-` or `@` are prefixed with `'` so a spreadsheet never runs them as formulas. |
 
 The ↗ button next to a key, or Enter on the key, opens the record as a card on the right. Its address carries `?record=`, so a link to it can be shared with another admin.
 
-- **Fields** lists the fields of the table with an input of their type; a value is saved when you leave the field or pick an option. Fields the table does not show but that hold a value for this record follow under **Not shown in this table**. The pencil next to a field's name edits the field itself (display name, type, options, switches), and **Add a field** at the bottom adds one, shown in the open table.
+- **Fields** lists the fields of the table with an input of their type; a value is saved when you leave the field or pick an option. Under a text field, up to six values other records already hold in it are offered as buttons, most used first (for example `FW25` and `SS25` under Season), so you follow the same style; a field with many different values gets none. An empty field with a [suggested value](#suggested-values) shows it instead, with the key it comes from: click it to use it, or **Fill N fields** at the top to use every suggestion at once. Fields the table does not show but that hold a value for this record follow under **Not shown in this table**. The pencil next to a field's name edits the field itself (display name, type, options, switches), and **Add a field** at the bottom adds one, shown in the open table.
 - **Files** shows the files linked to the record with their thumbnail, the primary one marked, and what linked each of them: a matching rule and its pattern, a folder, a file set by hand, the CSV mapping or the file metadata. Files linked to a range the record belongs to follow under **Covering the range**. Files are attached from [Unmatched](#fix-what-matching-could-not), not from the card.
 - **History** lists who created, changed, moved or deleted the record, when, where (grid, card, bulk edit, CSV import, Unmatched, removal of a field) and each value before and after, or the tables of a move. A record deleted and created again under the same key shows its earlier life. History started with this version; earlier changes are not listed, and it is never pruned.
 
-**Delete product** at the bottom of the card, or **Delete** on a selection, removes records. Their last values stay in the history. Files linked to their key stay linked and appear under **Product not imported** in the To review tab of Link to products until a record with that key exists again.
+**Delete product** at the bottom of the card, or **Delete** on a selection, removes records. Their last values stay in the history. Files linked to their key stay linked and appear under **Missing products** in the To review tab of Link to products until a record with that key exists again.
+
+### Suggested values
+
+A model sold in several colours or sizes is often keyed by parts: `18875-554-M`, `18875-554-L`, `18875-002-M`. Once one of them is filled in, its values are offered for the fields the others leave empty. Nothing needs setting up, and nothing is written until you accept a value.
+
+- **Similar keys.** Keys are split at `-`, `_`, `.`, `/` and spaces. Another key is similar when it has the same separators in the same order and starts with the same part. The more leading parts two keys share, the closer they are: `18875-554-L` is closer to `18875-554-M` than `18875-002-M` is. When a **Model field** is set, records of the same model count too, as the farthest ones.
+- **Agreement.** For each empty field, the closest similar records holding a value decide. If they all hold the same value, it is suggested. If they differ, as colours differ across colourways, nothing is suggested for that field. So `18875-554-L` is offered the colour of `18875-554-M`, while `18875-002-M` is offered the material but not the colour.
+- **Left out.** A key without separators, such as `ABC123`, gets no suggestion. Records of the same model never pass on the fields that tell the members of a model apart. A value its field would now refuse, such as a removed option, is never offered.
+
+An accepted value is an ordinary edit: it is checked like any other and appears in the history as a change in the card or the grid.
 
 ## Give each field a type
 
@@ -179,7 +189,7 @@ Open **Data Enrichment → Link to products**, tab **To review** (`/admin/data-e
 | Folders without a product | Folders holding product pictures no rule could link, largest first | **Attach** links every file of the folder and its subfolders, now and after each sync, to one record or one range |
 | Pictures without a product | Every product picture no rule could link, and why | **Attach** one file or the selected ones by hand |
 | Several products found | Files where two rules found different keys | **Use** one of the keys, or **Other**. The choice is kept and no rule changes it later |
-| Product not imported | Links to a key or value no record has yet | **Create record** with the key only, filled by the next CSV import, or **Detach** a link set by hand |
+| Missing products | Links to a key or value no record has yet | **Create and fill** opens the product card with the key set: fill it and click **Save**. **Quick create** makes the record with the key only, to fill later. **Detach** removes a link set by hand |
 
 The **Linked by hand** tab of the same page lists every folder and file linked by hand, newest first, with the number of files, the target and who set it. **Link a folder** links any folder, including one whose files are already matched, such as a pack that covers a whole range. **Detach** removes a link.
 
@@ -210,7 +220,7 @@ Choosing the file compares it with the current mapping before anything is writte
 
 ## Set the views
 
-Views are made for brands that sell products. A product is usually shot several times (front, back, side, close-up, in use), and a number after the product key in the file name tells these pictures apart: `ABC123-001.01.jpg`, `ABC123-001.02.jpg` and `ABC123-001.03.jpg` are three views of product `ABC123-001`. With views on, these files are linked to the same record, search can be filtered by view, and one view is used as the record's picture. Leave views off when each file shows its record once, as for events or venues. In **Settings**, section **Record label**, under **Views**. Separator, Digits and Thumbnail view show only while the switch is on:
+Views are made for brands that sell products. A product is usually shot several times (front, back, side, close-up, in use), and a number after the product key in the file name tells these pictures apart: `ABC123-001.01.jpg`, `ABC123-001.02.jpg` and `ABC123-001.03.jpg` are three views of product `ABC123-001`. With views on, these files are linked to the same record, search can be filtered by view, and one view is used as the record's picture. Leave views off when each file shows its record once, as for events or venues. In **Settings**, panel **Naming and views**, setting **Views**. Separator, Digits and Thumbnail view show only while the switch is on:
 
 | Setting | Effect |
 |---|---|
@@ -258,10 +268,10 @@ If matching fails, check the exact filename, captured key, scheduled job, record
 
 ## Readiness, models and the reader-facing catalogue
 
-Settings holds three decisions that turn records into a catalogue readers can browse:
+Settings, group **Data enrichment**, holds three decisions that turn records into a catalogue readers can browse. Each panel has its own save button:
 
-- **Ready to use**: the fields and the views a record must carry to count as complete, plus the labels shown for a complete and an incomplete record. Requiring nothing leaves every record ready. The score is recomputed on every edit, import and sync.
-- **Model field**: the field grouping several keys under one model, matched on a key that ignores case, accents and stray spaces.
-- **Keep records with no visible file out of the catalogue**: hides from listings records whose files the reader may not open. A direct link still opens the record.
+- **Ready to use** panel: the fields and the views a record must carry to count as complete, plus the labels shown for a complete and an incomplete record. Requiring nothing leaves every record ready. The score is recomputed on every edit, import and sync.
+- **Model field**, in the **Catalogue** panel: the field grouping several keys under one model, matched on a key that ignores case, accents and stray spaces.
+- **Hide records with no visible file**, in the **Catalogue** panel: hides from listings records whose files the reader may not open. A direct link still opens the record.
 
 Readers never reach a record through these screens. They reach it through a collection holding it; see [Product catalogue](./catalogue.md).

@@ -25,6 +25,7 @@ import { useQuery } from "@tanstack/vue-query"
 import { AlignLeft, Calendar, CircleChevronDown, Hash, Link, ListChecks, PencilLine, Plus, Trash2, Type } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 import RecordFieldInput from "./RecordFieldInput.vue"
+import RecordPicturePlaceholder from "./RecordPicturePlaceholder.vue"
 import type { GridField } from "./RecordsGrid.vue"
 
 type Detail = RouterOutput["record"]["get"]
@@ -53,6 +54,12 @@ const props = defineProps<{
   save: (recordId: string, field: GridField, value: string) => Promise<void>
   addOption: (field: GridField, option: string) => Promise<void>
   remove: (recordId: string) => Promise<void>
+  // A product that does not exist yet: the card collects its values and creates
+  // it on Save. A null key is typed in the card; a known one is fixed.
+  draft?: { recordKey: string | null } | null
+  create?: (key: string, values: Record<string, string>) => Promise<void>
+  // Saves several fields at once, for the suggested values.
+  fill?: (recordId: string, values: Record<string, string>) => Promise<void>
 }>()
 const emit = defineEmits<{ close: [], "update:tab": [tab: PanelTab], editField: [field: GridField], addField: [] }>()
 
@@ -61,6 +68,69 @@ const { data: record, status, error } = useQuery({
   queryFn: () => trpc.record.get.query(props.recordId!),
   enabled: computed(() => !!props.recordId),
 })
+
+// What other records hold in short text fields, offered as hints under them.
+const { data: hints } = useQuery({
+  queryKey: ["records", "hints"],
+  queryFn: () => trpc.recordAttribute.hints.query(),
+  enabled: computed(() => !!props.recordId || !!props.draft),
+  staleTime: 60_000,
+})
+
+// Values records with a look-alike key agree on, for the fields left empty.
+// Under the record's key so that saving a field refreshes them.
+const { data: suggestions } = useQuery({
+  queryKey: computed(() => ["records", "get", props.recordId, "suggestions"]),
+  queryFn: () => trpc.record.suggestions.query({ ids: [props.recordId!] }),
+  enabled: computed(() => !!props.recordId),
+})
+type Suggestion = NonNullable<typeof suggestions.value>[number]
+const suggestionOf = computed(() => new Map((suggestions.value ?? [])
+  .filter((item) => (record.value?.metaData[item.field] ?? "") === "")
+  .map((item) => [item.field, item])))
+const shownSuggestions = computed(() => props.fields.flatMap((field) => suggestionOf.value.get(field.name) ?? []))
+const filling = ref(false)
+const fillError = ref("")
+async function fillSuggested(items: Suggestion[]) {
+  if (!props.recordId || !props.fill || !items.length || filling.value) return
+  filling.value = true
+  fillError.value = ""
+  try {
+    await props.fill(props.recordId, Object.fromEntries(items.map((item) => [item.field, item.value])))
+  } catch (failure) {
+    fillError.value = (failure as Error).message
+  } finally {
+    filling.value = false
+  }
+}
+function suggestionSource(item: Suggestion) {
+  return item.support > 1 ? `Same as ${item.example} and ${item.support - 1} more` : `Same as ${item.example}`
+}
+
+const drafting = computed(() => !props.recordId && !!props.draft)
+const draftKey = ref("")
+const draftValues = ref<Record<string, string>>({})
+const creating = ref(false)
+const createError = ref("")
+watch(() => props.draft, (draft) => {
+  draftKey.value = draft?.recordKey ?? ""
+  draftValues.value = {}
+  createError.value = ""
+}, { immediate: true })
+
+async function createRecord() {
+  const key = draftKey.value.trim()
+  if (!key || !props.create || creating.value) return
+  creating.value = true
+  createError.value = ""
+  try {
+    await props.create(key, draftValues.value)
+  } catch (failure) {
+    createError.value = (failure as Error).message
+  } finally {
+    creating.value = false
+  }
+}
 
 const history = ref<HistoryItem[]>([])
 const historyMore = ref(false)
@@ -130,8 +200,43 @@ function when(value: string | Date) {
 </script>
 
 <template>
-  <Sheet :open="!!recordId" @update:open="(open) => !open && emit('close')">
+  <Sheet :open="!!recordId || drafting" @update:open="(open) => !open && emit('close')">
     <SheetContent class="record-panel">
+      <template v-if="drafting">
+        <header class="record-panel-header">
+          <RecordPicturePlaceholder class="record-panel-picture" />
+          <div class="min-w-0">
+            <SheetTitle class="truncate">{{ draft?.recordKey ?? `New ${recordLabel}` }}</SheetTitle>
+            <SheetDescription>Fill what you know, then save. Nothing exists until you do.</SheetDescription>
+          </div>
+        </header>
+        <form class="record-panel-tabs" @submit.prevent="createRecord">
+          <div class="record-panel-body">
+            <div v-if="draft?.recordKey === null" class="record-panel-field">
+              <div class="record-panel-field-label"><label for="panel-new-key">Key</label></div>
+              <input id="panel-new-key" v-model="draftKey" type="text" autofocus :disabled="creating" class="dv-input" @input="createError = ''" />
+            </div>
+            <p v-if="!fields.length" class="admin-text-secondary">No field yet.</p>
+            <div v-for="field in fields" :key="field.id" class="record-panel-field">
+              <div class="record-panel-field-label">
+                <component :is="TYPE_ICONS[field.valueType]" class="record-panel-field-type" aria-hidden="true" />
+                <label :for="`panel-${field.id}`">{{ fieldLabel(field) }}</label>
+              </div>
+              <RecordFieldInput :id="`panel-${field.id}`" :field="field" :model-value="draftValues[field.name] ?? ''" :hints="hints?.[field.name]"
+                :add-option="(option) => addOption(field, option)" @update:model-value="(value) => draftValues[field.name] = value" />
+            </div>
+            <div>
+              <Button type="button" variant="outline" size="sm" @click="emit('addField')"><Plus class="size-4" />Add a field</Button>
+            </div>
+            <p v-if="createError" role="alert" class="admin-form-error">{{ createError }}</p>
+          </div>
+          <footer class="record-panel-footer record-panel-footer--actions">
+            <Button type="button" variant="ghost" :disabled="creating" @click="emit('close')">Cancel</Button>
+            <Button type="submit" :disabled="creating || !draftKey.trim()">{{ creating ? "Saving…" : "Save" }}</Button>
+          </footer>
+        </form>
+      </template>
+      <template v-else>
       <template v-if="status === 'pending' || status === 'error'">
         <SheetTitle class="sr-only">{{ recordLabel }}</SheetTitle>
         <SheetDescription class="sr-only">{{ status === 'pending' ? 'Loading' : 'Could not load' }}</SheetDescription>
@@ -140,7 +245,7 @@ function when(value: string | Date) {
       <p v-else-if="status === 'error'" role="alert" class="admin-form-error p-6">{{ error?.message }}</p>
       <template v-else-if="record">
         <header class="record-panel-header">
-          <img v-if="record.thumbnailURL" :src="record.thumbnailURL" alt="" class="record-panel-picture" /><ThumbnailPlaceholder v-else class="record-panel-picture record-placeholder" aria-hidden="true" />
+          <img v-if="record.thumbnailURL" :src="record.thumbnailURL" alt="" class="record-panel-picture" /><RecordPicturePlaceholder v-else class="record-panel-picture" />
           <div class="min-w-0">
             <SheetTitle class="truncate">{{ record.recordKey }}</SheetTitle>
             <SheetDescription>
@@ -156,6 +261,13 @@ function when(value: string | Date) {
           </TabsList>
           <TabsContent value="fields" class="record-panel-body">
             <p v-if="!fields.length" class="admin-text-secondary">No field yet.</p>
+            <div v-if="fill && shownSuggestions.length" class="record-panel-suggestions">
+              <p>{{ shownSuggestions.length }} empty {{ shownSuggestions.length === 1 ? "field has" : "fields have" }} the same value in similar {{ recordLabel }} keys.</p>
+              <Button type="button" variant="outline" size="sm" :disabled="filling" @click="fillSuggested(shownSuggestions)">
+                {{ filling ? "Filling…" : `Fill ${shownSuggestions.length} ${shownSuggestions.length === 1 ? "field" : "fields"}` }}
+              </Button>
+              <p v-if="fillError" role="alert" class="admin-form-error">{{ fillError }}</p>
+            </div>
             <div v-for="field in fields" :key="field.id" class="record-panel-field">
               <div class="record-panel-field-label">
                 <component :is="TYPE_ICONS[field.valueType]" class="record-panel-field-type" aria-hidden="true" />
@@ -164,8 +276,13 @@ function when(value: string | Date) {
                   <PencilLine class="size-3.5" />
                 </button>
               </div>
-              <RecordFieldInput :id="`panel-${field.id}`" :field="field" :model-value="record.metaData[field.name] ?? ''"
+              <RecordFieldInput :id="`panel-${field.id}`" :field="field" :model-value="record.metaData[field.name] ?? ''" :hints="suggestionOf.has(field.name) ? undefined : hints?.[field.name]"
                 :save="(value) => save(record!.id, field, value)" :add-option="(option) => addOption(field, option)" />
+              <p v-if="suggestionOf.get(field.name)" class="record-field-hints">
+                <span class="admin-text-secondary">{{ suggestionSource(suggestionOf.get(field.name)!) }}:</span>
+                <button type="button" class="record-field-hint" :aria-label="`Use ${suggestionOf.get(field.name)!.value} for ${fieldLabel(field)}`"
+                  @click="save(record!.id, field, suggestionOf.get(field.name)!.value)">{{ formatRecordValue(field, suggestionOf.get(field.name)!.value) }}</button>
+              </p>
             </div>
             <template v-if="hiddenFields.length">
               <p class="record-panel-hidden-heading admin-text-secondary">Not shown in this table</p>
@@ -174,7 +291,7 @@ function when(value: string | Date) {
                   <component :is="TYPE_ICONS[field.valueType]" class="record-panel-field-type" aria-hidden="true" />
                   <label :for="`panel-${field.id}`">{{ fieldLabel(field) }}</label>
                 </div>
-                <RecordFieldInput :id="`panel-${field.id}`" :field="field" :model-value="record.metaData[field.name] ?? ''"
+                <RecordFieldInput :id="`panel-${field.id}`" :field="field" :model-value="record.metaData[field.name] ?? ''" :hints="hints?.[field.name]"
                   :save="(value) => save(record!.id, field, value)" :add-option="(option) => addOption(field, option)" />
               </div>
             </template>
@@ -239,6 +356,7 @@ function when(value: string | Date) {
         <footer class="record-panel-footer">
           <Button variant="ghost" class="text-destructive" @click="confirmRemove = true"><Trash2 class="size-4" />Delete {{ recordLabel }}</Button>
         </footer>
+      </template>
       </template>
     </SheetContent>
   </Sheet>

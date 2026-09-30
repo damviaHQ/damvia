@@ -13,7 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { describe, expect, test } from 'vitest'
-import { FILTER_OPERATORS, filterIsComplete, operatorsFor, type FilterOp } from '@/utils/recordFilters'
+import { FILTER_OPERATORS, filterIsComplete, operatorLabel, operatorsFor, type FilterOp } from '@/utils/recordFilters'
 
 describe('record filters', () => {
   test('each column type offers its own conditions, the default first', () => {
@@ -31,6 +31,12 @@ describe('record filters', () => {
     const offered = new Set((['key', 'text', 'number', 'single_select'] as const).flatMap(operatorsFor))
     for (const op of offered) expect(FILTER_OPERATORS[op]).toBeTruthy()
     expect(FILTER_OPERATORS.has_any).toBe('is any of')
+  })
+
+  test('the picture filter asks whether a record has a picture, having one by default', () => {
+    expect(operatorsFor('picture')).toEqual(['is_not_empty', 'is_empty'])
+    expect(operatorsFor('picture').map((op) => operatorLabel('picture', op))).toEqual(['has a picture', 'has no picture'])
+    expect(operatorLabel('text', 'is_empty')).toBe('is empty')
   })
 
   test('a filter narrows the list only once it is complete', () => {

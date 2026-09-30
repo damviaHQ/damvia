@@ -13,17 +13,17 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
-import ThumbnailPlaceholder from "@/assets/thumbnail-placeholder.svg"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { moveForKey, moveInGrid, startsTyping, type GridMove, type GridPosition } from "@/composables/useGridNavigation"
 import { fillDownPlan, fillPlan, inRange, pastePlan, parseClipboard, rangeOf, rangeSize, toClipboard, type CellWrite, type GridRange } from "@/utils/gridRange"
 import { VALUE_TYPE_LABELS, type ValueField } from "@/utils/recordValues"
-import { ArrowDown, ArrowUp, ChevronDown, EyeOff, Filter, Maximize2, PencilLine, Plus, Trash2 } from "@lucide/vue"
+import { ArrowDown, ArrowUp, ChevronDown, EyeOff, Filter, Maximize2, PencilLine, Trash2 } from "@lucide/vue"
 import { observeElementRect, useVirtualizer, type Rect, type Virtualizer } from "@tanstack/vue-virtual"
 import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from "vue"
 import RecordCellEditor, { type EditorMove } from "./RecordCellEditor.vue"
 import RecordCellValue from "./RecordCellValue.vue"
+import RecordPicturePlaceholder from "./RecordPicturePlaceholder.vue"
 
 export type GridField = ValueField & { id: string }
 export type GridRecord = { id: string, recordKey: string, metaData: Record<string, string>, thumbnailURL: string | null, fileCount: number, filledCount: number }
@@ -46,11 +46,9 @@ const props = defineProps<{
   sort: GridSort
   selected: string[]
   recordLabel: string
-  keyLabel: string
   commit: (record: GridRecord, field: GridField, value: string) => Promise<void>
   commitMany: (writes: GridWrite[], skipped: number) => Promise<void>
   addOption: (field: GridField, option: string) => Promise<void>
-  create: (key: string) => Promise<void>
 }>()
 const emit = defineEmits<{
   "update:selected": [ids: string[]]
@@ -61,13 +59,11 @@ const emit = defineEmits<{
   filter: [column: GridColumn]
   editField: [field: GridField]
   removeField: [field: GridField]
-  reveal: [recordKey: string]
   // The rows on screen, so the parent loads them.
   range: [start: number, end: number]
 }>()
 
 const root = ref<HTMLElement | null>(null)
-const newKeyInput = ref<HTMLInputElement | null>(null)
 const focused = ref<GridPosition>({ row: 0, column: 0 })
 const editing = ref<{ row: number, column: number, initial: string, typed?: string, draft?: string } | null>(null)
 // The selected range runs from the focused cell to "head"; null is the focused
@@ -94,11 +90,6 @@ const frozenLefts = computed(() => {
 })
 const frozenWidth = computed(() => 40 + props.columns.slice(0, frozenCount.value).reduce((total, column) => total + column.width, 0))
 const frozenStyle = (index: number) => frozenLefts.value[index] === null ? undefined : { left: `${frozenLefts.value[index]}px` }
-const newKey = ref("")
-const newKeyError = ref("")
-// The key typed when it belongs to a record that already exists.
-const conflictKey = ref<string | null>(null)
-const creating = ref(false)
 const flashed = ref<string | null>(null)
 
 // Only the rows on screen are drawn; spacer rows keep the scroll height.
@@ -445,6 +436,18 @@ function startResize(event: PointerEvent, column: GridColumn) {
   target.addEventListener("pointerup", onUp)
 }
 
+// A column menu gives focus back to its heading as it closes, which would
+// close the filters it just opened.
+let focusAway = false
+function filterBy(column: GridColumn) {
+  focusAway = true
+  emit("filter", column)
+}
+function keepFocusAway(event: Event) {
+  if (focusAway) event.preventDefault()
+  focusAway = false
+}
+
 function resizeByKey(event: KeyboardEvent, column: GridColumn) {
   const delta = event.key === "ArrowRight" ? 16 : event.key === "ArrowLeft" ? -16 : 0
   if (!delta) return
@@ -452,31 +455,7 @@ function resizeByKey(event: KeyboardEvent, column: GridColumn) {
   emit("resize", column.id, Math.min(800, Math.max(60, column.width + delta)))
 }
 
-async function submitNewKey() {
-  const key = newKey.value.trim()
-  if (!key || creating.value) return
-  creating.value = true
-  newKeyError.value = ""
-  conflictKey.value = null
-  try {
-    await props.create(key)
-    newKey.value = ""
-  } catch (error) {
-    newKeyError.value = (error as Error).message
-    if ((error as { data?: { code?: string } }).data?.code === "CONFLICT") conflictKey.value = key
-  } finally {
-    creating.value = false
-  }
-}
-
 defineExpose({
-  focusNewRow: () => {
-    root.value?.scrollTo({ top: root.value.scrollHeight })
-    nextTick(() => {
-      newKeyInput.value?.scrollIntoView({ block: "nearest" })
-      newKeyInput.value?.focus()
-    })
-  },
   // Brings a row on screen, so the parent loads it.
   scrollToRow: (index: number) => virtualizer.value.scrollToIndex(index, { align: "center" }),
   scrollToTop: () => root.value?.scrollTo({ top: 0 }),
@@ -490,8 +469,6 @@ defineExpose({
     focusCell({ row, column })
     flashed.value = id
     setTimeout(() => { if (flashed.value === id) flashed.value = null }, 2000)
-    newKeyError.value = ""
-    conflictKey.value = null
     return true
   },
 })
@@ -514,7 +491,17 @@ defineExpose({
           <th v-for="(column, c) in columns" :key="column.id" scope="col" :aria-sort="ariaSort(column)" :style="frozenStyle(c)"
             :class="{ 'is-frozen': frozenLefts[c] !== null, 'is-frozen-edge': c === frozenCount - 1, 'is-thumbnail': column.kind === 'thumbnail' }">
             <div class="records-grid-heading">
-              <span v-if="column.kind === 'thumbnail'" class="sr-only">{{ column.label }}</span>
+              <DropdownMenu v-if="column.kind === 'thumbnail'">
+                <DropdownMenuTrigger as-child>
+                  <button type="button" class="records-grid-heading-button records-grid-heading-button--icon" :aria-label="`${column.label} column`">
+                    <ChevronDown class="size-3.5 shrink-0 records-grid-heading-chevron" aria-hidden="true" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" @close-auto-focus="keepFocusAway">
+                  <DropdownMenuItem @select="filterBy(column)"><Filter />Filter by picture</DropdownMenuItem>
+                  <DropdownMenuItem @select="emit('hide', column.id)"><EyeOff />Hide</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <DropdownMenu v-else>
                 <DropdownMenuTrigger as-child>
                   <button type="button" class="records-grid-heading-button" :title="column.field ? VALUE_TYPE_LABELS[column.field.valueType] : undefined">
@@ -524,12 +511,12 @@ defineExpose({
                     <ChevronDown class="size-3.5 shrink-0 records-grid-heading-chevron" aria-hidden="true" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
+                <DropdownMenuContent align="start" @close-auto-focus="keepFocusAway">
                   <template v-if="column.sortKey">
                     <DropdownMenuItem @select="emit('sort', { column: column.sortKey!, direction: 'asc' })"><ArrowUp />Sort ascending</DropdownMenuItem>
                     <DropdownMenuItem @select="emit('sort', { column: column.sortKey!, direction: 'desc' })"><ArrowDown />Sort descending</DropdownMenuItem>
                   </template>
-                  <DropdownMenuItem v-if="column.kind === 'field' || column.kind === 'key'" @select="emit('filter', column)"><Filter />Filter by this field</DropdownMenuItem>
+                  <DropdownMenuItem v-if="column.kind === 'field' || column.kind === 'key'" @select="filterBy(column)"><Filter />Filter by this field</DropdownMenuItem>
                   <DropdownMenuItem v-if="column.kind !== 'key'" @select="emit('hide', column.id)"><EyeOff />Hide</DropdownMenuItem>
                   <template v-if="column.field">
                     <DropdownMenuSeparator />
@@ -571,7 +558,7 @@ defineExpose({
             @mousedown="onCellMousedown({ row: r, column: c }, $event)" @mouseenter="onCellMouseenter({ row: r, column: c }, $event)" @click="onCellClick({ row: r, column: c })" @dblclick="startEdit({ row: r, column: c })" @focus="focused = { row: r, column: c }">
             <template v-if="column.kind === 'thumbnail'">
               <button type="button" tabindex="-1" class="records-grid-thumbnail" :aria-label="`Files of ${row.recordKey}`" @click.stop="emit('open', row, 'files')">
-                <img v-if="row.thumbnailURL" :src="row.thumbnailURL" alt="" loading="lazy" decoding="async" /><ThumbnailPlaceholder v-else class="record-placeholder" aria-hidden="true" />
+                <img v-if="row.thumbnailURL" :src="row.thumbnailURL" alt="" loading="lazy" decoding="async" /><RecordPicturePlaceholder v-else />
               </button>
             </template>
             <div v-else-if="column.kind === 'key'" class="records-grid-key">
@@ -597,20 +584,6 @@ defineExpose({
         </template>
         </template>
         <tr v-if="paddingBottom > 0" class="records-grid-spacer" aria-hidden="true"><td :colspan="columns.length + 1" :style="{ height: `${paddingBottom}px` }" /></tr>
-        <tr class="records-grid-new">
-          <td class="records-grid-select"><Plus class="size-4 mx-auto admin-text-secondary" aria-hidden="true" /></td>
-          <td :colspan="columns.length">
-            <form class="records-grid-new-form" @submit.prevent="submitNewKey">
-              <input ref="newKeyInput" v-model="newKey" type="text" :disabled="creating" :aria-invalid="!!newKeyError || undefined"
-                :aria-describedby="newKeyError ? 'new-record-error' : undefined" :aria-label="`${keyLabel} of a new ${recordLabel}`"
-                :placeholder="`Add a ${recordLabel}: type its ${keyLabel} and press Enter`" @input="newKeyError = ''; conflictKey = null" />
-              <span v-if="newKeyError" id="new-record-error" role="alert" class="admin-form-error">
-                {{ newKeyError }}
-                <button v-if="conflictKey" type="button" class="records-grid-reveal" @click="emit('reveal', conflictKey)">Go to {{ conflictKey }}</button>
-              </span>
-            </form>
-          </td>
-        </tr>
       </tbody>
     </table>
   </div>

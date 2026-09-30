@@ -71,6 +71,12 @@ const incompleteRules = computed(() => rules.value.some(rule => !filterIsComplet
 const rulesChanged = computed(() => JSON.stringify(rules.value) !== JSON.stringify(collection.value?.recordFilters ?? []))
 const previewFields = computed(() => (fields.value ?? []).filter(field => field.name !== keyLabel.value))
 
+function missingOf(row: (typeof rows.value)[number]) {
+  if (row.readiness.ready) return ""
+  const { fields, views } = row.readiness.missing
+  return [...fields, ...views.map(view => `${view} picture`)].join(", ")
+}
+
 async function refresh() {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["collection"] }),
@@ -179,6 +185,7 @@ const { mutate: saveRules, isPending: isSavingRules } = useMutation({
                 <td class="whitespace-nowrap font-medium">{{ row.recordKey }}</td>
                 <td class="whitespace-nowrap">
                   <span class="flex items-center gap-2"><span aria-hidden="true" class="size-1.5 rounded-full" :class="row.readiness.ready ? 'bg-green-600' : 'bg-amber-500'" />{{ row.readiness.ready ? 'Ready' : 'Not ready' }}<span v-if="row.readiness.total" class="text-caption tabular-nums">{{ row.readiness.filled }}/{{ row.readiness.total }}</span></span>
+                  <span v-if="missingOf(row)" class="mt-0.5 block max-w-64 truncate text-caption text-amber-700" :title="`Missing: ${missingOf(row)}`">Missing: {{ missingOf(row) }}</span>
                 </td>
                 <td class="whitespace-nowrap">{{ row.source === 'rule' ? 'Automatic rule' : 'Reference' }}</td>
                 <td v-for="field in previewFields" :key="field.id"><span class="block max-w-64 truncate" :title="row.metaData[field.name]">{{ row.metaData[field.name] || '—' }}</span></td>

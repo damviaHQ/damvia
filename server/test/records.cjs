@@ -142,6 +142,31 @@ test('the list searches every value, filters, sorts numbers as numbers and count
     await rejects(locate({ recordKey: 'LST-404' }), 'NOT_FOUND')
 })
 
+test('the list filters records with or without a picture, counting only record pictures with a thumbnail', async () => {
+    const packshots = await save(AssetType, { name: 'Picture packshots', isRelatedToRecords: true, defaultDisplay: 'grid', listDisplayItems: [] })
+    const manuals = await save(AssetType, { name: 'Picture manuals', isRelatedToRecords: false, defaultDisplay: 'grid', listDisplayItems: [] })
+    const packshotFolder = await makeFolder({ name: 'Picture packshots', assetTypeId: packshots.id, assetTypeSource: 'manual' })
+    const manualFolder = await makeFolder({ name: 'Picture manuals', assetTypeId: manuals.id, assetTypeSource: 'manual' })
+    const ids = {}
+    for (const key of ['PIC-1', 'PIC-2', 'PIC-3', 'PIC-4']) ids[key] = (await admin.record.create({ recordKey: key })).id
+    await makeFile(packshotFolder, { name: 'PIC-1.jpg', assetTypeId: packshots.id, hasThumbnail: true, recordId: ids['PIC-1'] })
+    await makeFile(packshotFolder, { name: 'PIC-2.jpg', assetTypeId: packshots.id, hasThumbnail: false, recordId: ids['PIC-2'] })
+    await makeFile(manualFolder, { name: 'PIC-3.jpg', assetTypeId: manuals.id, hasThumbnail: true, recordId: ids['PIC-3'] })
+    const list = op => admin.record.list({ offset: 0, limit: 50, sort: { column: 'recordKey', direction: 'asc' }, filters: [{ column: 'recordKey', op: 'contains', value: 'PIC-' }, { column: '@picture', op }] })
+
+    const withPicture = await list('is_not_empty')
+    assert.deepEqual([withPicture.total, withPicture.records.map(r => r.recordKey)], [1, ['PIC-1']])
+    assert.ok(withPicture.records[0].thumbnailURL)
+    const without = await list('is_empty')
+    assert.deepEqual([without.total, without.records.map(r => r.recordKey)], [3, ['PIC-2', 'PIC-3', 'PIC-4']])
+    assert.ok(without.records.every(r => r.thumbnailURL === null))
+    await rejects(list('contains'), 'BAD_REQUEST')
+    const exported = await admin.record.exportRows({ filters: [{ column: 'recordKey', op: 'contains', value: 'PIC-' }, { column: '@picture', op: 'is_not_empty' }] })
+    assert.deepEqual(exported.rows.map(row => row[0]), ['PIC-1'])
+    assert.equal((await admin.record.locate({ recordKey: 'PIC-4', filters: [{ column: '@picture', op: 'is_not_empty' }] })).position, null)
+    await admin.record.remove({ ids: Object.values(ids) })
+})
+
 test('bulk edits and removals write one history row per record and leave links dangling', async () => {
     const a = await admin.record.create({ recordKey: 'BLK-1' })
     const b = await admin.record.create({ recordKey: 'BLK-2' })
@@ -328,6 +353,21 @@ test('Unmatched creates records through the same path and with history', async (
     await admin.entityResolution.createRecord({ key: 'UNM-1' })
     const [created] = await changesOf('UNM-1')
     assert.deepEqual([created.action, created.source, created.changes.SKU.new], ['create', 'unmatched', 'UNM-1'])
+})
+
+test('a record created from Unmatched with values keeps that source in its history', async () => {
+    await admin.record.create({ recordKey: 'UNM-2', values: { bf_name: 'Cap' }, source: 'unmatched' })
+    const [created] = await changesOf('UNM-2')
+    assert.deepEqual([created.action, created.source, created.changes.bf_name.new], ['create', 'unmatched', 'Cap'])
+})
+
+test('hints list the values a short text field already holds, most used first, and skip free text', async () => {
+    for (const [key, name] of [['HNT-1', 'Cap'], ['HNT-2', 'Cap'], ['HNT-3', 'Hat']]) await admin.record.create({ recordKey: key, values: { bf_name: name } })
+    const hints = await admin.recordAttribute.hints()
+    assert.equal(hints.bf_name[0], 'Cap')
+    assert.ok(hints.bf_name.includes('Hat'))
+    assert.ok(!('SKU' in hints), 'the key is not a field')
+    assert.ok(Object.values(hints).every(values => values.length <= 6))
 })
 
 test('every record and field procedure needs an approved admin', async () => {

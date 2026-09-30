@@ -3,7 +3,7 @@ title: Branding
 description: Rename the instance, set the accent colour of the portal and emails, set the login background, and replace the logo and favicon.
 sidebar:
   order: 5
-lastUpdated: 2026-09-29
+lastUpdated: 2026-09-30
 ---
 
 Branding uses runtime settings, build-time colours, an admin background upload, and static logo files. Knowing which is which saves a rebuild.
@@ -75,4 +75,4 @@ The redesigned admin uses the self-hosted Mona Sans font from the design-system 
 
 `/privacy-policy` and `/legal-information` are Vue views (`client/src/views/public/`), reachable without login. The privacy page is built from the server's configuration and names the organisation from `PRIVACY_CONTROLLER` and `PRIVACY_CONTACT`; see [Privacy and personal data](./privacy.md). The legal information page has hard-coded text: edit it for your organisation before going live.
 
-Settings groups Brand Logo and Login background into separate panels with consistent upload and replacement actions.
+Settings opens with a **Branding** group: brand name, brand logo, accent colour and login background, each with its own save or upload action and its explanation beside it. Record and catalogue settings follow under **Data enrichment**.

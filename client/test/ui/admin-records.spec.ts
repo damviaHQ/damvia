@@ -101,26 +101,90 @@ test('filters, columns, bulk actions and fields are one click away', async ({ pa
   await shot('records-field')
 })
 
-// Typing a key that exists links to its row, wherever it falls in the list,
-// and only the grid scrolls, never the page around it.
-test('an existing key jumps to its row', async ({ page, mockTrpc }) => {
-  await mockTrpc({
-    ...recordsApi,
-    'record.create': conflict('A record with key WX5678-200 already exists.'),
-    'record.locate': { id: records[1].id, tableId: tables[0].id, position: 1 },
-  }, { role: 'admin' })
+// Add product opens the card empty: the key and the values are typed there and
+// nothing exists until Save. A taken key is refused inside the card.
+test('a column menu opens the filters on that field, and the picture column filters by picture', async ({ page, mockTrpc, shot }) => {
+  const api = await mockTrpc(recordsApi, { role: 'admin' })
   await page.goto('/admin/data-enrichment/records')
   const grid = page.getByRole('grid', { name: 'product list' })
-  await expect(grid.locator('[data-cell="0-1"]')).toContainText('WX5678-100')
-  expect(await page.locator('#admin-content').evaluate(element => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1)
+  await expect(grid.locator('[data-cell="2-0"] .record-picture-placeholder')).toBeVisible()
 
-  await grid.getByRole('textbox', { name: 'SKU of a new product' }).fill('WX5678-200')
-  await page.keyboard.press('Enter')
-  await expect(page.getByRole('alert').filter({ hasText: 'already exists' })).toBeVisible()
-  await page.getByRole('button', { name: 'Go to WX5678-200' }).click()
-  await expect(grid.locator('[data-cell="1-1"]')).toBeFocused()
-  await expect(grid.locator('tr.is-flashed')).toContainText('WX5678-200')
-  await expect(page.getByRole('button', { name: 'Go to WX5678-200' })).toHaveCount(0)
+  await grid.getByRole('button', { name: 'Colour' }).click()
+  await page.getByRole('menuitem', { name: 'Filter by this field' }).click()
+  const filters = page.getByRole('dialog')
+  await expect(filters.getByLabel('Field of filter 1')).toHaveValue('colour')
+  await expect(filters.getByText('Forest')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.goto('/admin/data-enrichment/records')
+  await grid.getByRole('button', { name: 'Picture column' }).click()
+  await page.getByRole('menuitem', { name: 'Filter by picture' }).click()
+  await expect(filters.getByLabel('Field of filter 1')).toHaveValue('@picture')
+  await expect.poll(() => api.last('record.list')).toMatchObject({ filters: [{ column: '@picture', op: 'is_not_empty' }] })
+  await filters.getByLabel('Condition of filter 1').selectOption({ label: 'has no picture' })
+  await expect.poll(() => api.last('record.list')).toMatchObject({ filters: [{ column: '@picture', op: 'is_empty' }] })
+  await shot('records-picture-filter')
+})
+
+// Empty fields are offered the value records with a look-alike key agree on,
+// one by one or all at once.
+test('the card offers the values similar products agree on', async ({ page, mockTrpc, shot }) => {
+  const detail = recordsApi['record.get']
+  const api = await mockTrpc({
+    ...recordsApi,
+    'record.get': { ...detail, metaData: { SKU: 'WX5678-100', name: 'Canvas tote' } },
+    'record.suggestions': [
+      { recordId: records[0].id, field: 'price', value: '49', support: 2, example: 'WX5678-200' },
+      { recordId: records[0].id, field: 'story', value: 'Made in Porto.', support: 1, example: 'WX5678-200' },
+    ],
+  }, { role: 'admin' })
+  await page.goto(`/admin/data-enrichment/records?record=${records[0].id}`)
+  const card = page.getByRole('dialog')
+  await expect(card.getByText('Same as WX5678-200 and 1 more:')).toBeVisible()
+  await shot('records-suggestions')
+  await card.getByRole('button', { name: 'Use 49 for Price' }).click()
+  await expect.poll(() => api.inputs('record.patch')[0]).toEqual({ id: records[0].id, values: { price: '49' }, source: 'panel' })
+  await card.getByRole('button', { name: 'Fill 2 fields' }).click()
+  await expect.poll(() => api.inputs('record.patch')[1]).toEqual({ id: records[0].id, values: { price: '49', story: 'Made in Porto.' }, source: 'panel' })
+})
+
+test('a filter value offers the values the field already holds', async ({ page, mockTrpc }) => {
+  await mockTrpc(recordsApi, { role: 'admin' })
+  await page.goto('/admin/data-enrichment/records')
+  await page.getByRole('button', { name: 'Filters' }).click()
+  await page.getByRole('button', { name: 'Add filter' }).click()
+  await page.getByLabel('Field of filter 1').selectOption('name')
+  await page.getByLabel('Value of filter 1').focus()
+  const list = await page.getByLabel('Value of filter 1').getAttribute('list')
+  await expect(page.locator(`datalist[id="${list}"] option`)).toHaveCount(3)
+  await expect(page.locator(`datalist[id="${list}"] option`).first()).toHaveAttribute('value', 'Canvas tote')
+})
+
+test('a product is created from the card', async ({ page, mockTrpc }) => {
+  const api = await mockTrpc({
+    ...recordsApi,
+    'record.create': { ...records[0], id: '00000000-0000-4000-8000-0000000000aa', recordKey: 'NEW-1' },
+  }, { role: 'admin' })
+  await page.goto('/admin/data-enrichment/records')
+  await page.getByRole('button', { name: 'Add product' }).click()
+  const card = page.getByRole('dialog')
+  const save = card.getByRole('button', { name: 'Save' })
+  await expect(save).toBeDisabled()
+  await card.getByRole('textbox', { name: 'Key' }).fill('NEW-1')
+  await card.getByRole('textbox', { name: 'Name' }).fill('Beanie')
+  await save.click()
+  await expect.poll(() => api.inputs('record.create')[0]).toMatchObject({ recordKey: 'NEW-1', values: { name: 'Beanie' } })
+  await expect(page).toHaveURL(/record=00000000-0000-4000-8000-0000000000aa/)
+})
+
+test('a taken key is refused in the card', async ({ page, mockTrpc }) => {
+  await mockTrpc({ ...recordsApi, 'record.create': conflict('A record with key WX5678-200 already exists.') }, { role: 'admin' })
+  await page.goto('/admin/data-enrichment/records')
+  await page.getByRole('button', { name: 'Add product' }).click()
+  const card = page.getByRole('dialog')
+  await card.getByRole('textbox', { name: 'Key' }).fill('WX5678-200')
+  await card.getByRole('button', { name: 'Save' }).click()
+  await expect(card.getByRole('alert')).toContainText('already exists')
 })
 
 // Columns moved before the key stay frozen with it, and a picture moved after

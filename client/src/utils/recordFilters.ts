@@ -19,9 +19,19 @@ export type RecordFilter = { column: string, op: FilterOp, value?: string, value
 
 export const FILTER_OPERATORS: Record<FilterOp, string> = { contains: "contains", is: "is", is_not: "is not", is_empty: "is empty", is_not_empty: "is not empty", has_any: "is any of" }
 
+// Not a field: whether the record has a picture.
+export const PICTURE_COLUMN = "@picture"
+export type FilterColumnType = RecordValueType | "key" | "picture"
+
+export function operatorLabel(type: FilterColumnType, op: FilterOp): string {
+  if (type === "picture") return op === "is_empty" ? "has no picture" : "has a picture"
+  return FILTER_OPERATORS[op]
+}
+
 // The conditions a column offers, the first being the default.
-export function operatorsFor(type: RecordValueType | "key"): FilterOp[] {
+export function operatorsFor(type: FilterColumnType): FilterOp[] {
   if (type === "key") return ["contains", "is"]
+  if (type === "picture") return ["is_not_empty", "is_empty"]
   if (type === "single_select" || type === "multi_select") return ["has_any", "is_empty", "is_not_empty"]
   if (type === "number" || type === "date") return ["is", "is_not", "is_empty", "is_not_empty"]
   return ["contains", "is", "is_not", "is_empty", "is_not_empty"]

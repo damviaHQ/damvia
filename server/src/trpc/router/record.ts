@@ -19,6 +19,7 @@ import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { assetsS3, assetsS3Bucket, dataSource } from "../../env"
 import { rerunEntityStage, rerunFamilyStage, rerunReadinessStage } from "../../services/enrichment"
 import { linkedFilesOf } from "../../services/record-files"
+import { suggestValues } from "../../services/record-suggestions"
 import { tableExists, tableFieldNames } from "../../services/record-tables"
 import { analyseCsv, createRecord, EXPORT_MAX, fieldIsLinked, importCsv, LIST_MAX, listRecords, locateRecord, moveRecords, patchEach, patchRecords, removeRecords, RecordRow } from "../../services/records"
 import { authMiddleware, publicProcedure, router, userAdmin } from "../index"
@@ -109,17 +110,23 @@ export default router({
     }),
   create: publicProcedure
     .use(authMiddleware(userAdmin))
-    .input(z.object({ recordKey: z.string().trim().min(1).max(200), values: values.optional(), tableId: z.uuid().optional() }))
+    .input(z.object({ recordKey: z.string().trim().min(1).max(200), values: values.optional(), tableId: z.uuid().optional(), source: z.enum(['grid', 'unmatched']).default('grid') }))
     .mutation(async ({ input, ctx }) => {
       const id = await dataSource.transaction(async (em) => {
         if (input.tableId) await tableExists(em, input.tableId)
-        return createRecord(em, input, { userId: ctx.user.id, source: 'grid' })
+        return createRecord(em, input, { userId: ctx.user.id, source: input.source })
       })
       // Files that already carry the key attach now.
       await rerunEntityStage()
       await rerunReadinessStage([id])
       return getRecord(id)
     }),
+  // The values the records' look-alikes agree on, offered for their empty
+  // fields. Nothing is written: accepting one goes through patch or patchMany.
+  suggestions: publicProcedure
+    .use(authMiddleware(userAdmin))
+    .input(z.object({ ids }))
+    .query(({ input }) => suggestValues(dataSource.manager, input.ids)),
   patch: publicProcedure
     .use(authMiddleware(userAdmin))
     .input(z.object({ id: z.uuid(), values: values.refine((value) => Object.keys(value).length >= 1 && Object.keys(value).length <= 50, 'Send between 1 and 50 fields.'), source: z.enum(['grid', 'panel']) }))

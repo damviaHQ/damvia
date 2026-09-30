@@ -61,7 +61,7 @@ test('Link to products holds the rules, what to review and the links by hand in 
   await tabs.getByRole('tab', { name: /^To review/ }).click()
   await expect(page).toHaveURL(/tab=review/)
   await expect(page.getByRole('tab', { name: /Folders without a product/ })).toBeVisible()
-  await expect(page.getByRole('tab', { name: /Product not imported/ })).toBeVisible()
+  await expect(page.getByRole('tab', { name: /Missing products/ })).toBeVisible()
   await expect(page.getByRole('tab', { name: /Linked by hand/ }).first()).toBeVisible()
 
   await tabs.getByRole('tab', { name: /^Linked by hand/ }).click()

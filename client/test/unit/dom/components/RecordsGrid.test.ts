@@ -29,13 +29,13 @@ const rows = [
   { id: 'r2', recordKey: 'A-2', metaData: { Colour: '', Price: 'n/a' }, thumbnailURL: null, fileCount: 3, filledCount: 1 },
 ]
 
-function setup(commit = vi.fn().mockResolvedValue(undefined), create = vi.fn().mockResolvedValue(undefined), list: (typeof rows[number] | null)[] = rows) {
+function setup(commit = vi.fn().mockResolvedValue(undefined), list: (typeof rows[number] | null)[] = rows) {
   const commitMany = vi.fn().mockResolvedValue(undefined)
   const wrapper = mount(RecordsGrid, {
     attachTo: document.body,
-    props: { rows: list, columns, fieldCount: 2, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, commitMany, addOption: vi.fn(), create },
+    props: { rows: list, columns, fieldCount: 2, sort: null, selected: [], recordLabel: 'product', commit, commitMany, addOption: vi.fn() },
   })
-  return { wrapper, commit, commitMany, create }
+  return { wrapper, commit, commitMany }
 }
 const cell = (wrapper: ReturnType<typeof setup>['wrapper'], row: number, column: number) => wrapper.get(`[data-cell="${row}-${column}"]`)
 
@@ -94,27 +94,12 @@ describe('RecordsGrid', () => {
     wrapper.unmount()
   })
 
-  test('the last row creates a record from its key and shows why a key is refused', async () => {
-    const { wrapper, create } = setup(undefined, vi.fn().mockRejectedValueOnce(new Error('A record with key A-1 already exists.')).mockResolvedValue(undefined))
-    const input = wrapper.get('.records-grid-new input')
-    await input.setValue('A-1')
-    await wrapper.get('.records-grid-new form').trigger('submit')
-    await flushPromises()
-    expect(wrapper.get('#new-record-error').text()).toBe('A record with key A-1 already exists.')
-    await input.setValue(' A-3 ')
-    await wrapper.get('.records-grid-new form').trigger('submit')
-    await flushPromises()
-    expect(create).toHaveBeenLastCalledWith('A-3')
-    expect((input.element as HTMLInputElement).value).toBe('')
-    wrapper.unmount()
-  })
-
   test('ticking an option shows in the cell at once and saves when the list closes', async () => {
     const tags: GridField = { id: 'f3', name: 'Tags', displayName: null, valueType: 'multi_select', options: ['Eco', 'Sale'] }
     const commit = vi.fn().mockResolvedValue(undefined)
     const wrapper = mount(RecordsGrid, {
       attachTo: document.body,
-      props: { rows: [{ ...rows[0], metaData: { Tags: 'Eco' } }], columns: [...columns.slice(0, 2), { id: 'field:Tags', kind: 'field', label: 'Tags', width: 200, field: tags }], fieldCount: 1, sort: null, selected: [], recordLabel: 'product', keyLabel: 'SKU', commit, commitMany: vi.fn(), addOption: vi.fn(), create: vi.fn() },
+      props: { rows: [{ ...rows[0], metaData: { Tags: 'Eco' } }], columns: [...columns.slice(0, 2), { id: 'field:Tags', kind: 'field', label: 'Tags', width: 200, field: tags }], fieldCount: 1, sort: null, selected: [], recordLabel: 'product', commit, commitMany: vi.fn(), addOption: vi.fn() },
     })
     await cell(wrapper, 0, 2).trigger('click')
     await cell(wrapper, 0, 2).trigger('keydown', { key: 'Enter' })
@@ -176,7 +161,7 @@ describe('RecordsGrid', () => {
   })
 
   test('a row not loaded yet shows as a placeholder, reports the rows on screen, and is left out of a filled range', async () => {
-    const { wrapper, commit, commitMany } = setup(undefined, undefined, [rows[0], null, rows[1]])
+    const { wrapper, commit, commitMany } = setup(undefined, [rows[0], null, rows[1]])
     expect(wrapper.findAll('tr.records-grid-loading')).toHaveLength(1)
     expect(wrapper.emitted('range')?.[0]).toEqual([0, 2])
     await cell(wrapper, 0, 2).trigger('click')

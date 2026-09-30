@@ -149,11 +149,34 @@ export async function collectionRecordPreview(em: EntityManager, collectionId: s
 	const rows: {
 		id: string, record_key: string, meta_data: Record<string, string>, source: string, excluded: boolean,
 		readiness_filled: number, readiness_total: number, readiness_ready: boolean,
+		missing_fields: string[] | null, missing_views: string[] | null,
 	}[] = await em.query(`
 		SELECT r.id, r.record_key, hstore_to_json(r.meta_data) AS meta_data, cr.source, cr.excluded,
-			r.readiness_filled, r.readiness_total, r.readiness_ready
+			r.readiness_filled, r.readiness_total, r.readiness_ready,
+			(
+				SELECT array_agg(coalesce(a.display_name, a.name) ORDER BY a.position, a.name)
+				FROM record_attributes a
+				WHERE a.id = ANY(d.required_attribute_ids) AND coalesce(r.meta_data -> a.name, '') = ''
+			) AS missing_fields,
+			(
+				SELECT array_agg(wanted.view ORDER BY wanted.view)
+				FROM unnest(d.required_views) AS wanted(view)
+				WHERE NOT EXISTS (
+					SELECT 1 FROM asset_files f
+					LEFT JOIN asset_entity_links l ON l.asset_file_id = f.id AND l.target_kind = 'record' AND l.status = 'active'
+					WHERE coalesce(l.record_id, f.record_id) = r.id AND f.record_view = wanted.view
+				)
+			) AS missing_views
 		FROM collection_records cr
 		INNER JOIN records r ON r.id = cr.record_id
+		-- What a product lacks is named only when it is not ready, against the
+		-- definition the readiness stage scored it with.
+		LEFT JOIN LATERAL (
+			SELECT required_attribute_ids, required_views FROM readiness_definitions
+			WHERE table_id = r.table_id OR table_id IS NULL
+			ORDER BY table_id NULLS LAST
+			LIMIT 1
+		) d ON NOT r.readiness_ready
 		WHERE cr.collection_id = $1::uuid
 		ORDER BY r.record_key
 		LIMIT $2 OFFSET $3
@@ -165,7 +188,12 @@ export async function collectionRecordPreview(em: EntityManager, collectionId: s
 			metaData: row.meta_data ?? {},
 			source: row.source,
 			excluded: row.excluded,
-			readiness: { filled: row.readiness_filled, total: row.readiness_total, ready: row.readiness_ready },
+			readiness: {
+				filled: row.readiness_filled,
+				total: row.readiness_total,
+				ready: row.readiness_ready,
+				missing: { fields: row.missing_fields ?? [], views: row.missing_views ?? [] },
+			},
 		})),
 		total: summary.total as number,
 		included: summary.included as number,
