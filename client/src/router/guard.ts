@@ -27,6 +27,10 @@ export function guardNavigation(
   if (publicRoutes.includes(name)) {
     return true
   }
+  // An assistant's connection request comes back after sign-in, whole.
+  if (!isAuthenticated && name === 'connect-assistant') {
+    return { name: 'login', query: { assistant: JSON.stringify(to.query) } }
+  }
   if (!isAuthenticated && !authRoutes.includes(name)) {
     return { name: 'login', query: to.query }
   } else if (isAuthenticated && authRoutes.includes(name)) {

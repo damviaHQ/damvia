@@ -105,9 +105,11 @@ export async function revokeUserSessions(userId: string, opts: { exceptSessionId
 	await query.execute()
 }
 
+// An assistant connection (method `mcp`) is not ended by idleness: it is used
+// in bursts, and lasts until its absolute expiry unless it is revoked.
 export async function pruneExpiredSessions() {
 	await dataSource.query(
-		`DELETE FROM user_sessions WHERE expires_at <= now() OR last_seen_at <= now() - make_interval(hours => $1)`,
+		`DELETE FROM user_sessions WHERE expires_at <= now() OR (method <> 'mcp' AND last_seen_at <= now() - make_interval(hours => $1))`,
 		[sessionIdleHours()],
 	)
 	await dataSource.query(`DELETE FROM login_tokens WHERE expires_at <= now() - interval '1 day'`)

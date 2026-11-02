@@ -18,6 +18,7 @@ Account access, invitation access and object URLs have separate lifetimes. This 
 | Collection invitation | Access branch expires at the start of the selected date; deleting the invitation removes that branch. Other owner/group/public grants remain. |
 | Presigned S3 URLs | Authorisation is embedded in the signed URL. Removing an invitation or a user does not revoke an already issued S3 URL, but it expires on its own: one hour for previews and originals shown in the library, 5 minutes for the redirect behind a download link. |
 | Newsletter unsubscribe link | Signed with `APP_SECRET`, valid 90 days, and can only unsubscribe its one account. It stops working as soon as the person changes their newsletter choice in their profile. See [Newsletters](./newsletters.md#unsubscribing). |
+| AI assistant connection | A session of method `mcp`, listed with the assistant's name in **Account > Security**. Not ended by idleness; ends `SESSION_MAX_HOURS` after the person allowed it, and on the events below. See [AI assistants](../integrations/ai-assistants.md). |
 | Download link | `API_URL/v1/downloads/{id}` requires no session, so it can be passed on. Each click checks that the download is ready, not past its seven-day expiry, and that its owner is still approved, not suspended and can still reach every file, then redirects to an S3 URL valid 5 minutes. |
 
 ## What ends a session

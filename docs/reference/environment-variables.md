@@ -50,6 +50,7 @@ Any variable can also be read from a file, the way Docker and Kubernetes mount s
 | `SESSION_MAX_HOURS` | `720` | A session ends this long after sign-in, however active (30 days). Set `12` for an absolute limit of one working day. |
 | `SESSION_COOKIE_SAMESITE` | `lax` | `lax` works when the client and the API share a registrable domain (`dam.example.com` and `api.dam.example.com`, or one hostname). `none` is only for a client and an API on unrelated domains, and requires HTTPS. |
 | `MFA_REQUIRED_ROLES` | unset | Comma-separated roles (`admin`, `manager`, `member`, `guest`) that must use two-step verification. Their users are asked to enrol at their next sign-in and can do nothing else until they have. Single sign-on sessions are exempt. An unknown role stops the server at startup. |
+| `MCP_ENABLED` | `false` | `true` serves the MCP endpoint at `API_URL/v1/mcp` and its OAuth routes, so people can connect an AI assistant. See [AI assistants](../integrations/ai-assistants.md). |
 | `PASSWORD_BREACH_CHECK` | `true` | Checks new passwords against the Have I Been Pwned breach list. Only the first 5 characters of the password's SHA-1 leave the server. `false` for servers without internet access. |
 | `TRUST_PROXY` | `1` | How many reverse proxies to trust for the client address (`X-Forwarded-For`), used by rate limiting and logs. A number of hops, `true` (any, only on a private network), `false`, or a comma-separated list of proxy addresses. |
 

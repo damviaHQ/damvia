@@ -35,7 +35,7 @@ const recoveryCodes = ref<string[]>([])
 
 const methods: Record<string, string> = {
   password: 'Password', email_link: 'Email link', invitation: 'Invitation link', sso: 'Single sign-on',
-  password_reset: 'Password reset', sign_up: 'Sign-up', legacy: 'Earlier sign-in',
+  password_reset: 'Password reset', sign_up: 'Sign-up', legacy: 'Earlier sign-in', mcp: 'Connected through MCP',
 }
 
 function describeDevice(userAgent: string | null) {
@@ -118,7 +118,7 @@ async function mfaTurnedOn() {
         <li v-for="session in sessions.data.value" :key="session.id"
           class="flex flex-wrap items-center justify-between gap-3 py-3.5">
           <div class="grid gap-0.5">
-            <span class="text-body font-medium">{{ describeDevice(session.userAgent) }}<span v-if="session.current" class="text-neutral-500"> · this browser</span></span>
+            <span class="text-body font-medium">{{ session.method === 'mcp' ? `${session.clientLabel ?? 'AI assistant'} (AI assistant)` : describeDevice(session.userAgent) }}<span v-if="session.current" class="text-neutral-500"> · this browser</span></span>
             <span class="text-caption text-neutral-500">{{ methods[session.method] ?? session.method }} · signed in {{ formatDate(session.createdAt) }} · last active {{ formatDate(session.lastSeenAt) }}</span>
           </div>
           <Button v-if="!session.current" type="button" variant="ghost" size="sm" @click="revoke(session.id)">Sign out</Button>

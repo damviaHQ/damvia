@@ -6,7 +6,7 @@ sidebar:
 lastUpdated: 2026-09-30
 ---
 
-Damvia integrates with three kinds of external services, plus an optional identity provider. The cloud storage is where your files already live; Damvia only reads it. SMTP carries every account and notification email. S3-compatible storage holds Damvia's own copies, previews and archives. An OpenID Connect provider can handle sign-in.
+Damvia integrates with three kinds of external services, plus an optional identity provider and optional AI assistants. The cloud storage is where your files already live; Damvia only reads it. SMTP carries every account and notification email. S3-compatible storage holds Damvia's own copies, previews and archives. An OpenID Connect provider can handle sign-in.
 
 | Integration | Direction | Pages |
 |---|---|---|
@@ -14,6 +14,7 @@ Damvia integrates with three kinds of external services, plus an optional identi
 | SMTP | Outbound | [SMTP](./smtp.md) |
 | OpenID Connect identity provider (optional) | Sign-in redirects | [Single sign-on](./single-sign-on.md) |
 | S3 / MinIO | Read and write; browsers use presigned URLs | [Object storage](./object-storage.md) |
+| AI assistants such as Claude (optional) | Inbound MCP calls, as the person who connected them | [AI assistants](./ai-assistants.md) |
 
 ## One or several sources per instance
 

@@ -31,7 +31,7 @@ The two application packages have their own `package.json` and `node_modules`. A
 | `server/` | `npm run dev` | `ENABLE_WORKER=true nodemon --exec ts-node src/index.ts`: API, worker and cloud sync in one process, restarted on save |
 | `server/` | `npm run build` | `NODE_ENV=production tsc` into `server/dist/`, then the type declarations the client reads |
 | `server/` | `npm test` | Cleans `server/dist/`, builds the server and runs every suite in `server/test/*.cjs` one file at a time against `SECURITY_TEST_DATABASE_URL`, a disposable database whose name ends in `_test` |
-| `server/` | `npm run test:security` | Same build, the security-related suites only: `security`, `auth`, `auth-invariants`, `access`, `catalogue-access`, `record-picture-access`, `audit`, `privacy`, `credentials` |
+| `server/` | `npm run test:security` | Same build, the security-related suites only: `security`, `auth`, `auth-invariants`, `access`, `catalogue-access`, `record-picture-access`, `audit`, `privacy`, `credentials`, `mcp` |
 | `server/` | `npm start` | `NODE_ENV=production node dist/index.js` |
 | `server/` | `npm run cli -- <command>` | Maintenance CLI; see [CLI](../reference/cli.md) for the current commands and their data effects |
 | `server/` | `npm run typeorm` | `typeorm-ts-node-commonjs`, the TypeORM CLI running on the TypeScript sources |

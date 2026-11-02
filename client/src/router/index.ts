@@ -53,6 +53,7 @@ const router = createRouter({
 		{ name: 'sign-up', path: '/sign-up', component: () => import('@/views/auth/auth-sign-up.vue'), meta: { layout: 'auth', title: 'Sign up' } },
 		{ name: 'password-reset', path: '/password-reset', component: () => import('@/views/auth/auth-password-reset.vue'), meta: { layout: 'auth', title: 'Reset password' } },
 		{ name: 'password-update', path: '/password-update', component: () => import('@/views/auth/auth-password-update.vue'), meta: { layout: 'auth', title: 'Update password' } },
+		{ name: 'connect-assistant', path: '/connect-assistant', component: () => import('@/views/auth/connect-assistant.vue'), meta: { layout: 'auth', title: 'Connect an AI assistant' } },
 		{ name: 'home', path: '/', component: () => import('@/views/home.vue'), meta: { layout: 'main', title: 'Home', mobile: () => import('@/mobile/views/MobileHome.vue') } },
 		{ name: 'page', path: '/pages/:id', component: () => import('@/views/page.vue'), meta: { layout: 'main', title: 'Page', mobile: () => import('@/mobile/views/MobilePage.vue') } },
 		{ name: 'my-collections', path: '/collections', component: () => import('@/views/my-collections.vue'), meta: { layout: 'main', title: 'My collections', mobile: () => import('@/mobile/views/MobileSaved.vue') } },

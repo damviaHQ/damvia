@@ -28,6 +28,7 @@ Besides the sign-on routes, the non-tRPC routes are:
 - `GET /v1/downloads/:downloadId`: it loads the `Download` and its owner, redirects to `APP_URL/link-expired` when the row is missing, not ready or past `expiresAt`, or when the owner is no longer approved, is suspended or can no longer see every file, and otherwise redirects to a 5-minute presigned URL of `downloads/{id}` in the assets bucket.
 - `GET /v1/branding/email-logo.png` and `GET /v1/newsletter-images/:id.(jpg|png)`: public images for emails, sent with `Cross-Origin-Resource-Policy: cross-origin`, and a bare `404` for anything missing.
 - `POST /v1/unsubscribe/:token`: the one-click unsubscribe of RFC 8058, posted by mail providers without cookies or an `Origin`. It reads no body, is rate-limited per address and answers `200` or `400`.
+- With `MCP_ENABLED=true`, the routes of [AI assistants](../integrations/ai-assistants.md), registered by `server/src/mcp/routes.ts`: `POST /v1/mcp`, the MCP endpoint (Streamable HTTP without sessions, one `McpServer` per request, tools in `mcp/tools.ts`, previews and contact sheets in `mcp/previews.ts`); `/v1/oauth/register`, `/v1/oauth/token`, `/v1/oauth/revoke` and `/v1/oauth/authorize`, the OAuth 2.1 server in `mcp/oauth.ts`; and the metadata under `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`. `POST /v1/mcp` and the three OAuth `POST` routes skip the `Origin` check: they authenticate with a bearer token, PKCE or a client secret, never the cookie.
 - `POST /v1/email-events/:secret`: bounce and complaint reports from the mail provider, JSON or SNS `text/plain` up to 1 MB. The path must match `EMAIL_EVENTS_SECRET` (compared as SHA-256 digests in constant time), otherwise `404`. `services/email-events.ts` reads the formats of Postmark, Amazon SES (directly or through SNS, whose subscription it confirms at `sns.<region>.amazonaws.com` only), SendGrid, Mailgun, Resend and Brevo.
 
 ## A request travels client → tRPC → router → service → entity
@@ -54,6 +55,7 @@ Details of the procedures, predicates and error shape are in [tRPC API](./api.md
 | `worker.ts` | pg-boss instance, `createQueue` helper, every queue definition |
 | `modules/` | `index.ts` loads the [modules](./modules.md) listed in `DAMVIA_MODULES` when the tRPC router is built, before the data source starts: their entities and migrations, their routers under `modules`, their queues, and the `ModuleApi` they receive |
 | `cli.ts` | `commander` program: `check-integrity`, the source commands and `metadata:backfill` |
+| `mcp/` | The MCP server for AI assistants: OAuth 2.1 (`oauth.ts`), routes (`routes.ts`), tools (`tools.ts`), previews (`previews.ts`) |
 | `asset-updater/` | `base.ts` abstract driver, `dropbox.ts`, `one-drive.ts`; see [Storage drivers](./storage-drivers.md) |
 | `entity/` | 47 TypeORM entities and their enums |
 | `migrations/` | Hand-written SQL migrations, run at startup |

@@ -18,6 +18,8 @@ The server speaks plain HTTP on one port and expects a proxy to terminate TLS. T
 | `GET /v1/newsletter-images/:id.(jpg\|png)` | Images in newsletters. Public and cached for a year; emails already sent keep loading them, so keep the path reachable, and redirect it from the old host if `API_URL` changes. |
 | `POST /v1/unsubscribe/:token` | One-click unsubscribe, posted by mail providers without cookies or an `Origin`. Rate-limited per address. |
 | `POST /v1/email-events/:secret` | Bounce and spam reports from the mail provider, up to 1 MB. `404` unless `EMAIL_EVENTS_SECRET` is set and matches. |
+| `POST /v1/mcp`, `/v1/oauth/*` | Only with `MCP_ENABLED=true`. The MCP endpoint and the OAuth routes of [AI assistants](../integrations/ai-assistants.md). Called by the assistants' servers with a bearer token or PKCE, never the cookie, so they are exempt from the `Origin` check. Answers are JSON, not streamed. |
+| `GET /.well-known/oauth-authorization-server`, `GET /.well-known/oauth-protected-resource`, `GET /.well-known/oauth-protected-resource/v1/mcp` | Only with `MCP_ENABLED=true`. How an assistant finds where to sign in. Must reach the API, also on a hostname shared with the client. |
 
 Two Fastify settings matter for the proxy:
 
@@ -72,6 +74,10 @@ dam.example.com {
     reverse_proxy 127.0.0.1:3000
   }
   handle /v1/* {
+    reverse_proxy 127.0.0.1:3000
+  }
+  # Only for AI assistants (MCP_ENABLED=true).
+  handle /.well-known/oauth-* {
     reverse_proxy 127.0.0.1:3000
   }
   handle {

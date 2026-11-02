@@ -47,6 +47,7 @@ import recordTableRouter from "./record-table"
 import regionRouter from "./region"
 import resolverStepRouter from "./resolver-step"
 import settingsRouter from "./settings"
+import oauthRouter from "./oauth"
 import userRouter from "./user"
 import variantAxisRouter from "./variant-axis"
 import variantGroupRouter from "./variant-group"
@@ -60,6 +61,7 @@ const appRouter = router({
 	authorizedDomain: authorizedDomainRouter,
 	region: regionRouter,
 	organisation: organisationRouter,
+	oauth: oauthRouter,
 	catalogue: catalogueRouter,
 	collection: collectionRouter,
 	asset: assetRouter,

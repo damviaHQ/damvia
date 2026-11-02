@@ -34,6 +34,7 @@ const auditPage = {
 }
 const sessions = [
   { id: 's1', method: 'password', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/130.0', createdAt: '2026-09-27T08:00:00Z', lastSeenAt: '2026-09-27T09:00:00Z', current: true },
+  { id: 's3', method: 'mcp', clientLabel: 'Claude', userAgent: 'Claude-User', createdAt: '2026-09-26T08:00:00Z', lastSeenAt: '2026-09-26T09:00:00Z', current: false },
   { id: 's2', method: 'sso', userAgent: 'Mozilla/5.0 (iPhone) Safari/605.1', createdAt: '2026-09-26T08:00:00Z', lastSeenAt: '2026-09-26T09:00:00Z', current: false },
 ]
 
@@ -63,6 +64,8 @@ const screens: Record<string, Screen> = {
   'phone search': { url: '/search?q=Campaign', phone: true, answers: results, ready: page => page.getByText('3 files', { exact: true }) },
   'phone search filters': { url: '/search?q=Campaign&panel=filters', phone: true, answers: results, ready: page => page.getByRole('dialog', { name: 'Filters' }) },
   'phone downloads': { url: '/downloads', phone: true, ready: heading },
+  'assistant consent': { url: '/connect-assistant?client_id=c1&redirect_uri=https%3A%2F%2Fassistant.example.com%2Fcb', answers: { 'oauth.describe': { client: { name: 'Claude', clientUri: null, logoUri: null, returnsTo: 'assistant.example.com', registeredAt: '2026-11-02T08:00:00Z' }, scopes: ['damvia.read'], refusal: null, errorRedirect: null } }, ready: page => page.getByRole('button', { name: 'Allow' }) },
+  'phone assistant consent': { url: '/connect-assistant?client_id=c1&redirect_uri=https%3A%2F%2Fassistant.example.com%2Fcb', phone: true, answers: { 'oauth.describe': { client: { name: 'Claude', clientUri: null, logoUri: null, returnsTo: 'assistant.example.com', registeredAt: '2026-11-02T08:00:00Z' }, scopes: ['damvia.read'], refusal: null, errorRedirect: null } }, ready: page => page.getByRole('button', { name: 'Allow' }) },
   'phone menu': { url: '/collections/campaign', phone: true, ready: heading,
     open: async page => { await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Menu' }).click(); await expect(page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'Brand guidelines' })).toBeVisible() } },
   'phone sign-in': { url: '/login', phone: true, signedOut: true, answers: { 'settings.getAuthBackgroundImage': { imageUrl: 'https://example.test/cover.jpg', exists: true } }, ready: page => page.getByRole('button', { name: 'Log in', exact: true }) },

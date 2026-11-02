@@ -78,13 +78,25 @@ The sign-in procedures (`login`, `verifyMfa`, `exchangeLink`, `exchangeInvitatio
 | `exchangeInvitation` | mutation | public | Takes `invitationId.secret` from an `invitation` email while the invitation exists and has not expired; also returns `collectionId`. The session ends with the invitation |
 | `upgradeLegacyToken` | mutation | public | Exchanges a pre-session JWT from the `authorization` header for a session with method `legacy` |
 | `logout` | mutation | public | Deletes the current session and clears the cookie |
-| `sessions` | query | login | The caller's sessions: `method`, `userAgent`, `createdAt`, `lastSeenAt`, `current` |
+| `sessions` | query | login | The caller's sessions: `method`, `userAgent`, `clientLabel` (the assistant of an `mcp` session), `createdAt`, `lastSeenAt`, `current` |
 | `revokeSession` | mutation | login | Ends one of the caller's sessions |
 | `revokeOtherSessions` | mutation | login | Ends every session of the caller but the current one |
 | `mfaSetup` | mutation | login | Stores a pending, encrypted TOTP secret and returns it with its `otpauth` URI and a QR code SVG |
 | `mfaEnable` | mutation | login | Checks a first code, turns two-step verification on, returns ten recovery codes once, ends the caller's other sessions |
 | `mfaDisable` | mutation | login | Turns it off given a code; `FORBIDDEN` when the caller's role is in `MFA_REQUIRED_ROLES` |
 | `mfaRegenerateRecoveryCodes` | mutation | login | Replaces the recovery codes given a code |
+
+### `oauth`
+
+The consent page of [AI assistants](../integrations/ai-assistants.md), `/connect-assistant` in the client. Each procedure takes the OAuth authorization request as the assistant sent it (`response_type`, `client_id`, `redirect_uri`, `code_challenge`, `code_challenge_method`, `state`, `scope`, `resource`), checks it again, and answers `NOT_FOUND` unless `MCP_ENABLED=true`. An unknown client or a return address it did not register is `BAD_REQUEST`, shown to the person and never redirected.
+
+| Procedure | Kind | Auth | Purpose |
+|---|---|---|---|
+| `describe` | query | `userApproved` | The assistant's name, logo and return host, the scopes the caller's role allows, `refusal` (`guest`, `unapproved` or null) and `errorRedirect`, the address to send a malformed request back to |
+| `approve` | mutation | `userApproved` | Issues a one-minute code and returns `redirectTo`, the assistant's return address with `code`, `state` and `iss`. `FORBIDDEN` for a guest or an unapproved account. Records `assistant.authorized` |
+| `deny` | mutation | `userApproved` | Returns `redirectTo` with `error=access_denied` |
+
+The tokens themselves come from the REST routes under `/v1/oauth/` (`register`, `token`, `revoke`, and `authorize`, which redirects to the consent page), and the tools from `POST /v1/mcp`; see [Architecture](./architecture.md). Each MCP tool calls the procedures of this page through `appRouter.createCaller` with the person's user and their `mcp` session, so every predicate and access query applies.
 
 ### `user`
 

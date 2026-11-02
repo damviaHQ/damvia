@@ -73,6 +73,7 @@ Contributor reference, kept in the repository and not published on the documenta
 | `server/src/asset-updater/base.ts`, `services/asset.ts` (`upsertFolder`, `upsertFile`) | `contributing/storage-drivers.md` |
 | Folder layout of `server/src` and `client/src` | `contributing/architecture.md` |
 | Package scripts, AGPL header, PR process | `contributing/index.md` |
+| `server/src/mcp/`, `server/src/trpc/router/oauth.ts`, `server/src/entity/oauth.ts`, `client/src/views/auth/connect-assistant.vue`, `MCP_ENABLED` | `integrations/ai-assistants.md`, `contributing/api.md`, `contributing/architecture.md`, `contributing/data-model.md`, `deployment/reverse-proxy.md`, `reference/environment-variables.md` |
 
 ## Cross-cutting operator references
 

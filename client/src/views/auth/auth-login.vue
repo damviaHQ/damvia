@@ -45,7 +45,20 @@ const authParams = ref<{
 
 const mfaChallenge = ref<string | null>((window.history.state?.mfaChallenge as string | undefined) ?? null)
 const mfaCode = ref("")
-const redirectAfterSignIn = ref<{ name: string, params?: Record<string, string> }>({ name: "home" })
+const redirectAfterSignIn = ref<{ name: string, params?: Record<string, string>, query?: Record<string, string> }>({ name: "home" })
+
+// Signing in to let an AI assistant connect: back to its consent page.
+function assistantRequest(): Record<string, string> | null {
+  if (typeof route.query.assistant !== "string") return null
+  try {
+    const value = JSON.parse(route.query.assistant)
+    return value && typeof value === "object" && Object.values(value).every((item) => typeof item === "string") ? value : null
+  } catch {
+    return null
+  }
+}
+const assistant = assistantRequest()
+if (assistant) redirectAfterSignIn.value = { name: "connect-assistant", query: assistant }
 
 const isFormValid = computed(() => {
   return emailRegex.test(form.value.email) && acceptedPolicies.value

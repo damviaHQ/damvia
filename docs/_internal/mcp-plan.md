@@ -4,9 +4,22 @@ Statut : proposition, premières décisions intégrées (section 15). Rédigé l
 
 Document interne (dossier `_internal`, non publié). Il décrit ce que Damvia expose aux assistants IA (ChatGPT, Claude, Microsoft Copilot, Le Chat, Cursor et les autres clients compatibles) avec le Model Context Protocol : pour qui, pour quels usages, dans quel ordre, et comment le faire sans affaiblir le modèle d'accès existant.
 
+## Avancement (2 novembre 2026)
+
+Livré dans le core, derrière `MCP_ENABLED` : la phase 0 et les outils de lecture de la phase 1, pour Claude. Documentation : `docs/integrations/ai-assistants.md`. Écarts avec ce plan, choisis à l'implémentation :
+
+- Les adresses sont sous `/v1/` (`/v1/mcp`, `/v1/oauth/*`), comme les autres routes REST : les proxys existants les couvrent déjà ; seul `/.well-known/oauth-*` est à ajouter.
+- La connexion d'un assistant est une session de méthode `mcp`, listée dans Compte > Sécurité avec le nom de l'assistant. Pas d'écran « Applications connectées » séparé : la liste des sessions suffit.
+- Elle dure `SESSION_MAX_HOURS` à partir de l'autorisation, sans délai d'inactivité, plutôt que 30 jours glissants.
+- Inscription des clients par DCR seulement ; CIMD plus tard.
+- Pas encore d'écran « Assistants IA » ni de table `assistant_settings` : l'hébergeur active MCP avec `MCP_ENABLED`, les rôles autorisés sont fixés (admin, manager, member).
+- Outils livrés : `get_context`, `search_products`, `lookup_references`, `get_product`, `search_files`, `view_files` (vignettes et planches contact), `get_variants`, `list_collections`, `get_collection`, `whats_new`. `lookup_references` s'appuie sur la recherche multi-références existante, sans nouvelle procédure.
+
+Reste : phase 2 (collections, partage, téléchargements avec validation des licences), phase 3 (administration), étape ChatGPT, phase 4.
+
 ## 1. En bref
 
-- Damvia devient un **serveur MCP distant** à l'adresse `API_URL/mcp`. Un utilisateur l'ajoute comme connecteur dans son assistant, se connecte une fois avec son compte Damvia (mot de passe, lien e-mail, SSO, double authentification), puis interroge sa médiathèque en langage naturel. **Claude d'abord, ChatGPT ensuite** : le serveur suit le standard MCP, donc ChatGPT et les autres clients compatibles (Copilot, Le Chat, Cursor) l'utilisent sans le réécrire.
+- Damvia devient un **serveur MCP distant** à l'adresse `API_URL/v1/mcp`. Un utilisateur l'ajoute comme connecteur dans son assistant, se connecte une fois avec son compte Damvia (mot de passe, lien e-mail, SSO, double authentification), puis interroge sa médiathèque en langage naturel. **Claude d'abord, ChatGPT ensuite** : le serveur suit le standard MCP, donc ChatGPT et les autres clients compatibles (Copilot, Le Chat, Cursor) l'utilisent sans le réécrire.
 - **Dans le core, gratuit et open source** (AGPL, comme le reste de Damvia), désactivé par défaut. L'interface ne reçoit que les écrans indispensables à MCP : page d'autorisation, applications connectées, réglages « Assistants IA ». Rien d'autre ne change à l'écran : Damvia reste sobre (5.8).
 - **L'assistant agit exactement comme l'utilisateur, jamais plus.** Chaque outil MCP appelle les procédures tRPC existantes avec le contexte de l'utilisateur : visibilité des collections, groupes, régions, licences, champs visibles. Aucun droit nouveau, aucune deuxième implémentation des règles d'accès. Les invités n'ont pas accès aux assistants.
 - **L'assistant voit les visuels.** Il reçoit les vignettes comme des images et les regarde (vision) pour comprendre ce qu'elles montrent et choisir le bon fichier, sans rien télécharger (5.6).
@@ -113,11 +126,11 @@ Damvia gère déjà les identités, la double authentification, le SSO OIDC, la 
 
 Déroulé :
 
-1. L'assistant appelle `API_URL/mcp` sans jeton et reçoit `401` avec `WWW-Authenticate: Bearer resource_metadata="API_URL/.well-known/oauth-protected-resource/mcp"`.
-2. Il lit les métadonnées, s'inscrit (DCR ou CIMD), puis ouvre `API_URL/oauth/authorize` avec `code_challenge` (S256 obligatoire) et `resource=API_URL/mcp`.
+1. L'assistant appelle `API_URL/v1/mcp` sans jeton et reçoit `401` avec `WWW-Authenticate: Bearer resource_metadata="API_URL/.well-known/oauth-protected-resource/mcp"`.
+2. Il lit les métadonnées, s'inscrit (DCR ou CIMD), puis ouvre `API_URL/v1/oauth/authorize` avec `code_challenge` (S256 obligatoire) et `resource=API_URL/mcp`.
 3. Damvia redirige vers `APP_URL/oauth/consent`. Sans session, la connexion habituelle s'affiche (mot de passe, lien, SSO, double authentification). La page montre le nom et le logo du client, le domaine de redirection, un badge « client non vérifié » s'il s'est inscrit seul et n'est pas sur la liste blanche, les autorisations demandées en clair, ce que l'assistant verra (collections, produits, vignettes), puis **Autoriser** ou **Refuser**. Un compte `guest` reçoit un refus expliqué : les invités n'ont pas accès aux assistants.
 4. Sur accord : un code à usage unique valable 60 secondes, puis retour vers le client.
-5. `/oauth/token` échange le code contre un jeton d'accès opaque (60 minutes) et un jeton de rafraîchissement rotatif (30 jours glissants). La réutilisation d'un jeton de rafraîchissement déjà consommé révoque toute l'autorisation.
+5. `/v1/oauth/token` échange le code contre un jeton d'accès opaque (60 minutes) et un jeton de rafraîchissement rotatif ; la connexion dure `SESSION_MAX_HOURS` (30 jours par défaut) à partir de l'autorisation. La réutilisation d'un jeton de rafraîchissement déjà consommé révoque toute l'autorisation.
 6. Chaque autorisation s'appuie sur une `UserSession` de nouvelle méthode `mcp`, avec le nom du client (« Claude », « ChatGPT »). Résultat gratuit : elle apparaît dans Compte > Sécurité, et `revokeSessions`, la suspension, la suppression du compte, la réinitialisation du mot de passe et le changement d'e-mail par un admin la coupent comme les autres sessions. Les jetons sont stockés hachés, comme les jetons de session.
 
 **Double authentification.** Le consentement exige une session complète (double authentification passée si l'utilisateur l'a activée). Si son rôle figure dans `MFA_REQUIRED_ROLES` et qu'il ne s'est pas enrôlé, le consentement est refusé avec un message clair. `mfaEnrolmentRequired()` traite ensuite la méthode `mcp` comme satisfaite, puisque le consentement l'a vérifiée.
@@ -530,8 +543,8 @@ Jeu d'évaluation : `server/test/mcp-evals/`, une liste de demandes en langage n
 4. **Licences** : validées par l'utilisateur dans la conversation, le serveur imposant cette étape avant toute création de téléchargement, y compris pour un agent (12.3).
 5. **Édition** : dans le core, gratuit et open source (AGPL), désactivé par défaut (`MCP_ENABLED`). Plus souple qu'un module : pas de contrat d'extension à maintenir.
 6. **Liens utilisables par d'autres outils** : les liens de téléchargement de sept jours restent partageables ; ils revérifient l'accès de leur propriétaire à chaque ouverture.
-7. **Agents** : ils tournent dans Claude ou ChatGPT, il n'y a rien à coder pour eux. Ils utilisent la connexion de l'utilisateur, qui se renouvelle tant qu'elle sert (30 jours glissants), y compris pour une tâche programmée la nuit. Seule limite, voulue : un téléchargement sous licence attend la réponse de l'utilisateur. Éventuellement plus tard : une clé d'accès pour les outils d'automatisation (n8n, Make, scripts maison) qui ne savent pas faire la connexion OAuth.
-8. **Fiche « Damvia » dans les catalogues d'applications de Claude et de ChatGPT** : plus tard. Une fiche publiée pointe vers une seule adresse, alors que chaque client a sa propre instance (`dam.client-a.com`, `dam.client-b.com`) ; il faudrait un petit service central qui retrouve l'instance de la personne à partir de son e-mail. D'ici là, chaque client ajoute son adresse (`https://dam.client.com/mcp`) comme connecteur personnalisé, une fois, par son administrateur.
+7. **Agents** : ils tournent dans Claude ou ChatGPT, il n'y a rien à coder pour eux. Ils utilisent la connexion de l'utilisateur, qui dure 30 jours à partir de l'autorisation (`SESSION_MAX_HOURS`), y compris pour une tâche programmée la nuit. Seule limite, voulue : un téléchargement sous licence attend la réponse de l'utilisateur. Éventuellement plus tard : une clé d'accès pour les outils d'automatisation (n8n, Make, scripts maison) qui ne savent pas faire la connexion OAuth.
+8. **Fiche « Damvia » dans les catalogues d'applications de Claude et de ChatGPT** : plus tard. Une fiche publiée pointe vers une seule adresse, alors que chaque client a sa propre instance (`dam.client-a.com`, `dam.client-b.com`) ; il faudrait un petit service central qui retrouve l'instance de la personne à partir de son e-mail. D'ici là, chaque client ajoute son adresse (`https://dam.client.com/v1/mcp`) comme connecteur personnalisé, une fois, par son administrateur.
 9. **Interface sobre** : seuls les trois écrans indispensables à MCP sont ajoutés (autorisation, applications connectées, « Assistants IA »). Les procédures serveur créées pour MCP n'ont pas de bouton ; l'interface ne les adopte que si ses utilisateurs les demandent (5.8).
 
 ### Restant à prendre

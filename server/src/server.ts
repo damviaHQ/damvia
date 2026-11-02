@@ -18,7 +18,8 @@ import helmet from '@fastify/helmet'
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify'
 import fastify from 'fastify'
 import { appRouter, createContext } from './trpc'
-import {apiURL, appURL, assetsS3, assetsS3Bucket, dataSource, emailEventsSecret, logger, requestLogging, trustProxy} from "./env"
+import {apiURL, appURL, assetsS3, assetsS3Bucket, dataSource, emailEventsSecret, logger, mcpEnabled, requestLogging, trustProxy} from "./env"
+import { EXTERNAL_PATHS, registerMcpRoutes } from "./mcp/routes"
 import {Download, DownloadStatus} from "./entity/download";
 import { userCollectionFilesQuery } from "./services/collection"
 import { recordAudit } from "./services/audit"
@@ -47,6 +48,8 @@ server.register(cors, { origin: allowedOrigins[0], credentials: true })
 // Origin header come from non-browser clients, which hold no cookie.
 server.addHook('onRequest', async (req, res) => {
 	const origin = req.headers.origin
+	// Assistants call these from their own servers and never send the cookie.
+	if (mcpEnabled() && EXTERNAL_PATHS.includes(req.url.split('?')[0])) return
 	if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS' && origin && !allowedOrigins.includes(origin)) {
 		return res.code(403).send({ error: 'Origin not allowed' })
 	}
@@ -93,6 +96,7 @@ server.register(fastifyTRPCPlugin, {
 // A download link works without signing in, so it can be passed on. It stops
 // working when it expires, or when its owner could no longer download the files.
 registerOidcRoutes(server)
+if (mcpEnabled()) registerMcpRoutes(server)
 
 server.get<{ Params: { downloadId: string } }>(
 	'/v1/downloads/:downloadId',

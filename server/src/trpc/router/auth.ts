@@ -184,6 +184,8 @@ export default router({
 				id: session.id,
 				method: session.method,
 				userAgent: session.userAgent,
+				// The assistant behind an `mcp` session, such as "Claude".
+				clientLabel: session.clientLabel,
 				createdAt: session.createdAt,
 				lastSeenAt: session.lastSeenAt,
 				current: session.id === ctx.session.id,

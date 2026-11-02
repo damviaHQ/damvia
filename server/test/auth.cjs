@@ -614,7 +614,7 @@ test('a person lists their sessions, ends one of their own, or ends every other 
     assert.equal(listed.length, 3)
     assert.deepEqual(listed.filter(row => row.current).map(row => row.id), [current.session.id])
     assert.ok(listed.every(row => row.method === 'password' && row.userAgent === 'node-test'))
-    assert.deepEqual(Object.keys(listed[0]).sort(), ['createdAt', 'current', 'id', 'lastSeenAt', 'method', 'userAgent'])
+    assert.deepEqual(Object.keys(listed[0]).sort(), ['clientLabel', 'createdAt', 'current', 'id', 'lastSeenAt', 'method', 'userAgent'])
     for (let i = 1; i < listed.length; i++) assert.ok(listed[i - 1].lastSeenAt >= listed[i].lastSeenAt)
     const stranger = await withPassword()
     const strangerToken = (await signIn(stranger)).token

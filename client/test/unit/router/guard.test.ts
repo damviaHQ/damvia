@@ -28,6 +28,12 @@ describe('navigation guard', () => {
     for (const name of authRoutes) expect(guardNavigation({ name, query: {} }, false)).toBeUndefined()
   })
 
+  test('an AI assistant connection request survives sign-in whole', () => {
+    const query = { client_id: 'c', redirect_uri: 'https://assistant.example.com/cb', state: 's' }
+    expect(guardNavigation({ name: 'connect-assistant', query }, false)).toEqual({ name: 'login', query: { assistant: JSON.stringify(query) } })
+    expect(guardNavigation({ name: 'connect-assistant', query }, true)).toBeUndefined()
+  })
+
   test('authenticated users skip the auth screens and reach everything else', () => {
     for (const name of authRoutes) expect(guardNavigation({ name, query: {} }, true)).toEqual({ name: 'home' })
     expect(guardNavigation({ name: 'home', query: {} }, true)).toBeUndefined()

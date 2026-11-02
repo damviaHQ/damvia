@@ -268,6 +268,12 @@ export function analyticsRetentionDays(): number | null {
   return days > 0 ? days : null
 }
 
+// The MCP server that lets AI assistants (Claude, ChatGPT...) reach the
+// library on behalf of a person. Off unless the host turns it on.
+export function mcpEnabled() {
+  return process.env.MCP_ENABLED === 'true'
+}
+
 export function passwordLessAuth() {
   return process.env.ENABLE_PASSWORD_LESS_AUTH === 'true'
 }

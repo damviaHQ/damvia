@@ -24,6 +24,8 @@ export enum SessionMethod {
 	PASSWORD_RESET = 'password_reset',
 	SIGN_UP = 'sign_up',
 	LEGACY = 'legacy',
+	// An AI assistant connected through the MCP server; no cookie is ever issued.
+	MCP = 'mcp',
 }
 
 @Entity('user_sessions')
@@ -52,6 +54,10 @@ export class UserSession {
 
 	@Column({ type: 'varchar', nullable: true })
 	userAgent: string | null
+
+	// The assistant behind an `mcp` session, such as "Claude".
+	@Column({ type: 'varchar', nullable: true })
+	clientLabel: string | null
 
 	@CreateDateColumn({ type: 'timestamptz' })
 	createdAt: Date
