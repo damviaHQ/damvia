@@ -19,6 +19,7 @@ import vueJsx from '@vitejs/plugin-vue-jsx'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import tailwind from '@tailwindcss/vite'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 // DAMVIA_MODULES lists the modules built into this client: packages, or paths
 // from the client folder, separated by commas. Each one's client part is its
@@ -49,9 +50,27 @@ export function damviaModules(): Plugin {
   }
 }
 
+// With SENTRY_AUTH_TOKEN, a build sends its source maps to the error tracker
+// (GlitchTip, Sentry), which then shows stack traces in the TypeScript and
+// Vue sources, and removes them from dist/. See docs/integrations/error-tracking.md.
+const sourceMaps = loadEnv('production', process.cwd(), ['SENTRY_', 'VITE_SENTRY_'])
+const uploadSourceMaps = Boolean(sourceMaps.SENTRY_AUTH_TOKEN)
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [damviaModules(), tailwind(), vue(), vueJsx(), svgLoader()],
+  plugins: [
+    damviaModules(), tailwind(), vue(), vueJsx(), svgLoader(),
+    uploadSourceMaps && sentryVitePlugin({
+      authToken: sourceMaps.SENTRY_AUTH_TOKEN,
+      url: sourceMaps.SENTRY_URL || undefined,
+      org: sourceMaps.SENTRY_ORG,
+      project: sourceMaps.SENTRY_PROJECT,
+      release: { name: sourceMaps.VITE_SENTRY_RELEASE || undefined },
+      sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+      telemetry: false,
+    }),
+  ],
+  build: { sourcemap: uploadSourceMaps ? 'hidden' : false },
   server: { fs: { allow: [fileURLToPath(new URL("..", import.meta.url))] } },
   resolve: {
     dedupe: ['vue', 'zod', '@internationalized/date'],

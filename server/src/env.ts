@@ -13,6 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import './load-env'
+// Before the libraries it instruments.
+import { reportLog } from './monitoring'
 import { Resolver } from 'node:dns/promises'
 import "reflect-metadata"
 import { Client as MinioClient } from 'minio'
@@ -108,6 +110,12 @@ export function serializeErrors(value: unknown, depth = 0): unknown {
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, serializeErrors(item, depth + 1)]))
 }
 
+// Runs before errorDetails, while logged errors are still Error objects with their stack.
+const errorReports = format((info) => {
+  reportLog(info)
+  return info
+})
+
 const errorDetails = format((info) => {
   for (const key of Object.keys(info)) {
     info[key] = serializeErrors(info[key])
@@ -117,6 +125,7 @@ const errorDetails = format((info) => {
 
 export const logger = createLogger({
   format: format.combine(
+    errorReports(),
     format.timestamp(),
     format.splat(),
     errorDetails(),

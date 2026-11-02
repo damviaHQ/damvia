@@ -3,7 +3,7 @@ title: Architecture
 description: The single server process, the path of a request from the Vue client to a TypeORM entity, the folder map of both packages, and where a new feature goes.
 sidebar:
   order: 2
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
 This page gives a developer the shape of the code: what runs, how a request travels, what each folder holds, and where to add something. The meaning of the objects (collections, pages, records) is in [Core concepts](../introduction/concepts.md).
@@ -21,13 +21,14 @@ Any failure in steps 2 to 4 logs the error and exits with code 1. Sync initialis
 
 ## Fastify exposes tRPC and a few REST routes
 
-`server/src/server.ts` builds Fastify with `maxParamLength: 5000` (path parameters, not the tRPC input query string), `bodyLimit: 5242880` and `trustProxy` from `TRUST_PROXY`. It registers `@fastify/cookie`, `@fastify/helmet` (the API's security headers), and `@fastify/cors` limited to the origin of `APP_URL` with credentials. An `onRequest` hook refuses with `403` any request other than `GET`, `HEAD` or `OPTIONS` whose `Origin` is neither `APP_URL`'s nor `API_URL`'s; with the `SameSite` cookie this is the defence against cross-site request forgery. Unless `REQUEST_LOG=false`, an `onResponse` hook logs one `http.response` line per request. It then mounts `fastifyTRPCPlugin` under the prefix `/trpc` with `appRouter` and `createContext`. Its `onError` hook logs every procedure error as `http.request` with the procedure `path`, error `code`, `requestId` and `userId`. It excludes request bodies and raw error objects.
+`server/src/server.ts` builds Fastify with `maxParamLength: 5000` (path parameters, not the tRPC input query string), `bodyLimit: 5242880` and `trustProxy` from `TRUST_PROXY`. It registers `@fastify/cookie`, `@fastify/helmet` (the API's security headers), and `@fastify/cors` limited to the origin of `APP_URL` with credentials. An `onRequest` hook refuses with `403` any request other than `GET`, `HEAD` or `OPTIONS` whose `Origin` is neither `APP_URL`'s nor `API_URL`'s; with the `SameSite` cookie this is the defence against cross-site request forgery. Unless `REQUEST_LOG=false`, an `onResponse` hook logs one `http.response` line per request. It then mounts `fastifyTRPCPlugin` under the prefix `/trpc` with `appRouter` and `createContext`. Its `onError` hook logs every procedure error as `http.request` with the procedure `path`, error `code`, `requestId` and `userId`. It excludes request bodies and raw error objects. With `SENTRY_DSN` set, the `INTERNAL_SERVER_ERROR` ones also go to the error tracker, tagged with the procedure and the request id; `server/src/monitoring.ts` sets that up before anything else is loaded. See [Error tracking](../integrations/error-tracking.md).
 
 Besides the sign-on routes, the non-tRPC routes are:
 
 - `GET /v1/downloads/:downloadId`: it loads the `Download` and its owner, redirects to `APP_URL/link-expired` when the row is missing, not ready or past `expiresAt`, or when the owner is no longer approved, is suspended or can no longer see every file, and otherwise redirects to a 5-minute presigned URL of `downloads/{id}` in the assets bucket.
 - `GET /v1/branding/email-logo.png` and `GET /v1/newsletter-images/:id.(jpg|png)`: public images for emails, sent with `Cross-Origin-Resource-Policy: cross-origin`, and a bare `404` for anything missing.
 - `POST /v1/unsubscribe/:token`: the one-click unsubscribe of RFC 8058, posted by mail providers without cookies or an `Origin`. It reads no body, is rate-limited per address and answers `200` or `400`.
+- `POST /v1/monitoring`: only with `SENTRY_DSN` set, the client's error reports. `server/src/monitoring-tunnel.ts` reads the DSN in the first line of each envelope and passes the envelope on only to a project of the server's own tracker, rate-limited per address, up to 1 MB.
 - `POST /v1/email-events/:secret`: bounce and complaint reports from the mail provider, JSON or SNS `text/plain` up to 1 MB. The path must match `EMAIL_EVENTS_SECRET` (compared as SHA-256 digests in constant time), otherwise `404`. `services/email-events.ts` reads the formats of Postmark, Amazon SES (directly or through SNS, whose subscription it confirms at `sns.<region>.amazonaws.com` only), SendGrid, Mailgun, Resend and Brevo.
 
 ## A request travels client → tRPC → router → service → entity

@@ -13,6 +13,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. -->
 <script setup lang="ts">
+import { monitoringEnabled } from "@/services/monitoring"
 import { useGlobalStore } from "@/stores/globalStore"
 import { computed } from "vue"
 
@@ -74,6 +75,7 @@ const hours = (value: number | undefined) => value && value % 24 === 0 ? `${valu
         <li>The library's administrators, and managers for users of their region.</li>
         <li>The companies that host the library, its files and its email, acting on behalf of the organisation that runs it.</li>
         <li v-if="privacy?.passwordBreachCheck">When you choose a password, the first five characters of a fingerprint of it are sent to the Have I Been Pwned service to check it against known data breaches. The password itself never leaves the library.</li>
+        <li v-if="privacy?.errorReporting || monitoringEnabled">When something goes wrong, a technical report of the error goes to the error tracking service chosen by the organisation that runs the library. It names your account by its internal identifier only: never your name, your email address, your password or what you type in forms.</li>
         <li>Your organisation's identity provider, if you sign in with single sign-on.</li>
       </ul>
     </section>

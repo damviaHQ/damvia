@@ -1,12 +1,12 @@
 ---
 title: Integrations
-description: "How Damvia talks to the outside world: one or more cloud storage sources, an SMTP server, and two S3 buckets."
+description: "How Damvia talks to the outside world: one or more cloud storage sources, an SMTP server, two S3 buckets and, optionally, an error tracker."
 sidebar:
   order: 1
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
-Damvia integrates with three kinds of external services, plus an optional identity provider. The cloud storage is where your files already live; Damvia only reads it. SMTP carries every account and notification email. S3-compatible storage holds Damvia's own copies, previews and archives. An OpenID Connect provider can handle sign-in.
+Damvia integrates with three kinds of external services, plus an optional identity provider and an optional error tracker. The cloud storage is where your files already live; Damvia only reads it. SMTP carries every account and notification email. S3-compatible storage holds Damvia's own copies, previews and archives. An OpenID Connect provider can handle sign-in.
 
 | Integration | Direction | Pages |
 |---|---|---|
@@ -14,6 +14,7 @@ Damvia integrates with three kinds of external services, plus an optional identi
 | SMTP | Outbound | [SMTP](./smtp.md) |
 | OpenID Connect identity provider (optional) | Sign-in redirects | [Single sign-on](./single-sign-on.md) |
 | S3 / MinIO | Read and write; browsers use presigned URLs | [Object storage](./object-storage.md) |
+| GlitchTip, Sentry or any service that speaks the Sentry protocol (optional) | Outbound error reports, the browser's through the API | [Error tracking](./error-tracking.md) |
 
 ## One or several sources per instance
 

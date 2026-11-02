@@ -3,7 +3,7 @@ title: Privacy and personal data
 description: What personal data Damvia stores, for how long, which settings reduce it, and how to answer access, correction and deletion requests.
 sidebar:
   order: 6
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
 The organisation that runs a Damvia instance is responsible for the personal data in it. This page lists what the software stores, so you can write your record of processing and your privacy notice, and shows how to answer requests from the people concerned. It describes the software, not a legal assessment.
@@ -26,10 +26,11 @@ The organisation that runs a Damvia instance is responsible for the personal dat
 | Who each newsletter went to: address, name, status, send time, the mail server's refusal | `newsletter_recipients` | As long as the newsletter (sent newsletters cannot be deleted); address and name removed when the account is deleted | Delivery report; the daily sending limit |
 | People picked by hand in saved audiences | `audiences`, `newsletters` (the filter, as account ids) | Until the audience or draft is deleted | Choosing who receives a newsletter |
 | Request log lines (method, path, status, address) | Server log | Your log retention | Operations |
+| Error reports: the error and its stack, the path of the request, the account id and role, the browser's user agent | Your error tracker, when `SENTRY_DSN` or `VITE_SENTRY_DSN` is set | The tracker's retention | Fixing errors; see [Error tracking](../integrations/error-tracking.md#what-is-sent-and-what-is-not) |
 
 The client stores display preferences, filters and recent searches in the browser's local storage. It sets one cookie, `damvia_session` (HttpOnly), plus `damvia_oidc` for 10 minutes during single sign-on. There are no statistics or advertising cookies, so no consent banner is needed for Damvia itself.
 
-Outside the instance, personal data reaches your SMTP provider (email addresses and message content; with `EMAIL_EVENTS_SECRET` set, it reports bounces and spam complaints back), your object storage (downloaded archives), your identity provider (with single sign-on), and, when a password is set with `PASSWORD_BREACH_CHECK` on, the Have I Been Pwned range API. That API receives only the first 5 characters of the password's SHA-1, never the password or the email.
+Outside the instance, personal data reaches your SMTP provider (email addresses and message content; with `EMAIL_EVENTS_SECRET` set, it reports bounces and spam complaints back), your object storage (downloaded archives), your identity provider (with single sign-on), your error tracker (with error tracking set up; no name, email address, IP address, request body or query string), and, when a password is set with `PASSWORD_BREACH_CHECK` on, the Have I Been Pwned range API. That API receives only the first 5 characters of the password's SHA-1, never the password or the email.
 
 ## Settings that reduce what is kept
 
@@ -42,10 +43,11 @@ Outside the instance, personal data reaches your SMTP provider (email addresses 
 | `REQUEST_LOG=false` | No per-request log line. |
 | `SESSION_IDLE_HOURS`, `SESSION_MAX_HOURS` | Shorter sessions. |
 | `PASSWORD_BREACH_CHECK=false` | No call to Have I Been Pwned. |
+| `SENTRY_DSN`, `VITE_SENTRY_DSN` unset | No error reports. |
 
 ## The privacy page
 
-`APP_URL/privacy-policy` is built from the running configuration: retention periods, search mode, whether addresses are logged, session lengths and the breach check. Set `PRIVACY_CONTROLLER` (the responsible organisation) and `PRIVACY_CONTACT` (an email address or URL) so it names who to contact. If your organisation publishes its own notice, link to it from the legal information page (see [Branding](./branding.md#legal-pages)) and keep the facts consistent with this page.
+`APP_URL/privacy-policy` is built from the running configuration: retention periods, search mode, whether addresses are logged, session lengths, the breach check and whether errors are reported. Set `PRIVACY_CONTROLLER` (the responsible organisation) and `PRIVACY_CONTACT` (an email address or URL) so it names who to contact. If your organisation publishes its own notice, link to it from the legal information page (see [Branding](./branding.md#legal-pages)) and keep the facts consistent with this page.
 
 ## Answering requests
 

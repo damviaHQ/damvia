@@ -10,6 +10,7 @@ Contributor reference, kept in the repository and not published on the documenta
 | `server/src/env.ts` | `reference/environment-variables.md`, `configuration/server-env.md` |
 | `server/.env.template`, `client/.env.template` | `reference/environment-variables.md`, `configuration/client-env.md` |
 | `server/src/worker.ts` | `reference/background-jobs.md`, `deployment/worker-and-scaling.md` |
+| `server/src/monitoring.ts`, `server/src/monitoring-tunnel.ts`, `client/src/services/monitoring.ts`, `client/src/services/sentry.ts`, `sentryVitePlugin` in `client/vite.config.ts` | `integrations/error-tracking.md`, `configuration/privacy.md`, `reference/environment-variables.md` |
 | `server/src/index.ts` (startup, 5-minute sync loop) | `integrations/index.md`, `deployment/worker-and-scaling.md` |
 | `server/src/server.ts` (Fastify, cookie, helmet, CORS and origin check, request log, body limit, `/v1/downloads/:id`, `/v1/branding/email-logo.png`, `/v1/newsletter-images/`, `/v1/unsubscribe/`, `/v1/email-events/`) | `deployment/reverse-proxy.md`, `administration/downloads.md`, `contributing/architecture.md`, `integrations/smtp.md` |
 | `server/src/cli.ts`, `server/src/services/system.ts` | `reference/cli.md`, `deployment/integrity-check.md` |

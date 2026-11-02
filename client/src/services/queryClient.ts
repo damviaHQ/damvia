@@ -12,11 +12,16 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-import { QueryClient } from '@tanstack/vue-query'
+import { MutationCache, QueryCache, QueryClient } from '@tanstack/vue-query'
+import { reportError } from './monitoring'
 
 // One cache for the whole app, reachable outside components so signing out
 // can empty it: the next person on the same device must not see cached data.
+// A query or mutation that fails shows its error where it is used; it is also
+// reported, unless it comes from the API, whose server reports it (see sentry.ts).
 export const queryClient = new QueryClient({
+	queryCache: new QueryCache({ onError: reportError }),
+	mutationCache: new MutationCache({ onError: reportError }),
 	defaultOptions: {
 		queries: {
 			refetchOnWindowFocus: false,

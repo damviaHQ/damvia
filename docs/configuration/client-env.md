@@ -3,7 +3,7 @@ title: Client configuration
 description: "The client has four build-time variables: the API endpoint and three brand colours."
 sidebar:
   order: 3
-lastUpdated: 2026-09-27
+lastUpdated: 2026-11-02
 ---
 
 The client is a static bundle built by Vite. Its configuration is read when you run `npm run dev` or `npm run build`, and the values end up inside the JavaScript. Changing `client/.env` on a running dev server has no effect until it restarts; changing it in production means rebuilding and redeploying the bundle.
@@ -59,6 +59,10 @@ A value that is neither a known Tailwind name nor valid CSS is passed to the bro
 :::note
 Most of the interface uses the neutral grey palette from shadcn-vue and is not affected by the brand colours. They apply to accents only. See [Branding](./branding.md) for the other levers.
 :::
+
+## Error tracking is set at build time too
+
+`VITE_SENTRY_DSN` turns error reports on, and a build without it does not contain the SDK. The build also reads `SENTRY_AUTH_TOKEN` and its companions to upload source maps; they have no `VITE_` prefix and never reach the bundle. See [Error tracking](../integrations/error-tracking.md).
 
 ## No other client settings
 

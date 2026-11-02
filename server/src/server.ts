@@ -29,10 +29,17 @@ import { readUnsubscribeToken, setNewsletterSubscription } from "./services/news
 import { hit } from "./services/rate-limit"
 import { applyEmailEvent, readEmailEvents, snsConfirmationUrl } from "./services/email-events"
 import { createHash, timingSafeEqual } from "node:crypto"
+import { monitorFastify, reportError, tagRequest } from "./monitoring"
+import { registerMonitoringTunnel } from "./monitoring-tunnel"
+import { maskedPath } from "./util/request-path"
 
 const server = fastify({ routerOptions: { maxParamLength: 5000 }, logger: false, bodyLimit: 5242880, trustProxy: trustProxy() })
 
 const allowedOrigins = [new URL(appURL()).origin, new URL(apiURL()).origin]
+
+monitorFastify(server)
+// The reference an error message gives the user finds the report in the error tracker.
+server.addHook('onRequest', async (req) => tagRequest(req.id))
 
 server.register(cookie)
 server.register(helmet, {
@@ -63,7 +70,7 @@ if (requestLogging()) {
 	server.addHook('onResponse', async (req, res) => {
 		logger.info('http.response', {
 			method: req.method,
-			path: req.url.split('?')[0].replace(/^\/v1\/downloads\/[^/]+/, '/v1/downloads/:id').replace(/^\/v1\/unsubscribe\/[^/]+/, '/v1/unsubscribe/:token').replace(/^\/v1\/email-events\/[^/]+/, '/v1/email-events/:secret'),
+			path: maskedPath(req.url),
 			status: res.statusCode,
 			ms: Math.round(res.elapsedTime),
 			ip: req.ip,
@@ -83,6 +90,7 @@ server.register(fastifyTRPCPlugin, {
 				return
 			}
 			const cause = error.cause as (Error & { code?: unknown }) | undefined
+			reportError(cause ?? error, { tags: { procedure: path ?? 'unknown', request_id: String(req.id) } })
 			logger.error('http.request', {
 				code: error.code, path, userId: ctx?.user?.id, requestId: req.id,
 				cause: cause && { name: cause.name, code: cause.code, message: cause.message },
@@ -93,6 +101,7 @@ server.register(fastifyTRPCPlugin, {
 // A download link works without signing in, so it can be passed on. It stops
 // working when it expires, or when its owner could no longer download the files.
 registerOidcRoutes(server)
+registerMonitoringTunnel(server)
 
 server.get<{ Params: { downloadId: string } }>(
 	'/v1/downloads/:downloadId',

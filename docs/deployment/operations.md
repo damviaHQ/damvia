@@ -3,7 +3,7 @@ title: Operations
 description: Monitor sync completion, queues, temporary storage, provider credentials and email delivery.
 sidebar:
   order: 9
-lastUpdated: 2026-09-16
+lastUpdated: 2026-11-02
 ---
 
 An API response confirms that the server can answer a request. You also need to check that cloud sync, background tasks, storage and email are working. Use the server logs and the read-only database queries below.
@@ -21,6 +21,7 @@ An API response confirms that the server can answer a request. You also need to 
 | Server disk | `diskFreeBytes` in `storage.measured`, the "Server disk" block for `SERVER_ALERT_EMAILS`, no `disk-alert` email | Free orphan objects, archives and temp files, or extend the volume. The plan cannot see what other services put on the disk; this check can. |
 | SMTP delivery | A controlled test reaches a test inbox | Check queue state and provider delivery log, not just absence of server errors. |
 | Provider credentials | Current, unexpired secrets with expected scopes | Track OneDrive secret expiry; test rotation before expiry. Dropbox revocation stops refresh. |
+| Error reports, with [error tracking](../integrations/error-tracking.md) set up | No new issue, or new issues triaged | Each report carries its `request_id`, `queue` or `source` tag: start from the matching log lines. A silent tracker after a deploy can mean a missing `SENTRY_DSN`; run the test command of that page. |
 
 ## Read-only queue and asset checks
 

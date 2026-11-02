@@ -18,6 +18,7 @@ import { CollectionInvitation } from "./entity/collection-invitation"
 import { Download, DownloadStatus } from "./entity/download"
 import { User } from "./entity/user"
 import {dataSource, logger} from "./env"
+import { reportError, withMonitoringScope } from "./monitoring"
 import { processDeletion, updateFileContent } from "./services/asset"
 import { extractStoredFileMetadata } from "./services/file-metadata"
 import { synchronizeCollection } from "./services/collection"
@@ -87,7 +88,7 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 
 		await boss.work<T>(name, workerOptions ?? {}, (jobs) =>
 			Promise.all(jobs.map(async (job) =>
-				processor(job.data).catch((error) => {
+				withMonitoringScope({ queue: job.name, job_id: job.id }, async () => processor(job.data)).catch((error) => {
 					logger.error('job', {
 						status: 'failed',
 						queue: job.name,
@@ -95,6 +96,7 @@ export function createQueue<T>({ name, processor, cron, workerOptions }: CreateQ
 						error: error.message,
 						stacktrace: error.stack,
 					})
+					reportError(error, { tags: { queue: job.name, job_id: job.id } })
 					throw error
 				})
 			))

@@ -3,7 +3,7 @@ title: Environment variables
 description: Every variable the server and the client read, with its default and where it is used.
 sidebar:
   order: 2
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
 This table is the source of truth. `server/.env.template` and `client/.env.template` are copies to start from; `scripts/check-docs.sh` fails when a variable used in the code is missing here. For the reasoning behind each group of settings, read [Server configuration](../configuration/server-env.md).
@@ -131,6 +131,15 @@ The scheme sets `useSSL`; the port defaults to 443 for `https` and 80 for `http`
 
 See [Records](../administration/records.md).
 
+### Error tracking
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SENTRY_DSN` | unset (off) | DSN of the server's project in GlitchTip, Sentry or another service that speaks the Sentry protocol. Unset, the SDK is not loaded and nothing is sent. Also turns on `API_URL/v1/monitoring`, through which the client's reports reach the same tracker. A value that does not parse stops the server at startup. See [Error tracking](../integrations/error-tracking.md). |
+| `SENTRY_ENVIRONMENT` | `NODE_ENV`, else `development` | Environment the reports are filed under, such as `production` or `staging`. |
+| `SENTRY_RELEASE` | unset | Version the reports are filed under, such as `damvia@1.2.0`. Use the same value as `VITE_SENTRY_RELEASE`. |
+| `SENTRY_TRACES_SAMPLE_RATE` | unset (no tracing) | Share of requests traced, from `0` to `1`. Anything else stops the server at startup. |
+
 ## Client
 
 Client variables are read by Vite **at build time** and baked into the bundle. Changing one means restarting `npm run dev` or rebuilding.
@@ -141,6 +150,14 @@ Client variables are read by Vite **at build time** and baked into the bundle. C
 | `VITE_BRAND_COLOR` | `#e5e5e5` | Accent colour. A Tailwind name (`red-500`), a hex colour without `#` (`e11d48`), or any CSS colour. In dotenv, quote values starting with `#`: `VITE_BRAND_COLOR="#e11d48"`. |
 | `VITE_BRAND_COLOR_HOVER` | `#f5f5f5` | Hover shade of the accent. |
 | `VITE_BRAND_COLOR_STRONG` | `#262626` | Strong shade of the accent. |
+| `VITE_SENTRY_DSN` | unset (off) | DSN of the client's project. Unset, the SDK is left out of the build. See [Error tracking](../integrations/error-tracking.md). |
+| `VITE_SENTRY_TUNNEL` | `true` | `false` sends the reports straight to the tracker instead of through `API_URL/v1/monitoring`; the client's Content Security Policy must then allow the tracker in `connect-src`. |
+| `VITE_SENTRY_ENVIRONMENT` | the Vite mode (`production` for a build) | Environment the reports are filed under. |
+| `VITE_SENTRY_RELEASE` | unset | Version the reports and the uploaded source maps are filed under. Use the same value as the server's `SENTRY_RELEASE`. |
+| `VITE_SENTRY_TRACES_SAMPLE_RATE` | unset (no tracing) | Share of page loads traced, from `0` to `1`. Unset, the tracing code is left out of the build. |
+| `SENTRY_AUTH_TOKEN` | unset (no upload) | Build only, never in the bundle: a token of the tracker allowed to upload source maps. With it, `npm run build` uploads the source maps and deletes them from `dist/`. |
+| `SENTRY_URL` | sentry.io | Build only: address of the tracker the source maps go to, such as your GlitchTip. |
+| `SENTRY_ORG`, `SENTRY_PROJECT` | unset | Build only: organisation and project slugs of the client's project on the tracker. |
 | `DAMVIA_MODULES` | unset (no module) | Modules built into the client, separated by commas: the same package names as the server's `DAMVIA_MODULES`, or paths starting with `.` from the client folder. Their screens, menu entries and components are compiled with the core, so a change needs a rebuild. Read from the environment or from `client/.env`. See [Modules](../contributing/modules.md). |
 
 The brand colours are resolved in `client/tailwind.config.js`, which loads `client/.env` itself. See [Client configuration](../configuration/client-env.md).

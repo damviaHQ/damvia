@@ -18,6 +18,7 @@ import { z } from "zod"
 import { User, UserRole } from "../entity/user"
 import { SessionMethod } from "../entity/user-session"
 import { mfaRequiredRoles } from "../env"
+import { identifyUser, nameProcedure } from "../monitoring"
 import { recordAudit } from "../services/audit"
 import { sessionFromRequest } from "../services/session"
 
@@ -45,6 +46,7 @@ export const t = initTRPC.context<typeof createContext>().create({
 
 export async function createContext({ req, res }: CreateFastifyContextOptions) {
 	const found = await sessionFromRequest(req)
+	identifyUser(found?.user ?? null)
 	return { req, res, user: found?.user ?? null, session: found?.session ?? null }
 }
 
@@ -71,7 +73,11 @@ export function mfaEnrolmentRequired(user: User, method: SessionMethod | undefin
 
 export const middleware = t.middleware
 export const router = t.router
-export const publicProcedure = t.procedure
+// Error reports and traces name the procedure, as every call shares the /trpc/:path route.
+export const publicProcedure = t.procedure.use(({ path, next }) => {
+	nameProcedure(path)
+	return next()
+})
 export const authMiddleware =
 	(...chain: ((u: User) => boolean)[]) =>
 		middleware(async (opts) => {

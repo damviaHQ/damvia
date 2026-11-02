@@ -12,6 +12,7 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+import { flushMonitoring, withMonitoringScope } from "./monitoring"
 import { assetUpdaters, dataSource, logger } from "./env"
 import { adoptUnassignedAssets, recordAssetSourceRun, registerAssetSources, staleAssetSourceKeys } from "./services/asset"
 import { runEnrichmentPass } from "./services/enrichment"
@@ -28,16 +29,18 @@ async function startAssetUpdater() {
 	}
 	const fetchUpdates = async () => {
 		for (const updater of updaters) {
-			await recordAssetSourceRun(updater.key, 'started')
-			await updater.fetchUpdates()
-				.then(async () => {
-					await recordAssetSourceRun(updater.key, 'succeeded')
-					logger.info('assets updated successfully', { source: updater.key })
-				})
-				.catch(async (error) => {
-					logger.error('failed to update assets', { source: updater.key, error })
-					await recordAssetSourceRun(updater.key, { error: error?.message ?? String(error) })
-				})
+			await withMonitoringScope({ source: updater.key, provider: updater.providerName }, async () => {
+				await recordAssetSourceRun(updater.key, 'started')
+				await updater.fetchUpdates()
+					.then(async () => {
+						await recordAssetSourceRun(updater.key, 'succeeded')
+						logger.info('assets updated successfully', { source: updater.key })
+					})
+					.catch(async (error) => {
+						logger.error('failed to update assets', { source: updater.key, error })
+						await recordAssetSourceRun(updater.key, { error: error?.message ?? String(error) })
+					})
+			})
 		}
 		await dataSource.query(`
 			INSERT INTO collection_files (asset_file_id, collection_id)
@@ -76,8 +79,9 @@ async function run() {
 	await dataSource.initialize()
 	await logSecurityWarnings()
 	await checkAssetSources(assetUpdaters().map((updater) => updater.key))
-	startAssetUpdater().catch((error) => {
+	startAssetUpdater().catch(async (error) => {
 		logger.error('failed to start asset updater', { error })
+		await flushMonitoring()
 		process.exit(1)
 	})
 	await startQueues({ enableWorker: process.env.ENABLE_WORKER === 'true' })
@@ -88,7 +92,8 @@ async function run() {
 	logger.info('server listening', { addr })
 }
 
-run().catch((error) => {
+run().catch(async (error) => {
 	logger.error(error)
+	await flushMonitoring()
 	process.exit(1)
 })

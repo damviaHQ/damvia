@@ -18,6 +18,7 @@ import { createApp } from 'vue'
 import lazyLoad from 'vue3-lazyload'
 import App from './app.vue'
 import router from './router'
+import { startMonitoring } from './services/monitoring'
 import { queryClient } from './services/queryClient'
 import './style.css'
 
@@ -26,7 +27,21 @@ interStylesheet.rel = 'stylesheet'
 interStylesheet.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
 document.head.append(interStylesheet)
 
+// After a deploy, an open tab can ask for files the new build no longer has.
+// Loading the new build once fixes it; a second failure is a real one.
+window.addEventListener('vite:preloadError', (event) => {
+	try {
+		if (Date.now() - Number(sessionStorage.getItem('damvia_reloaded_at') ?? 0) < 60_000) return
+		sessionStorage.setItem('damvia_reloaded_at', String(Date.now()))
+	} catch {
+		return
+	}
+	event.preventDefault()
+	window.location.reload()
+})
+
 const app = createApp(App)
+startMonitoring(app, router)
 app.use(vueQuery, { queryClient })
 app.use(lazyLoad, {})
 app.use(router)

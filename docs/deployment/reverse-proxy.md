@@ -3,7 +3,7 @@ title: Reverse proxy
 description: Put HTTPS in front of the API and the client, and expose the S3 endpoint browsers must reach.
 sidebar:
   order: 4
-lastUpdated: 2026-09-29
+lastUpdated: 2026-11-02
 ---
 
 The server speaks plain HTTP on one port and expects a proxy to terminate TLS. Three hostnames are involved: the client (`APP_URL`), the API (`API_URL`) and the S3 endpoint from the bucket URLs, and all three must be reachable by browsers.
@@ -18,6 +18,7 @@ The server speaks plain HTTP on one port and expects a proxy to terminate TLS. T
 | `GET /v1/newsletter-images/:id.(jpg\|png)` | Images in newsletters. Public and cached for a year; emails already sent keep loading them, so keep the path reachable, and redirect it from the old host if `API_URL` changes. |
 | `POST /v1/unsubscribe/:token` | One-click unsubscribe, posted by mail providers without cookies or an `Origin`. Rate-limited per address. |
 | `POST /v1/email-events/:secret` | Bounce and spam reports from the mail provider, up to 1 MB. `404` unless `EMAIL_EVENTS_SECRET` is set and matches. |
+| `POST /v1/monitoring` | The client's error reports, up to 1 MB, passed on to the error tracker. `404` unless `SENTRY_DSN` is set. See [Error tracking](../integrations/error-tracking.md#reports-pass-through-the-api). |
 
 Two Fastify settings matter for the proxy:
 
@@ -128,6 +129,6 @@ base-uri 'self';
 form-action 'self'
 ```
 
-`connect-src` covers presigned uploads to S3 and `frame-src` the PDF previews. This policy blocks the Inter font that `index.html` loads from Google Fonts: add `https://fonts.googleapis.com` to `style-src` and `font-src https://fonts.gstatic.com`, or self-host the font. Test the policy in `Content-Security-Policy-Report-Only` mode with a reader, an editor and an admin session before enforcing it, and add any other host the browser console reports.
+`connect-src` covers presigned uploads to S3 and `frame-src` the PDF previews. Error reports go to the API by default and need nothing more; a client built with `VITE_SENTRY_TUNNEL=false` sends them to the tracker itself, so add the tracker's origin to `connect-src` (see [Error tracking](../integrations/error-tracking.md#reports-pass-through-the-api)). This policy blocks the Inter font that `index.html` loads from Google Fonts: add `https://fonts.googleapis.com` to `style-src` and `font-src https://fonts.gstatic.com`, or self-host the font. Test the policy in `Content-Security-Policy-Report-Only` mode with a reader, an editor and an admin session before enforcing it, and add any other host the browser console reports.
 
 The nginx examples assume certificates already issued at the displayed paths. Replace the hostnames and certificate paths, validate the configuration before reloading, and arrange certificate renewal. They do not provision certificates.

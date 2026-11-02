@@ -3,7 +3,7 @@ title: Server configuration
 description: What each group of server variables controls, and the values that trip people up.
 sidebar:
   order: 2
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
 `server/.env` is loaded by `dotenv` when `server/src/env.ts` is imported, which is the first thing the server, the worker and the CLI do. Copy `server/.env.template` and work through it top to bottom. Any variable can instead be read from a file by setting `NAME_FILE=/path`, which suits Docker and Kubernetes secrets; a value set directly in `NAME` wins. Defaults and one-line descriptions are in [Environment variables](../reference/environment-variables.md); this page explains the choices.
@@ -110,6 +110,7 @@ Record matching is set in the admin, on **Data Enrichment → Link to products**
 | `NODE_ENV` | `npm start` already sets `production`. |
 | `APP_NAME` | The brand name when **Settings → Brand name** is empty: browser tab, email sender name, header and footer. Also the issuer of two-step verification entries. |
 | `REQUEST_LOG` | `false` stops the `http.response` line written for every request. |
+| `SENTRY_DSN` | Errors should reach GlitchTip or Sentry. See [Error tracking](../integrations/error-tracking.md). |
 
 The API, worker and CLI all require a valid `APP_SECRET` at startup. See [Accounts and links](../administration/accounts-and-links.md) for session and link lifetimes.
 

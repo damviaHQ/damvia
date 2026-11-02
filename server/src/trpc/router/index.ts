@@ -15,6 +15,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { EnrichmentSettings } from "../../entity/enrichment-settings"
 import { Region } from "../../entity/region"
 import { analyticsRetentionDays, analyticsSearchMode, auditLogIp, auditRetentionDays, dataSource, oidcSettings, passwordBreachCheck, passwordLessAuth, sessionIdleHours, sessionMaxHours } from "../../env"
+import { monitoringSettings } from "../../monitoring"
 import { brandName } from "../../services/branding"
 import { moduleRouters } from "../../modules"
 import { publicProcedure, router } from "../index"
@@ -106,6 +107,7 @@ const appRouter = router({
 				sessionIdleHours: sessionIdleHours(),
 				sessionMaxHours: sessionMaxHours(),
 				passwordBreachCheck: passwordBreachCheck(),
+				errorReporting: monitoringSettings() !== null,
 			},
 		}
 	})

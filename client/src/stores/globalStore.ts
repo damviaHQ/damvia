@@ -15,8 +15,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCClientError } from "@trpc/client"
 import Cookie from 'js-cookie'
 import { defineStore } from "pinia"
-import { computed, getCurrentInstance, onMounted, ref } from "vue"
+import { computed, getCurrentInstance, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router"
+import { setMonitoringUser } from "../services/monitoring"
 import { queryClient } from "../services/queryClient"
 import { RouterOutput, trpc, upgradeLegacyToken } from "../services/server.ts"
 import { readDisplayDetails, type DisplayDetails, type DisplayView } from "../utils/displayPreferences"
@@ -32,6 +33,7 @@ export const useGlobalStore = defineStore('global', () => {
 	// only once the API has answered `user.me`.
 	const authChecked = ref(false)
 	const isAuthenticated = computed(() => user.value !== undefined)
+	watch(() => user.value?.id, (id) => setMonitoringUser(id ?? null))
 	// A selection holds whatever the reader is about to act on: collections,
 	// files, or products from the catalogue.
 	const selection = ref<SelectionItem[]>([])
