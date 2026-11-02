@@ -7,7 +7,7 @@ Document interne (dossier `_internal`, non publié). Il décrit ce que Damvia ex
 ## 1. En bref
 
 - Damvia devient un **serveur MCP distant** à l'adresse `API_URL/mcp`. Un utilisateur l'ajoute comme connecteur dans son assistant, se connecte une fois avec son compte Damvia (mot de passe, lien e-mail, SSO, double authentification), puis interroge sa médiathèque en langage naturel. **Claude et ChatGPT sont pris en charge tous les deux dès la phase 0** ; les autres clients compatibles MCP (Copilot, Le Chat, Cursor) utilisent le même serveur.
-- **Livré en module payant** (`damvia-mcp`, dépôt privé, licence commerciale). Le core open source ne gagne que des points d'extension génériques, utilisables par n'importe quel module, et les améliorations qui servent aussi l'interface web (5.1, 5.8, 5.9).
+- **Livré en module payant** (`damvia-mcp`, dépôt privé, licence commerciale). Le core open source ne gagne que des points d'extension génériques, utilisables par n'importe quel module, sans changement visible dans l'interface : il reste sobre (5.1, 5.8, 5.9).
 - **L'assistant agit exactement comme l'utilisateur, jamais plus.** Chaque outil MCP appelle les procédures tRPC existantes avec le contexte de l'utilisateur : visibilité des collections, groupes, régions, licences, champs visibles. Aucun droit nouveau, aucune deuxième implémentation des règles d'accès. Les invités n'ont pas accès aux assistants.
 - **L'assistant voit les visuels.** Il reçoit les vignettes comme des images et les regarde (vision) pour comprendre ce qu'elles montrent et choisir le bon fichier, sans rien télécharger (5.6).
 - **Les licences se valident dans la conversation.** Avant de créer un téléchargement qui contient des fichiers sous licence, Damvia oblige l'assistant à montrer les conditions à l'utilisateur et à obtenir son accord explicite (12.3).
@@ -147,17 +147,16 @@ const caller = damvia.callAs({ user, session, req })   // point d'extension, 5.8
 const page = await caller.catalogue.list({ collectionId, search, filters, limit: 20 })
 ```
 
-Le code MCP ne contient pas de SQL sur les tables du core. Les audits automatiques d'`authMiddleware` (mutations des admins et managers) s'appliquent. Toute capacité manquante est ajoutée **comme procédure tRPC**. Celles qui servent aussi l'interface web vont dans le core open source ; celles qui ne servent qu'aux assistants restent dans le module :
+Le code MCP ne contient pas de SQL sur les tables du core. Les audits automatiques d'`authMiddleware` (mutations des admins et managers) s'appliquent. Une capacité manquante est d'abord construite **dans le module**, en enchaînant les procédures existantes. Elle ne descend dans le core que si elle passe le test de sobriété de la section 5.8.
 
-| Nouvelle procédure | Où | Pourquoi |
-|---|---|---|---|
-| `catalogue.lookupKeys` | Core | Une liste collée de références (jusqu'à 1 000) donne trouvées, introuvables et proches, en réutilisant `damvia_key_head` et `services/record-suggestions.ts`. `catalogue.list` limite `search` à 200 caractères, trop court pour une commande collée. |
-| `collection.compose` | Core | Construit ou met à jour une collection à partir de sources (collections, filtres de champs, listes de références, résultats de recherche de fichiers) et d'opérations (ajouter, retirer, intersection), en mode `preview` puis `apply`, dans une transaction. Donne aussi un bouton « Dupliquer et modifier » dans l'interface. |
-| `download.create` (extension) | Core | Enregistre le canal et le client de l'acceptation de licence (`licenseAcceptedVia`, `licenseAcceptedClient`) et vérifie le jeton d'acceptation (12.3). |
-| `collection.fileDetails` | Core | Le détail d'un fichier pour un lecteur (métadonnées visibles, licence, produits liés, variantes, collections où il apparaît), aujourd'hui dispersé entre `catalogue.fileRecords`, `variantGroup.findById` et les listes. |
-| `modules.mcp.connectedApps`, `modules.mcp.revokeConnectedApp` | Module | Liste et révocation des applications connectées par l'utilisateur. |
-| `modules.mcp.getSettings`, `updateSettings`, `clients`, `disableClient` | Module | Réglages et clients côté admin. |
-| `analytics.*` | Core | Ventilation par canal (interface ou assistant) et par client. |
+| Capacité | Où | Comment |
+|---|---|---|
+| Vérifier une liste de références | Module | `catalogue.list` en mode « plusieurs références », par lots (la recherche est limitée à 200 caractères). Les références « proches » d'une référence introuvable attendront : elles demanderaient une procédure du core. |
+| Composer une collection | Module | Aperçu calculé avec `catalogue.list` et `collection.findById` avant toute écriture, puis `collection.createUserCollection`, `collection.addItems` (copie figée d'une collection), `collection.addRecordsByKey` et `collection.removeRecords`. Si une étape échoue, le module supprime la collection qu'il vient de créer. |
+| Détail d'un fichier | Module | Assemble `catalogue.fileRecords` (produits liés), `variantGroup.findById` (déclinaisons) et `collection.getFiles` (licence). |
+| Acceptation de licence par jeton | Module | Le module vérifie son jeton, puis appelle `download.create` avec l'acceptation, comme le fait l'interface. Il garde la trace (client, empreinte du texte accepté, jeton) dans sa table `mcp_licence_acceptances`, qui référence `downloads(id)`. Le core enregistre seulement le canal `mcp` (point `channel`). |
+| Applications connectées, réglages, clients | Module | `modules.mcp.*` |
+| Statistiques d'usage des assistants | Module | Son écran admin lit les événements d'activité qui portent le canal `mcp`. Le tableau de bord du core ne change pas. |
 
 ### 5.4 Ce que renvoient les outils
 
@@ -231,7 +230,25 @@ Le contrat des modules (`docs/contributing/modules.md`) dit qu'un point d'extens
 
 Ces points servent aussi à d'autres modules futurs : un connecteur e-commerce, une API publique à jetons pour les intégrateurs, un module de webhooks.
 
-Ce qui va aussi dans le core, parce que l'interface web en profite : `catalogue.lookupKeys`, `collection.compose` et le bouton « Dupliquer et modifier », `collection.fileDetails`, l'acceptation de licence par jeton dans `download.create` avec les colonnes `licenseAcceptedVia` et `licenseAcceptedClient` (libellé du client), la ventilation des statistiques par canal, les libellés de vues, les synonymes de types de fichiers, la description des champs. Elles restent gratuites (décision 9 de la section 15).
+**Rien de visible dans le core.** Damvia est conçu pour rester sobre. Le core ne reçoit que les points d'extension ci-dessus, sans lesquels le module ne fonctionnerait pas correctement ou pas sûrement. Aucun écran, bouton ni réglage du core ne change ; la section de la page Compte n'apparaît que si un module en déclare une. Une fonction n'entre dans le core que si elle passe l'un de ces deux tests, et elle est alors gratuite pour tous :
+
+1. l'interface web en a besoin pour elle-même : des utilisateurs l'ont demandée sans parler d'IA ;
+2. le module ne peut pas la faire sûrement (droits d'accès, cohérence des données) ou assez vite avec les procédures existantes.
+
+Évaluation des fonctions envisagées au départ :
+
+| Fonction | Ce que l'interface fait déjà | Verdict |
+|---|---|---|
+| Coller une liste de références et voir les introuvables | « Ajouter par référence » du constructeur de catalogue renvoie les références introuvables ; la recherche de produits accepte plusieurs références | Rien dans le core ; le module enchaîne les procédures |
+| « Dupliquer et modifier » une collection | Ajouter un catalogue à ses collections en fige une copie ; la barre d'actions retire ensuite des produits | Pas de nouveau bouton ; le module enchaîne les procédures |
+| Détail d'un fichier | L'aperçu montre déjà ces informations | Rien dans le core |
+| Trace d'une acceptation de licence par assistant | Sans objet : l'interface garde sa case à cocher | Table du module ; seul le canal passe par le core |
+| Statistiques par canal | Non indispensable au tableau de bord | Écran du module |
+| Libellés de vues (`00` Face, `01` Dos) | Les vues sont des numéros, et personne ne l'a demandé dans l'interface | Réglage du module ; à remonter dans le core seulement si les utilisateurs de l'interface le demandent |
+| Synonymes de types de fichiers | La description du type existe (255 caractères) | Utiliser la description ; sinon réglage du module |
+| Description des champs produits | Le nom d'affichage existe | Réglage du module, si le pilote montre un besoin |
+
+Toutes restent dans le module pour l'instant (décision 9 de la section 15).
 
 ### 5.9 Licence et distribution du module
 
@@ -263,11 +280,11 @@ Règles de correspondance données au modèle dans les instructions du serveur :
 - « fiche technique, PDF, catalogue, notice » : type de fichier `document` et les types correspondants ;
 - en cas d'ambiguïté entre deux types : montrer les deux groupes avec leurs comptes (facettes) ou poser la question, jamais deviner en silence.
 
-Petites évolutions produit qui améliorent beaucoup les résultats, et servent aussi l'interface :
+Réglages qui améliorent beaucoup les résultats, dans l'écran « Assistants IA » du module, sans toucher au core (5.8) :
 
-1. **Synonymes sur les types de fichiers** : utiliser d'abord la description existante (255 caractères), puis, si besoin, un champ `asset_types.synonyms` (Packshot : « photo produit, détouré, fond blanc, cutout, e-commerce » ; Visuel campagne : « lifestyle, ambiance, KV, key visual, mise en scène »).
-2. **Libellés de vues** dans Paramètres > Nommage et vues (`00` Face, `01` Dos, `02` Profil, `03` Détail). Aujourd'hui les vues ne sont que des numéros : l'assistant devrait deviner.
-3. **Description des champs produits** (optionnelle, à côté du nom d'affichage) : « Saison au format SS26 ou FW26 ».
+1. **Synonymes des types de fichiers** : utiliser d'abord la description existante du type (255 caractères), puis, si elle ne suffit pas, des indications par type dans le module (Packshot : « photo produit, détouré, fond blanc, cutout, e-commerce » ; Visuel campagne : « lifestyle, ambiance, KV, key visual, mise en scène »).
+2. **Libellés de vues** (`00` Face, `01` Dos, `02` Profil, `03` Détail). Les vues ne sont que des numéros dans Damvia : sans ces libellés, l'assistant devrait deviner.
+3. **Indications sur les champs produits** (optionnelles) : « Saison au format SS26 ou FW26 ».
 4. **Valeurs exactes** : les filtres sur les champs à choix exigent la valeur exacte ; `get_context` et `product_facets` les fournissent pour que le modèle ne les invente pas.
 
 ## 7. Catalogue des outils
@@ -285,7 +302,7 @@ Colonnes : ce que fait l'outil, les procédures sur lesquelles il s'appuie, le s
 | Outil | Ce qu'il fait | S'appuie sur | Scope | Confirmation | Phase |
 |---|---|---|---|---|---|
 | `search_products` | Texte, plusieurs références, filtres de champs, collection ; cartes avec visuel principal, titre, valeurs visibles, lien | `catalogue.list`, `catalogue.facets` | read | Non | 1 |
-| `lookup_references` | Liste collée : trouvées, introuvables, proches | `catalogue.lookupKeys` (nouveau) | read | Non | 1 |
+| `lookup_references` | Liste collée : trouvées et introuvables | `catalogue.list` (plusieurs références, par lots) | read | Non | 1 |
 | `get_product` | Fiche complète : champs visibles, visuels par vue, fichiers liés groupés par type (packshots, visuels, PDF, vidéos), même modèle, produits associés | `catalogue.get`, `catalogue.fileRecords` | read | Non | 1 |
 | `product_facets` | Valeurs d'un champ et leurs comptes dans un périmètre | `catalogue.facets` | read | Non | 1 |
 
@@ -294,7 +311,7 @@ Colonnes : ce que fait l'outil, les procédures sur lesquelles il s'appuie, le s
 | Outil | Ce qu'il fait | S'appuie sur | Scope | Confirmation | Phase |
 |---|---|---|---|---|---|
 | `search_files` | Texte, types de fichiers, image, vidéo ou document, extensions, taille, vues, axes de variantes, métadonnées (dates, mots-clés), champs produits, périmètre de collection, tri par nouveauté ; variantes regroupées ; résultats « couvrant la gamme » séparés ; termes introuvables signalés | `collection.search`, `collection.rangeSearch`, `collection.searchNotFound` | read | Non | 1 |
-| `get_file` | Détail d'un fichier, licence, produits liés, variantes, vignette | `collection.fileDetails` (nouveau) | read | Non | 1 |
+| `get_file` | Détail d'un fichier, licence, produits liés, variantes, vignette | `catalogue.fileRecords`, `variantGroup.findById`, `collection.getFiles` | read | Non | 1 |
 | `view_files` | Montre au modèle jusqu'à 10 vignettes, ou une planche contact de 16, pour qu'il les regarde (5.6) | `damvia.previewImages` (point d'extension), `analytics.trackView` | read | Non | 1 |
 | `get_variants` | Les déclinaisons d'un visuel (format, langue, durée) | `variantGroup.findById` | read | Non | 1 |
 | `whats_new` | Ajouts récents, globalement ou sous une collection, avec filtres de type | `collection.lastAddedFiles`, `collection.search` (tri `newest`) | read | Non | 1 |
@@ -309,7 +326,7 @@ Colonnes : ce que fait l'outil, les procédures sur lesquelles il s'appuie, le s
 | `create_collection` | Collection personnelle ; pour un admin, collection publique créée en brouillon | `collection.createUserCollection`, `collection.create` | collections | Non | 2 |
 | `add_to_collection` | Fichiers, produits par référence, collections entières | `collection.addItems`, `collection.addRecordsByKey` | collections | Non | 2 |
 | `remove_from_collection` | Retirer fichiers ou produits | `collection.removeFiles`, `collection.removeRecords` | collections | Oui | 2 |
-| `compose_collection` | Le cas « collection 2026 sans telle référence » : sources, opérations, aperçu du résultat, puis création | `collection.compose` (nouveau) | collections | Oui | 2 |
+| `compose_collection` | Le cas « collection 2026 sans telle référence » : sources, opérations, aperçu du résultat, puis création | Enchaînement de procédures existantes (5.3) | collections | Oui | 2 |
 | `rename_collection`, `move_collection` | Renommer, déplacer dans ses collections | `collection.rename`, `collection.move` | collections | Non | 2 |
 | `delete_collection` | Supprimer une collection qu'on peut modifier | `collection.remove` | collections | Oui | 2 |
 | `set_collection_rules` | Règles dynamiques d'une collection de produits (admin) | `collection.setRecordRules` | admin | Oui | 3 |
@@ -328,7 +345,7 @@ Colonnes : ce que fait l'outil, les procédures sur lesquelles il s'appuie, le s
 
 | Outil | Ce qu'il fait | S'appuie sur | Scope | Confirmation | Phase |
 |---|---|---|---|---|---|
-| `check_usage_rights` | Pour un fichier ou une sélection : licence, usages print et digital, validité, jours restants, conditions ; ce qui n'est plus accessible est compté, jamais nommé | `collection.getFiles`, `collection.fileDetails` | read | Non | 2 |
+| `check_usage_rights` | Pour un fichier ou une sélection : licence, usages print et digital, validité, jours restants, conditions ; ce qui n'est plus accessible est compté, jamais nommé | `collection.getFiles`, `catalogue.fileRecords` | read | Non | 2 |
 
 La description de l'outil précise qu'il restitue les faits enregistrés dans Damvia et ne vaut pas avis juridique.
 
@@ -484,7 +501,7 @@ La recherche actuelle est lexicale : noms de fichiers, références, champs cher
 ### 12.2 Traçabilité
 
 - Session de méthode `module` avec le nom du client, visible par l'utilisateur et les admins.
-- Téléchargements : `licenseAcceptedVia` et `licenseAcceptedClient` à côté de `licenseAcceptedAt`.
+- Acceptations de licence : table du module `mcp_licence_acceptances` (téléchargement, client, empreinte du texte accepté, heure), en plus de `licenseAcceptedAt` du core.
 - `activity_events.metadata` reçoit `channel: 'mcp'` et `clientId` ; les statistiques distinguent l'interface et les assistants.
 - Les mutations des admins et managers sont déjà auditées par `authMiddleware` ; l'entrée reçoit en plus le canal `mcp` et le client.
 - Les modifications de fiches portent la source `assistant` dans `record_changes`.
@@ -496,7 +513,7 @@ Regarder une vignette n'engage pas, comme dans l'interface web. Créer un télé
 1. **Premier appel.** `prepare_download` sans acceptation, sur une sélection qui contient des fichiers sous licence : rien n'est créé. Le résultat porte `status: "licence_acceptance_required"` ; pour chaque licence, son nom, ses usages (print, digital), ses régions, ses dates, le texte des conditions et le nombre de fichiers concernés ; un `acceptanceToken` valable 10 minutes, à usage unique, lié à l'utilisateur, à la sélection exacte, aux licences et à l'empreinte du texte des conditions ; et une consigne pour l'assistant : afficher les conditions telles quelles, demander un accord explicite, ne jamais accepter à la place de l'utilisateur, ne pas rappeler l'outil avant sa réponse.
 2. **Formulaire d'accord quand le client le gère.** Le serveur utilise alors l'élicitation MCP : le client affiche les conditions et une case « J'accepte » que la personne coche elle-même. C'est la preuve la plus forte.
 3. **Sinon, dans la conversation.** L'assistant pose la question ; après un oui explicite, il rappelle `prepare_download` avec le jeton et `userConfirmed: true`.
-4. **Vérification et création.** Damvia vérifie le jeton (même sélection, mêmes licences, même texte, ni expiré ni déjà utilisé), puis crée le téléchargement avec `licenseAcceptedAt` et `licenseIds` comme aujourd'hui, plus deux colonnes nouvelles : `licenseAcceptedVia` (`web` ou `mcp`) et `licenseAcceptedClient` (« Claude », « ChatGPT »). Chaque événement de téléchargement garde la licence et l'heure d'acceptation.
+4. **Vérification et création.** Damvia vérifie le jeton (même sélection, mêmes licences, même texte, ni expiré ni déjà utilisé), puis crée le téléchargement par `download.create`, avec `licenseAcceptedAt` et `licenseIds` comme aujourd'hui. Le module enregistre dans `mcp_licence_acceptances` le client (« Claude », « ChatGPT »), l'empreinte du texte accepté et le jeton ; le core enregistre le canal `mcp`. Chaque événement de téléchargement garde la licence et l'heure d'acceptation.
 5. **Lien dans la conversation.** L'assistant dépose le lien `API_URL/v1/downloads/{id}`. Un agent qui exécute du code peut récupérer le fichier : le lien marche sans session pendant sept jours et revérifie l'accès du propriétaire à chaque ouverture.
 
 Changer la sélection après l'accord invalide le jeton : on ne peut pas faire accepter une licence puis télécharger d'autres fichiers. Une sélection sans fichier sous licence se télécharge directement.
@@ -516,7 +533,7 @@ Changer la sélection après l'accord invalide le jeton : on ne peut pas faire a
 - Un fichier déplacé dans le stockage cloud perd ses liens de collections manuelles (`docs/reference/known-limitations.md`) : une collection composée par l'assistant peut perdre un fichier sans prévenir. À corriger en priorité si les collections composées deviennent un usage courant.
 - Recherche lexicale seulement (11.2).
 - Vues sans libellé (section 6).
-- `catalogue.list` limite la recherche à 200 caractères (`catalogue.lookupKeys` y répond).
+- `catalogue.list` limite la recherche à 200 caractères (le module découpe les listes en lots).
 - Processus unique : le trafic MCP partage le processus avec la synchronisation et le worker. Mesurer, et appliquer des limites de débit dès la phase 1.
 
 ## 13. Feuille de route
@@ -525,11 +542,11 @@ Ordres de grandeur pour un développeur à temps plein connaissant le code, à a
 
 | Phase | Contenu | Critères d'acceptation | Durée |
 |---|---|---|---|
-| 0a. Core : points d'extension | Dans le core open source : `routes`, `callAs`, `sessions`, `channel`, `previewImages`, `privacy`, `accountNav` (5.8), documentés dans `docs/contributing/modules.md` et testés dans `server/test/modules.cjs` et `client/test/ui/modules.spec.ts` ; exception de module ajoutée à la licence (5.9) | Le module d'exemple des tests utilise chaque point ; aucun nom propre à MCP dans le core ; collisions de routes refusées au démarrage | 1,5 à 2 semaines |
+| 0a. Core : points d'extension | Dans le core open source : `routes`, `callAs`, `sessions`, `channel`, `previewImages`, `privacy`, `accountNav` (5.8), documentés dans `docs/contributing/modules.md` et testés dans `server/test/modules.cjs` et `client/test/ui/modules.spec.ts` ; exception de module ajoutée à la licence (5.9) | Le module d'exemple des tests utilise chaque point ; aucun nom propre à MCP dans le core ; aucun écran du core ne change ; collisions de routes refusées au démarrage | 1,5 à 2 semaines |
 | 0b. Module : fondations | Création du dépôt privé `damvia-mcp` ; vérification sur Claude et ChatGPT de ce que suppose la section 5.7 (images vues par le modèle, formulaire d'accord, confirmations) ; OAuth 2.1 (métadonnées, DCR et CIMD, consentement, jetons, révocation), tables `mcp_*`, sessions de méthode `module`, clé de licence, `/mcp` en Streamable HTTP, scopes, liste d'outils filtrée, `get_context`, réglages admin, applications connectées, exemptions du contrôle d'origine, documentation proxy, tests du module (OAuth) | Connexion depuis Claude, ChatGPT et MCP Inspector ; une révocation dans Damvia coupe l'accès au prochain appel ; utilisateur suspendu refusé ; compte invité refusé ; double authentification respectée | 3 à 4 semaines |
-| 1. Trouver | Outils produits, références, fichiers, variantes, collections, nouveautés ; `view_files`, vignettes jointes aux résultats et planches contact ; ressources ; premiers prompts ; `catalogue.lookupKeys` et `collection.fileDetails` (core) ; canal dans les statistiques (core) | Tests de parité (admin, manager, membre d'une autre région, licence expirée, champ masqué, vignette d'un fichier inaccessible) ; jeu d'évaluation de 60 demandes réelles en français et en anglais avec au moins 85 % de bons outils et bons arguments ; p95 sous 1,5 s | 2 à 3 semaines |
-| 2. Agir | Collections (créer, ajouter, retirer, composer, renommer, déplacer, supprimer), partage, téléchargements, exports, droits d'usage, confirmation en deux temps, validation des licences dans la conversation avec jeton d'acceptation et formulaire quand le client le gère, colonnes `licenseAcceptedVia` et `licenseAcceptedClient` (core) ; `collection.compose` et « Dupliquer et modifier » dans l'interface | Aucune écriture sans confirmation dans les tests ; composition idempotente ; aucun téléchargement sous licence sans jeton valide lié à la sélection exacte ; jeton refusé si la sélection a changé | 3 semaines |
-| 3. Administrer | Qualité catalogue, fichiers non rattachés, fiches avec différences, aperçu d'import, assistant de règles, demande non satisfaite, statistiques, validations, licences qui expirent, audit, brouillons ; libellés de vues, synonymes, descriptions de champs | Chaque écriture admin auditée avec le canal `mcp` ; historique `assistant` ; manager limité à sa région | 3 à 4 semaines |
+| 1. Trouver | Outils produits, références, fichiers, variantes, collections, nouveautés ; `view_files`, vignettes jointes aux résultats et planches contact ; ressources ; premiers prompts ; vérification de listes de références et détail d'un fichier par enchaînement de procédures existantes ; statistiques d'usage dans l'écran du module | Tests de parité (admin, manager, membre d'une autre région, licence expirée, champ masqué, vignette d'un fichier inaccessible) ; jeu d'évaluation de 60 demandes réelles en français et en anglais avec au moins 85 % de bons outils et bons arguments ; p95 sous 1,5 s | 2 à 3 semaines |
+| 2. Agir | Collections (créer, ajouter, retirer, composer, renommer, déplacer, supprimer), partage, téléchargements, exports, droits d'usage, confirmation en deux temps, validation des licences dans la conversation avec jeton d'acceptation et formulaire quand le client le gère, table `mcp_licence_acceptances` ; composition de collection par enchaînement, avec nettoyage en cas d'échec | Aucune écriture sans confirmation dans les tests ; composition idempotente ; aucun téléchargement sous licence sans jeton valide lié à la sélection exacte ; jeton refusé si la sélection a changé | 3 semaines |
+| 3. Administrer | Qualité catalogue, fichiers non rattachés, fiches avec différences, aperçu d'import, assistant de règles, demande non satisfaite, statistiques, validations, licences qui expirent, audit, brouillons ; réglages du module : libellés de vues, indications sur les types de fichiers et les champs | Chaque écriture admin auditée avec le canal `mcp` ; historique `assistant` ; manager limité à sa région | 3 à 4 semaines |
 | 4. Interface riche et sémantique | MCP Apps, indexation sémantique optionnelle, similaires, doublons, images clés des vidéos, champ de licence « Assistants IA » | À définir après le pilote | 4 à 6 semaines |
 
 Les phases 0 et 1 apportent l'essentiel de la valeur (trouver) avec un risque faible, puisqu'elles ne font que lire. Lancer un **pilote** dès la fin de la phase 1 avec le premier client (module offert pour la durée du test, clé de licence émise avec une date de fin), une de ses équipes internes et deux ou trois de ses distributeurs. Ajuster les descriptions d'outils à partir de leurs vraies demandes, et mesurer avec eux les indicateurs de la section 14.
@@ -557,7 +574,7 @@ Jeu d'évaluation : `test/evals/` dans le module, une liste de demandes en langa
 6. **Liens utilisables par d'autres outils** : les liens de téléchargement de sept jours restent partageables ; ils revérifient l'accès de leur propriétaire à chaque ouverture.
 7. **Agents** : ils tournent dans Claude ou ChatGPT, rien à coder pour eux dans le module. Ils utilisent la connexion de l'utilisateur, qui se renouvelle tant qu'elle sert (30 jours glissants), y compris pour une tâche programmée la nuit. Seule limite, voulue : un téléchargement sous licence attend la réponse de l'utilisateur. Éventuellement plus tard : une clé d'accès pour les outils d'automatisation (n8n, Make, scripts maison) qui ne savent pas faire la connexion OAuth.
 8. **Fiche « Damvia » dans les catalogues d'applications de Claude et de ChatGPT** : plus tard. Une fiche publiée pointe vers une seule adresse, alors que chaque client a sa propre instance (`dam.client-a.com`, `dam.client-b.com`) ; il faudrait un petit service central qui retrouve l'instance de la personne à partir de son e-mail. D'ici là, chaque client ajoute son adresse (`https://dam.client.com/mcp`) comme connecteur personnalisé, une fois, par son administrateur.
-9. **Gratuit dans le core** : pour construire le module, il faut ajouter à Damvia quelques fonctions qui servent aussi sans IA, dans l'interface web : coller une liste de références et voir lesquelles n'existent pas, « Dupliquer et modifier » une collection, nommer les vues (`00` Face, `01` Dos), etc. Elles vont dans Damvia open source, pour tous les utilisateurs. Le module payant ne contient que ce qui concerne les assistants : connexion à Claude et ChatGPT, outils, vision, validation des licences dans la conversation (5.8).
+9. **Core sobre** : le core ne reçoit que les points d'extension (5.8), sans changement visible dans l'interface. Une fonction n'y entre que si l'interface web la justifie pour elle-même ou si le module ne peut pas la faire sûrement ; elle est alors gratuite pour tous. Les fonctions envisagées au départ (recherche de références, composition de collection, détail d'un fichier, libellés de vues...) restent dans le module pour l'instant ; l'interface sait déjà faire l'essentiel.
 10. **Conditions commerciales** : hors de ce plan. Le mécanisme de clé de licence (5.9) suffit à tout modèle, y compris un module offert.
 
 ### Restant à prendre
@@ -569,17 +586,17 @@ Jeu d'évaluation : `test/evals/` dans le module, une liste de demandes en langa
 ### Core open source (dépôt `damvia`)
 
 - **Points d'extension** : `server/src/modules/` (`ModuleApi` : `routes`, `callAs`, `sessions`, `previewImages`, `privacy`) ; `server/src/server.ts` (montage des routes de modules, exemption `externalCallers` du contrôle d'origine, refus des collisions) ; `server/src/trpc/index.ts` (`channel` dans le contexte, méthode `module` dans `mfaEnrolmentRequired`) ; `server/src/entity/user-session.ts` (`SessionMethod.MODULE`, colonnes `module` et `label`) ; `server/src/services/privacy.ts` ; `client/src/modules.ts` et la page Compte (`accountNav`).
-- **Fonctionnalités utiles à l'interface** : `catalogue.lookupKeys`, `collection.compose` et « Dupliquer et modifier », `collection.fileDetails`, jeton d'acceptation de licence dans `download.create` (colonnes `downloads.license_accepted_via` et `downloads.license_accepted_client`), canal dans `activity_events.metadata` et l'audit, statistiques par canal, libellés de vues, synonymes de types de fichiers, description des champs.
-- **Migrations** dans `server/src/migrations/`, avec leur ligne dans `docs/deployment/upgrading.md`.
-- **Tests** : `server/test/modules.cjs` et `client/test/ui/modules.spec.ts` pour chaque point d'extension ; tests de `catalogue.lookupKeys`, `collection.compose` et du jeton de licence (absent, expiré, réutilisé, sélection modifiée).
+- **Aucun changement visible** dans l'interface du core.
+- **Migration** pour les colonnes `module` et `label` de `user_sessions`, avec sa ligne dans `docs/deployment/upgrading.md`.
+- **Tests** : `server/test/modules.cjs` et `client/test/ui/modules.spec.ts` pour chaque point d'extension, avec le module d'exemple.
 - **Licence** : exception de module au titre de la section 7 de l'AGPL, rédigée par un juriste ; accord de contribution (CLA) pour les contributions futures.
-- **Documentation** : `contributing/modules.md` (nouveaux points d'extension, exception de licence), `contributing/architecture.md`, `contributing/api.md`, `contributing/data-model.md`, `introduction/roles-and-access.md` (sessions de module), `administration/accounts-and-links.md`, `administration/downloads.md`, `administration/analytics.md`, `configuration/privacy.md`, `reference/asvs-self-assessment.md`, `deployment/upgrading.md` ; lignes correspondantes dans `page-map.md`.
+- **Documentation** : `contributing/modules.md` (nouveaux points d'extension, exception de licence), `contributing/architecture.md`, `contributing/api.md`, `contributing/data-model.md`, `introduction/roles-and-access.md` (sessions de module), `administration/accounts-and-links.md` (sessions de module), `configuration/privacy.md`, `reference/asvs-self-assessment.md`, `deployment/upgrading.md` ; lignes correspondantes dans `page-map.md`.
 
 ### Module payant (dépôt privé `damvia-mcp`)
 
-- **Serveur** : le serveur MCP, les outils, ressources et prompts, le serveur d'autorisation OAuth, les jetons de confirmation, les planches contact, la vérification de la clé de licence ; tables `mcp_oauth_clients`, `mcp_oauth_codes`, `mcp_grants`, `mcp_settings` et leurs migrations.
+- **Serveur** : le serveur MCP, les outils, ressources et prompts, le serveur d'autorisation OAuth, les jetons de confirmation, les planches contact, la vérification de la clé de licence ; tables `mcp_oauth_clients`, `mcp_oauth_codes`, `mcp_grants`, `mcp_licence_acceptances`, `mcp_settings` (dont libellés de vues et indications sur les types et les champs) et leurs migrations.
 - **Client** : page de consentement, Administration > Assistants IA, Compte > Applications connectées.
 - **Dépendance** : `@modelcontextprotocol/sdk` (licence MIT), version épinglée. Aucune nouvelle infrastructure pour les phases 0 à 3.
 - **Variables** : `DAMVIA_MODULES` (existante) et `DAMVIA_MCP_LICENSE_KEY`.
-- **Tests** : OAuth, parité des droits outil par outil (vignettes comprises), outils, validation des licences, jeu d'évaluation `test/evals/` rejoué sur Claude et ChatGPT ; exécutés contre chaque version supportée du core.
+- **Tests** : OAuth, parité des droits outil par outil (vignettes comprises), outils, composition de collection (dont le nettoyage en cas d'échec), validation des licences (jeton absent, expiré, réutilisé, sélection modifiée), jeu d'évaluation `test/evals/` rejoué sur Claude et ChatGPT ; exécutés contre chaque version supportée du core.
 - **Documentation** : installation, réglages, guide utilisateur (connecter Claude ou ChatGPT, exemples de demandes), configuration du proxy inverse pour `/mcp` et `/.well-known/*`, page de confidentialité propre au module.
