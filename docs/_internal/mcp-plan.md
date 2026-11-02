@@ -231,7 +231,7 @@ Le contrat des modules (`docs/contributing/modules.md`) dit qu'un point d'extens
 
 Ces points servent aussi à d'autres modules futurs : un connecteur e-commerce, une API publique à jetons pour les intégrateurs, un module de webhooks.
 
-Ce qui va aussi dans le core, parce que l'interface web en profite : `catalogue.lookupKeys`, `collection.compose` et le bouton « Dupliquer et modifier », `collection.fileDetails`, l'acceptation de licence par jeton dans `download.create` avec les colonnes `licenseAcceptedVia` et `licenseAcceptedClient` (libellé du client), la ventilation des statistiques par canal, les libellés de vues, les synonymes de types de fichiers, la description des champs. Si vous préférez garder certaines de ces améliorations pour les clients payants, il faut le décider avant la phase 1 (question 10 de la section 15).
+Ce qui va aussi dans le core, parce que l'interface web en profite : `catalogue.lookupKeys`, `collection.compose` et le bouton « Dupliquer et modifier », `collection.fileDetails`, l'acceptation de licence par jeton dans `download.create` avec les colonnes `licenseAcceptedVia` et `licenseAcceptedClient` (libellé du client), la ventilation des statistiques par canal, les libellés de vues, les synonymes de types de fichiers, la description des champs. Elles restent gratuites (décision 9 de la section 15).
 
 ### 5.9 Licence et distribution du module
 
@@ -532,7 +532,7 @@ Ordres de grandeur pour un développeur à temps plein connaissant le code, à a
 | 3. Administrer | Qualité catalogue, fichiers non rattachés, fiches avec différences, aperçu d'import, assistant de règles, demande non satisfaite, statistiques, validations, licences qui expirent, audit, brouillons ; libellés de vues, synonymes, descriptions de champs | Chaque écriture admin auditée avec le canal `mcp` ; historique `assistant` ; manager limité à sa région | 3 à 4 semaines |
 | 4. Interface riche et sémantique | MCP Apps, indexation sémantique optionnelle, similaires, doublons, images clés des vidéos, champ de licence « Assistants IA » | À définir après le pilote | 4 à 6 semaines |
 
-Les phases 0 et 1 apportent l'essentiel de la valeur (trouver) avec un risque faible, puisqu'elles ne font que lire. Lancer un **pilote** dès la fin de la phase 1 avec une équipe interne et deux ou trois distributeurs, et ajuster les descriptions d'outils à partir de leurs vraies demandes.
+Les phases 0 et 1 apportent l'essentiel de la valeur (trouver) avec un risque faible, puisqu'elles ne font que lire. Lancer un **pilote** dès la fin de la phase 1 avec le premier client (module offert pour la durée du test, clé de licence émise avec une date de fin), une de ses équipes internes et deux ou trois de ses distributeurs. Ajuster les descriptions d'outils à partir de leurs vraies demandes, et mesurer avec eux les indicateurs de la section 14.
 
 ## 14. Mesurer le succès
 
@@ -554,14 +554,15 @@ Jeu d'évaluation : `test/evals/` dans le module, une liste de demandes en langa
 4. **Licences** : validées par l'utilisateur dans la conversation, le serveur imposant cette étape avant toute création de téléchargement, y compris pour un agent (12.3).
 5. **Édition** : module payant `damvia-mcp`, sous licence commerciale ; le core n'ouvre que des points d'extension génériques (5.1, 5.8, 5.9).
 
+6. **Liens utilisables par d'autres outils** : les liens de téléchargement de sept jours restent partageables ; ils revérifient l'accès de leur propriétaire à chaque ouverture.
+7. **Agents sans humain** (synchronisation nocturne d'une boutique de distributeur) : plus tard, avec des comptes de service et des jetons à portée restreinte.
+8. **Annuaire central pour l'offre hébergée** : plus tard ; chaque instance garde sa propre URL (`https://dam.client.com/mcp`), ajoutée comme connecteur personnalisé.
+9. **Gratuit dans le core** : les améliorations qui servent aussi l'interface web (recherche de références, « Dupliquer et modifier », détail d'un fichier, libellés de vues, synonymes, description des champs) restent dans le core open source (5.8).
+10. **Conditions commerciales** : hors de ce plan. Le mécanisme de clé de licence (5.9) suffit à tout modèle, y compris un module offert.
+
 ### Restant à prendre
 
-6. **Liens utilisables par d'autres outils** : garder les liens de téléchargement de sept jours partageables (proposé, ils revérifient l'accès) ou exiger une session.
-7. **Agents sans humain** (synchronisation nocturne d'une boutique de distributeur) : comptes de service et jetons à portée restreinte, dans une phase ultérieure.
-8. **Offre hébergée** : chaque instance a sa propre URL (`https://dam.client.com/mcp`), donc un connecteur personnalisé par client. Un annuaire central (domaine e-mail vers instance) permettrait une seule fiche « Damvia » dans les catalogues d'applications des assistants : plus tard.
-9. **ChatGPT et la vision** : si la vérification de la phase 0 montre que ChatGPT ne transmet pas au modèle les images renvoyées par les outils, avancer les légendes générées par Damvia (11.2, niveau 2) pour ChatGPT, ou accepter que la vision soit propre à Claude au début.
-10. **Ce qui reste gratuit** : les améliorations qui servent aussi l'interface web (recherche de références, composition de collection, détail d'un fichier, libellés de vues) vont dans le core open source (proposé), ou certaines sont réservées aux clients payants, ce qui demande alors de les livrer dans un module avec leurs écrans.
-11. **Prix et clé de licence** : par instance, par nombre d'utilisateurs connectés à un assistant, ou inclus dans l'offre hébergée ; durée et renouvellement de la clé.
+11. **ChatGPT et la vision** : si la vérification de la phase 0 montre que ChatGPT ne transmet pas au modèle les images renvoyées par les outils, avancer les légendes générées par Damvia (11.2, niveau 2) pour ChatGPT, ou accepter que la vision soit propre à Claude au début. À trancher avec le résultat de cette vérification.
 
 ## 16. Annexe : ce que le chantier touche
 
