@@ -6,7 +6,7 @@ Document interne (dossier `_internal`, non publié). Il décrit ce que Damvia ex
 
 ## 1. En bref
 
-- Damvia devient un **serveur MCP distant** à l'adresse `API_URL/mcp`. Un utilisateur l'ajoute comme connecteur dans son assistant, se connecte une fois avec son compte Damvia (mot de passe, lien e-mail, SSO, double authentification), puis interroge sa médiathèque en langage naturel. **Claude et ChatGPT sont pris en charge tous les deux dès la phase 0** ; les autres clients compatibles MCP (Copilot, Le Chat, Cursor) utilisent le même serveur.
+- Damvia devient un **serveur MCP distant** à l'adresse `API_URL/mcp`. Un utilisateur l'ajoute comme connecteur dans son assistant, se connecte une fois avec son compte Damvia (mot de passe, lien e-mail, SSO, double authentification), puis interroge sa médiathèque en langage naturel. **Claude d'abord, ChatGPT ensuite** : le serveur suit le standard MCP, donc ChatGPT et les autres clients compatibles (Copilot, Le Chat, Cursor) l'utilisent sans le réécrire.
 - **Dans le core, gratuit et open source** (AGPL, comme le reste de Damvia), désactivé par défaut. L'interface ne reçoit que les écrans indispensables à MCP : page d'autorisation, applications connectées, réglages « Assistants IA ». Rien d'autre ne change à l'écran : Damvia reste sobre (5.8).
 - **L'assistant agit exactement comme l'utilisateur, jamais plus.** Chaque outil MCP appelle les procédures tRPC existantes avec le contexte de l'utilisateur : visibilité des collections, groupes, régions, licences, champs visibles. Aucun droit nouveau, aucune deuxième implémentation des règles d'accès. Les invités n'ont pas accès aux assistants.
 - **L'assistant voit les visuels.** Il reçoit les vignettes comme des images et les regarde (vision) pour comprendre ce qu'elles montrent et choisir le bon fichier, sans rien télécharger (5.6).
@@ -194,7 +194,7 @@ Oui, c'est possible. Un résultat d'outil MCP peut contenir des images (`type: "
 
 ### 5.7 Claude et ChatGPT
 
-Les deux sont pris en charge dès la phase 0, avec le même serveur et les mêmes outils. Une première tâche de la phase 0 vérifie, sur les deux, ce que le tableau ci-dessous suppose, car ces produits évoluent vite.
+Claude d'abord, ChatGPT ensuite (décision), avec le même serveur et les mêmes outils. La phase 0 vérifie sur Claude ce que le tableau ci-dessous suppose ; la phase « ChatGPT » (section 13) fait de même pour ChatGPT, car ces produits évoluent vite. Le serveur ne contient rien de propre à l'un ou à l'autre.
 
 | | Claude | ChatGPT |
 |---|---|---|
@@ -206,7 +206,7 @@ Les deux sont pris en charge dès la phase 0, avec le même serveur et les même
 | Confirmation avant une action | Claude demande l'autorisation d'appeler un outil, sauf « toujours autoriser » | ChatGPT demande confirmation pour les actions d'écriture |
 | Agents | Claude enchaîne les outils ; avec l'exécution de code, il peut récupérer un fichier depuis un lien de téléchargement si le domaine est autorisé dans ses réglages réseau | Le mode agent enchaîne les outils et peut ouvrir le lien |
 
-Les descriptions d'outils et le jeu d'évaluation (section 14) sont rejoués sur les deux assistants à chaque version.
+Les descriptions d'outils et le jeu d'évaluation (section 14) sont rejoués sur Claude à chaque version, puis aussi sur ChatGPT dès qu'il est pris en charge.
 
 ### 5.8 Une interface sobre
 
@@ -501,8 +501,9 @@ Ordres de grandeur pour un développeur à temps plein connaissant le code, à a
 
 | Phase | Contenu | Critères d'acceptation | Durée |
 |---|---|---|---|
-| 0. Fondations | Vérification sur Claude et ChatGPT de ce que suppose la section 5.7 (images vues par le modèle, formulaire d'accord, confirmations) ; OAuth 2.1 (métadonnées, DCR et CIMD, consentement, jetons, révocation), tables `oauth_*`, session `mcp`, `/mcp` en Streamable HTTP, scopes, liste d'outils filtrée, `get_context`, réglages admin, applications connectées, exemptions du contrôle d'origine, documentation proxy, tests `server/test/mcp-oauth.cjs` | Connexion depuis Claude, ChatGPT et MCP Inspector ; une révocation dans Damvia coupe l'accès au prochain appel ; utilisateur suspendu refusé ; compte invité refusé ; double authentification respectée | 3 à 4 semaines |
+| 0. Fondations | Vérification sur Claude de ce que suppose la section 5.7 (images vues par le modèle, formulaire d'accord, confirmations) ; OAuth 2.1 (métadonnées, DCR et CIMD, consentement, jetons, révocation), tables `oauth_*`, session `mcp`, `/mcp` en Streamable HTTP, scopes, liste d'outils filtrée, `get_context`, réglages admin, applications connectées, exemptions du contrôle d'origine, documentation proxy, tests `server/test/mcp-oauth.cjs` | Connexion depuis Claude (web, bureau) et MCP Inspector ; une révocation dans Damvia coupe l'accès au prochain appel ; utilisateur suspendu refusé ; compte invité refusé ; double authentification respectée | 3 à 4 semaines |
 | 1. Trouver | Outils produits, références, fichiers, variantes, collections, nouveautés ; `view_files`, vignettes jointes aux résultats et planches contact ; ressources ; premiers prompts ; `catalogue.lookupKeys`, `collection.fileDetails`, `previewImagesFor` ; statistiques d'usage dans l'écran « Assistants IA » | Tests de parité (admin, manager, membre d'une autre région, licence expirée, champ masqué, vignette d'un fichier inaccessible) ; jeu d'évaluation de 60 demandes réelles en français et en anglais avec au moins 85 % de bons outils et bons arguments ; p95 sous 1,5 s | 2 à 3 semaines |
+| ChatGPT | Vérification sur ChatGPT de ce que suppose la section 5.7 (inscription du client, images vues par le modèle, confirmations, formulaire d'accord) ; ajustements de compatibilité ; jeu d'évaluation rejoué sur ChatGPT ; guide de connexion | Connexion et outils de lecture qui marchent depuis ChatGPT ; score d'évaluation proche de celui de Claude ; décision prise sur la vision (question 10) | 1 semaine, après la phase 1 ou pendant le pilote |
 | 2. Agir | Collections (créer, ajouter, retirer, composer, renommer, déplacer, supprimer), partage, téléchargements, exports, droits d'usage, confirmation en deux temps, validation des licences dans la conversation avec jeton d'acceptation et formulaire quand le client le gère, colonnes `licenseAcceptedVia` et `licenseAcceptedClient` ; `collection.compose`, sans bouton dans l'interface | Aucune écriture sans confirmation dans les tests ; composition idempotente ; aucun téléchargement sous licence sans jeton valide lié à la sélection exacte ; jeton refusé si la sélection a changé | 3 semaines |
 | 3. Administrer | Qualité catalogue, fichiers non rattachés, fiches avec différences, aperçu d'import, assistant de règles, demande non satisfaite, statistiques, validations, licences qui expirent, audit, brouillons ; vocabulaire pour les assistants dans l'écran « Assistants IA » : libellés de vues, indications sur les types de fichiers et les champs | Chaque écriture admin auditée avec le canal `mcp` ; historique `assistant` ; manager limité à sa région | 3 à 4 semaines |
 | 4. Interface riche et sémantique | MCP Apps, indexation sémantique optionnelle, similaires, doublons, images clés des vidéos, champ de licence « Assistants IA » | À définir après le pilote | 4 à 6 semaines |
@@ -517,13 +518,13 @@ Les phases 0 et 1 apportent l'essentiel de la valeur (trouver) avec un risque fa
 - **Charge évitée** : e-mails de demande de visuels reçus par les commerciaux.
 - **Qualité** : score du jeu d'évaluation à chaque version, incidents (refus d'accès inattendus, plaintes).
 
-Jeu d'évaluation : `server/test/mcp-evals/`, une liste de demandes en langage naturel avec l'outil et les arguments attendus, rejouée contre deux assistants à chaque version. Les descriptions d'outils se corrigent à partir des échecs.
+Jeu d'évaluation : `server/test/mcp-evals/`, une liste de demandes en langage naturel avec l'outil et les arguments attendus, rejouée contre Claude à chaque version, puis aussi contre ChatGPT dès qu'il est pris en charge. Les descriptions d'outils se corrigent à partir des échecs.
 
 ## 15. Décisions
 
 ### Prises le 2 novembre 2026
 
-1. **Clients** : Claude et ChatGPT, tous les deux dès la phase 0 (5.7).
+1. **Clients** : Claude d'abord, dès la phase 0 ; ChatGPT ensuite, après la phase 1 (5.7, 13).
 2. **Invités** : pas d'accès aux assistants. Le consentement refuse les comptes `guest`.
 3. **Vignettes** : envoyées aux assistants ; le modèle les regarde pour choisir les visuels (5.6).
 4. **Licences** : validées par l'utilisateur dans la conversation, le serveur imposant cette étape avant toute création de téléchargement, y compris pour un agent (12.3).
@@ -535,7 +536,7 @@ Jeu d'évaluation : `server/test/mcp-evals/`, une liste de demandes en langage n
 
 ### Restant à prendre
 
-10. **ChatGPT et la vision** : si la vérification de la phase 0 montre que ChatGPT ne transmet pas au modèle les images renvoyées par les outils, avancer les légendes générées par Damvia (11.2, niveau 2) pour ChatGPT, ou accepter que la vision soit propre à Claude au début. À trancher avec le résultat de cette vérification.
+10. **ChatGPT et la vision** : si la vérification de la phase « ChatGPT » montre que ChatGPT ne transmet pas au modèle les images renvoyées par les outils, avancer les légendes générées par Damvia (11.2, niveau 2) pour ChatGPT, ou accepter que la vision soit propre à Claude au début. À trancher avec le résultat de cette vérification.
 
 ## 16. Annexe : ce que le chantier touche
 
@@ -543,5 +544,5 @@ Jeu d'évaluation : `server/test/mcp-evals/`, une liste de demandes en langage n
 - **Client** : trois écrans seulement : page d'autorisation, Compte > Applications connectées, Administration > Paramètres > Assistants IA. Aucun autre écran ne change.
 - **Dépendance** : `@modelcontextprotocol/sdk` (licence MIT, compatible AGPL), version épinglée. Aucune nouvelle infrastructure pour les phases 0 à 3.
 - **Variables** : `MCP_ENABLED` dans `server/.env.template` et `docs/reference/environment-variables.md`.
-- **Tests** : `server/test/mcp-oauth.cjs`, `server/test/mcp-access.cjs` (parité des droits, vignettes comprises), `server/test/mcp-tools.cjs` (dont `collection.compose`), `server/test/mcp-licence.cjs` (jeton d'acceptation : absent, expiré, réutilisé, sélection modifiée), ajout aux tests de sécurité de `npm run test:security`, `client/test/ui/` pour les trois écrans ; jeu d'évaluation `server/test/mcp-evals/` rejoué sur Claude et ChatGPT.
+- **Tests** : `server/test/mcp-oauth.cjs`, `server/test/mcp-access.cjs` (parité des droits, vignettes comprises), `server/test/mcp-tools.cjs` (dont `collection.compose`), `server/test/mcp-licence.cjs` (jeton d'acceptation : absent, expiré, réutilisé, sélection modifiée), ajout aux tests de sécurité de `npm run test:security`, `client/test/ui/` pour les trois écrans ; jeu d'évaluation `server/test/mcp-evals/` rejoué sur Claude, puis sur ChatGPT.
 - **Documentation** (selon `docs/_internal/page-map.md`) : nouvelles pages `docs/integrations/ai-assistants.md` (administrateurs et utilisateurs : connecter Claude ou ChatGPT, exemples de demandes) et `docs/contributing/mcp.md` (développeurs) ; mises à jour de `contributing/architecture.md`, `contributing/api.md`, `contributing/data-model.md`, `introduction/roles-and-access.md`, `administration/accounts-and-links.md`, `administration/downloads.md`, `configuration/privacy.md`, `deployment/reverse-proxy.md`, `reference/asvs-self-assessment.md`, `reference/environment-variables.md`, `deployment/upgrading.md` (migrations) ; nouvelle ligne dans `page-map.md`.
