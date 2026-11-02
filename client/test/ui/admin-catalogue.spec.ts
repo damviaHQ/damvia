@@ -40,6 +40,7 @@ function fixture(mockTrpc: MockTrpc) {
     'settings.getEnrichment': { recordLabelSingular: 'Product', recordLabelPlural: 'Products', relatedRecords },
     'record.list': { records: [], total: 0, keyColumnName: 'SKU' },
     'recordAttribute.list': [{ id: 'name', name: 'name', displayName: 'Name', valueType: 'text', options: [], viewable: true }, { id: 'season', name: 'season', displayName: 'Season', valueType: 'text', options: [], viewable: true }],
+    'recordAttribute.values': ['Winter', 'Summer'],
   }, { role: 'admin' })
 }
 
