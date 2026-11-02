@@ -7,6 +7,7 @@ Document interne (dossier `_internal`, non publié). Il décrit ce que Damvia ex
 ## 1. En bref
 
 - Damvia devient un **serveur MCP distant** à l'adresse `API_URL/mcp`. Un utilisateur l'ajoute comme connecteur dans son assistant, se connecte une fois avec son compte Damvia (mot de passe, lien e-mail, SSO, double authentification), puis interroge sa médiathèque en langage naturel. **Claude et ChatGPT sont pris en charge tous les deux dès la phase 0** ; les autres clients compatibles MCP (Copilot, Le Chat, Cursor) utilisent le même serveur.
+- **Livré en module payant** (`damvia-mcp`, dépôt privé, licence commerciale). Le core open source ne gagne que des points d'extension génériques, utilisables par n'importe quel module, et les améliorations qui servent aussi l'interface web (5.1, 5.8, 5.9).
 - **L'assistant agit exactement comme l'utilisateur, jamais plus.** Chaque outil MCP appelle les procédures tRPC existantes avec le contexte de l'utilisateur : visibilité des collections, groupes, régions, licences, champs visibles. Aucun droit nouveau, aucune deuxième implémentation des règles d'accès. Les invités n'ont pas accès aux assistants.
 - **L'assistant voit les visuels.** Il reçoit les vignettes comme des images et les regarde (vision) pour comprendre ce qu'elles montrent et choisir le bon fichier, sans rien télécharger (5.6).
 - **Les licences se valident dans la conversation.** Avant de créer un téléchargement qui contient des fichiers sous licence, Damvia oblige l'assistant à montrer les conditions à l'utilisateur et à obtenir son accord explicite (12.3).
@@ -77,32 +78,38 @@ Damvia possède déjà la matière qu'un assistant sait exploiter :
 6. **Désactivé par défaut**, activé par l'hébergeur puis réglé par les administrateurs de l'instance.
 7. **Pas d'IA embarquée obligatoire.** Damvia ne transmet rien à un fournisseur d'IA de sa propre initiative avant la phase 4, et celle-ci reste optionnelle.
 8. **Les données de l'instance sont des données, pas des instructions.** Noms de fichiers, valeurs de champs et textes de pages peuvent contenir des tentatives d'injection ; ils sont renvoyés en contenu structuré et ne déclenchent jamais seuls une action sortante.
-9. **Le core reste générique.** Le serveur MCP sert toutes les instances ; une fonctionnalité propre à un client reste dans un module (voir `docs/contributing/modules.md`).
+9. **Le core reste générique, MCP est un module.** Le core ne reçoit que des points d'extension nommés d'après ce qu'ils font (jamais d'après MCP), utilisables par tout module et couverts par `server/test/modules.cjs`, selon les règles de `docs/contributing/modules.md`. Le module n'utilise rien d'autre du core.
 
 ## 5. Architecture
 
 ### 5.1 Où vit le serveur MCP
 
-Dans le core, pas dans un module : un module ne peut ajouter que des routeurs tRPC, des entités, des files de tâches et des écrans, alors que MCP demande des routes HTTP (`/mcp`, `/.well-known/*`, `/oauth/*`) et une nouvelle méthode de session. C'est aussi une capacité utile à toutes les instances.
+Dans un **module payant**, `damvia-mcp` (décision), gardé dans son propre dépôt privé et chargé par `DAMVIA_MODULES` comme tout module. Son nom de module est `mcp` : ses tables commencent par `mcp_`, ses files par `mcp/`, son routeur tRPC est `modules.mcp.*`.
+
+Aujourd'hui, un module ne peut ajouter que des routeurs tRPC, des entités, des files de tâches et des écrans. MCP demande en plus des routes HTTP (`/mcp`, `/.well-known/*`, `/oauth/*`), des sessions, les appels tRPC au nom d'un utilisateur, les vignettes et une entrée dans la page Compte. Le core doit donc d'abord ouvrir ces points d'extension, de façon générique (5.8).
 
 ```
-server/src/mcp/
-  index.ts        enregistre les routes Fastify : /mcp, /.well-known/*, /oauth/*
-  server.ts       McpServer (@modelcontextprotocol/sdk), transport Streamable HTTP sans état
-  context.ts      jeton d'accès -> UserSession -> contexte tRPC ; contrôle des autorisations (scopes)
-  tools/          un fichier par domaine : context, products, files, collections, delivery, rights, admin
-  resources.ts    ressources et modèles de ressources damvia://...
-  prompts.ts      recettes prêtes à l'emploi
-  format.ts       mise en forme compacte : cartes, liens profonds, vignettes signées
-  confirm.ts      jetons de confirmation des actions en deux temps (10 minutes, usage unique)
-  oauth/          serveur d'autorisation : metadata, authorize, token, register, revoke
+damvia-mcp/                (dépôt privé)
+  package.json             "main": "dist/server/index.js"
+  src/server/index.ts      setup(damvia) : entités, migrations, routeur, routes HTTP, files
+  src/server/mcp.ts        McpServer (@modelcontextprotocol/sdk), transport Streamable HTTP sans état
+  src/server/context.ts    jeton d'accès -> session -> damvia.callAs(...) ; contrôle des scopes
+  src/server/tools/        un fichier par domaine : context, products, files, collections, delivery, rights, admin
+  src/server/resources.ts  ressources et modèles de ressources damvia://...
+  src/server/prompts.ts    recettes prêtes à l'emploi
+  src/server/format.ts     mise en forme compacte : cartes, liens profonds, vignettes, planches contact
+  src/server/confirm.ts    jetons de confirmation et d'acceptation de licence (10 minutes, usage unique)
+  src/server/oauth/        serveur d'autorisation : metadata, authorize, token, register, revoke
+  src/server/licence.ts    vérification de la clé de licence du module (5.9)
+  client/index.ts          routes : consentement, Administration > Assistants IA, Compte > Applications connectées
+  test/                    tests du module contre une version donnée du core
 ```
 
-Côté client : une page de consentement `client/src/views/auth/oauth-consent.vue`, une section « Applications connectées » dans `client/src/components/account/`, un panneau « Assistants IA » dans les paramètres d'administration.
+Côté client, dans le module : une page de consentement (route en mise en page `auth`), un écran « Assistants IA » (entrée `adminNav` dans la section `settings`), une section « Applications connectées » dans la page Compte (nouveau point d'extension `accountNav`, 5.8).
 
 **Transport.** Streamable HTTP en mode sans état : aucune affinité de session n'est nécessaire, ce qui convient au processus unique actuel et à plusieurs processus plus tard. Le flux SSE ne sert qu'aux notifications de progression des opérations longues (préparation d'archive).
 
-**Intégration Fastify.** Le hook `onRequest` de `server/src/server.ts` refuse toute requête non `GET` dont l'`Origin` n'est pas celle d'`APP_URL` ou d'`API_URL`. Les appels à `/mcp`, `/oauth/token`, `/oauth/register` et `/oauth/revoke` viennent des serveurs des assistants : ils sont exemptés, comme `/v1/unsubscribe`, car ils s'authentifient par jeton `Bearer` ou par PKCE et jamais par le cookie. `/mcp` refuse explicitement toute requête qui ne porte que le cookie `damvia_session` : pas d'autorité implicite, donc pas de CSRF ni de rebinding DNS exploitable.
+**Intégration Fastify.** Le hook `onRequest` de `server/src/server.ts` refuse toute requête non `GET` dont l'`Origin` n'est pas celle d'`APP_URL` ou d'`API_URL`. Les appels à `/mcp`, `/oauth/token`, `/oauth/register` et `/oauth/revoke` viennent des serveurs des assistants : le point d'extension des routes (5.8) les déclare « appelants externes », ce qui les exempte comme `/v1/unsubscribe`, car ils s'authentifient par jeton `Bearer` ou par PKCE et jamais par le cookie. `/mcp` refuse explicitement toute requête qui ne porte que le cookie `damvia_session` : pas d'autorité implicite, donc pas de CSRF ni de rebinding DNS exploitable.
 
 **Proxy inverse.** `/mcp` ne doit pas être mis en tampon (SSE) et accepte des requêtes longues ; `/.well-known/oauth-protected-resource` et `/.well-known/oauth-authorization-server` doivent atteindre l'API. À documenter dans `docs/deployment/reverse-proxy.md`.
 
@@ -117,9 +124,9 @@ Déroulé :
 3. Damvia redirige vers `APP_URL/oauth/consent`. Sans session, la connexion habituelle s'affiche (mot de passe, lien, SSO, double authentification). La page montre le nom et le logo du client, le domaine de redirection, un badge « client non vérifié » s'il s'est inscrit seul et n'est pas sur la liste blanche, les autorisations demandées en clair, ce que l'assistant verra (collections, produits, vignettes), puis **Autoriser** ou **Refuser**. Un compte `guest` reçoit un refus expliqué : les invités n'ont pas accès aux assistants.
 4. Sur accord : un code à usage unique valable 60 secondes, puis retour vers le client.
 5. `/oauth/token` échange le code contre un jeton d'accès opaque (60 minutes) et un jeton de rafraîchissement rotatif (30 jours glissants). La réutilisation d'un jeton de rafraîchissement déjà consommé révoque toute l'autorisation.
-6. Chaque autorisation s'appuie sur une `UserSession` de nouvelle méthode `mcp`. Résultat gratuit : elle apparaît dans Compte > Sécurité, et `revokeSessions`, la suspension, la suppression du compte, la réinitialisation du mot de passe et le changement d'e-mail par un admin la coupent comme les autres sessions. Les jetons sont stockés hachés, comme les jetons de session.
+6. Chaque autorisation s'appuie sur une `UserSession` de méthode `module` (nom du module `mcp`, libellé du client), ouverte par le point d'extension `sessions` (5.8). Résultat gratuit : elle apparaît dans Compte > Sécurité, et `revokeSessions`, la suspension, la suppression du compte, la réinitialisation du mot de passe et le changement d'e-mail par un admin la coupent comme les autres sessions. Les jetons sont stockés hachés, comme les jetons de session.
 
-**Double authentification.** Le consentement exige une session complète (double authentification passée si l'utilisateur l'a activée). Si son rôle figure dans `MFA_REQUIRED_ROLES` et qu'il ne s'est pas enrôlé, le consentement est refusé avec un message clair. `mfaEnrolmentRequired()` traite ensuite la méthode `mcp` comme satisfaite, puisque le consentement l'a vérifiée.
+**Double authentification.** Le consentement exige une session complète (double authentification passée si l'utilisateur l'a activée). Si son rôle figure dans `MFA_REQUIRED_ROLES` et qu'il ne s'est pas enrôlé, le consentement est refusé avec un message clair. `mfaEnrolmentRequired()` traite ensuite la méthode `module` comme satisfaite, puisque le consentement l'a vérifiée.
 
 **Autorisations (scopes).** Accordées = demandées ∩ permises par le rôle ∩ permises par l'instance.
 
@@ -131,26 +138,26 @@ Déroulé :
 | `damvia.share` | Inviter une adresse e-mail, révoquer une invitation | `admin`, `manager`, `member` |
 | `damvia.admin` | Outils d'administration : catalogue, fiches, règles, statistiques ; comptes de sa région pour un manager | `admin`, `manager` (partiel) |
 
-**Nouvelles tables.** `oauth_clients` (nom, logo, URI de redirection, origine `dcr`, `cimd` ou `admin`, vérifié, désactivé, dernière utilisation), `oauth_authorization_codes` (courte durée, défi PKCE, ressource), `oauth_grants` (utilisateur, client, scopes, empreinte du jeton de rafraîchissement, session, création, dernière utilisation, révocation). Colonne `user_sessions.oauth_grant_id`, valeur `mcp` dans `SessionMethod`.
+**Nouvelles tables, dans le module.** `mcp_oauth_clients` (nom, logo, URI de redirection, origine `dcr`, `cimd` ou `admin`, vérifié, désactivé, dernière utilisation), `mcp_oauth_codes` (courte durée, défi PKCE, ressource), `mcp_grants` (utilisateur, client, scopes, empreinte du jeton de rafraîchissement, session avec `REFERENCES user_sessions(id) ON DELETE CASCADE`, création, dernière utilisation, révocation). La cascade suffit : quand le core supprime une session (révocation, suspension, suppression du compte), l'autorisation disparaît avec elle. Côté core, une méthode de session générique `module` avec le nom du module et un libellé (5.8).
 
 ### 5.3 Un outil MCP est un appel tRPC au nom de l'utilisateur
 
 ```ts
-const caller = appRouter.createCaller({ req, res, user, session })
+const caller = damvia.callAs({ user, session, req })   // point d'extension, 5.8
 const page = await caller.catalogue.list({ collectionId, search, filters, limit: 20 })
 ```
 
-Le code MCP ne contient pas de SQL. Les audits automatiques d'`authMiddleware` (mutations des admins et managers) s'appliquent. Toute capacité manquante est ajoutée **comme procédure tRPC**, pour que l'interface web en profite aussi :
+Le code MCP ne contient pas de SQL sur les tables du core. Les audits automatiques d'`authMiddleware` (mutations des admins et managers) s'appliquent. Toute capacité manquante est ajoutée **comme procédure tRPC**. Celles qui servent aussi l'interface web vont dans le core open source ; celles qui ne servent qu'aux assistants restent dans le module :
 
-| Nouvelle procédure | Pourquoi |
-|---|---|
-| `catalogue.lookupKeys` | Une liste collée de références (jusqu'à 1 000) donne trouvées, introuvables et proches, en réutilisant `damvia_key_head` et `services/record-suggestions.ts`. `catalogue.list` limite `search` à 200 caractères, trop court pour une commande collée. |
-| `collection.compose` | Construit ou met à jour une collection à partir de sources (collections, filtres de champs, listes de références, résultats de recherche de fichiers) et d'opérations (ajouter, retirer, intersection), en mode `preview` puis `apply`, dans une transaction. Donne aussi un bouton « Dupliquer et modifier » dans l'interface. |
-| `download.create` (extension) | Enregistre le canal et le client de l'acceptation de licence (`licenseAcceptedVia`, `oauthClientId`) et vérifie le jeton d'acceptation (12.3). |
-| `collection.fileDetails` | Le détail d'un fichier pour un lecteur (métadonnées visibles, licence, produits liés, variantes, collections où il apparaît), aujourd'hui dispersé entre `catalogue.fileRecords`, `variantGroup.findById` et les listes. |
-| `user.connectedApps`, `user.revokeConnectedApp` | Liste et révocation des applications connectées par l'utilisateur. |
-| `settings.getAssistants`, `settings.updateAssistants`, `oauthClient.list`, `oauthClient.disable` | Réglages et clients côté admin. |
-| `analytics.*` | Ventilation par canal (interface ou assistant) et par client. |
+| Nouvelle procédure | Où | Pourquoi |
+|---|---|---|---|
+| `catalogue.lookupKeys` | Core | Une liste collée de références (jusqu'à 1 000) donne trouvées, introuvables et proches, en réutilisant `damvia_key_head` et `services/record-suggestions.ts`. `catalogue.list` limite `search` à 200 caractères, trop court pour une commande collée. |
+| `collection.compose` | Core | Construit ou met à jour une collection à partir de sources (collections, filtres de champs, listes de références, résultats de recherche de fichiers) et d'opérations (ajouter, retirer, intersection), en mode `preview` puis `apply`, dans une transaction. Donne aussi un bouton « Dupliquer et modifier » dans l'interface. |
+| `download.create` (extension) | Core | Enregistre le canal et le client de l'acceptation de licence (`licenseAcceptedVia`, `licenseAcceptedClient`) et vérifie le jeton d'acceptation (12.3). |
+| `collection.fileDetails` | Core | Le détail d'un fichier pour un lecteur (métadonnées visibles, licence, produits liés, variantes, collections où il apparaît), aujourd'hui dispersé entre `catalogue.fileRecords`, `variantGroup.findById` et les listes. |
+| `modules.mcp.connectedApps`, `modules.mcp.revokeConnectedApp` | Module | Liste et révocation des applications connectées par l'utilisateur. |
+| `modules.mcp.getSettings`, `updateSettings`, `clients`, `disableClient` | Module | Réglages et clients côté admin. |
+| `analytics.*` | Core | Ventilation par canal (interface ou assistant) et par client. |
 
 ### 5.4 Ce que renvoient les outils
 
@@ -164,15 +171,15 @@ Le code MCP ne contient pas de SQL. Les audits automatiques d'`authMiddleware` (
 
 ### 5.5 Réglages
 
-- **Hébergeur** : `MCP_ENABLED` (faux par défaut), à ajouter dans `server/.env.template` et `docs/reference/environment-variables.md` (le contrôle `scripts/check-docs.mjs` l'exige).
-- **Administrateurs** (nouvelle table à ligne unique `assistant_settings`) : rôles autorisés parmi `admin`, `manager` et `member` (les invités n'ont jamais accès) ; politique d'inscription des clients (ouverte avec badge « non vérifié », liste blanche de domaines de redirection, ou clients enregistrés par un admin) ; nombre et taille maximale des vignettes par réponse ; téléchargements sous licence par assistant (autorisés avec validation dans la conversation, ou interdits) ; durées des jetons.
+- **Hébergeur** : le module est actif quand il est installé et cité dans `DAMVIA_MODULES`, côté serveur et côté build du client ; sa clé de licence est dans `DAMVIA_MCP_LICENSE_KEY` (5.9). Ces variables sont documentées avec le module, pas dans le core.
+- **Administrateurs** (table du module à ligne unique `mcp_settings`) : rôles autorisés parmi `admin`, `manager` et `member` (les invités n'ont jamais accès) ; politique d'inscription des clients (ouverte avec badge « non vérifié », liste blanche de domaines de redirection, ou clients enregistrés par un admin) ; nombre et taille maximale des vignettes par réponse ; téléchargements sous licence par assistant (autorisés avec validation dans la conversation, ou interdits) ; durées des jetons.
 - **Écrans** : Administration > Paramètres > Assistants IA (activation, politiques, clients connectés avec nombre d'utilisateurs et dernière utilisation, révocation) ; Compte > Applications connectées (client, autorisations, date, dernière utilisation, révoquer).
 
 ### 5.6 L'assistant regarde les visuels sans les télécharger
 
 Oui, c'est possible. Un résultat d'outil MCP peut contenir des images (`type: "image"`, données en base64, type MIME). Les modèles de Claude et de ChatGPT sont multimodaux : ils voient l'image comme si l'utilisateur l'avait collée dans la conversation. Ils peuvent la décrire, la comparer à d'autres, juger le fond, le cadrage, la présence d'un mannequin, les couleurs, le texte incrusté, la place du logo.
 
-**Ce que Damvia envoie.** L'aperçu qu'il génère déjà pour la médiathèque (`asset-file/{id}-thumbnail`, rendu jusqu'à 1 280 px de haut), redimensionné par sharp à 512 px sur le grand côté par défaut, 1 024 px à la demande pour le détail, en WebP ou JPEG. Jamais l'original. Aucun téléchargement n'est créé et aucune acceptation de licence n'est demandée : c'est la règle de l'interface web, où regarder un aperçu n'engage pas. L'accès est celui de l'aperçu : `userCollectionFilesQuery`, avec les régions et les dates de licence ; un fichier dont la licence a expiré n'est pas montré. Une fonction de service (`previewImagesFor(user, collectionFileIds, size)`) vérifie l'accès puis lit les vignettes ; le code MCP ne touche pas au stockage directement.
+**Ce que Damvia envoie.** L'aperçu qu'il génère déjà pour la médiathèque (`asset-file/{id}-thumbnail`, rendu jusqu'à 1 280 px de haut), redimensionné par sharp à 512 px sur le grand côté par défaut, 1 024 px à la demande pour le détail, en WebP ou JPEG. Jamais l'original. Aucun téléchargement n'est créé et aucune acceptation de licence n'est demandée : c'est la règle de l'interface web, où regarder un aperçu n'engage pas. L'accès est celui de l'aperçu : `userCollectionFilesQuery`, avec les régions et les dates de licence ; un fichier dont la licence a expiré n'est pas montré. Le point d'extension `damvia.previewImages(user, collectionFileIds, size)` (5.8) vérifie l'accès puis lit les vignettes ; le module ne touche pas au stockage directement.
 
 **Par type de fichier.** Images : la vignette. Vidéos : l'image générée par ffmpeg, puis plusieurs images clés dans une version suivante. PDF et documents : l'aperçu de la première page (LibreOffice et Ghostscript, déjà en place). Fichiers sans aperçu : métadonnées seulement.
 
@@ -207,6 +214,36 @@ Les deux sont pris en charge dès la phase 0, avec le même serveur et les même
 | Agents | Claude enchaîne les outils ; avec l'exécution de code, il peut récupérer un fichier depuis un lien de téléchargement si le domaine est autorisé dans ses réglages réseau | Le mode agent enchaîne les outils et peut ouvrir le lien |
 
 Les descriptions d'outils et le jeu d'évaluation (section 14) sont rejoués sur les deux assistants à chaque version.
+
+### 5.8 Ce que le core doit ouvrir
+
+Le contrat des modules (`docs/contributing/modules.md`) dit qu'un point d'extension s'ajoute quand un module en a besoin, sous un nom qui décrit ce qu'il fait, utilisable par tout module, documenté et testé dans `server/test/modules.cjs` ou `client/test/ui/modules.spec.ts`. Ajouter un membre à `ModuleApi` est un changement mineur. Voici ce que demande `damvia-mcp` :
+
+| Point d'extension | Côté | Ce qu'il permet | Garde-fous |
+|---|---|---|---|
+| `routes` | Serveur | Déclarer des routes HTTP en plus du routeur tRPC | Chemins déclarés au démarrage ; refus de démarrer en cas de collision avec le core ou un autre module ; chemins `/.well-known/*` limités aux suffixes de métadonnées ; option `externalCallers` pour les routes appelées par d'autres serveurs, exemptées du contrôle d'`Origin` mais où le cookie de session n'est jamais lu |
+| `callAs({ user, session, req })` | Serveur | Appeler les procédures tRPC du core au nom d'un utilisateur, avec toutes ses règles d'accès | Le contexte porte `channel` (le nom du module) ; aucune procédure n'est appelable sans session valide |
+| `sessions.create`, `sessions.find`, `sessions.touch` | Serveur | Ouvrir et retrouver des sessions de méthode `module`, avec le nom du module et un libellé (« ChatGPT », « Claude ») | Sessions visibles dans Compte > Sécurité et révoquées par les mêmes règles que les autres (suspension, réinitialisation, suppression, `revokeSessions`) ; une session ne s'ouvre que depuis une session complète, double authentification comprise |
+| `channel` dans le contexte tRPC | Serveur | Les événements d'activité, l'audit et les acceptations de licence enregistrent par quel canal l'action est passée | Valeur fixée par le core (`web` ou le nom du module), jamais par l'appelant |
+| `previewImages(user, ids, size)` | Serveur | Lire les vignettes de fichiers que l'utilisateur peut voir | Même contrôle que l'aperçu de la médiathèque ; tailles bornées ; jamais l'original |
+| `privacy.export`, `privacy.anonymise` | Serveur | Inclure les données du module dans l'export des données personnelles et dans l'anonymisation | Appelé par `services/privacy.ts` pour chaque module qui le déclare |
+| `accountNav` | Client | Ajouter une section à la page Compte | Comme `nav` et `adminNav` : visible selon les rôles de la route |
+
+Ces points servent aussi à d'autres modules futurs : un connecteur e-commerce, une API publique à jetons pour les intégrateurs, un module de webhooks.
+
+Ce qui va aussi dans le core, parce que l'interface web en profite : `catalogue.lookupKeys`, `collection.compose` et le bouton « Dupliquer et modifier », `collection.fileDetails`, l'acceptation de licence par jeton dans `download.create` avec les colonnes `licenseAcceptedVia` et `licenseAcceptedClient` (libellé du client), la ventilation des statistiques par canal, les libellés de vues, les synonymes de types de fichiers, la description des champs. Si vous préférez garder certaines de ces améliorations pour les clients payants, il faut le décider avant la phase 1 (question 10 de la section 15).
+
+### 5.9 Licence et distribution du module
+
+**Licence.** Le core est sous AGPL v3. Un module chargé dans le même processus peut être considéré comme une œuvre dérivée, donc soumis lui aussi à l'AGPL. En tant que titulaire des droits sur tout le code du core, vous pouvez néanmoins vendre `damvia-mcp` sous licence commerciale. Le plus propre est d'ajouter au core une **exception de module**, au titre de la section 7 de l'AGPL : le titulaire autorise les modules qui n'utilisent que le contrat `ModuleApi` et `ClientModule` à être distribués sous la licence de leur choix. Clients et hébergeurs ont alors une règle écrite. Trois précautions :
+
+1. Vérifier sur l'historique complet du dépôt qu'aucune contribution extérieure n'a été intégrée au core. L'historique visible et les en-têtes ne montrent que vous, mais le clone de cette session est partiel.
+2. Mettre en place un accord de contribution (CLA) avant d'accepter des contributions extérieures, sinon vous ne pourriez plus accorder ce type d'exception sur leur code.
+3. Faire rédiger l'exception et la licence commerciale du module par un juriste.
+
+**Distribution.** Paquet publié sur un registre npm privé ou une URL Git à accès restreint, livré avec le core dans l'image serveur (`FROM damvia-server`, puis `npm install` du module, comme le décrit `docs/contributing/modules.md`). Pour les instances que vous hébergez, rien de plus. Pour les instances auto-hébergées, une **clé de licence** signée (domaine de l'instance, date de fin, édition), vérifiée hors ligne au démarrage avec une clé publique embarquée dans le module. Une clé expirée laisse le serveur démarrer, mais désactive `/mcp` et le signale dans le tableau de bord admin : on ne bloque jamais le DAM lui-même.
+
+**Compatibilité.** Le module déclare la plage de versions du core qu'il supporte ; ses tests tournent contre chaque version du core avant publication, comme le demande la page des modules.
 
 ## 6. Parler la langue de l'instance : types de fichiers, types de produits, vues
 
@@ -258,7 +295,7 @@ Colonnes : ce que fait l'outil, les procédures sur lesquelles il s'appuie, le s
 |---|---|---|---|---|---|
 | `search_files` | Texte, types de fichiers, image, vidéo ou document, extensions, taille, vues, axes de variantes, métadonnées (dates, mots-clés), champs produits, périmètre de collection, tri par nouveauté ; variantes regroupées ; résultats « couvrant la gamme » séparés ; termes introuvables signalés | `collection.search`, `collection.rangeSearch`, `collection.searchNotFound` | read | Non | 1 |
 | `get_file` | Détail d'un fichier, licence, produits liés, variantes, vignette | `collection.fileDetails` (nouveau) | read | Non | 1 |
-| `view_files` | Montre au modèle jusqu'à 10 vignettes, ou une planche contact de 16, pour qu'il les regarde (5.6) | `previewImagesFor` (nouveau service), `analytics.trackView` | read | Non | 1 |
+| `view_files` | Montre au modèle jusqu'à 10 vignettes, ou une planche contact de 16, pour qu'il les regarde (5.6) | `damvia.previewImages` (point d'extension), `analytics.trackView` | read | Non | 1 |
 | `get_variants` | Les déclinaisons d'un visuel (format, langue, durée) | `variantGroup.findById` | read | Non | 1 |
 | `whats_new` | Ajouts récents, globalement ou sous une collection, avec filtres de type | `collection.lastAddedFiles`, `collection.search` (tri `newest`) | read | Non | 1 |
 
@@ -446,10 +483,10 @@ La recherche actuelle est lexicale : noms de fichiers, références, champs cher
 
 ### 12.2 Traçabilité
 
-- Session de méthode `mcp` avec le nom du client, visible par l'utilisateur et les admins.
-- Téléchargements : `licenseAcceptedVia` et `oauthClientId` à côté de `licenseAcceptedAt`.
+- Session de méthode `module` avec le nom du client, visible par l'utilisateur et les admins.
+- Téléchargements : `licenseAcceptedVia` et `licenseAcceptedClient` à côté de `licenseAcceptedAt`.
 - `activity_events.metadata` reçoit `channel: 'mcp'` et `clientId` ; les statistiques distinguent l'interface et les assistants.
-- Les mutations des admins et managers sont déjà auditées par `authMiddleware` ; l'entrée reçoit en plus `via: 'mcp'` et le client.
+- Les mutations des admins et managers sont déjà auditées par `authMiddleware` ; l'entrée reçoit en plus le canal `mcp` et le client.
 - Les modifications de fiches portent la source `assistant` dans `record_changes`.
 
 ### 12.3 Licences : validation dans la conversation (décision)
@@ -459,7 +496,7 @@ Regarder une vignette n'engage pas, comme dans l'interface web. Créer un télé
 1. **Premier appel.** `prepare_download` sans acceptation, sur une sélection qui contient des fichiers sous licence : rien n'est créé. Le résultat porte `status: "licence_acceptance_required"` ; pour chaque licence, son nom, ses usages (print, digital), ses régions, ses dates, le texte des conditions et le nombre de fichiers concernés ; un `acceptanceToken` valable 10 minutes, à usage unique, lié à l'utilisateur, à la sélection exacte, aux licences et à l'empreinte du texte des conditions ; et une consigne pour l'assistant : afficher les conditions telles quelles, demander un accord explicite, ne jamais accepter à la place de l'utilisateur, ne pas rappeler l'outil avant sa réponse.
 2. **Formulaire d'accord quand le client le gère.** Le serveur utilise alors l'élicitation MCP : le client affiche les conditions et une case « J'accepte » que la personne coche elle-même. C'est la preuve la plus forte.
 3. **Sinon, dans la conversation.** L'assistant pose la question ; après un oui explicite, il rappelle `prepare_download` avec le jeton et `userConfirmed: true`.
-4. **Vérification et création.** Damvia vérifie le jeton (même sélection, mêmes licences, même texte, ni expiré ni déjà utilisé), puis crée le téléchargement avec `licenseAcceptedAt` et `licenseIds` comme aujourd'hui, plus deux colonnes nouvelles : `licenseAcceptedVia` (`web` ou `mcp`) et `oauthClientId`. Chaque événement de téléchargement garde la licence et l'heure d'acceptation.
+4. **Vérification et création.** Damvia vérifie le jeton (même sélection, mêmes licences, même texte, ni expiré ni déjà utilisé), puis crée le téléchargement avec `licenseAcceptedAt` et `licenseIds` comme aujourd'hui, plus deux colonnes nouvelles : `licenseAcceptedVia` (`web` ou `mcp`) et `licenseAcceptedClient` (« Claude », « ChatGPT »). Chaque événement de téléchargement garde la licence et l'heure d'acceptation.
 5. **Lien dans la conversation.** L'assistant dépose le lien `API_URL/v1/downloads/{id}`. Un agent qui exécute du code peut récupérer le fichier : le lien marche sans session pendant sept jours et revérifie l'accès du propriétaire à chaque ouverture.
 
 Changer la sélection après l'accord invalide le jeton : on ne peut pas faire accepter une licence puis télécharger d'autres fichiers. Une sélection sans fichier sous licence se télécharge directement.
@@ -484,14 +521,15 @@ Changer la sélection après l'accord invalide le jeton : on ne peut pas faire a
 
 ## 13. Feuille de route
 
-Ordres de grandeur pour un développeur à temps plein connaissant le code, à affiner après la phase 0.
+Ordres de grandeur pour un développeur à temps plein connaissant le code, à affiner après la phase 0. Les phases 0a et 0b peuvent se chevaucher : le module se développe contre une branche du core qui porte les points d'extension.
 
 | Phase | Contenu | Critères d'acceptation | Durée |
 |---|---|---|---|
-| 0. Fondations | Vérification sur Claude et ChatGPT de ce que suppose la section 5.7 (images vues par le modèle, formulaire d'accord, confirmations) ; OAuth 2.1 (métadonnées, DCR et CIMD, consentement, jetons, révocation), tables `oauth_*`, session `mcp`, `/mcp` en Streamable HTTP, scopes, liste d'outils filtrée, `get_context`, réglages admin, applications connectées, exemptions du contrôle d'origine, documentation proxy, tests `server/test/mcp-oauth.cjs` | Connexion depuis Claude, ChatGPT et MCP Inspector ; une révocation dans Damvia coupe l'accès au prochain appel ; utilisateur suspendu refusé ; compte invité refusé ; double authentification respectée | 3 à 4 semaines |
-| 1. Trouver | Outils produits, références, fichiers, variantes, collections, nouveautés ; `view_files`, vignettes jointes aux résultats et planches contact ; ressources ; premiers prompts ; `catalogue.lookupKeys`, `collection.fileDetails`, `previewImagesFor` ; canal dans les statistiques | Tests de parité (admin, manager, membre d'une autre région, licence expirée, champ masqué, vignette d'un fichier inaccessible) ; jeu d'évaluation de 60 demandes réelles en français et en anglais avec au moins 85 % de bons outils et bons arguments ; p95 sous 1,5 s | 2 à 3 semaines |
-| 2. Agir | Collections (créer, ajouter, retirer, composer, renommer, déplacer, supprimer), partage, téléchargements, exports, droits d'usage, confirmation en deux temps, validation des licences dans la conversation avec jeton d'acceptation et formulaire quand le client le gère, colonnes `licenseAcceptedVia` et `oauthClientId` ; `collection.compose` et « Dupliquer et modifier » dans l'interface | Aucune écriture sans confirmation dans les tests ; composition idempotente ; aucun téléchargement sous licence sans jeton valide lié à la sélection exacte ; jeton refusé si la sélection a changé | 3 semaines |
-| 3. Administrer | Qualité catalogue, fichiers non rattachés, fiches avec différences, aperçu d'import, assistant de règles, demande non satisfaite, statistiques, validations, licences qui expirent, audit, brouillons ; libellés de vues, synonymes, descriptions de champs | Chaque écriture admin auditée avec `via: 'mcp'` ; historique `assistant` ; manager limité à sa région | 3 à 4 semaines |
+| 0a. Core : points d'extension | Dans le core open source : `routes`, `callAs`, `sessions`, `channel`, `previewImages`, `privacy`, `accountNav` (5.8), documentés dans `docs/contributing/modules.md` et testés dans `server/test/modules.cjs` et `client/test/ui/modules.spec.ts` ; exception de module ajoutée à la licence (5.9) | Le module d'exemple des tests utilise chaque point ; aucun nom propre à MCP dans le core ; collisions de routes refusées au démarrage | 1,5 à 2 semaines |
+| 0b. Module : fondations | Création du dépôt privé `damvia-mcp` ; vérification sur Claude et ChatGPT de ce que suppose la section 5.7 (images vues par le modèle, formulaire d'accord, confirmations) ; OAuth 2.1 (métadonnées, DCR et CIMD, consentement, jetons, révocation), tables `mcp_*`, sessions de méthode `module`, clé de licence, `/mcp` en Streamable HTTP, scopes, liste d'outils filtrée, `get_context`, réglages admin, applications connectées, exemptions du contrôle d'origine, documentation proxy, tests du module (OAuth) | Connexion depuis Claude, ChatGPT et MCP Inspector ; une révocation dans Damvia coupe l'accès au prochain appel ; utilisateur suspendu refusé ; compte invité refusé ; double authentification respectée | 3 à 4 semaines |
+| 1. Trouver | Outils produits, références, fichiers, variantes, collections, nouveautés ; `view_files`, vignettes jointes aux résultats et planches contact ; ressources ; premiers prompts ; `catalogue.lookupKeys` et `collection.fileDetails` (core) ; canal dans les statistiques (core) | Tests de parité (admin, manager, membre d'une autre région, licence expirée, champ masqué, vignette d'un fichier inaccessible) ; jeu d'évaluation de 60 demandes réelles en français et en anglais avec au moins 85 % de bons outils et bons arguments ; p95 sous 1,5 s | 2 à 3 semaines |
+| 2. Agir | Collections (créer, ajouter, retirer, composer, renommer, déplacer, supprimer), partage, téléchargements, exports, droits d'usage, confirmation en deux temps, validation des licences dans la conversation avec jeton d'acceptation et formulaire quand le client le gère, colonnes `licenseAcceptedVia` et `licenseAcceptedClient` (core) ; `collection.compose` et « Dupliquer et modifier » dans l'interface | Aucune écriture sans confirmation dans les tests ; composition idempotente ; aucun téléchargement sous licence sans jeton valide lié à la sélection exacte ; jeton refusé si la sélection a changé | 3 semaines |
+| 3. Administrer | Qualité catalogue, fichiers non rattachés, fiches avec différences, aperçu d'import, assistant de règles, demande non satisfaite, statistiques, validations, licences qui expirent, audit, brouillons ; libellés de vues, synonymes, descriptions de champs | Chaque écriture admin auditée avec le canal `mcp` ; historique `assistant` ; manager limité à sa région | 3 à 4 semaines |
 | 4. Interface riche et sémantique | MCP Apps, indexation sémantique optionnelle, similaires, doublons, images clés des vidéos, champ de licence « Assistants IA » | À définir après le pilote | 4 à 6 semaines |
 
 Les phases 0 et 1 apportent l'essentiel de la valeur (trouver) avec un risque faible, puisqu'elles ne font que lire. Lancer un **pilote** dès la fin de la phase 1 avec une équipe interne et deux ou trois distributeurs, et ajuster les descriptions d'outils à partir de leurs vraies demandes.
@@ -504,7 +542,7 @@ Les phases 0 et 1 apportent l'essentiel de la valeur (trouver) avec un risque fa
 - **Charge évitée** : e-mails de demande de visuels reçus par les commerciaux.
 - **Qualité** : score du jeu d'évaluation à chaque version, incidents (refus d'accès inattendus, plaintes).
 
-Jeu d'évaluation : `server/test/mcp-evals/`, une liste de demandes en langage naturel avec l'outil et les arguments attendus, rejouée contre deux assistants à chaque version. Les descriptions d'outils se corrigent à partir des échecs.
+Jeu d'évaluation : `test/evals/` dans le module, une liste de demandes en langage naturel avec l'outil et les arguments attendus, rejouée contre deux assistants à chaque version. Les descriptions d'outils se corrigent à partir des échecs.
 
 ## 15. Décisions
 
@@ -514,20 +552,33 @@ Jeu d'évaluation : `server/test/mcp-evals/`, une liste de demandes en langage n
 2. **Invités** : pas d'accès aux assistants. Le consentement refuse les comptes `guest`.
 3. **Vignettes** : envoyées aux assistants ; le modèle les regarde pour choisir les visuels (5.6).
 4. **Licences** : validées par l'utilisateur dans la conversation, le serveur imposant cette étape avant toute création de téléchargement, y compris pour un agent (12.3).
+5. **Édition** : module payant `damvia-mcp`, sous licence commerciale ; le core n'ouvre que des points d'extension génériques (5.1, 5.8, 5.9).
 
 ### Restant à prendre
 
-5. **Liens utilisables par d'autres outils** : garder les liens de téléchargement de sept jours partageables (proposé, ils revérifient l'accès) ou exiger une session.
-6. **Agents sans humain** (synchronisation nocturne d'une boutique de distributeur) : comptes de service et jetons à portée restreinte, dans une phase ultérieure.
-7. **Offre hébergée** : chaque instance a sa propre URL (`https://dam.client.com/mcp`), donc un connecteur personnalisé par client. Un annuaire central (domaine e-mail vers instance) permettrait une seule fiche « Damvia » dans les catalogues d'applications des assistants : plus tard.
-8. **Édition** : dans le core AGPL (proposé, cohérent avec le projet) ou en module payant.
+6. **Liens utilisables par d'autres outils** : garder les liens de téléchargement de sept jours partageables (proposé, ils revérifient l'accès) ou exiger une session.
+7. **Agents sans humain** (synchronisation nocturne d'une boutique de distributeur) : comptes de service et jetons à portée restreinte, dans une phase ultérieure.
+8. **Offre hébergée** : chaque instance a sa propre URL (`https://dam.client.com/mcp`), donc un connecteur personnalisé par client. Un annuaire central (domaine e-mail vers instance) permettrait une seule fiche « Damvia » dans les catalogues d'applications des assistants : plus tard.
 9. **ChatGPT et la vision** : si la vérification de la phase 0 montre que ChatGPT ne transmet pas au modèle les images renvoyées par les outils, avancer les légendes générées par Damvia (11.2, niveau 2) pour ChatGPT, ou accepter que la vision soit propre à Claude au début.
+10. **Ce qui reste gratuit** : les améliorations qui servent aussi l'interface web (recherche de références, composition de collection, détail d'un fichier, libellés de vues) vont dans le core open source (proposé), ou certaines sont réservées aux clients payants, ce qui demande alors de les livrer dans un module avec leurs écrans.
+11. **Prix et clé de licence** : par instance, par nombre d'utilisateurs connectés à un assistant, ou inclus dans l'offre hébergée ; durée et renouvellement de la clé.
 
 ## 16. Annexe : ce que le chantier touche
 
-- **Serveur** : `server/src/mcp/` (nouveau) ; `server/src/server.ts` (enregistrement des routes, exemptions du contrôle d'origine) ; `server/src/entity/` (`oauth-client.ts`, `oauth-authorization-code.ts`, `oauth-grant.ts`, `assistant-settings.ts`, `SessionMethod.MCP`, `user_sessions.oauth_grant_id`, `downloads.license_accepted_via`, `downloads.oauth_client_id`) ; `server/src/migrations/` ; `server/src/trpc/index.ts` (`mfaEnrolmentRequired`) ; `server/src/trpc/router/` (`catalogue.lookupKeys`, `collection.compose`, `collection.fileDetails`, extension de `download.create`, applications connectées, réglages, statistiques par canal) ; `server/src/services/` (`previewImagesFor` et planche contact avec sharp, `session.ts`, `privacy.ts`, `analytics.ts`).
-- **Client** : page de consentement, Compte > Applications connectées, Administration > Assistants IA, bouton « Dupliquer et modifier », libellés de vues.
-- **Dépendance** : `@modelcontextprotocol/sdk` (licence MIT, compatible AGPL), version épinglée. Aucune nouvelle infrastructure pour les phases 0 à 3.
-- **Variables** : `MCP_ENABLED` dans `server/.env.template` et `docs/reference/environment-variables.md`.
-- **Tests** : `server/test/mcp-oauth.cjs`, `server/test/mcp-access.cjs` (parité des droits, vignettes comprises), `server/test/mcp-tools.cjs`, `server/test/mcp-licence.cjs` (jeton d'acceptation : absent, expiré, réutilisé, sélection modifiée), ajout aux tests de sécurité de `npm run test:security`, `client/test/ui/` pour le consentement et les applications connectées.
-- **Documentation** (selon `docs/_internal/page-map.md`) : nouvelles pages `docs/integrations/ai-assistants.md` (administrateurs et utilisateurs) et `docs/contributing/mcp.md` (développeurs) ; mises à jour de `contributing/architecture.md`, `contributing/api.md`, `contributing/data-model.md`, `introduction/roles-and-access.md`, `administration/accounts-and-links.md`, `administration/analytics.md`, `configuration/privacy.md`, `deployment/reverse-proxy.md`, `reference/asvs-self-assessment.md`, `reference/environment-variables.md`, `deployment/upgrading.md` (migrations) ; nouvelle ligne dans `page-map.md`.
+### Core open source (dépôt `damvia`)
+
+- **Points d'extension** : `server/src/modules/` (`ModuleApi` : `routes`, `callAs`, `sessions`, `previewImages`, `privacy`) ; `server/src/server.ts` (montage des routes de modules, exemption `externalCallers` du contrôle d'origine, refus des collisions) ; `server/src/trpc/index.ts` (`channel` dans le contexte, méthode `module` dans `mfaEnrolmentRequired`) ; `server/src/entity/user-session.ts` (`SessionMethod.MODULE`, colonnes `module` et `label`) ; `server/src/services/privacy.ts` ; `client/src/modules.ts` et la page Compte (`accountNav`).
+- **Fonctionnalités utiles à l'interface** : `catalogue.lookupKeys`, `collection.compose` et « Dupliquer et modifier », `collection.fileDetails`, jeton d'acceptation de licence dans `download.create` (colonnes `downloads.license_accepted_via` et `downloads.license_accepted_client`), canal dans `activity_events.metadata` et l'audit, statistiques par canal, libellés de vues, synonymes de types de fichiers, description des champs.
+- **Migrations** dans `server/src/migrations/`, avec leur ligne dans `docs/deployment/upgrading.md`.
+- **Tests** : `server/test/modules.cjs` et `client/test/ui/modules.spec.ts` pour chaque point d'extension ; tests de `catalogue.lookupKeys`, `collection.compose` et du jeton de licence (absent, expiré, réutilisé, sélection modifiée).
+- **Licence** : exception de module au titre de la section 7 de l'AGPL, rédigée par un juriste ; accord de contribution (CLA) pour les contributions futures.
+- **Documentation** : `contributing/modules.md` (nouveaux points d'extension, exception de licence), `contributing/architecture.md`, `contributing/api.md`, `contributing/data-model.md`, `introduction/roles-and-access.md` (sessions de module), `administration/accounts-and-links.md`, `administration/downloads.md`, `administration/analytics.md`, `configuration/privacy.md`, `reference/asvs-self-assessment.md`, `deployment/upgrading.md` ; lignes correspondantes dans `page-map.md`.
+
+### Module payant (dépôt privé `damvia-mcp`)
+
+- **Serveur** : le serveur MCP, les outils, ressources et prompts, le serveur d'autorisation OAuth, les jetons de confirmation, les planches contact, la vérification de la clé de licence ; tables `mcp_oauth_clients`, `mcp_oauth_codes`, `mcp_grants`, `mcp_settings` et leurs migrations.
+- **Client** : page de consentement, Administration > Assistants IA, Compte > Applications connectées.
+- **Dépendance** : `@modelcontextprotocol/sdk` (licence MIT), version épinglée. Aucune nouvelle infrastructure pour les phases 0 à 3.
+- **Variables** : `DAMVIA_MODULES` (existante) et `DAMVIA_MCP_LICENSE_KEY`.
+- **Tests** : OAuth, parité des droits outil par outil (vignettes comprises), outils, validation des licences, jeu d'évaluation `test/evals/` rejoué sur Claude et ChatGPT ; exécutés contre chaque version supportée du core.
+- **Documentation** : installation, réglages, guide utilisateur (connecter Claude ou ChatGPT, exemples de demandes), configuration du proxy inverse pour `/mcp` et `/.well-known/*`, page de confidentialité propre au module.
