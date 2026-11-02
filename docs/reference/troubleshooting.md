@@ -3,7 +3,7 @@ title: Troubleshooting
 description: The failures a new instance meets first, what they mean, and the fix.
 sidebar:
   order: 6
-lastUpdated: 2026-09-29
+lastUpdated: 2026-11-02
 ---
 
 Symptoms are grouped by where you notice them. Server messages are quoted as they appear in the logs (Winston, plain text on stdout).
@@ -28,6 +28,7 @@ Symptoms are grouped by where you notice them. Server messages are quoted as the
 | Folders appear but files stay in status `creating` with no thumbnail | The worker is off, queue publication failed, startup raced database/queue initialisation, or processing jobs failed. | Run one process with `ENABLE_WORKER=true`. See [Worker and scaling](../deployment/worker-and-scaling.md). |
 | Files appear but have no preview | A system package is missing: `ffmpeg` (video), `ghostscript` (PDF, EPS, AI), `libreoffice` (office documents), `imagemagick`. | Install them; the `server/Dockerfile` does. Then mark the affected asset ids `outdated` and run the CLI with the worker active; see the [targeted refresh procedure](../deployment/integrity-check.md#targeted-refresh-of-a-stale-original-or-missing-preview). |
 | A changed source file still serves the old version | The provider checksum changed but its `asset/update-content` job failed or is still queued, or the provider did not expose a usable checksum change. | Check the file status and the `asset/update-content` jobs first. The daily [integrity check](../deployment/integrity-check.md) catches missing or size-mismatched originals, not every same-size content change. Use its targeted refresh procedure only after diagnosing the queue/source. |
+| A collection scheduled to publish is still a draft after its time | No process runs with `ENABLE_WORKER=true`, so `collection/publish-scheduled` never runs. | Start the worker. Every collection that is due is published within a minute. |
 | OneDrive: Graph reports an access/path error | `ONEDRIVE_DRIVE` does not point to an existing path, or the app registration lacks `Files.Read.All` application permission with admin consent. | See [OneDrive](../integrations/onedrive.md). |
 
 ## Users cannot get in

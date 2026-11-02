@@ -151,6 +151,7 @@ const table = useTable({
   },
 })
 
+const formatPublishAt = (date: Date | string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(date))
 </script>
 
 <template>
@@ -197,7 +198,7 @@ const table = useTable({
                 <Folder class="size-5 shrink-0 text-neutral-500" />
                 <div class="flex items-center gap-4 text-neutral-600 text-body">
                   {{ cell.row.original.name }}
-                  <div v-if="cell.row.original.draft" class="flex items-center gap-1 text-neutral-500 font-light">
+                  <div v-if="cell.row.original.draft" class="flex items-center gap-1 text-neutral-500 font-light" :title="cell.row.original.publishAt ? `Publishes on ${formatPublishAt(cell.row.original.publishAt)}` : undefined">
                     <EyeOff class="w-4 h-4" />
                     draft
                   </div>

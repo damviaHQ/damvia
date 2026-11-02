@@ -3,7 +3,7 @@ title: Collections and sharing
 description: Choose manual or synchronised collections, control access, and understand what source changes do to their contents.
 sidebar:
   order: 8
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
 A collection is the unit people browse and share. Public collections make up the common catalogue; private collections belong to one user. A collection can follow a source folder or be assembled from selected files.
@@ -80,6 +80,19 @@ Groups restrict the collection path. Licences restrict the individual file every
 
 Draft collections are visible only to admins and their owner. Admins are exempt from file-licence restrictions.
 
+## Publish a draft on a schedule
+
+An admin can have a draft catalogue collection publish itself at a chosen date and time, for a launch or an embargo. In the collection's **Settings**, with **Hide collection** ticked, tick **Publish on a schedule** and pick the date and time. The time is entered in your browser's time zone, shown next to the field. The collections list then shows a **publishes** badge with the date, and **Draft** labels elsewhere show it on hover.
+
+Within a minute of that time, the collection and everything inside it become visible, exactly as if you had unticked **Hide collection** then: the same group restrictions, licences and menu entries apply. A sub-collection with its own earlier time publishes on its own; one with a later time is published with its parent.
+
+- Pick a new time and save to change it; untick **Publish on a schedule** to cancel it. The collection stays a draft until you publish it.
+- Unticking **Hide collection** publishes now and drops the schedule, as does moving the collection under a collection that is already published.
+- The time must be in the future and within a year. Only public collections are drafts, so private collections have no schedule.
+- Publication needs a process running with `ENABLE_WORKER=true` (the `collection/publish-scheduled` job). If the worker is stopped when the time comes, the collection is published as soon as it is back.
+
+Scheduling, changing and cancelling are recorded in the [audit log](./audit-log.md), and the publication itself is recorded on behalf of the admin who scheduled it.
+
 ## Share a collection with a guest
 
 An owner or admin can invite an email address to a collection and choose an expiry date. **Send Invite** emails an access link. **Copy Link** creates the invitation without sending it and produces a link that begins the email-login flow.
@@ -92,7 +105,7 @@ Removing the invitation ends that access path. It does not remove access gained 
 
 ## Edit and delete safely
 
-An admin can edit any public collection; a private collection's owner can edit their own. Editing can change the name, description, draft state, thumbnail and allowed groups. Public collections cannot be converted to private collections or the reverse.
+An admin can edit any public collection; a private collection's owner can edit their own. Editing can change the name, description, draft state and its [scheduled publication](#publish-a-draft-on-a-schedule), thumbnail and allowed groups. Public collections cannot be converted to private collections or the reverse.
 
 On `/admin/collections`, those settings are the row's **Settings** action. The row also carries **Open**, which shows the collection as a reader sees it in a new tab, and **Page**, which opens its page editor directly — see [Menu and pages](./menu-and-pages.md#choose-a-standalone-or-collection-page). Leaving that editor returns to the collection, not to the dashboard.
 

@@ -51,6 +51,7 @@ function handleSelection(event: Event, collection: Collection) {
   }
   globalStore.addToSelection({ id: collection.id, type: "collection" })
 }
+const formatPublishAt = (date: Date | string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(date))
 </script>
 
 <template>
@@ -68,7 +69,7 @@ function handleSelection(event: Event, collection: Collection) {
         <CollectionPathTooltip :path="getPath?.(collection)">
           <router-link :to="generateRoute(collection)" class="min-w-0 flex-1 truncate text-sm text-neutral-600 hover:text-neutral-950" :title="getPath?.(collection) ? undefined : collection.name">{{ collection.name }}</router-link>
         </CollectionPathTooltip>
-        <span v-if="collection.draft" class="text-xs text-neutral-500">Draft</span>
+        <span v-if="collection.draft" class="text-xs text-neutral-500" :title="collection.publishAt ? `Publishes on ${formatPublishAt(collection.publishAt)}` : undefined">Draft</span>
         <div v-if="collection.canEdit" class="flex shrink-0 items-center group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100" :class="elementsOpen[collection.id] ? 'opacity-100' : 'opacity-0'">
           <CollectionDropdownActions :collection="collection" @update:open="elementsOpen[collection.id] = $event" />
         </div>

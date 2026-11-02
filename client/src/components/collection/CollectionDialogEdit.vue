@@ -53,6 +53,8 @@ const form = ref<{
   name?: string;
   description?: string;
   draft?: boolean;
+  publishLater: boolean;
+  publishAt: string;
   thumbnailFile?: File;
   thumbnailURL?: string | null;
   limitedToGroupIds?: string[];
@@ -64,6 +66,8 @@ const form = ref<{
   includesAllRecords: boolean;
   recordFilters: RecordFilter[];
 }>({
+  publishLater: false,
+  publishAt: "",
   actionBarCustom: false,
   actionBarRules: editableSettings(null),
   resetDescendantActionBars: false,
@@ -71,6 +75,17 @@ const form = ref<{
   includesAllRecords: false,
   recordFilters: [],
 })
+// A datetime-local value, in the admin's own time zone.
+function localInput(date: Date) {
+  const offset = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+}
+const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+const minimumPublishAt = computed(() => modelValue.value ? localInput(new Date(Date.now() + 60_000)) : "")
+const formatDate = (date: Date | string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(date))
+// Only an administrator publishes the catalogue, and only a draft waits for a time.
+const canSchedulePublish = computed(() => globalStore.user?.role === "admin" && collection.value.public)
+
 // Only the collection page asks for the rules; the admin list does not.
 const actionBar = computed(() => "actionBar" in collection.value ? collection.value.actionBar : null)
 function updateForm() {
@@ -78,6 +93,8 @@ function updateForm() {
     name: collection.value.name,
     description: collection.value.description,
     draft: collection.value.draft,
+    publishLater: !!collection.value.publishAt,
+    publishAt: collection.value.publishAt ? localInput(new Date(collection.value.publishAt)) : "",
     thumbnailURL: collection.value.thumbnailURL,
     limitedToGroupIds: collection.value.limitedToGroupIds,
     parentId: collection.value.parentId,
@@ -160,6 +177,16 @@ function productSettingsChanged() {
 }
 
 async function onSubmit() {
+  const schedule = canSchedulePublish.value && form.value.draft && form.value.publishLater
+  const previousPublishAt = props.collection.publishAt ? localInput(new Date(props.collection.publishAt)) : ""
+  if (schedule && !form.value.publishAt) {
+    toast.error("Pick the date and time to publish the collection.")
+    return
+  }
+  if (schedule && form.value.publishAt !== previousPublishAt && new Date(form.value.publishAt).getTime() <= Date.now()) {
+    toast.error("Pick a time in the future to publish the collection.")
+    return
+  }
   try {
     if (form.value.thumbnailURL && form.value.thumbnailFile) {
       const upload = await trpc.collection.presignedThumbnailUploadUrl.query({
@@ -191,6 +218,15 @@ async function onSubmit() {
       updateData.name = form.value.name
     }
     const collection = await trpc.collection.update.mutate(updateData)
+    // Saved as a draft: publish it later, at the new time, or not at all.
+    if (canSchedulePublish.value && form.value.draft) {
+      const wanted = form.value.publishLater ? form.value.publishAt : ""
+      if (wanted && wanted !== previousPublishAt) {
+        collection.publishAt = (await trpc.collection.schedulePublish.mutate({ id: props.collection.id, at: new Date(wanted) })).publishAt
+      } else if (!wanted && previousPublishAt) {
+        collection.publishAt = (await trpc.collection.unschedulePublish.mutate(props.collection.id)).publishAt
+      }
+    }
     if (productSettingsChanged()) {
       await trpc.collection.setRecordRules.mutate({
         id: props.collection.id,
@@ -256,6 +292,25 @@ async function onSubmit() {
             <Label for="collection-draft">Hide collection</Label>
             <FieldDescription id="collection-draft-help">Hide this collection and its assets from users.</FieldDescription>
           </div>
+        </div>
+        <div v-if="canSchedulePublish && form.draft" class="grid gap-3 pl-7">
+          <div class="flex items-start gap-3">
+            <Checkbox id="collection-publish-later" v-model="form.publishLater" class="mt-0.5" aria-describedby="collection-publish-later-help" />
+            <div class="grid gap-1">
+              <Label for="collection-publish-later">Publish on a schedule</Label>
+              <FieldDescription id="collection-publish-later-help">
+                At that time the collection and everything inside it become visible, as if you unticked Hide collection.
+              </FieldDescription>
+            </div>
+          </div>
+          <FieldGroup v-if="form.publishLater">
+            <Label for="collection-publish-at">Date and time <span class="font-normal text-neutral-500">{{ timeZone }}</span></Label>
+            <Input id="collection-publish-at" v-model="form.publishAt" type="datetime-local" :min="minimumPublishAt" aria-describedby="collection-publish-at-help" />
+            <FieldDescription id="collection-publish-at-help">
+              <template v-if="collection.publishAt">Currently scheduled for {{ formatDate(collection.publishAt) }}.</template>
+              Published within a minute of that time.
+            </FieldDescription>
+          </FieldGroup>
         </div>
         <FieldGroup v-if="collection.canEditLimitedToGroupIds" >
           <Label for="limitedToGroupIds">Limit access to groups</Label>

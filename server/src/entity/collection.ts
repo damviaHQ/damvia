@@ -74,6 +74,14 @@ export class Collection {
 	@Index()
 	draft: boolean
 
+	// When a draft publishes itself, with everything inside it. The database
+	// clears both columns once the collection is no longer a draft.
+	@Column({ type: 'timestamptz', nullable: true })
+	publishAt: Date | null
+
+	@Column({ type: 'uuid', nullable: true })
+	publishScheduledById: string | null
+
 	@Column({ type: 'varchar', nullable: true })
 	@Index()
 	assetFolderId: string | null

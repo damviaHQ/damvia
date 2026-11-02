@@ -3,7 +3,7 @@ title: Background jobs
 description: Every queue and cron the worker runs, what triggers it, and what it does.
 sidebar:
   order: 3
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
 Damvia runs its background work with [pg-boss](https://github.com/timgit/pg-boss), a job queue stored in the same Postgres database as the application. There is no Redis. Every API process connects pg-boss and can queue jobs; jobs are processed inside the API process when `ENABLE_WORKER=true`; see [Worker and scaling](../deployment/worker-and-scaling.md) for how to run it.
@@ -21,6 +21,7 @@ All core queues are declared in `server/src/worker.ts`. A [module](../contributi
 | `activity/prune-events` | `30 4 * * *` (daily at 04:30 UTC) | Deletes the `activity_events` rows older than `ANALYTICS_RETENTION_DAYS` (365 by default) and logs `activity.pruned` with the number removed. Does nothing when the variable is `0`. See [Insights](../administration/analytics.md). |
 | `auth/prune-sessions` | `45 4 * * *` (daily at 04:45 UTC) | Deletes sessions past their absolute expiry or idle for longer than `SESSION_IDLE_HOURS`, and single-use email sign-in links that expired more than a day ago. Expired sessions are already refused at every request; this only keeps the tables small. |
 | `audit/prune` | `15 5 * * *` (daily at 05:15 UTC) | Deletes [audit log](../administration/audit-log.md) entries older than `AUDIT_RETENTION_DAYS` (730 by default) and logs `audit.pruned` with the number removed. It is the only code allowed to delete entries: it sets `damvia.audit_prune` for its own transaction, which the table's trigger checks. Does nothing when the variable is `0`. |
+| `collection/publish-scheduled` | `* * * * *` (every minute) | Publishes every draft collection whose [scheduled publication](../administration/collections-and-sharing.md#publish-a-draft-on-a-schedule) time has come, with everything inside it, exactly as unticking **Hide collection** would: `draft` goes to `false` on the whole subtree and the synced menu entries are refreshed. Each collection is re-read under its row lock, so one published, moved or rescheduled meanwhile, or published by another worker, is skipped; ancestors go first, so a due child is published once, with its parent. Each publication is audited as `collection.access_changed` on behalf of the admin who scheduled it, and logged as `collection.published`. |
 | `newsletter/dispatch` | `* * * * *` (every minute), and pushed at once by **Send now** | Starts every [newsletter](../administration/newsletters.md) that is `scheduled` and due. Switching it to `sending` is the lock: a newsletter another worker already started is skipped. It copies everyone matching the audience at that moment into `newsletter_recipients`, then pushes one `newsletter/send` job per 50 recipients. A newsletter still `sending` that has sent nothing for 15 minutes, because its jobs were lost or the daily limit held it, has its waiting recipients queued again once the limit allows. |
 | `license/expiry-notice` | `0 6 * * *` (daily at 06:00 UTC) | Emails every active admin the `license-expiring` template listing the licences whose end date is exactly one of `LICENSE_EXPIRY_NOTICE_DAYS` away (30, 7 and 1 by default). Each licence is announced once per notice day; nothing is stored, so a day the job does not run is not caught up. |
 

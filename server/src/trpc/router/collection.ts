@@ -74,6 +74,8 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		name: collection.name,
 		public: collection.public,
 		draft: collection.draft,
+		// Only a draft has one, and only its editors are told.
+		publishAt: opts.user && collection.canEdit(opts.user) ? collection.publishAt : undefined,
 		description: collection.description,
 		numberOfFiles: collection.numberOfFiles,
 		numberOfRecords: collection.numberOfRecords,
@@ -640,6 +642,11 @@ export default router({
 			collection.name = input.name
 			collection.description = input.description ?? null
 			collection.draft = input.draft ?? collection.draft
+			// Published by hand: nothing is left to publish later.
+			if (!collection.draft) {
+				collection.publishAt = null
+				collection.publishScheduledById = null
+			}
 			collection.hasThumbnail = input.hasThumbnail ?? collection.hasThumbnail
 			if (!collection.public && !collection.ownerId) {
 				collection.ownerId = ctx.user.id
@@ -682,6 +689,57 @@ export default router({
 				...await formatCollection({ collection, user: ctx.user }),
 				...await formatActionBar(collection, ctx.user),
 			}
+		}),
+	// A draft of the catalogue publishes itself at the given time, with
+	// everything inside it, as unticking "Hide collection" would then. Taking
+	// the time again replaces it.
+	schedulePublish: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(z.object({ id: z.uuid(), at: z.coerce.date() }))
+		.mutation(async ({ input, ctx }) => {
+			const now = Date.now()
+			if (Number.isNaN(input.at.getTime()) || input.at.getTime() < now - 60_000 || input.at.getTime() > now + 366 * 24 * 3600 * 1000) {
+				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Choose a time in the future, within a year.' })
+			}
+			const collection = await dataSource.transaction(async (em) => {
+				const collection = await em.getRepository(Collection).findOne({ where: { id: input.id }, lock: { mode: 'pessimistic_write' } })
+				if (!collection) {
+					throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+				} else if (!collection.public) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'Only catalogue collections can be published on a schedule.' })
+				} else if (!collection.draft) {
+					throw new TRPCError({ code: 'BAD_REQUEST', message: 'This collection is already published.' })
+				}
+				const before = collection.publishAt
+				collection.publishAt = input.at
+				collection.publishScheduledById = ctx.user.id
+				await em.getRepository(Collection).update(collection.id, { publishAt: input.at, publishScheduledById: ctx.user.id })
+				await recordAudit(em, { actorId: ctx.user.id, action: 'collection.publish_scheduled', targetType: 'collection', targetId: collection.id,
+					before: { publishAt: before }, after: { publishAt: input.at }, req: ctx.req })
+				return collection
+			})
+			return formatCollection({ collection, user: ctx.user })
+		}),
+	// The draft stays a draft until it is published by hand or scheduled again.
+	unschedulePublish: publicProcedure
+		.use(authMiddleware(userAdmin))
+		.input(z.uuid())
+		.mutation(async ({ input, ctx }) => {
+			const collection = await dataSource.transaction(async (em) => {
+				const collection = await em.getRepository(Collection).findOne({ where: { id: input }, lock: { mode: 'pessimistic_write' } })
+				if (!collection) {
+					throw new TRPCError({ code: 'NOT_FOUND', message: 'Collection not found.' })
+				}
+				if (collection.publishAt) {
+					await em.getRepository(Collection).update(collection.id, { publishAt: null, publishScheduledById: null })
+					await recordAudit(em, { actorId: ctx.user.id, action: 'collection.publish_unscheduled', targetType: 'collection', targetId: collection.id,
+						before: { publishAt: collection.publishAt }, req: ctx.req })
+					collection.publishAt = null
+					collection.publishScheduledById = null
+				}
+				return collection
+			})
+			return formatCollection({ collection, user: ctx.user })
 		}),
 	// Whom an editor can name in the action bar settings. Owners are often
 	// members, who cannot list groups or users anywhere else.

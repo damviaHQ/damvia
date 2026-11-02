@@ -20,7 +20,7 @@ import { User } from "./entity/user"
 import {dataSource, logger} from "./env"
 import { processDeletion, updateFileContent } from "./services/asset"
 import { extractStoredFileMetadata } from "./services/file-metadata"
-import { synchronizeCollection } from "./services/collection"
+import { publishDueCollections, synchronizeCollection } from "./services/collection"
 import { pruneActivityEvents } from "./services/analytics"
 import { pruneExpiredSessions } from "./services/session"
 import { pruneAuditLog } from "./services/audit"
@@ -280,6 +280,13 @@ export const collectionSynchronizationQueue = createQueue<{ collectionId: string
 	name: 'collection/synchronization',
 	processor: (data) => dataSource.transaction((em) => synchronizeCollection(em, data.collectionId)),
 	workerOptions: { batchSize: 1 },
+})
+
+// Every minute: drafts whose scheduled publication time has come.
+export const collectionPublishScheduledQueue = createQueue<void>({
+	name: 'collection/publish-scheduled',
+	processor: () => publishDueCollections().then(() => undefined),
+	cron: '* * * * *',
 })
 
 export const downloadCreateArchiveQueue = createQueue<{ downloadId: string }>({

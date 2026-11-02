@@ -3,7 +3,7 @@ title: tRPC API
 description: How procedures are declared and authorised, what a request and an error look like on the wire, and every procedure of every router with its access predicate.
 sidebar:
   order: 4
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 ---
 
 This page lists the whole server API and the conventions a new procedure must follow. The request path through the process is in [Architecture](./architecture.md); the access rules as an administrator sees them are in [Roles and access](../introduction/roles-and-access.md).
@@ -174,7 +174,9 @@ Two restrictions separate this router from `record.list`, which is admin only. F
 | `addItems` | mutation | `userApproved` | Duplicates selected files or whole collections into a collection the caller can edit (`duplicateCollection`, `duplicateFiles`) |
 | `rename` | mutation | `userApproved` | Name only, refused on synchronized collections and when a sibling already has that name |
 | `move` | mutation | `userApproved` | Changes the parent, or takes the collection to the top level with `parentId: null`. Refused on a synchronized collection under a synchronized parent, into the collection's own subtree, across the public and private divide, and onto a name a sibling already has. The subtree follows, with `draft`, owner and group restriction re-derived from the new parent |
-| `update` | mutation | `userApproved` | Name, description, `public`, `draft`, `hasThumbnail`, `limitedToGroupIds`, `actionBar` (a rule per tool with `mode` `everyone`, `only`, `except` or `nobody` and `roles`, `groupIds`, `userIds`; null follows the parent, omitted keeps it); `resetDescendantActionBars` puts every sub-collection back on its parent's rules. The sibling-name rule applies to custom collections |
+| `update` | mutation | `userApproved` | Name, description, `public`, `draft`, `hasThumbnail`, `limitedToGroupIds`, `actionBar` (a rule per tool with `mode` `everyone`, `only`, `except` or `nobody` and `roles`, `groupIds`, `userIds`; null follows the parent, omitted keeps it); `resetDescendantActionBars` puts every sub-collection back on its parent's rules. The sibling-name rule applies to custom collections. Saving `draft: false` publishes now and drops any scheduled publication of the subtree. Every formatted collection carries `publishAt`, the scheduled publication time or null, for its editors only |
+| `schedulePublish` | mutation | `userAdmin` | `{ id, at }`: the draft catalogue collection publishes itself, with its subtree, at `at` (the `collection/publish-scheduled` job). Calling it again replaces the time. `BAD_REQUEST` for a private collection, a collection that is not a draft, or a time in the past or more than a year ahead. Audited as `collection.publish_scheduled` |
+| `unschedulePublish` | mutation | `userAdmin` | Removes the time; the collection stays a draft. Audited as `collection.publish_unscheduled` when there was one |
 | `actionBarAudience` | query | `userApproved` | Groups and approved users (`id`, `name`, `email`; a non-admin's own region only) an editor of the collection can name in its action bar rules; `FORBIDDEN` for anyone who cannot edit it |
 | `presignedThumbnailUploadUrl` | query | `userApproved` | Presigned PUT for `collections/{id}-thumbnail` |
 | `removeFiles` | mutation | `userApproved` | Removes collection files |

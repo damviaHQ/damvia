@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { useGlobalToast } from "@/composables/useGlobalToast"
 import { RouterOutput, trpc } from "@/services/server.ts"
 import { useQuery, useQueryClient } from "@tanstack/vue-query"
-import { ChevronDown, ChevronRight, CirclePlus, ExternalLink, EyeOff, FilePenLine, Folder, Image, Settings, Trash2, Unlink } from "@lucide/vue"
+import { CalendarClock, ChevronDown, ChevronRight, CirclePlus, ExternalLink, EyeOff, FilePenLine, Folder, Image, Settings, Trash2, Unlink } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 
 const { status, data: collections, error } = useQuery({
@@ -153,6 +153,7 @@ async function confirmDeleteCollection() {
     collectionToDelete.value = null
   }
 }
+const formatPublishAt = (date: Date | string) => new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(date))
 </script>
 
 <template>
@@ -198,6 +199,10 @@ async function confirmDeleteCollection() {
           <Badge v-if="item.draft" variant="outline" class="flex items-center gap-1">
             <EyeOff class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
             draft
+          </Badge>
+          <Badge v-if="item.draft && item.publishAt" variant="outline" class="flex items-center gap-1" :title="`Published automatically on ${formatPublishAt(item.publishAt)}`">
+            <CalendarClock class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />
+            publishes {{ formatPublishAt(item.publishAt) }}
           </Badge>
           <Badge v-if="item.thumbnailURL" variant="outline" class="flex items-center gap-1">
             <Image class="h-[var(--dv-icon-compact)] w-[var(--dv-icon-compact)]" />

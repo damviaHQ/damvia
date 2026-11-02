@@ -21,6 +21,7 @@ import { User, UserRole } from "../entity/user"
 import { dataSource, logger, mainS3, mainS3Bucket } from "../env"
 import { collectionSynchronizationQueue } from "../worker"
 
+import { recordAudit } from "./audit"
 import { removePageObjects } from "./page-storage"
 import { visibleRecordsCondition } from "./product-collections"
 
@@ -398,9 +399,47 @@ export async function moveCollection(em: EntityManager, collection: Collection, 
 		await inheritGroupsInSubtree(em, collection.path, parent)
 		collection.draft = parent.draft
 		collection.ownerId = parent.ownerId
+		if (!collection.draft) {
+			collection.publishAt = null
+			collection.publishScheduledById = null
+		}
 	}
 	await moveCollectionMenuItems(em, collection, oldParentId, parent?.id ?? null)
 	await recomputeCollectionRollups(em, [...new Set([...pathIds(oldPath), ...pathIds(collection.path)])])
+}
+
+// Publishes every draft whose time has come, with everything inside it, as
+// unticking "Hide collection" does. Each one is re-read under its row lock,
+// so a collection published, moved or rescheduled meanwhile, or handled by
+// another worker, is left alone. Ancestors go first: publishing one also
+// publishes its due descendants, which are then skipped.
+export async function publishDueCollections(): Promise<number> {
+	const due: { id: string }[] = await dataSource.query(`
+		SELECT id FROM collections WHERE publish_at <= now() AND draft IS TRUE ORDER BY length(mpath), publish_at
+	`)
+	let published = 0
+	for (const { id } of due) {
+		const done = await dataSource.transaction(async (em) => {
+			const [row] = await em.query(`
+				SELECT mpath, publish_at AS "publishAt", publish_scheduled_by_id AS "scheduledById", owner_id AS "ownerId", limited_to_group_ids AS "limitedToGroupIds"
+				FROM collections WHERE id = $1 AND draft IS TRUE AND publish_at <= now() FOR UPDATE
+			`, [id])
+			if (!row) return false
+			// The trigger clears the schedule of every row that stops being a draft.
+			await em.query(`UPDATE collections SET draft = false WHERE mpath LIKE $1 || '%' AND draft IS TRUE`, [row.mpath])
+			const collection = await em.getRepository(Collection).findOneByOrFail({ id })
+			await syncCollectionMenuItems(em, collection, true)
+			const access = { ownerId: row.ownerId, limitedToGroupIds: row.limitedToGroupIds }
+			await recordAudit(em, {
+				actorId: row.scheduledById, action: 'collection.access_changed', targetType: 'collection', targetId: id,
+				before: { draft: true, ...access }, after: { draft: false, ...access, scheduledFor: row.publishAt },
+			})
+			logger.info('collection.published', { collectionId: id, scheduledFor: row.publishAt })
+			return true
+		})
+		if (done) published++
+	}
+	return published
 }
 
 export type MoveSynchronizedCollectionsOptions = {

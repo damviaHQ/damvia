@@ -3,7 +3,7 @@ title: Audit log
 description: The append-only record of administrative changes, sign-ins, refusals and access to downloads, and how to filter, export and retain it.
 sidebar:
   order: 17
-lastUpdated: 2026-09-29
+lastUpdated: 2026-11-02
 ---
 
 Damvia records who changed what, every sign-in and failed sign-in, and every refused request in the `audit_log` table. Admins read it under **User Management > Audit log** (`/admin/audit-log`). Managers have no access.
@@ -45,7 +45,8 @@ An entry is written in the same transaction as the change it describes where the
 | `password.reset`, `password.reset_sent`, `user.verification_resent` | A password reset completed; a reset or verification email sent by an admin or manager. |
 | `user.email_verified` | An admin or manager marked a user's email address as verified without the confirmation link. |
 | `access_review.exported`, `audit.exported` | Someone exported the access review or the audit log. |
-| `collection.access_changed` | A collection's draft state, owner or group restrictions changed, with before and after. |
+| `collection.access_changed` | A collection's draft state, owner or group restrictions changed, with before and after. A scheduled publication is recorded the same way when it runs, on behalf of the admin who scheduled it, with `scheduledFor` in `after`. |
+| `collection.publish_scheduled`, `collection.publish_unscheduled` | An admin set or changed the time a draft collection publishes itself, with the previous and new time; or removed it. |
 | `invitation.created`, `invitation.removed` | A guest invitation was sent or withdrawn. |
 | `license.accepted` | A user accepted the usage terms before a download, with the licences. |
 | `download.link_opened` | A download link was followed and redirected to the file. |
