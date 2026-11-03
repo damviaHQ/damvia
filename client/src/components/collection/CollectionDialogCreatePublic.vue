@@ -30,6 +30,9 @@ import { RouterOutput, trpc } from "@/services/server.ts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query"
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
+import CollectionPublishSchedule from "@/components/collection/CollectionPublishSchedule.vue"
+import { publishTimeProblem } from "@/utils/publishSchedule"
+import { useGlobalStore } from "@/stores/globalStore"
 import {Loader2Icon} from "@lucide/vue";
 import {Checkbox} from "@/components/ui/checkbox";
 
@@ -41,10 +44,14 @@ const emit = defineEmits<{
 const toast = useGlobalToast()
 const queryClient = useQueryClient()
 
-const form = ref<{ name: string; collectionId?: string; draft: boolean }>({
+const globalStore = useGlobalStore()
+const form = ref<{ name: string; collectionId?: string; draft: boolean; publishLater: boolean; publishAt: string }>({
   name: '',
   draft: false,
+  publishLater: false,
+  publishAt: '',
 })
+const schedulesPublish = computed(() => globalStore.user?.role === "admin" && form.value.draft && !form.value.collectionId && form.value.publishLater)
 
 const { isPending, mutate } = useMutation({
   mutationFn() {
@@ -53,6 +60,7 @@ const { isPending, mutate } = useMutation({
       parentId: form.value.collectionId,
       public: true,
       draft: form.value.collectionId ? undefined : form.value.draft ?? false,
+      publishAt: schedulesPublish.value ? new Date(form.value.publishAt) : undefined,
     })
   },
   async onSuccess(collection) {
@@ -79,7 +87,7 @@ const { data: collections } = useQuery({
 watch(
   () => props.modelValue,
   () => {
-    form.value = { name: '', draft: false }
+    form.value = { name: '', draft: false, publishLater: false, publishAt: '' }
   }
 )
 
@@ -103,6 +111,12 @@ const collectionOptions = computed(() => {
 async function onSubmit() {
   if (!form.value.name || form.value.name.trim() === '') {
     toast.error("Collection name is required")
+    return
+  }
+  // Only a top-level draft is sent as one; a child follows its parent.
+  const problem = schedulesPublish.value ? publishTimeProblem(form.value.publishAt) : null
+  if (problem) {
+    toast.error(problem)
     return
   }
 
@@ -141,9 +155,13 @@ function handleKeyDown(event: KeyboardEvent) {
             <Treeselect v-model="form.collectionId" input-id="parent-collection" placeholder="Parent collection"
               :options="collectionOptions" :clearable="true" :flat="true" />
           </FieldGroup>
-          <div class="flex items-center gap-2">
-            <Checkbox v-model="form.draft" id="draft" />
-            <Label for="draft">Draft</Label>
+          <div>
+            <div class="flex items-center gap-2">
+              <Checkbox v-model="form.draft" id="draft" />
+              <Label for="draft">Draft</Label>
+            </div>
+            <CollectionPublishSchedule v-if="globalStore.user?.role === 'admin' && form.draft && !form.collectionId" id="create-public-collection" class="mt-3"
+              v-model:enabled="form.publishLater" v-model:at="form.publishAt" />
           </div>
         </div>
 

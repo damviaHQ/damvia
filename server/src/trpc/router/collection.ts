@@ -13,7 +13,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 import { TRPCError } from "@trpc/server"
-import { Brackets, ILike, In, IsNull, Not } from "typeorm"
+import type { FastifyRequest } from "fastify"
+import { Brackets, EntityManager, ILike, In, IsNull, Not } from "typeorm"
 import { z } from "zod"
 import { relatedRecordsSettings } from "../../services/catalogue"
 import { AssetFolder } from "../../entity/asset-folder"
@@ -122,6 +123,32 @@ export async function formatCollection({ collection, ...opts }: FormatCollection
 		orphanedReason: collection.orphanedReason,
 		orphanedFromName: collection.orphanedFromName,
 	}
+}
+
+// A publication time is in the future and within a year.
+function assertPublishTime(at: Date) {
+	const now = Date.now()
+	if (Number.isNaN(at.getTime()) || at.getTime() < now - 60_000 || at.getTime() > now + 366 * 24 * 3600 * 1000) {
+		throw new TRPCError({ code: 'BAD_REQUEST', message: 'Choose a time in the future, within a year.' })
+	}
+}
+
+// A new collection born as a draft of the catalogue may carry its publication
+// time; anything else would never wait to be published.
+function schedulePublishOnCreate(collection: Collection, user: User, at: Date | undefined) {
+	if (!at) return null
+	assertPublishTime(at)
+	if (user.role !== UserRole.ADMIN || !collection.public || !collection.draft) {
+		throw new TRPCError({ code: 'BAD_REQUEST', message: 'Only a draft of the catalogue can be published on a schedule.' })
+	}
+	collection.publishAt = at
+	collection.publishScheduledById = user.id
+	return at
+}
+
+async function auditPublishScheduled(em: EntityManager, ctx: { user: User, req: FastifyRequest }, collectionId: string, at: Date, before: Date | null = null) {
+	await recordAudit(em, { actorId: ctx.user.id, action: 'collection.publish_scheduled', targetType: 'collection', targetId: collectionId,
+		before: { publishAt: before }, after: { publishAt: at }, req: ctx.req })
 }
 
 const thumbnailStagingKey = (collectionId: string, uploadId: string) => `collections/staging/${collectionId}/${uploadId}`
@@ -473,6 +500,7 @@ export default router({
 				draft: z.boolean().optional(),
 				parentId: z.uuid().optional(),
 				catalogueMode: z.enum(CATALOGUE_MODES).optional(),
+				publishAt: z.coerce.date().optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
@@ -492,6 +520,7 @@ export default router({
 				collection.draft = false
 			}
 			collection.owner = collection.public ? null : ctx.user
+			const publishAt = schedulePublishOnCreate(collection, ctx.user, input.publishAt)
 			await assertNameFree(collection.parent?.id, collection.name)
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
@@ -499,6 +528,7 @@ export default router({
 				if (collection.catalogueMode !== 'files') {
 					await createCataloguePage(em, collection)
 				}
+				if (publishAt) await auditPublishScheduled(em, ctx, collection.id, publishAt)
 			})
 			return formatCollection({ collection, user: ctx.user })
 		}),
@@ -511,6 +541,7 @@ export default router({
 				public: z.boolean().optional(),
 				draft: z.boolean().optional(),
 				parentId: z.uuid().optional(),
+				publishAt: z.coerce.date().optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
@@ -534,8 +565,10 @@ export default router({
 			collection.public = collection.parent?.public ?? input.public ?? false
 			collection.draft = collection.parent?.draft ?? input.draft ?? false
 			collection.owner = collection.public ? null : ctx.user
+			const publishAt = schedulePublishOnCreate(collection, ctx.user, input.publishAt)
 			await dataSource.transaction(async (em) => {
 				await em.getRepository(Collection).save(collection)
+				if (publishAt) await auditPublishScheduled(em, ctx, collection.id, publishAt)
 				await collectionSynchronizationQueue.push({ collectionId: collection.id })
 			})
 			return formatCollection({ collection, user: ctx.user })
@@ -697,10 +730,7 @@ export default router({
 		.use(authMiddleware(userAdmin))
 		.input(z.object({ id: z.uuid(), at: z.coerce.date() }))
 		.mutation(async ({ input, ctx }) => {
-			const now = Date.now()
-			if (Number.isNaN(input.at.getTime()) || input.at.getTime() < now - 60_000 || input.at.getTime() > now + 366 * 24 * 3600 * 1000) {
-				throw new TRPCError({ code: 'BAD_REQUEST', message: 'Choose a time in the future, within a year.' })
-			}
+			assertPublishTime(input.at)
 			const collection = await dataSource.transaction(async (em) => {
 				const collection = await em.getRepository(Collection).findOne({ where: { id: input.id }, lock: { mode: 'pessimistic_write' } })
 				if (!collection) {
@@ -714,8 +744,7 @@ export default router({
 				collection.publishAt = input.at
 				collection.publishScheduledById = ctx.user.id
 				await em.getRepository(Collection).update(collection.id, { publishAt: input.at, publishScheduledById: ctx.user.id })
-				await recordAudit(em, { actorId: ctx.user.id, action: 'collection.publish_scheduled', targetType: 'collection', targetId: collection.id,
-					before: { publishAt: before }, after: { publishAt: input.at }, req: ctx.req })
+				await auditPublishScheduled(em, ctx, collection.id, input.at, before)
 				return collection
 			})
 			return formatCollection({ collection, user: ctx.user })

@@ -33,6 +33,8 @@ import { useQuery, useQueryClient } from "@tanstack/vue-query"
 import { Check, FolderPen, FolderSync } from "@lucide/vue"
 import { computed, ref, watch } from "vue"
 import Treeselect from "vue3-treeselect-ts"
+import CollectionPublishSchedule from "@/components/collection/CollectionPublishSchedule.vue"
+import { publishTimeProblem } from "@/utils/publishSchedule"
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -49,7 +51,9 @@ const form = ref<{
   synchronized?: boolean
   assetFolderId?: string
   draft?: boolean
-}>({})
+  publishLater: boolean
+  publishAt: string
+}>({ publishLater: false, publishAt: "" })
 const { data: collections } = useQuery({
   queryKey: ["collection", "tree"],
   queryFn: () => trpc.collection.tree.query(),
@@ -67,7 +71,7 @@ const { data: assetFolders } = useQuery({
 watch(
   () => props.modelValue,
   () => {
-    form.value = {}
+    form.value = { publishLater: false, publishAt: "" }
     kind.value = "custom"
   }
 )
@@ -96,7 +100,16 @@ const collectionOptions = computed(() => {
   return formatCollectionArray(collections.value) ?? []
 })
 
+const schedulesPublish = computed(() => globalStore.user?.role === "admin" && !!form.value.draft && !form.value.collectionId && form.value.publishLater)
+
 async function onSubmit() {
+  // Only a top-level draft is sent as one; a child follows its parent.
+  const publishAt = schedulesPublish.value ? form.value.publishAt : ""
+  const problem = schedulesPublish.value ? publishTimeProblem(publishAt) : null
+  if (problem) {
+    toast.error(problem)
+    return
+  }
   try {
     const collection = await (form.value.assetFolderId
       ? trpc.collection.createFromAsset.mutate({
@@ -104,12 +117,14 @@ async function onSubmit() {
         parentId: form.value.collectionId,
         public: true,
         draft: form.value.collectionId ? undefined : form.value.draft ?? false,
+        publishAt: publishAt ? new Date(publishAt) : undefined,
       })
       : trpc.collection.create.mutate({
         name: form.value.name!,
         parentId: form.value.collectionId,
         public: true,
         draft: form.value.collectionId ? undefined : form.value.draft ?? false,
+        publishAt: publishAt ? new Date(publishAt) : undefined,
       }))
 
     queryClient.invalidateQueries({ queryKey: ['collection'] })
@@ -176,6 +191,8 @@ async function onSubmit() {
               <Checkbox v-model="form.draft" id="draft" />
               <Label for="draft">Draft</Label>
             </div>
+            <CollectionPublishSchedule v-if="globalStore.user?.role === 'admin' && form.draft && !form.collectionId" id="create-collection" class="mt-3"
+              v-model:enabled="form.publishLater" v-model:at="form.publishAt" />
           </div>
         </div>
 

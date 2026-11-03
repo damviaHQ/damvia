@@ -82,7 +82,7 @@ Draft collections are visible only to admins and their owner. Admins are exempt 
 
 ## Publish a draft on a schedule
 
-An admin can have a draft catalogue collection publish itself at a chosen date and time, for a launch or an embargo. In the collection's **Settings**, with **Hide collection** ticked, tick **Publish on a schedule** and pick the date and time. The time is entered in your browser's time zone, shown next to the field. The collections list then shows a **publishes** badge with the date, and **Draft** labels elsewhere show it on hover.
+An admin can have a draft catalogue collection publish itself at a chosen date and time, for a launch or an embargo. When creating a top-level collection, tick **Draft**, then **Publish on a schedule**, and pick the date and time. For an existing collection, open its **Settings**, keep **Hide collection** ticked, tick **Publish on a schedule** and pick the date and time. A collection created inside another one follows its parent's draft state, so its own time is set from its **Settings** once it exists. The time is entered in your browser's time zone, shown next to the field. The collections list then shows a **publishes** badge with the date, and **Draft** labels elsewhere show it on hover.
 
 Within a minute of that time, the collection and everything inside it become visible, exactly as if you had unticked **Hide collection** then: the same group restrictions, licences and menu entries apply. A sub-collection with its own earlier time publishes on its own; one with a later time is published with its parent.
 

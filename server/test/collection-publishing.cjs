@@ -18,7 +18,7 @@ const { test, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
 const harness = require('./lib/helpers.cjs')
-const { db, state, caller, makeUser, makeCollection, forbidden, collectionRow: row } = harness
+const { db, state, caller, makeCollection, makeFolder, forbidden, collectionRow: row } = harness
 const { userCollectionsQuery } = harness.services.collections
 let admin, member, manager, guest
 before(async () => ({ admin, member, manager, guest } = await harness.setup()))
@@ -164,4 +164,48 @@ test('only editors are told when a collection publishes', async () => {
     assert.ok((await formatCollection({ collection: full, user: admin })).publishAt)
     assert.equal((await formatCollection({ collection: full, user: member })).publishAt, undefined)
     assert.equal((await formatCollection({ collection: full })).publishAt, undefined)
+})
+
+test('a draft created with a time is scheduled with it, and publishes when due', async () => {
+    const at = inAnHour()
+    const created = await caller(admin).collection.create({ name: randomUUID(), public: true, draft: true, publishAt: at })
+    assert.equal(new Date(created.publishAt).getTime(), at.getTime())
+    const saved = await row(created.id)
+    assert.equal(saved.publishAt.getTime(), at.getTime())
+    assert.equal(saved.publishScheduledById, admin.id)
+    assert.deepEqual((await auditOf(created.id)).map(entry => entry.action), ['collection.publish_scheduled'])
+
+    await makeDue(created.id)
+    await runPublishing()
+    assert.equal((await row(created.id)).draft, false)
+    assert.equal(await visibleTo(member, created.id), true)
+
+    // Under a draft parent the new collection is a draft too, so it may wait.
+    const { parent } = await draftTree()
+    const child = await caller(admin).collection.create({ name: randomUUID(), parentId: parent.id, publishAt: at })
+    assert.equal((await row(child.id)).publishAt.getTime(), at.getTime())
+
+    // A synchronized folder linked as a draft takes its time the same way.
+    const folder = await makeFolder()
+    const linked = await caller(admin).collection.createFromAsset({ assetFolderId: folder.id, public: true, draft: true, publishAt: at })
+    assert.equal((await row(linked.id)).publishAt.getTime(), at.getTime())
+    assert.deepEqual((await auditOf(linked.id)).map(entry => entry.action), ['collection.publish_scheduled'])
+})
+
+test('a time on a collection that would not be a draft is refused, and nothing is created', async () => {
+    const count = async name => (await db.query('SELECT count(*)::int AS n FROM collections WHERE name = $1', [name]))[0].n
+    const attempts = [
+        [admin, { public: true, draft: false, publishAt: inAnHour() }, /draft of the catalogue/],
+        [admin, { public: true, parentId: (await makeCollection()).id, publishAt: inAnHour() }, /draft of the catalogue/],
+        [admin, { public: true, draft: true, publishAt: new Date(Date.now() - 3600_000) }, /future/],
+        [member, { public: true, draft: true, publishAt: inAnHour() }, /draft of the catalogue/],
+    ]
+    for (const [user, values, message] of attempts) {
+        const name = randomUUID()
+        await assert.rejects(caller(user).collection.create({ name, ...values }), message)
+        assert.equal(await count(name), 0)
+    }
+    const folder = await makeFolder()
+    await assert.rejects(caller(admin).collection.createFromAsset({ assetFolderId: folder.id, public: true, draft: false, publishAt: inAnHour() }), /draft of the catalogue/)
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM collections WHERE asset_folder_id = $1', [folder.id]))[0].n, 0)
 })
